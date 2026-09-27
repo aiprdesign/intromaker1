@@ -46,7 +46,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["particle-assemble", "glitch-reveal"],
       body: ["hud-scan", "glitch-reveal", "kinetic-slam", "split-wipe", "orbit-rings"],
       outro: ["cinematic-title", "neon-draw"],
-      transitions: ["glitch", "flash", "zoom"],
+      transitions: ["glitch", "whip", "flash", "dolly"],
     },
   },
   {
@@ -59,7 +59,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["particle-assemble", "orbit-rings"],
       body: ["liquid-gradient", "hud-scan", "orbit-rings", "type-cascade", "kinetic-slam"],
       outro: ["cinematic-title", "particle-assemble"],
-      transitions: ["zoom", "flash", "wipe"],
+      transitions: ["dolly", "leak", "whip", "zoom"],
     },
   },
   {
@@ -72,7 +72,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["shockwave", "kinetic-slam"],
       body: ["kinetic-slam", "split-wipe", "shockwave", "glitch-reveal"],
       outro: ["cinematic-title", "kinetic-slam"],
-      transitions: ["flash", "zoom", "glitch"],
+      transitions: ["whip", "flash", "dolly", "shutter"],
     },
   },
   {
@@ -85,7 +85,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["particle-assemble", "shockwave"],
       body: ["orbit-rings", "cinematic-title", "hud-scan", "liquid-gradient"],
       outro: ["cinematic-title"],
-      transitions: ["zoom", "flash"],
+      transitions: ["dolly", "leak", "zoom"],
     },
   },
   {
@@ -98,7 +98,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["particle-assemble", "cinematic-title"],
       body: ["liquid-gradient", "type-cascade", "cinematic-title", "orbit-rings"],
       outro: ["cinematic-title"],
-      transitions: ["zoom", "flash", "cut"],
+      transitions: ["leak", "shutter", "dolly"],
     },
   },
   {
@@ -111,7 +111,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["retro-grid", "neon-draw"],
       body: ["neon-draw", "kinetic-slam", "split-wipe", "shape-burst"],
       outro: ["retro-grid"],
-      transitions: ["glitch", "wipe", "flash"],
+      transitions: ["glitch", "wipe", "leak", "whip"],
     },
   },
   {
@@ -124,7 +124,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["neon-draw", "shockwave"],
       body: ["kinetic-slam", "neon-draw", "split-wipe", "glitch-reveal", "shape-burst"],
       outro: ["neon-draw", "retro-grid"],
-      transitions: ["flash", "glitch", "zoom"],
+      transitions: ["flash", "whip", "glitch", "leak"],
     },
   },
   {
@@ -137,7 +137,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["shockwave", "glitch-reveal"],
       body: ["kinetic-slam", "hud-scan", "split-wipe", "glitch-reveal"],
       outro: ["shockwave", "cinematic-title"],
-      transitions: ["glitch", "flash", "zoom"],
+      transitions: ["glitch", "whip", "flash", "dolly"],
     },
   },
   {
@@ -150,7 +150,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["particle-assemble", "liquid-gradient"],
       body: ["liquid-gradient", "type-cascade", "orbit-rings"],
       outro: ["cinematic-title", "liquid-gradient"],
-      transitions: ["zoom", "cut", "wipe"],
+      transitions: ["leak", "dolly", "zoom"],
     },
   },
   {
@@ -163,7 +163,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["shape-burst", "type-cascade"],
       body: ["type-cascade", "split-wipe", "shape-burst", "kinetic-slam"],
       outro: ["shape-burst", "type-cascade"],
-      transitions: ["wipe", "zoom", "flash"],
+      transitions: ["wipe", "whip", "zoom"],
     },
   },
   {
@@ -176,7 +176,7 @@ const MOODS: { keys: RegExp; mood: Mood }[] = [
       title: ["cinematic-title", "type-cascade"],
       body: ["split-wipe", "type-cascade", "hud-scan", "kinetic-slam"],
       outro: ["cinematic-title"],
-      transitions: ["wipe", "cut", "zoom"],
+      transitions: ["shutter", "wipe", "whip"],
     },
   },
 ];
@@ -189,7 +189,7 @@ const DEFAULT_MOOD: Mood = {
   title: ["particle-assemble", "shockwave"],
   body: ["kinetic-slam", "glitch-reveal", "split-wipe", "liquid-gradient", "type-cascade", "hud-scan"],
   outro: ["cinematic-title"],
-  transitions: ["flash", "zoom", "glitch", "wipe"],
+  transitions: ["flash", "whip", "dolly", "leak", "glitch"],
 };
 
 /** Words that never carry meaning in a prompt. */
@@ -341,11 +341,11 @@ export function planFromPrompt(req: PlanRequest): VideoPlan {
     text: title,
     subtext: year ? `${pick(OUTRO_SUBS)} · ${year}` : pick(OUTRO_SUBS),
     duration: outroLen,
-    transition: "zoom",
+    transition: pick(["leak", "dolly", "shutter"] as const),
   });
 
   const palette = req.palette && req.palette !== "auto" ? req.palette : mood.palette;
-  return sanitizePlan({
+  return beatSync(sanitizePlan({
     title: title,
     palette,
     font: mood.font,
@@ -353,7 +353,16 @@ export function planFromPrompt(req: PlanRequest): VideoPlan {
     bpm: mood.bpm,
     seed,
     scenes,
-  });
+  }));
+}
+
+/** Snap scene lengths to whole beats so every cut lands on a kick drum. */
+export function beatSync(plan: VideoPlan): VideoPlan {
+  const beat = 60 / plan.bpm;
+  return {
+    ...plan,
+    scenes: plan.scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round(s.duration / beat)) * beat })),
+  };
 }
 
 /** Clamp and repair a plan from any source (AI, URL, user edits). */

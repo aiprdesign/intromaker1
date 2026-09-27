@@ -32,7 +32,7 @@ export const PALETTE_IDS = [
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
 
-export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe"] as const;
+export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
 export const FONTS = ["anton", "grotesk"] as const;
@@ -90,6 +90,8 @@ export interface SkillContext {
   palette: Palette;
   font: FontId;
   seed: number;
+  /** Seconds per beat of the soundtrack; scenes start on a beat, so impacts can land on kicks. */
+  beat: number;
 }
 
 export interface Skill {

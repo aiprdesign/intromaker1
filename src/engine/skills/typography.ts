@@ -22,8 +22,9 @@ function kineticSlam(sc: SkillContext) {
   const { ctx, w, h, t, d, palette, u } = sc;
   const words = sc.scene.text.toUpperCase().split(/\s+/).filter(Boolean);
   const n = Math.max(1, words.length);
-  const slot = Math.min(0.42, (d * 0.5) / n);
-  const start = 0.1;
+  // One word per beat (half-beats for long lines) so every slam lands on a kick.
+  const slot = n * sc.beat <= d * 0.6 ? sc.beat : sc.beat / 2;
+  const start = 0;
   const finalT = start + n * slot;
   const idx = Math.min(n - 1, Math.floor((t - start) / slot));
   const inFinal = t >= finalT || n === 1;

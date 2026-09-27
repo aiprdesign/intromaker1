@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod/v4";
 import { PALETTES } from "@/engine/palettes";
-import { LENGTH_SECONDS, planFromPrompt, sanitizePlan, type Length, type PlanRequest } from "@/engine/planner";
+import { beatSync, LENGTH_SECONDS, planFromPrompt, sanitizePlan, type Length, type PlanRequest } from "@/engine/planner";
 import { SKILLS } from "@/engine/skills";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type PaletteId } from "@/engine/types";
 
@@ -34,7 +34,7 @@ ${SKILLS.map((s) => `- ${s.id} (${s.name}): ${s.tagline} Best for: ${s.bestFor}`
 
 Palettes: ${PALETTE_IDS.map((id) => `${id} (${PALETTES[id].name})`).join(", ")}.
 Fonts: anton (tall condensed, trailer/impact), grotesk (modern geometric, tech/premium).
-Transitions (how a scene enters): cut, flash, zoom, glitch, wipe.
+Transitions (how a scene enters): cut, flash, zoom, glitch, wipe, whip (motion-blurred whip pan), dolly (zoom-blur rush-in), leak (warm light-leak burn), shutter (letterbox shutters snap open).
 
 How to direct an epic, modern piece:
 - Structure: a hook that builds anticipation → the main title/brand reveal → 2-5 punchy beats (features, benefits, stats, emotions) → a final brand lock-up outro with a call to action in the subtext.
@@ -100,13 +100,13 @@ export async function POST(req: Request) {
       return Response.json({ plan: builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
     }
     const out = response.parsed_output;
-    const plan = sanitizePlan({
+    const plan = beatSync(sanitizePlan({
       ...out,
       aspect,
       palette: palette !== "auto" ? palette : out.palette,
       seed: seed ?? Math.floor(Math.random() * 1e9),
       scenes: out.scenes.map((s) => ({ ...s, subtext: s.subtext || undefined })),
-    });
+    }));
     return Response.json({ plan, engine: "claude" });
   } catch (err) {
     const message =

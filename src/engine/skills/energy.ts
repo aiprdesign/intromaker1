@@ -100,7 +100,8 @@ function hyperspace(sc: SkillContext) {
   const { ctx, w, h, t, palette, u, seed } = sc;
   ctx.fillStyle = palette.bg0;
   ctx.fillRect(0, 0, w, h);
-  const tp = Math.min(1.2, sc.d * 0.4);
+  // Punch through on a downbeat.
+  const tp = Math.min(sc.d * 0.45, sc.beat * Math.max(2, Math.round(1.2 / sc.beat)));
   const s = range(t, 0, tp);
   const speed = t < tp ? 0.25 + 9 * s * s * s : 0.3 + 8.9 * Math.exp(-(t - tp) * 3.5);
   const travel = t < tp ? 0.25 * t + (9 * tp * s ** 4) / 4 : 0.25 * tp + (9 * tp) / 4 + 0.3 * (t - tp) + (8.9 / 3.5) * (1 - Math.exp(-(t - tp) * 3.5));
@@ -181,7 +182,7 @@ function hyperspace(sc: SkillContext) {
 
 function shockwave(sc: SkillContext) {
   const { ctx, w, h, t, palette, u, seed } = sc;
-  const tb = Math.min(1.0, sc.d * 0.35);
+  const tb = Math.min(sc.d * 0.4, sc.beat * 2);
   const after = t - tb;
   background(sc, { hot: palette.primary, hotAlpha: after > 0 ? 0.35 * Math.exp(-after * 1.5) + 0.12 : 0.1 });
   const cx = w / 2;
