@@ -3,6 +3,7 @@ import type { FontId } from "./types";
 export const FONT_FAMILY: Record<FontId, { display: string; weight: number; tracking: number }> = {
   anton: { display: "Anton", weight: 400, tracking: 0.02 },
   grotesk: { display: "Space Grotesk", weight: 700, tracking: -0.02 },
+  inter: { display: "Inter", weight: 800, tracking: -0.045 },
 };
 
 export const SUB_FONT = "Inter";
@@ -106,15 +107,35 @@ export function layoutHeadline(
   ctx: CanvasRenderingContext2D,
   text: string,
   font: FontId,
-  opts: { w: number; h: number; cx: number; cy: number; maxWidth: number; maxSize: number; maxLines?: number },
+  opts: {
+    w: number;
+    h: number;
+    cx: number;
+    cy: number;
+    maxWidth: number;
+    maxSize: number;
+    maxLines?: number;
+    /** Keep the copy's own casing (modern SaaS sentence case) instead of ALL CAPS. */
+    natural?: boolean;
+  },
 ): HeadlineLayout {
-  const upper = text.toUpperCase();
+  const upper = opts.natural ? text : text.toUpperCase();
   const portrait = opts.h > opts.w;
   const maxLines = opts.maxLines ?? (portrait ? 3 : upper.length > 16 ? 2 : 1);
-  const lines = balanceLines(upper, maxLines);
-  let size = opts.maxSize;
-  for (const line of lines) size = Math.min(size, fitSize(ctx, line, font, opts.maxWidth, opts.maxSize));
-  const lineHeight = size * (font === "anton" ? 1.05 : 1.0);
+  // Use the fewest lines that keep the type near its maximum size (avoids "There's / a / way").
+  let lines = balanceLines(upper, 1);
+  let size = 0;
+  for (let n = 1; n <= maxLines; n++) {
+    const candidate = balanceLines(upper, n);
+    let s = opts.maxSize;
+    for (const line of candidate) s = Math.min(s, fitSize(ctx, line, font, opts.maxWidth, opts.maxSize));
+    if (s > size * 1.12 || n === 1) {
+      lines = candidate;
+      size = s;
+    }
+    if (s >= opts.maxSize * 0.97) break;
+  }
+  const lineHeight = size * (font === "anton" ? 1.05 : font === "inter" ? 1.08 : 1.0);
   const top = opts.cy - ((lines.length - 1) * lineHeight) / 2;
   return {
     lines,

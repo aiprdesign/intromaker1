@@ -33,9 +33,10 @@ export function background(sc: SkillContext, opts: { hot?: string; hotAlpha?: nu
 /** Standard headline layout for a scene. */
 export function headline(
   sc: SkillContext,
-  opts: { cy?: number; widthFrac?: number; sizeFrac?: number; maxLines?: number; text?: string } = {},
+  opts: { cy?: number; widthFrac?: number; sizeFrac?: number; maxLines?: number; text?: string; natural?: boolean; font?: SkillContext["font"] } = {},
 ): HeadlineLayout {
-  const { ctx, w, h, scene, font } = sc;
+  const { ctx, w, h, scene } = sc;
+  const font = opts.font ?? sc.font;
   const short = Math.min(w, h);
   const layout = layoutHeadline(ctx, opts.text ?? scene.text, font, {
     w,
@@ -45,6 +46,7 @@ export function headline(
     maxWidth: w * (opts.widthFrac ?? 0.84),
     maxSize: short * (opts.sizeFrac ?? 0.3),
     maxLines: opts.maxLines,
+    natural: opts.natural,
   });
   ctx.font = displayFont(font, layout.size);
   ctx.textBaseline = "middle";

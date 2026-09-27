@@ -10,7 +10,7 @@ type Props =
   | { plan: VideoPlan; scene?: undefined; long?: number; fps?: number; className?: string }
   | {
       scene: Scene;
-      plan: Pick<VideoPlan, "palette" | "font" | "seed">;
+      plan: Pick<VideoPlan, "palette" | "font" | "seed" | "style">;
       long?: number;
       fps?: number;
       className?: string;

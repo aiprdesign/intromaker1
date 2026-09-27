@@ -22,6 +22,16 @@ export const SKILL_IDS = [
   "product-showcase",
   "photo-montage",
   "screen-wall",
+  "blur-reveal",
+  "word-swap",
+  "ui-tour",
+  "bento",
+  "ui-cards",
+  "pain-strike",
+  "integrations",
+  "testimonial",
+  "logo-marquee",
+  "cta",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -43,7 +53,7 @@ export type PaletteId = (typeof PALETTE_IDS)[number];
 export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
-export const FONTS = ["anton", "grotesk"] as const;
+export const FONTS = ["anton", "grotesk", "inter"] as const;
 export type FontId = (typeof FONTS)[number];
 
 export type Aspect = "16:9" | "9:16" | "1:1";
@@ -62,6 +72,10 @@ export interface Brand {
   logo?: string;
   images: string[];
   videos: string[];
+  /** Customer / partner logos for "Trusted by" scenes. */
+  clientLogos?: string[];
+  /** Customer avatars keyed by testimonial author. */
+  avatars?: Record<string, string>;
   /** Brand colours; override the palette's accent colours. */
   colors?: { primary: string; secondary: string };
 }
@@ -74,7 +88,13 @@ export interface SiteData {
   tagline: string;
   description: string;
   headlines: string[];
+  /** Short feature descriptions paired with headlines where found. */
+  features: string[];
   stats: string[];
+  /** Real customer quotes found on the page. */
+  testimonials: { quote: string; author: string; role: string; avatar: string | null }[];
+  /** Customer / partner logo images ("Trusted by…" walls). */
+  clientLogos: string[];
   cta: string | null;
   logo: string | null;
   images: string[];
@@ -94,6 +114,8 @@ export interface Scene {
   transition: Transition;
   /** Image or video shown by media skills. */
   media?: Media;
+  /** List content for multi-item skills (bento features, pain points, logos…). */
+  items?: string[];
 }
 
 export interface VideoPlan {
@@ -106,6 +128,8 @@ export interface VideoPlan {
   seed: number;
   scenes: Scene[];
   brand?: Brand;
+  /** "saas": clean product-launch look and upbeat score; "trailer": epic cinematic. */
+  style?: "saas" | "trailer";
 }
 
 export interface Palette {
@@ -138,6 +162,15 @@ export interface SkillContext {
   /** Seconds per beat of the soundtrack; scenes start on a beat, so impacts can land on kicks. */
   beat: number;
   brand?: Brand;
+  style?: "saas" | "trailer";
+}
+
+export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike";
+
+/** A sound-effect cue at a scene-local time (seconds). */
+export interface SfxCue {
+  t: number;
+  kind: SfxKind;
 }
 
 export interface Skill {
@@ -146,6 +179,10 @@ export interface Skill {
   tagline: string;
   /** Guidance for the AI director. */
   bestFor: string;
-  sample: { text: string; subtext?: string };
+  sample: { text: string; subtext?: string; items?: string[] };
   render: (sc: SkillContext) => void;
+  /** Sound effects synced to this skill's animation. */
+  sfx?: (scene: Scene, beat: number) => SfxCue[];
+  /** Placeholder shown for the storyboard's list field when the skill uses `items`. */
+  itemsHint?: string;
 }

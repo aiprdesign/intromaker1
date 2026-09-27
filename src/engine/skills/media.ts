@@ -1,4 +1,5 @@
 import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
+import { saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { getImage, getMedia, isDarkLogo, mediaSize, type Drawable } from "../media";
 import { scratch } from "../scratch";
@@ -6,7 +7,7 @@ import { subFont } from "../text";
 import type { Skill, SkillContext } from "../types";
 
 /** Draw `d` scaled to cover the box (like CSS object-fit: cover), with zoom and focal pan. */
-function drawCover(
+export function drawCover(
   ctx: CanvasRenderingContext2D,
   d: Drawable,
   x: number,
@@ -31,7 +32,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /** Placeholder "app UI" when a scene has no media yet. */
-function mockUi(sc: SkillContext, x: number, y: number, w: number, h: number) {
+export function mockUi(sc: SkillContext, x: number, y: number, w: number, h: number) {
   const { ctx, palette, u } = sc;
   const g = ctx.createLinearGradient(x, y, x + w, y + h);
   g.addColorStop(0, rgba(palette.primary, 0.25));
@@ -52,9 +53,15 @@ function mockUi(sc: SkillContext, x: number, y: number, w: number, h: number) {
 
 function logoReveal(sc: SkillContext) {
   const { ctx, w, h, t, d, palette, u, brand } = sc;
-  background(sc, { hot: palette.primary, hotAlpha: 0.22 });
-  dust(sc, 70, palette.secondary, 0.15);
+  const saas = sc.style === "saas";
+  if (saas) saasBackground(sc, { beams: 2 });
+  else {
+    background(sc, { hot: palette.primary, hotAlpha: 0.22 });
+    dust(sc, 70, palette.secondary, 0.15);
+  }
   const logo = getImage(brand?.logo);
+  // A wide wordmark already spells the name; don't repeat it underneath.
+  const wordmark = !!logo && logo.naturalWidth / Math.max(1, logo.naturalHeight) >= 1.8;
   const cx = w / 2;
   const short = Math.min(w, h);
   const cy = logo ? h * 0.4 : h * 0.47;
@@ -74,7 +81,7 @@ function logoReveal(sc: SkillContext) {
     ctx.fillRect(0, 0, w, h);
   }
   // Rotating light burst behind the mark.
-  const burst = clamp(range(t, hit - 0.3, hit + 0.2)) * (1 - ex);
+  const burst = clamp(range(t, hit - 0.3, hit + 0.2)) * (1 - ex) * (saas ? 0.45 : 1);
   if (burst > 0) {
     ctx.save();
     ctx.translate(cx, cy);
@@ -96,7 +103,7 @@ function logoReveal(sc: SkillContext) {
   }
   // Shockwave ring on the hit.
   const ring = range(t, hit, hit + 0.9);
-  if (ring > 0 && ring < 1) {
+  if (ring > 0 && ring < 1 && !saas) {
     ctx.save();
     ctx.strokeStyle = palette.primary;
     ctx.globalAlpha = (1 - ring) * 0.9;
@@ -108,8 +115,9 @@ function logoReveal(sc: SkillContext) {
   }
 
   let nameY = h * 0.47;
+  const logoY = wordmark ? h * 0.46 : cy;
   if (logo && logo.naturalWidth) {
-    const box = short * (h > w ? 0.34 : 0.3);
+    const box = short * (h > w ? 0.34 : 0.3) * (wordmark ? 1.25 : 1);
     const ar = logo.naturalWidth / logo.naturalHeight;
     const lw = ar >= 1 ? Math.min(box * 1.9, box * ar) : box * ar;
     const lh = lw / ar;
@@ -131,7 +139,7 @@ function logoReveal(sc: SkillContext) {
 
     ctx.save();
     ctx.globalAlpha = clamp(k * 1.5) * (1 - ex);
-    ctx.translate(cx, cy);
+    ctx.translate(cx, logoY);
     const s = Math.max(0, k) * (1 + ex * 0.4);
     ctx.scale(s, s);
     const blur = (1 - clamp(k)) * 16 * u;
@@ -139,11 +147,16 @@ function logoReveal(sc: SkillContext) {
     glow(ctx, rgba(palette.primary, 0.9), 40 * u);
     ctx.drawImage(buf.canvas, -lw / 2 - pad, -lh / 2 - pad);
     ctx.restore();
-    nameY = cy + lh / 2 + short * 0.12;
+    nameY = (wordmark ? logoY : cy) + lh / 2 + short * 0.12;
   }
 
+  if (wordmark) {
+    subline(sc, nameY - short * 0.04, range(t, hit + 0.8, hit + 1.4), { alpha: 1 - ex });
+    flash(sc, t >= hit ? (1 - range(t, hit, hit + 0.25)) * 0.15 : 0, palette.text);
+    return;
+  }
   // Brand name + tagline.
-  const layout = headline(sc, { cy: nameY, sizeFrac: logo ? 0.13 : 0.26, maxLines: 1 });
+  const layout = headline(sc, { cy: nameY, sizeFrac: logo ? 0.13 : 0.26, maxLines: 1, natural: saas, font: saas ? saasFont(sc) : undefined });
   const nk = ease.outExpo(range(t, hit + (logo ? 0.35 : 0), hit + (logo ? 1.1 : 0.7)));
   ctx.save();
   ctx.globalAlpha = nk * (1 - ex);

@@ -56,7 +56,7 @@ export interface RenderOptions {
 export function renderScene(
   ctx: CanvasRenderingContext2D,
   scene: Scene,
-  plan: Pick<VideoPlan, "palette" | "font" | "seed"> & { bpm?: number; brand?: VideoPlan["brand"] },
+  plan: Pick<VideoPlan, "palette" | "font" | "seed"> & { bpm?: number; brand?: VideoPlan["brand"]; style?: VideoPlan["style"] },
   t: number,
   w: number,
   h: number,
@@ -82,6 +82,7 @@ export function renderScene(
     seed: (plan.seed + index * 7919) >>> 0,
     beat,
     brand: plan.brand,
+    style: plan.style,
   };
   resetCtx(target);
   target.save();

@@ -7,7 +7,7 @@ import Player from "@/components/Player";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors } from "@/engine/media";
-import { decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Length } from "@/engine/planner";
+import { decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Length, type StyleChoice } from "@/engine/planner";
 import { SKILL_MAP, SKILLS } from "@/engine/skills";
 import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan } from "@/engine/types";
 
@@ -26,6 +26,7 @@ export default function Studio() {
   const [note, setNote] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [version, setVersion] = useState(0);
+  const [style, setStyle] = useState<StyleChoice>("auto");
   const [siteUrl, setSiteUrl] = useState("");
   const [site, setSite] = useState<SiteData | null>(null);
   const [brandColors, setBrandColors] = useState<Brand["colors"]>(undefined);
@@ -62,7 +63,7 @@ export default function Studio() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed, site: s, colors }),
+        body: JSON.stringify({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed, site: s, colors, style }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -74,8 +75,8 @@ export default function Studio() {
       // Offline or API unavailable: the director also runs in the browser.
       setPlan(
         s
-          ? planFromSite(s, { aspect: a, length, palette: pal, seed: opts.seed, colors })
-          : planFromPrompt({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed }),
+          ? planFromSite(s, { aspect: a, length, palette: pal, seed: opts.seed, colors, style })
+          : planFromPrompt({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed, style }),
       );
       setVersion((v) => v + 1);
       setEngine("builtin");
@@ -322,6 +323,21 @@ export default function Studio() {
             ))}
           </div>
 
+          <label className="field-label">Style</label>
+          <div className="seg-control">
+            {(
+              [
+                ["auto", "Auto"],
+                ["saas", "SaaS launch"],
+                ["trailer", "Epic trailer"],
+              ] as [StyleChoice, string][]
+            ).map(([id, label]) => (
+              <button key={id} className={style === id ? "active" : ""} onClick={() => setStyle(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           <label className="field-label">Length</label>
           <div className="seg-control">
             {(["short", "standard", "long"] as Length[]).map((l) => (
@@ -416,12 +432,29 @@ export default function Studio() {
                   </select>
                 </div>
                 <input
-                  className="input headline"
+                  className={`input headline ${plan.style === "saas" ? "natural" : ""}`}
                   value={s.text}
-                  maxLength={48}
+                  maxLength={200}
                   onChange={(e) => updateScene(i, { text: e.target.value })}
                   aria-label="Headline"
+                  title="Wrap a word in *asterisks* for the gradient accent"
                 />
+                {SKILL_MAP[s.skill].itemsHint !== undefined && (
+                  <input
+                    className="input"
+                    value={(s.items ?? []).join(", ")}
+                    placeholder={SKILL_MAP[s.skill].itemsHint}
+                    onChange={(e) =>
+                      updateScene(i, {
+                        items: e.target.value
+                          .split(",")
+                          .map((x) => x.trimStart())
+                          .filter((x, j, arr) => x || j === arr.length - 1),
+                      })
+                    }
+                    aria-label="List items"
+                  />
+                )}
                 <input
                   className="input"
                   value={s.subtext ?? ""}

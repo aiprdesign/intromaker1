@@ -28,7 +28,7 @@ const PLANS = [
     name: "Free",
     price: "$0",
     period: "forever",
-    features: ["All 23 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
+    features: ["All 33 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
     cta: "Start creating",
   },
   {
@@ -65,8 +65,9 @@ export default function Home() {
             <span className="grad">from a single prompt.</span>
           </h1>
           <p className="lede">
-            IntroMaker turns a prompt — or your website — into cinematic intros, trailers and SaaS promos. Paste a URL and it pulls
-            your logo, screenshots, video, copy and brand colours into a beat-synced motion-graphics video.
+            IntroMaker turns a prompt, or your website, into a product launch film or an epic trailer. Paste a URL and it pulls
+            your logo, screenshots, video, copy, testimonials and brand colours into a beat-synced video with a cursor-driven
+            product tour, bento features and a clicked CTA.
           </p>
           <HeroPrompt />
         </div>
@@ -75,13 +76,13 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>23 pro motion skills. All rendered live.</h2>
+          <h2>33 pro motion skills. All rendered live.</h2>
           <p>Every card below is real-time output of the engine — the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See all 23 skills →
+            See all 33 skills →
           </Link>
         </div>
       </section>

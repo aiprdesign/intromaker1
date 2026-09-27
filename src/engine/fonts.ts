@@ -8,6 +8,8 @@ export function ensureFonts() {
     document.fonts.load('700 100px "Space Grotesk"'),
     document.fonts.load('500 40px "Inter"'),
     document.fonts.load('600 40px "Inter"'),
+    document.fonts.load('700 40px "Inter"'),
+    document.fonts.load('800 100px "Inter"'),
   ])
     .then(() => undefined)
     .catch(() => undefined);

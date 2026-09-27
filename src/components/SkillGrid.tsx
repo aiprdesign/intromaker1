@@ -8,6 +8,7 @@ import { PALETTE_IDS, type PaletteId } from "@/engine/types";
 import LoopCanvas from "./LoopCanvas";
 
 const DEFAULT_PALETTES: PaletteId[] = [
+  "cosmos", "cyber", "aurora", "ice", "cosmos", "synthwave", "cyber", "gold", "cosmos", "aurora",
   "gold", "ice", "cosmos", "cyber", "inferno", "toxic", "inferno", "aurora", "synthwave", "synthwave",
   "cosmos", "ice", "gold", "mono", "cyber", "synthwave", "cyber", "cyber", "inferno",
   "cosmos", "aurora", "ice", "synthwave",
@@ -34,11 +35,11 @@ export default function SkillGrid({ limit, pickers = false }: { limit?: number; 
       <div className="skill-grid">
         {skills.map((s, i) => {
           const pal = palette === "mix" ? DEFAULT_PALETTES[i % DEFAULT_PALETTES.length] : palette;
-          const scene = { skill: s.id, text: s.sample.text, subtext: s.sample.subtext, duration: 4.2, transition: "cut" as const };
+          const scene = { skill: s.id, text: s.sample.text, subtext: s.sample.subtext, items: s.sample.items, duration: 4.6, transition: "cut" as const };
           return (
             <article className="skill-card" key={s.id}>
               <div className="skill-canvas">
-                <LoopCanvas scene={scene} plan={{ palette: pal, font: i % 3 === 1 ? "grotesk" : "anton", seed: 77 + i }} long={640} />
+                <LoopCanvas scene={scene} plan={{ style: i < 10 ? "saas" : "trailer", palette: pal, font: i < 10 ? "inter" : i % 3 === 1 ? "grotesk" : "anton", seed: 77 + i }} long={640} />
               </div>
               <div className="skill-meta">
                 <div className="skill-head">

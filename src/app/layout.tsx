@@ -5,12 +5,14 @@ import "@fontsource/space-grotesk/700.css";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
+import "@fontsource/inter/800.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "IntroMaker — Prompt to epic motion graphics",
   description:
-    "Type a prompt, get a cinematic motion-graphics video. 23 pro animation skills, website import, AI director, generated soundtrack and one-click export.",
+    "Type a prompt, get a cinematic motion-graphics video. 33 pro animation skills, SaaS launch films, website import, AI director, generated soundtrack and one-click export.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

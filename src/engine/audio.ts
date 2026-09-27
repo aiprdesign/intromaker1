@@ -1,4 +1,5 @@
-import type { VideoPlan } from "./types";
+import { SKILL_MAP } from "./skills";
+import type { SfxKind, VideoPlan } from "./types";
 
 /** A minor: i – VI – III – VII, one chord per bar (MIDI notes). */
 const PROGRESSION = [
@@ -8,6 +9,14 @@ const PROGRESSION = [
   [55, 59, 62], // G
 ];
 const BASS = [45, 41, 36, 43];
+/** C major: I – V – vi – IV, bright and optimistic for product launches. */
+const PROGRESSION_MAJOR = [
+  [60, 64, 67],
+  [55, 59, 62],
+  [57, 60, 64],
+  [53, 57, 60],
+];
+const BASS_MAJOR = [36, 43, 45, 41];
 const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 
 /**
@@ -29,6 +38,9 @@ export class Soundtrack {
   private reverbSend: GainNode;
   /** Pads and bass route through here so kicks can duck them. */
   private duck: GainNode;
+  /** Tempo-synced echo for plucks. */
+  private delay: DelayNode;
+  private delayIn: GainNode;
 
   /** Render the full score for `plan` offline, faster than realtime. */
   static async renderOffline(plan: VideoPlan, sampleRate = 48000): Promise<AudioBuffer> {
@@ -74,6 +86,17 @@ export class Soundtrack {
     this.duck = c.createGain();
     this.duck.connect(this.out);
     this.duck.connect(this.reverbSend);
+
+    this.delayIn = c.createGain();
+    this.delay = c.createDelay(2);
+    const fb = c.createGain();
+    fb.gain.value = 0.32;
+    const damp = c.createBiquadFilter();
+    damp.type = "lowpass";
+    damp.frequency.value = 3500;
+    this.delayIn.connect(this.delay);
+    this.delay.connect(damp).connect(fb).connect(this.delay);
+    damp.connect(this.duck);
   }
 
   setMuted(muted: boolean) {
@@ -103,6 +126,11 @@ export class Soundtrack {
     this.stop();
     const now = this.ctx.currentTime + lead;
     const at = (videoT: number) => now + (videoT - from);
+    this.scheduleSfx(plan, from, at);
+    if (plan.style === "saas") {
+      this.playSaas(plan, from, at);
+      return;
+    }
     const total = plan.scenes.reduce((a, s) => a + s.duration, 0);
     const beat = 60 / plan.bpm;
     const bar = beat * 4;
@@ -186,12 +214,12 @@ export class Soundtrack {
     g.setTargetAtTime(1, t + 0.02, beat * 0.25);
   }
 
-  private pad(t: number, dur: number, chord: number[], fadeOut: number) {
+  private pad(t: number, dur: number, chord: number[], fadeOut: number, level = 0.045) {
     const c = this.ctx;
     const g = c.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.045, t + Math.min(0.4, dur * 0.3));
-    g.gain.setValueAtTime(0.045, t + dur);
+    g.gain.linearRampToValueAtTime(level, t + Math.min(0.4, dur * 0.3));
+    g.gain.setValueAtTime(level, t + dur);
     g.gain.linearRampToValueAtTime(0, t + dur + fadeOut);
     const lp = c.createBiquadFilter();
     lp.type = "lowpass";
@@ -371,5 +399,235 @@ export class Soundtrack {
     g.connect(this.reverbSend);
     n.start(t, Math.random());
     n.stop(t + dur + 0.02);
+  }
+
+  /* ───────── SaaS score ───────── */
+
+  /**
+   * Upbeat product-launch track: a filtered pad + pluck build through the hook, then
+   * four-on-the-floor kick, claps, shakers, bass and delayed plucks; drops out for the ending.
+   */
+  private playSaas(plan: VideoPlan, from: number, at: (t: number) => number) {
+    const total = plan.scenes.reduce((a, s) => a + s.duration, 0);
+    const beat = 60 / plan.bpm;
+    const bar = beat * 4;
+    this.delay.delayTime.value = beat * 0.75;
+    const starts: number[] = [];
+    let acc = 0;
+    for (const sc of plan.scenes) {
+      starts.push(acc);
+      acc += sc.duration;
+    }
+    const dropIn = plan.scenes.length > 2 ? starts[1] : 0;
+    const ending = Math.max(dropIn, total - beat * 2);
+
+    for (let b = Math.floor(from / bar); b * bar < total; b++) {
+      const t0 = b * bar;
+      const chord = PROGRESSION_MAJOR[b % 4];
+      const start = Math.max(t0, from);
+      const len = Math.min(bar, total - t0) - (start - t0);
+      if (len > 0.05) this.pad(at(start), len, chord, t0 + bar >= total - 0.01 ? 2.4 : 0.15, 0.03);
+      // Plucked arpeggio in 8ths; filtered during the hook build.
+      for (let k = 0; k < 8; k++) {
+        const nt = t0 + k * (beat / 2);
+        if (nt < from || nt >= Math.min(total, ending + beat)) continue;
+        const note = chord[[0, 1, 2, 1, 0, 2, 1, 2][k]] + 12 + (k === 7 ? 12 : 0);
+        const build = nt < dropIn ? 0.25 + 0.75 * (nt / Math.max(0.01, dropIn)) : 1;
+        this.pluck(at(nt), note, build);
+      }
+      if (t0 >= dropIn) {
+        for (let k = 0; k < 4; k += 2) {
+          const bt = t0 + k * beat;
+          if (bt >= from && bt < ending && bt < total) this.bass(at(bt), beat * 1.6, BASS_MAJOR[b % 4] + 12);
+        }
+      }
+    }
+    for (let bt = Math.ceil(from / (beat / 4) - 1e-6) * (beat / 4); bt < total - 0.05; bt += beat / 4) {
+      const sixteenth = Math.round(bt / (beat / 4));
+      const onBeat = sixteenth % 4 === 0;
+      const n = Math.round(bt / beat);
+      if (bt < dropIn || bt >= ending) continue;
+      if (onBeat) {
+        this.kick(at(bt), 0.6);
+        this.duckAt(at(bt), beat);
+        if (n % 2 === 1) this.clap(at(bt));
+      }
+      this.hat(at(bt), sixteenth % 2 ? 0.035 : 0.06);
+    }
+    // Build into the drop and a soft hit on each cut.
+    plan.scenes.forEach((sc, i) => {
+      const st = starts[i];
+      if (i > 0 && st >= from - 0.01) this.impact(at(st), i === 1 ? 0.55 : 0.3);
+      if (i === 0 && dropIn - 1.2 >= from) this.riser(at(Math.max(0, dropIn - 1.4)), Math.min(1.4, dropIn));
+    });
+    if (total - 0.02 >= from) this.impact(at(total - beat * 2), 0.45);
+  }
+
+  private pluck(t: number, note: number, bright: number) {
+    const c = this.ctx;
+    const o = this.track(c.createOscillator());
+    o.type = "square";
+    o.frequency.value = hz(note);
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(600 + 3600 * bright, t);
+    lp.frequency.exponentialRampToValueAtTime(500, t + 0.2);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.055, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(lp).connect(g);
+    g.connect(this.duck);
+    g.connect(this.delayIn);
+    o.start(t);
+    o.stop(t + 0.25);
+  }
+
+  private clap(t: number) {
+    const c = this.ctx;
+    const bp = c.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 1500;
+    bp.Q.value = 0.9;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    // Three quick bursts, then a short tail — the classic clap shape.
+    [0, 0.011, 0.022].forEach((o) => {
+      g.gain.setValueAtTime(0.32, t + o);
+      g.gain.exponentialRampToValueAtTime(0.05, t + o + 0.009);
+    });
+    g.gain.setValueAtTime(0.25, t + 0.033);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    const n = this.noiseSource();
+    n.connect(bp).connect(g);
+    g.connect(this.out);
+    g.connect(this.reverbSend);
+    n.start(t, Math.random());
+    n.stop(t + 0.2);
+  }
+
+  /* ───────── Sound effects ───────── */
+
+  private scheduleSfx(plan: VideoPlan, from: number, at: (t: number) => number) {
+    const beat = 60 / plan.bpm;
+    let start = 0;
+    for (const sc of plan.scenes) {
+      if (sc.transition !== "cut" && start > 0 && start >= from) {
+        const kind: SfxKind = sc.transition === "whip" || sc.transition === "wipe" ? "whoosh" : "swoosh";
+        this.sfx(at(Math.max(from, start - 0.12)), kind);
+      }
+      const cues = SKILL_MAP[sc.skill]?.sfx?.(sc, beat) ?? [];
+      for (const cue of cues) {
+        const t = start + cue.t;
+        if (cue.t >= 0 && cue.t < sc.duration && t >= from) this.sfx(at(t), cue.kind);
+      }
+      start += sc.duration;
+    }
+  }
+
+  private sfx(t: number, kind: SfxKind) {
+    const c = this.ctx;
+    switch (kind) {
+      case "whoosh":
+      case "swoosh": {
+        const dur = kind === "whoosh" ? 0.55 : 0.32;
+        const n = this.noiseSource();
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.Q.value = 1.2;
+        bp.frequency.setValueAtTime(kind === "whoosh" ? 350 : 900, t);
+        bp.frequency.exponentialRampToValueAtTime(kind === "whoosh" ? 2600 : 5000, t + dur * 0.55);
+        bp.frequency.exponentialRampToValueAtTime(500, t + dur);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(kind === "whoosh" ? 0.32 : 0.2, t + dur * 0.5);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        const pan = c.createStereoPanner();
+        pan.pan.setValueAtTime(-0.7, t);
+        pan.pan.linearRampToValueAtTime(0.7, t + dur);
+        n.connect(bp).connect(g).connect(pan);
+        pan.connect(this.out);
+        pan.connect(this.reverbSend);
+        n.start(t, Math.random());
+        n.stop(t + dur + 0.02);
+        break;
+      }
+      case "click": {
+        const o = this.track(c.createOscillator());
+        o.type = "sine";
+        o.frequency.setValueAtTime(2400, t);
+        o.frequency.exponentialRampToValueAtTime(900, t + 0.03);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.22, t + 0.002);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+        o.connect(g).connect(this.out);
+        o.start(t);
+        o.stop(t + 0.06);
+        const n = this.noiseSource();
+        const hp = c.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 5000;
+        const ng = c.createGain();
+        ng.gain.setValueAtTime(0.18, t);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
+        n.connect(hp).connect(ng).connect(this.out);
+        n.start(t, Math.random());
+        n.stop(t + 0.02);
+        break;
+      }
+      case "pop":
+      case "tick": {
+        const o = this.track(c.createOscillator());
+        o.type = "sine";
+        const f0 = kind === "pop" ? 520 : 1500;
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.exponentialRampToValueAtTime(f0 * (kind === "pop" ? 2.1 : 1.2), t + 0.05);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(kind === "pop" ? 0.16 : 0.08, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + (kind === "pop" ? 0.13 : 0.05));
+        o.connect(g);
+        g.connect(this.out);
+        g.connect(this.reverbSend);
+        o.start(t);
+        o.stop(t + 0.15);
+        break;
+      }
+      case "shimmer": {
+        [84, 88, 91, 96].forEach((note, i) => {
+          const tt = t + i * 0.045;
+          const o = this.track(c.createOscillator());
+          o.type = "sine";
+          o.frequency.value = hz(note);
+          const g = c.createGain();
+          g.gain.setValueAtTime(0.0001, tt);
+          g.gain.exponentialRampToValueAtTime(0.05, tt + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.9);
+          o.connect(g);
+          g.connect(this.out);
+          g.connect(this.reverbSend);
+          o.start(tt);
+          o.stop(tt + 0.95);
+        });
+        break;
+      }
+      case "strike": {
+        const n = this.noiseSource();
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.Q.value = 2;
+        bp.frequency.setValueAtTime(900, t);
+        bp.frequency.exponentialRampToValueAtTime(2800, t + 0.16);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        n.connect(bp).connect(g).connect(this.out);
+        n.start(t, Math.random());
+        n.stop(t + 0.2);
+        break;
+      }
+    }
   }
 }

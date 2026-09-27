@@ -83,9 +83,11 @@ export async function scrapeSite(rawUrl: string): Promise<SiteData> {
   const h1 = clean(root.querySelector("h1")?.text ?? "");
   const tagline = h1 && h1.split(" ").length <= 12 && h1.toLowerCase() !== name.toLowerCase() ? h1 : description.split(/(?<=[.!?])\s/)[0] ?? "";
 
-  // Headlines: short, meaningful h1–h3 text (features / value props).
+  // Headlines: short, meaningful h1–h3 text (features / value props), each with the
+  // paragraph that follows it as its description.
   const seen = new Set<string>([name.toLowerCase(), tagline.toLowerCase()]);
   const headlines: string[] = [];
+  const features: string[] = [];
   for (const el of root.querySelectorAll("h1, h2, h3")) {
     const t = clean(el.text).replace(/[.!]+$/, "");
     const words = t.split(" ").length;
@@ -93,6 +95,15 @@ export async function scrapeSite(rawUrl: string): Promise<SiteData> {
     if (/cookie|javascript|browser|©|\?$/i.test(t)) continue;
     seen.add(t.toLowerCase());
     headlines.push(t);
+    let desc = "";
+    for (let sib = el.nextElementSibling, n = 0; sib && n < 3; sib = sib.nextElementSibling, n++) {
+      const txt = clean(sib.text);
+      if (/^(p|div|span)$/i.test(sib.tagName) && txt.length >= 20 && txt.length <= 180) {
+        desc = txt;
+        break;
+      }
+    }
+    features.push(desc);
     if (headlines.length >= 12) break;
   }
 
@@ -176,6 +187,54 @@ export async function scrapeSite(rawUrl: string): Promise<SiteData> {
   }
   addVid(absolute(meta(root, "og:video", "og:video:url", "og:video:secure_url"), pageBase));
 
+  // Real customer testimonials only (never invented).
+  const ancestorMatches = (el: HTMLElement, re: RegExp, depth = 5) => {
+    for (let n: HTMLElement | null = el, d = 0; n && d < depth; n = n.parentNode as HTMLElement | null, d++) {
+      if (re.test(`${n.getAttribute?.("class") ?? ""} ${n.getAttribute?.("id") ?? ""} ${n.getAttribute?.("aria-label") ?? ""}`)) return true;
+    }
+    return false;
+  };
+  const testimonials: SiteData["testimonials"] = [];
+  const quoteSeen = new Set<string>();
+  const containers = [
+    ...root.querySelectorAll("blockquote"),
+    ...root.querySelectorAll("figure"),
+    ...root.querySelectorAll("[class*=testimonial], [class*=Testimonial], [class*=quote], [class*=review]"),
+  ];
+  for (const el of containers) {
+    if (testimonials.length >= 3) break;
+    const qEl = el.tagName === "BLOCKQUOTE" ? el : (el.querySelector("blockquote, q, p") ?? el);
+    const quote = clean(qEl.text).replace(/^["“”']+|["“”']+$/g, "");
+    if (quote.length < 30 || quote.length > 280 || quoteSeen.has(quote)) continue;
+    const scope = el.tagName === "BLOCKQUOTE" ? (el.parentNode as HTMLElement) ?? el : el;
+    // Most specific selector first: a dedicated name element beats a whole caption.
+    const nameEl = ["[class*=name]", "[class*=author]", "cite", "strong", "figcaption"]
+      .map((sel) => scope.querySelector(sel))
+      .find((n) => n && clean(n.text) && !clean(n.text).includes(quote.slice(0, 30)));
+    const author = clean((nameEl?.structuredText ?? "").split("\n")[0]).split(/[,–—|·]/)[0].trim();
+    if (!author || author.length > 60) continue;
+    const roleEl = scope.querySelector("[class*=role], [class*=title], [class*=position], [class*=company], small");
+    let role = clean(roleEl?.text ?? "");
+    if (role === author || role.length > 80) role = "";
+    if (!role && nameEl) role = clean(nameEl.text).split(/[,–—|·]/).slice(1).join(", ").trim();
+    const avatarEl = scope.querySelector("img");
+    const avatar = absolute(avatarEl?.getAttribute("src") ?? fromSrcset(avatarEl?.getAttribute("srcset")), pageBase);
+    quoteSeen.add(quote);
+    testimonials.push({ quote, author, role, avatar });
+  }
+
+  // Customer / partner logo walls.
+  const clientLogos: string[] = [];
+  for (const img of root.querySelectorAll("img")) {
+    if (clientLogos.length >= 12) break;
+    const u = absolute(img.getAttribute("src") ?? fromSrcset(img.getAttribute("srcset")), pageBase);
+    if (!u || u === logo || clientLogos.includes(u)) continue;
+    const hint = `${img.getAttribute("alt") ?? ""} ${img.getAttribute("class") ?? ""}`;
+    if (ancestorMatches(img, /customer|client|trusted|partner|logo-?(wall|cloud|grid|strip|marquee)|brands|companies/i) || (/logo/i.test(hint) && !ancestorMatches(img, /header|nav/i, 6))) {
+      clientLogos.push(u);
+    }
+  }
+
   const themeColor = meta(root, "theme-color", "msapplication-TileColor");
 
   return {
@@ -185,7 +244,10 @@ export async function scrapeSite(rawUrl: string): Promise<SiteData> {
     tagline,
     description,
     headlines,
+    features,
     stats,
+    testimonials,
+    clientLogos,
     cta,
     logo,
     images,

@@ -2,21 +2,28 @@ import type { VideoPlan } from "./types";
 
 export const HERO_PLAN: VideoPlan = {
   title: "IntroMaker",
-  palette: "cyber",
-  font: "grotesk",
+  palette: "cosmos",
+  font: "inter",
   aspect: "16:9",
-  bpm: 124,
+  bpm: 120,
   seed: 4242,
+  style: "saas",
   scenes: [
-    { skill: "hyperspace", text: "TYPE A PROMPT", duration: 2.6, transition: "cut" },
-    { skill: "particle-assemble", text: "GET EPIC", subtext: "motion graphics", duration: 3.4, transition: "flash" },
-    { skill: "kinetic-slam", text: "IN SECONDS", duration: 2.6, transition: "zoom" },
-    { skill: "glitch-reveal", text: "23 SKILLS", subtext: "one prompt", duration: 2.6, transition: "glitch" },
-    { skill: "cinematic-title", text: "INTROMAKER", subtext: "Prompt to motion", duration: 3.4, transition: "zoom" },
+    { skill: "blur-reveal", text: "Turn a prompt into a *launch film*", items: ["Introducing IntroMaker"], duration: 3.5, transition: "cut" },
+    { skill: "word-swap", text: "Make intros|trailers|launch films|promos", subtext: "Or paste your website URL", duration: 4, transition: "dolly" },
+    {
+      skill: "bento",
+      text: "Everything in *one studio*",
+      items: ["AI director", "33 motion skills", "Website import", "Beat-synced score", "Frame-perfect export", "Vertical & square"],
+      duration: 5,
+      transition: "whip",
+    },
+    { skill: "cta", text: "Make yours *now*", subtext: "Open the studio", duration: 4, transition: "dolly" },
   ],
 };
 
 export const EXAMPLE_PROMPTS = [
+  'Launch video for "Pulse", an analytics app for product teams. Real-time dashboards, AI insights, team sharing, 5,000+ companies',
   'Epic cyberpunk launch trailer for "NOVA AI", an AI copilot for developers. 10M+ users, ship faster, launching 2026',
   'Luxury gold intro for a watch brand called "AURUM" — timeless craftsmanship, Swiss made',
   "Hype gaming channel intro for SHADOWSTRIKE with toxic green energy, headshots and victory",

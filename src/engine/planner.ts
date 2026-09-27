@@ -20,12 +20,15 @@ import {
 export type Length = "short" | "standard" | "long";
 export const LENGTH_SECONDS: Record<Length, number> = { short: 10, standard: 16, long: 26 };
 
+export type StyleChoice = "auto" | "saas" | "trailer";
+
 export interface PlanRequest {
   prompt: string;
   aspect: Aspect;
   length: Length;
   palette?: PaletteId | "auto";
   seed?: number;
+  style?: StyleChoice;
 }
 
 interface Mood {
@@ -270,8 +273,76 @@ function stats(prompt: string): string[] {
   return out;
 }
 
+/** Product/SaaS prompts get the modern launch-film treatment unless they ask for a trailer. */
+export function isSaasPrompt(prompt: string) {
+  const l = prompt.toLowerCase();
+  return (
+    /\b(saas|app|platform|software|startup|product|dashboard|b2b|api|crm|tool|workspace|launch video|explainer|demo)\b/.test(l) &&
+    !/\b(epic|trailer|cinematic|game|gaming|movie|film|hype|festival|documentary)\b/.test(l)
+  );
+}
+
+/** Recover a phrase's original casing from the prompt ("AI insights", not "Ai insights"). */
+function naturalCase(phrase: string, source: string) {
+  const i = source.toLowerCase().indexOf(phrase.toLowerCase());
+  const raw = i >= 0 ? source.slice(i, i + phrase.length) : phrase.charAt(0) + phrase.slice(1).toLowerCase();
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function planFromPromptSaas(req: PlanRequest): VideoPlan {
+  const prompt = req.prompt.trim();
+  const seed = (req.seed ?? hashString(prompt)) >>> 0;
+  const r = rng(seed);
+  const pick = <T,>(arr: readonly T[]) => arr[Math.floor(r() * arr.length)];
+  const bpm = pick([116, 120, 124] as const);
+  const beat = 60 / bpm;
+  const brand = extractBrand(prompt) ?? "Your product";
+  const numbers = stats(prompt);
+  const body = phrases(prompt, brand)
+    .filter((p) => !numbers.some((n) => n.includes(p)))
+    .map((p) => naturalCase(p, prompt))
+    .filter((p) => p.split(" ").length <= 6);
+  // The clause right after the brand is usually its one-line pitch: "an analytics app for product teams".
+  const pitch = prompt
+    .slice(prompt.indexOf(brand) + brand.length)
+    .replace(/^["'”’\s,:—–-]+/, "")
+    .split(/[.;!?\n]|,\s/)[0]
+    .trim()
+    .replace(/^(is\s+)?(an?|the)\s+/i, "The ");
+  const pitchOk = pitch.split(/\s+/).length >= 3 && pitch.split(/\s+/).length <= 10;
+  const tagline = pitchOk ? pitch : body[0] ?? `Meet ${brand}`;
+  const features = body.filter((b) => !tagline.toLowerCase().includes(b.toLowerCase()));
+  const target = LENGTH_SECONDS[req.length];
+  const scenes: Scene[] = [
+    { skill: "blur-reveal", text: tagline, items: [`Introducing ${brand}`], duration: 7 * beat, transition: "cut" },
+    { skill: "particle-assemble", text: brand, duration: 6 * beat, transition: "dolly" },
+  ];
+  if (features.length >= 3) {
+    scenes.push({ skill: "bento", text: `Everything in *${brand}*`, items: features.slice(0, 6), duration: Math.max(4.4, 10 * beat), transition: "whip" });
+  } else if (features.length) {
+    scenes.push({ skill: "blur-reveal", text: features.join(". "), duration: 7 * beat, transition: "whip" });
+  }
+  if (numbers.length) {
+    scenes.push({
+      skill: "ui-cards",
+      text: `See ${brand} *in action*`,
+      items: [features[0] ?? brand, naturalCase(numbers[0], prompt), features[1] ?? "", features[2] ?? ""],
+      duration: Math.max(4.2, 9 * beat),
+      transition: "dolly",
+    });
+  }
+  const used = scenes.reduce((a, s) => a + s.duration, 0);
+  if (used + 8 * beat < target && features.length >= 2) {
+    scenes.push({ skill: "word-swap", text: `Built for ${features.slice(0, 3).map((f) => f.toLowerCase()).join("|")}`, duration: 8 * beat, transition: "whip" });
+  }
+  scenes.push({ skill: "cta", text: `Try *${brand}* today`, subtext: "Get started", duration: Math.max(3.6, 8 * beat), transition: "dolly" });
+  const palette = req.palette && req.palette !== "auto" ? req.palette : "cosmos";
+  return beatSync(sanitizePlan({ title: brand, palette, font: "inter", aspect: req.aspect, bpm, seed, scenes, style: "saas" }));
+}
+
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
 export function planFromPrompt(req: PlanRequest): VideoPlan {
+  if (req.style === "saas" || (req.style !== "trailer" && isSaasPrompt(req.prompt))) return planFromPromptSaas(req);
   const prompt = req.prompt.trim() || "Epic intro";
   const lower = prompt.toLowerCase();
   const seed = (req.seed ?? hashString(prompt)) >>> 0;
@@ -397,6 +468,7 @@ export function brandFromSite(site: SiteData, colors?: Brand["colors"]): Brand {
     logo: site.logo ? assetUrl(site.logo) : undefined,
     images: site.images.map(assetUrl),
     videos: site.videos.map(assetUrl),
+    clientLogos: site.clientLogos.map(assetUrl),
     colors,
   };
 }
@@ -415,7 +487,18 @@ export function readSite(raw: unknown): SiteData | null {
     tagline: str(r.tagline, 200),
     description: str(r.description, 400),
     headlines: strs(r.headlines, 14, 80),
+    features: strs(r.features, 14, 160),
     stats: strs(r.stats, 6, 40),
+    testimonials: (Array.isArray(r.testimonials) ? r.testimonials : [])
+      .filter((q): q is Record<string, unknown> => !!q && typeof q === "object" && typeof (q as Record<string, unknown>).quote === "string")
+      .slice(0, 4)
+      .map((q) => ({
+        quote: String(q.quote).slice(0, 280),
+        author: String(q.author ?? "").slice(0, 60),
+        role: String(q.role ?? "").slice(0, 80),
+        avatar: http(q.avatar) ? (q.avatar as string) : null,
+      })),
+    clientLogos: (Array.isArray(r.clientLogos) ? r.clientLogos : []).filter(http).slice(0, 16) as string[],
     cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
     logo: http(r.logo) ? (r.logo as string) : null,
     images: (Array.isArray(r.images) ? r.images : []).filter(http).slice(0, 14) as string[],
@@ -435,10 +518,159 @@ function punchy(text: string, max: number) {
  * Built-in director for an imported website: logo reveal, the real product in a 3D browser,
  * feature beats over the site's own imagery, stats, a screen wall and a CTA outro.
  */
-export function planFromSite(
-  site: SiteData,
-  req: { aspect: Aspect; length: Length; palette?: PaletteId | "auto"; seed?: number; colors?: Brand["colors"] },
-): VideoPlan {
+export interface SiteRequest {
+  aspect: Aspect;
+  length: Length;
+  palette?: PaletteId | "auto";
+  seed?: number;
+  colors?: Brand["colors"];
+  style?: StyleChoice;
+}
+
+/** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
+export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
+  return req.style === "trailer" ? planFromSiteTrailer(site, req) : planFromSiteSaas(site, req);
+}
+
+/** Sentence-case copy: trim, drop trailing period for headlines, keep the site's own casing. */
+function sentenceCopy(text: string, maxWords: number) {
+  const first = text.split(/(?<=[.!?])\s|\s[—–|]\s/)[0].trim();
+  const words = first.split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > maxWords) return "";
+  return first;
+}
+
+/**
+ * The SaaS launch-film structure used by best-in-class product videos:
+ * hook statement → logo → product tour → features bento → live product → proof → integrations → CTA.
+ * Only real site content is used for claims, quotes and logos.
+ */
+function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
+  const seed = (req.seed ?? hashString(site.url)) >>> 0;
+  const r = rng(seed);
+  const pick = <T,>(arr: readonly T[]) => arr[Math.floor(r() * arr.length)];
+  const bpm = pick([116, 120, 124] as const);
+  const beat = 60 / bpm;
+  const beats = (n: number) => n * beat;
+  const target = LENGTH_SECONDS[req.length];
+  const brand = brandFromSite(site, req.colors);
+  const images = brand.images.map((src): Media => ({ src, kind: "image" }));
+  const video: Media | undefined = brand.videos[0] ? { src: brand.videos[0], kind: "video" } : undefined;
+  const hero = video ?? images[0];
+
+  const tagline = sentenceCopy(site.tagline, 10) || sentenceCopy(site.description, 12) || `Meet ${site.name}`;
+  const shortFeatures = site.headlines.map((h) => sentenceCopy(h, 6)).filter((h) => h && h !== tagline);
+  const longFeatures = site.headlines.map((h) => sentenceCopy(h, 9)).filter((h) => h && h !== tagline);
+  const stat = site.stats.find((st) => /team|customer|compan|user|business|developer|people|brand|org/i.test(st));
+  const quote = site.testimonials.find((q) => q.quote.length <= 190 && q.author);
+  const integrationLine = site.headlines.find((h) => /integrat|connect|tools|apps|stack|plug/i.test(h));
+
+  type Beat = { scene: Scene; priority: number };
+  const candidates: Beat[] = [];
+  const add = (priority: number, scene: Scene) => candidates.push({ priority, scene });
+
+  // 1. Hook: the site's own promise, blurred in word by word.
+  add(1, {
+    skill: "blur-reveal",
+    text: tagline,
+    items: [`Introducing ${site.name}`],
+    duration: beats(7),
+    transition: "cut",
+  });
+  // 2. Brand lock-up.
+  add(2, {
+    skill: brand.logo ? "logo-reveal" : "particle-assemble",
+    text: site.name,
+    subtext: site.domain,
+    duration: beats(6),
+    transition: "dolly",
+  });
+  // 3. Product tour on the real product.
+  if (hero) {
+    add(3, {
+      skill: "ui-tour",
+      text: longFeatures[0] ?? `See ${site.name} in action`,
+      items: shortFeatures.slice(1, 3),
+      duration: Math.max(5.6, beats(12)),
+      transition: "whip",
+      media: hero,
+    });
+  }
+  // 4. Feature bento from the site's own feature headings.
+  if (shortFeatures.length >= 3) {
+    add(4, {
+      skill: "bento",
+      text: `Everything in *${site.name}*`,
+      items: shortFeatures.slice(0, 6),
+      duration: Math.max(4.4, beats(10)),
+      transition: "dolly",
+    });
+  }
+  // 5. The product, alive, with real stats in the widgets.
+  const second = images[hero === images[0] ? 1 : 0] ?? hero;
+  if (second && (site.stats.length || shortFeatures.length)) {
+    add(6, {
+      skill: "ui-cards",
+      text: longFeatures[1] ?? tagline,
+      items: [shortFeatures[0] ?? site.name, site.stats[0] ?? "", shortFeatures[1] ?? "", shortFeatures[2] ?? ""].filter((x, i) => x || i < 2),
+      duration: Math.max(4.2, beats(9)),
+      transition: "whip",
+      media: second,
+    });
+  }
+  // 6. Social proof: only real quotes and real customer logos.
+  if (quote) {
+    add(5, {
+      skill: "testimonial",
+      text: quote.quote,
+      subtext: [quote.author, quote.role].filter(Boolean).join(" · "),
+      duration: Math.max(4.6, beats(10)),
+      transition: "leak",
+      ...(quote.avatar ? { media: { src: assetUrl(quote.avatar), kind: "image" as const } } : {}),
+    });
+  }
+  if (brand.clientLogos && brand.clientLogos.length >= 4) {
+    add(5, {
+      skill: "logo-marquee",
+      text: stat ? `Trusted by *${stat.toLowerCase()}*` : "Trusted by *leading teams*",
+      duration: beats(7),
+      transition: "dolly",
+    });
+  } else if (stat) {
+    add(7, { skill: "number-ticker", text: stat, duration: beats(6), transition: "dolly" });
+  }
+  // 7. Integrations, if the site talks about them.
+  if (integrationLine) {
+    add(7, { skill: "integrations", text: sentenceCopy(integrationLine, 9) || integrationLine, duration: beats(8), transition: "whip" });
+  }
+  // 8. CTA with the site's real button label.
+  add(1, {
+    skill: "cta",
+    text: `Try *${site.name}* today`,
+    subtext: site.cta ?? "Get started",
+    duration: Math.max(3.6, beats(8)),
+    transition: "dolly",
+  });
+
+  // Keep the highest-priority beats that fit the target length, in story order.
+  const order = candidates.map((c, i) => ({ ...c, i }));
+  const chosen = new Set<number>();
+  let used = 0;
+  for (const c of [...order].sort((a, b) => a.priority - b.priority || a.i - b.i)) {
+    if (used + c.scene.duration <= target + 1.5 || c.priority <= 1) {
+      chosen.add(c.i);
+      used += c.scene.duration;
+    }
+  }
+  const scenes = order.filter((c) => chosen.has(c.i)).map((c) => c.scene);
+
+  const palette = req.palette && req.palette !== "auto" ? req.palette : "cosmos";
+  return beatSync(
+    sanitizePlan({ title: site.name, palette, font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas" }),
+  );
+}
+
+function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
   const text = [site.name, site.tagline, site.description, ...site.headlines].join(" ").toLowerCase();
   const seed = (req.seed ?? hashString(site.url)) >>> 0;
   const r = rng(seed);
@@ -544,7 +776,7 @@ export function planFromSite(
 
   const palette = req.palette && req.palette !== "auto" ? req.palette : mood.palette;
   return beatSync(
-    sanitizePlan({ title: site.name, palette, font: mood.font, aspect: req.aspect, bpm: mood.bpm, seed, scenes, brand }),
+    sanitizePlan({ title: site.name, palette, font: mood.font, aspect: req.aspect, bpm: mood.bpm, seed, scenes, brand, style: "trailer" }),
   );
 }
 
@@ -576,6 +808,7 @@ function sanitizeBrand(b: unknown): Brand | undefined {
     logo: isAsset(brand.logo) ? brand.logo : undefined,
     images: (brand.images ?? []).filter(isAsset).slice(0, 14),
     videos: (brand.videos ?? []).filter(isAsset).slice(0, 4),
+    clientLogos: (brand.clientLogos ?? []).filter(isAsset).slice(0, 16),
     colors: brand.colors && isHex(brand.colors.primary) && isHex(brand.colors.secondary) ? brand.colors : undefined,
   };
 }
@@ -586,13 +819,16 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     .slice(0, 16)
     .map((s) => ({
       skill: (SKILL_IDS as readonly string[]).includes(s.skill as string) ? (s.skill as SkillId) : "kinetic-slam",
-      text: String(s.text ?? "").slice(0, 48) || "UNTITLED",
-      subtext: s.subtext ? String(s.subtext).slice(0, 60) : undefined,
+      text: String(s.text ?? "").slice(0, 200) || "Untitled",
+      subtext: s.subtext ? String(s.subtext).slice(0, 100) : undefined,
       duration: Math.min(8, Math.max(1.6, Number(s.duration) || 3)),
       transition: (TRANSITIONS as readonly string[]).includes(s.transition as string)
         ? (s.transition as Transition)
         : "cut",
       media: sanitizeMedia(s.media),
+      items: Array.isArray(s.items)
+        ? s.items.filter((i) => typeof i === "string" && i.trim()).slice(0, 8).map((i) => String(i).slice(0, 70))
+        : undefined,
     }));
   if (!scenes.length) scenes.push({ skill: "particle-assemble", text: "HELLO", duration: 3, transition: "cut" });
   return {
@@ -604,6 +840,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     seed: (Number(raw.seed) || 1) >>> 0,
     scenes,
     brand: sanitizeBrand(raw.brand),
+    style: raw.style === "saas" ? "saas" : "trailer",
   };
 }
 
