@@ -50,6 +50,7 @@ export default function Studio() {
       palette?: PaletteId | "auto";
       site?: SiteData | null;
       colors?: Brand["colors"];
+      length?: Length;
     } = {},
   ) => {
     const s = opts.site !== undefined ? opts.site : site;
@@ -57,13 +58,14 @@ export default function Studio() {
     const p = (opts.prompt ?? prompt).trim() || (s ? "" : EXAMPLE_PROMPTS[0]);
     const a = opts.aspect ?? aspect;
     const pal = opts.palette ?? palette;
+    const len = opts.length ?? length;
     setLoading(true);
     setNote(null);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed, site: s, colors, style }),
+        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -75,8 +77,8 @@ export default function Studio() {
       // Offline or API unavailable: the director also runs in the browser.
       setPlan(
         s
-          ? planFromSite(s, { aspect: a, length, palette: pal, seed: opts.seed, colors, style })
-          : planFromPrompt({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed, style }),
+          ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style })
+          : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style }),
       );
       setVersion((v) => v + 1);
       setEngine("builtin");
@@ -105,7 +107,10 @@ export default function Studio() {
       const colorSources = [s.logo, ...s.images.slice(0, 2)].filter(Boolean).map((u) => assetUrl(u as string));
       const colors = (await extractBrandColors(colorSources, s.themeColor)) ?? undefined;
       setBrandColors(colors);
-      await generate({ site: s, colors: useBrandColors ? colors : undefined });
+      // A full story arc needs room: websites default to the long cut.
+      const len = length === "standard" ? "long" : length;
+      setLength(len);
+      await generate({ site: s, colors: useBrandColors ? colors : undefined, length: len });
     } catch (e) {
       setImportError((e as Error).message);
     } finally {
@@ -255,8 +260,15 @@ export default function Studio() {
                 </button>
               </div>
               {site.tagline && <p className="site-tagline">{site.tagline}</p>}
-              {site.images.length > 0 && (
+              {(site.images.length > 0 || site.shots?.hero) && (
                 <div className="site-thumbs">
+                  {[site.shots?.hero, site.shots?.full, ...(site.shots?.sections ?? [])]
+                    .filter((x): x is string => !!x)
+                    .slice(0, 4)
+                    .map((src) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={src} src={src} alt="" loading="lazy" className="shot" />
+                    ))}
                   {site.images.slice(0, 8).map((src) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={src} src={assetUrl(src)} alt="" loading="lazy" />
@@ -264,11 +276,20 @@ export default function Studio() {
                 </div>
               )}
               <div className="site-stats">
+                <span className={site.shots?.full ? "live" : ""}>{site.shots?.full ? "● Live capture" : "Static import"}</span>
+                <span>{(site.shots?.sections.length ?? 0) + (site.shots?.full ? 2 : 0)} screenshots</span>
                 <span>{site.images.length} images</span>
                 <span>{site.videos.length} videos</span>
-                <span>{site.headlines.length} headlines</span>
+                <span>{site.headlines.length} features</span>
                 <span>{site.stats.length} stats</span>
+                <span>{site.steps?.length ?? 0} steps</span>
+                <span>{site.testimonials.length} quotes</span>
+                <span>{site.clientLogos.length} customer logos</span>
+                {site.font && <span>Font: {site.font}</span>}
               </div>
+              {!site.shots?.full && (
+                <p className="hint">Tip: install Google Chrome or Microsoft Edge to capture live screenshots of the site.</p>
+              )}
               {brandColors && (
                 <label className="brand-colors">
                   <input
@@ -342,7 +363,7 @@ export default function Studio() {
           <div className="seg-control">
             {(["short", "standard", "long"] as Length[]).map((l) => (
               <button key={l} className={length === l ? "active" : ""} onClick={() => setLength(l)}>
-                {l === "short" ? "~10s" : l === "standard" ? "~16s" : "~26s"}
+                {l === "short" ? "~12s" : l === "standard" ? "~20s" : "~34s"}
               </button>
             ))}
           </div>
@@ -421,6 +442,15 @@ export default function Studio() {
           <div className="storyboard">
             {plan.scenes.map((s, i) => (
               <div className="scene-card" key={i}>
+                {plan.style === "saas" && (
+                  <input
+                    className="input eyebrow-input"
+                    value={s.eyebrow ?? ""}
+                    placeholder="Chapter label (optional)"
+                    onChange={(e) => updateScene(i, { eyebrow: e.target.value || undefined })}
+                    aria-label="Chapter label"
+                  />
+                )}
                 <div className="scene-top">
                   <span className="scene-n">{String(i + 1).padStart(2, "0")}</span>
                   <select className="select sm grow" value={s.skill} onChange={(e) => updateScene(i, { skill: e.target.value as SkillId })}>

@@ -32,6 +32,8 @@ export const SKILL_IDS = [
   "testimonial",
   "logo-marquee",
   "cta",
+  "site-scroll",
+  "steps",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -74,6 +76,8 @@ export interface Brand {
   videos: string[];
   /** Customer / partner logos for "Trusted by" scenes. */
   clientLogos?: string[];
+  /** Brand headline font family, loaded from Google Fonts when available. */
+  font?: string;
   /** Customer avatars keyed by testimonial author. */
   avatars?: Record<string, string>;
   /** Brand colours; override the palette's accent colours. */
@@ -95,6 +99,14 @@ export interface SiteData {
   testimonials: { quote: string; author: string; role: string; avatar: string | null }[];
   /** Customer / partner logo images ("Trusted by…" walls). */
   clientLogos: string[];
+  /** "How it works" step titles. */
+  steps: string[];
+  /** Problems the product removes ("no more spreadsheets" → "Spreadsheets"). */
+  pains: string[];
+  /** The site's headline font family (e.g. from Google Fonts). */
+  font: string | null;
+  /** Screenshots from the live browser capture (same-origin /api/shot URLs). */
+  shots: { hero: string | null; full: string | null; sections: string[] };
   cta: string | null;
   logo: string | null;
   images: string[];
@@ -116,6 +128,8 @@ export interface Scene {
   media?: Media;
   /** List content for multi-item skills (bento features, pain points, logos…). */
   items?: string[];
+  /** Chapter label shown above the headline ("How it works", "Loved by teams"). */
+  eyebrow?: string;
 }
 
 export interface VideoPlan {

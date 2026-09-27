@@ -487,7 +487,7 @@ export function eyebrow(sc: SkillContext, text: string, y: number, k: number) {
   ctx.save();
   ctx.globalAlpha = clamp(k);
   pill(sc, text, sc.w / 2, y + (1 - k) * 10 * u, {
-    size: 22 * u,
+    size: 27 * u,
     fill: rgba(palette.primary, 0.12),
     border: rgba(palette.primary, 0.45),
     color: palette.text,

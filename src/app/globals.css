@@ -1013,3 +1013,16 @@ textarea {
   height: 18px;
   border-radius: 6px;
 }
+
+.site-thumbs img.shot {
+  object-position: top;
+  outline: 1px solid rgba(0, 240, 255, 0.35);
+}
+.site-stats .live {
+  color: #2effc0;
+}
+.input.eyebrow-input {
+  font-size: 12px;
+  padding: 5px 9px;
+  color: var(--cyan);
+}

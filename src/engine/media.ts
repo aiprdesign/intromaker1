@@ -23,6 +23,7 @@ export function onMediaReady(fn: () => void) {
 const notifyReady = () => readyListeners.forEach((fn) => fn());
 
 export { assetUrl } from "./assets";
+import { loadBrandFont } from "./fonts";
 
 function loadImage(src: string) {
   if (pending.has(src)) return pending.get(src)!;
@@ -117,7 +118,7 @@ function planAssets(plan: VideoPlan) {
 /** Resolve once every asset the plan uses has loaded (or failed). */
 export async function preloadPlanMedia(plan: VideoPlan) {
   const { imgs, vids } = planAssets(plan);
-  await Promise.all([...imgs.map(loadImage), ...vids.map(loadVideo)]);
+  await Promise.all([...imgs.map(loadImage), ...vids.map(loadVideo), loadBrandFont(plan.brand?.font)]);
 }
 
 /** Export: seek every video used at time `time` to its exact frame. */

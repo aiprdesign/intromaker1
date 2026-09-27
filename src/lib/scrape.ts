@@ -1,5 +1,6 @@
 import { parse, type HTMLElement } from "node-html-parser";
 import type { SiteData } from "@/engine/types";
+import { captureSite } from "./capture";
 import { safeFetch, UrlError } from "./netguard";
 
 const MAX_HTML = 3_000_000;
@@ -65,14 +66,28 @@ function siteName(root: HTMLElement, host: string) {
   return short ?? nameFromDomain(host);
 }
 
-export async function scrapeSite(rawUrl: string): Promise<SiteData> {
+export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}): Promise<SiteData> {
   const withScheme = /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`;
-  const res = await safeFetch(withScheme, { headers: { Accept: "text/html,application/xhtml+xml" } });
-  if (!res.ok) throw new UrlError(`The site responded with HTTP ${res.status}.`);
-  const type = res.headers.get("content-type") ?? "";
-  if (!type.includes("html")) throw new UrlError("That URL isn't a web page.");
-  const html = (await res.text()).slice(0, MAX_HTML);
-  const base = new URL(res.url || withScheme);
+  // Prefer a live render in the user's browser (JS sites, lazy images, screenshots); else static fetch.
+  const live = opts.live !== false ? await (async () => {
+    const { assertPublicUrl } = await import("./netguard");
+    await assertPublicUrl(withScheme);
+    return captureSite(withScheme);
+  })() : null;
+  let html: string;
+  let finalUrl: string;
+  if (live) {
+    html = live.html.slice(0, MAX_HTML);
+    finalUrl = live.finalUrl;
+  } else {
+    const res = await safeFetch(withScheme, { headers: { Accept: "text/html,application/xhtml+xml" } });
+    if (!res.ok) throw new UrlError(`The site responded with HTTP ${res.status}.`);
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.includes("html")) throw new UrlError("That URL isn't a web page.");
+    html = (await res.text()).slice(0, MAX_HTML);
+    finalUrl = res.url || withScheme;
+  }
+  const base = new URL(finalUrl);
   const root = parse(html, { comment: false, blockTextElements: { script: false, style: false, noscript: false } });
   const baseHref = root.querySelector("base")?.getAttribute("href");
   const pageBase = baseHref ? new URL(baseHref, base) : base;
@@ -93,6 +108,8 @@ export async function scrapeSite(rawUrl: string): Promise<SiteData> {
     const words = t.split(" ").length;
     if (!t || words < 2 || words > 9 || t.length > 60 || JUNK.test(t) || seen.has(t.toLowerCase())) continue;
     if (/cookie|javascript|browser|©|\?$/i.test(t)) continue;
+    // Step titles and section labels aren't features.
+    if (/^(step\s*)?\d+[.):\-–]\s|^how (it|\w+) works|^(features|testimonials|pricing|faq)$/i.test(t)) continue;
     seen.add(t.toLowerCase());
     headlines.push(t);
     let desc = "";
@@ -235,6 +252,53 @@ export async function scrapeSite(rawUrl: string): Promise<SiteData> {
     }
   }
 
+  // "How it works" steps: titles under a steps heading, or numbered sub-headings.
+  const steps: string[] = [];
+  const stepsHeading = root
+    .querySelectorAll("h2, h3")
+    .find((el) => /how (it|\w+) works|get started in|in \w+ (simple |easy )?steps|three steps|simple steps|how to get started/i.test(el.text));
+  if (stepsHeading) {
+    let scope: HTMLElement | null = stepsHeading.parentNode as HTMLElement;
+    for (let i = 0; i < 3 && scope && scope.querySelectorAll("h3, h4").length < 2; i++) scope = scope.parentNode as HTMLElement;
+    for (const el of scope?.querySelectorAll("h3, h4") ?? []) {
+      const t = clean(el.text).replace(/^(step\s*)?\d+[.):\-–]?\s*/i, "");
+      if (t && t !== clean(stepsHeading.text) && t.split(" ").length <= 7 && !steps.includes(t)) steps.push(t);
+      if (steps.length >= 4) break;
+    }
+  }
+  if (steps.length < 2) {
+    steps.length = 0;
+    for (const el of root.querySelectorAll("h3, h4")) {
+      const m = clean(el.text).match(/^(?:step\s*)?(\d)[.):\-–]\s*(.{3,50})$/i);
+      if (m && m[2].split(" ").length <= 7) steps.push(m[2]);
+      if (steps.length >= 4) break;
+    }
+  }
+
+  // Pain points the product removes.
+  const pains: string[] = [];
+  const painRe = /\b(?:no more|say goodbye to|stop|without|tired of|instead of|forget about|ditch|replace)\s+([a-z][a-z-]*(?:\s[a-z][a-z-]*){0,3})(?=[.,!;:]|\s(?:and|or|with|so|to)\s|$)/gi;
+  let pm: RegExpExecArray | null;
+  while ((pm = painRe.exec(bodyText)) && pains.length < 4) {
+    const phrase = pm[1].trim();
+    if (/^(the|a|an|your|you|it|this|that|any|all|using|having|worrying)$/i.test(phrase.split(" ")[0]) && phrase.split(" ").length === 1) continue;
+    const nice = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+    if (nice.length >= 5 && !pains.includes(nice)) pains.push(nice);
+  }
+
+  // Brand font: the first Google Fonts family the page loads.
+  let font: string | null = null;
+  for (const l of root.querySelectorAll('link[href*="fonts.googleapis.com"]')) {
+    const fam = (l.getAttribute("href") ?? "").match(/family=([^:&;]+)/);
+    if (fam) {
+      const name = decodeURIComponent(fam[1]).replace(/\+/g, " ").trim();
+      if (/^[A-Za-z0-9 ]{2,40}$/.test(name)) {
+        font = name;
+        break;
+      }
+    }
+  }
+
   const themeColor = meta(root, "theme-color", "msapplication-TileColor");
 
   return {
@@ -248,6 +312,10 @@ export async function scrapeSite(rawUrl: string): Promise<SiteData> {
     stats,
     testimonials,
     clientLogos,
+    steps,
+    pains,
+    font,
+    shots: { hero: live?.hero ?? null, full: live?.full ?? null, sections: live?.sections ?? [] },
     cta,
     logo,
     images,

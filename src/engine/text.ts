@@ -8,8 +8,20 @@ export const FONT_FAMILY: Record<FontId, { display: string; weight: number; trac
 
 export const SUB_FONT = "Inter";
 
+/** The website's own headline font, used in place of Inter when it has loaded. */
+let brandFont: string | null = null;
+export function setBrandFont(name: string | null) {
+  brandFont = name;
+}
+
+/** Letter tracking (em) for a face; brand fonts get a neutral tight setting. */
+export function trackingOf(font: FontId) {
+  return font === "inter" && brandFont ? -0.02 : FONT_FAMILY[font].tracking;
+}
+
 export function displayFont(font: FontId, size: number) {
   const f = FONT_FAMILY[font];
+  if (font === "inter" && brandFont) return `700 ${Math.round(size)}px "${brandFont}", "Inter", sans-serif`;
   return `${f.weight} ${Math.round(size)}px "${f.display}", Impact, sans-serif`;
 }
 
@@ -26,7 +38,7 @@ export function fitSize(
   maxSize: number,
 ) {
   ctx.font = displayFont(font, 100);
-  const w = measureTracked(ctx, text, 100 * FONT_FAMILY[font].tracking);
+  const w = measureTracked(ctx, text, 100 * trackingOf(font));
   if (w <= 0) return maxSize;
   return Math.min(maxSize, (100 * maxWidth) / w);
 }
@@ -142,7 +154,7 @@ export function layoutHeadline(
     size,
     lineHeight,
     ys: lines.map((_, i) => top + i * lineHeight),
-    tracking: size * FONT_FAMILY[font].tracking,
+    tracking: size * trackingOf(font),
   };
 }
 

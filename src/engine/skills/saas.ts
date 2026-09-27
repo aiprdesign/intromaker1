@@ -69,6 +69,24 @@ function stagger(sc: SkillContext) {
   return Math.min(0.11, sc.beat / 2);
 }
 
+/** Top-of-frame headline with an optional chapter eyebrow ("How it works") above it. */
+function topHeadline(sc: SkillContext) {
+  const { w, h, t, d, u, scene } = sc;
+  const portrait = h > w;
+  const hasEb = !!scene.eyebrow;
+  const cy = h * (portrait ? 0.12 : 0.12) + (hasEb ? h * 0.04 : 0);
+  const layout = sentence(sc, { text: accented(scene.text), cy, sizeFrac: portrait ? 0.075 : 0.068, widthFrac: 0.84, maxLines: 2 });
+  if (hasEb) eyebrow(sc, scene.eyebrow!, layout.ys[0] - layout.size * 0.62 - 26 * u, range(t, 0.05, 0.45) * (1 - range(t, d - 0.4, d)));
+  blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
+  return layout;
+}
+
+/** Chapter eyebrow above a centred block whose first line sits at `top`. */
+function chapter(sc: SkillContext, top: number, start = 0.05) {
+  const { t, d, u, scene } = sc;
+  if (scene.eyebrow) eyebrow(sc, scene.eyebrow, top - 40 * u, range(t, start, start + 0.4) * (1 - range(t, d - 0.4, d)));
+}
+
 function drawLogoMark(sc: SkillContext, src: string | undefined, cx: number, cy: number, box: number, alpha = 1) {
   const img = getImage(src);
   if (!img || !img.naturalWidth) return false;
@@ -102,7 +120,7 @@ function blurReveal(sc: SkillContext) {
   const exitAt = d - 0.45;
   const layout = sentence(sc, { text: accented(scene.text), cy: h * 0.47, sizeFrac: 0.115, widthFrac: 0.8, maxLines: h > w ? 4 : 3 });
   const top = layout.ys[0] - layout.size * 0.62;
-  eyebrow(sc, scene.items?.[0] ?? "", top - 44 * u, range(t, 0.05, 0.5) * (1 - range(t, exitAt, exitAt + 0.3)));
+  eyebrow(sc, scene.eyebrow ?? scene.items?.[0] ?? "", top - 44 * u, range(t, 0.05, 0.5) * (1 - range(t, exitAt, exitAt + 0.3)));
   const n = blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt });
   const bottom = layout.ys[layout.ys.length - 1] + layout.size * 0.62;
   subText(sc, scene.subtext, bottom + 46 * u, range(t, 0.35 + n * stagger(sc), 0.95 + n * stagger(sc)) * (1 - range(t, exitAt, exitAt + 0.4)));
@@ -349,8 +367,7 @@ function uiTour(sc: SkillContext) {
   band.addColorStop(1, rgba(palette.bg0, 0));
   ctx.fillStyle = band;
   ctx.fillRect(0, 0, w, h * 0.26);
-  const layout = sentence(sc, { text: accented(scene.text), cy: portrait ? h * 0.13 : h * 0.12, sizeFrac: portrait ? 0.075 : 0.068, widthFrac: 0.84, maxLines: 2 });
-  blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
+  topHeadline(sc);
 }
 
 /* ───────────────────────── Bento Grid ───────────────────────── */
@@ -522,8 +539,7 @@ function bento(sc: SkillContext) {
   const cells = (portrait ? BENTO_PORT : BENTO_LAND)[n];
   const cols = portrait ? 2 : 4;
   const rows = portrait ? 4 : 2;
-  const layout = sentence(sc, { text: accented(scene.text), cy: h * (portrait ? 0.1 : 0.13), sizeFrac: portrait ? 0.075 : 0.068, widthFrac: 0.84, maxLines: 2 });
-  blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
+  topHeadline(sc);
   const gx0 = w * 0.07;
   const gy0 = h * (portrait ? 0.2 : 0.25);
   const gw = w * 0.86;
@@ -600,8 +616,7 @@ function uiCards(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 2 });
   const portrait = h > w;
-  const layout = sentence(sc, { text: accented(scene.text), cy: h * (portrait ? 0.12 : 0.12), sizeFrac: portrait ? 0.075 : 0.068, widthFrac: 0.84, maxLines: 2 });
-  blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
+  topHeadline(sc);
   const ex = ease.inCubic(exitT(sc, 0.4));
   // Central product screen.
   const sw = portrait ? w * 0.78 : w * 0.5;
@@ -718,6 +733,7 @@ function painStrike(sc: SkillContext) {
     const size = Math.min(70 * u, (w * 0.8) / Math.max(8, Math.max(...items.map((i) => i.length)) * 0.55));
     const lh = size * 1.55;
     const top = h * 0.46 - ((items.length - 1) * lh) / 2;
+    chapter(sc, top - lh * 0.4);
     ctx.save();
     ctx.font = `700 ${Math.round(size)}px Inter, sans-serif`;
     ctx.textAlign = "center";
@@ -848,6 +864,7 @@ function orbit(sc: SkillContext) {
   }
   ctx.restore();
   const layout = sentence(sc, { text: accented(scene.text), cy: portrait ? h * 0.8 : h * 0.86, sizeFrac: 0.07, widthFrac: 0.84, maxLines: 2 });
+  chapter(sc, layout.ys[0] - layout.size * 0.6, 0.5);
   blurInLayout(sc, layout, 0.6, 0.06, { exitAt: d - 0.4 });
 }
 
@@ -868,6 +885,7 @@ function testimonial(sc: SkillContext) {
   const cx0 = w / 2 - cw / 2;
   const cy0 = qTop - 110 * u;
   const k = clamp(spring(t - 0.1, 10, 7), 0, 1.05);
+  chapter(sc, cy0 - 6 * u);
   ctx.save();
   ctx.globalAlpha = clamp(t / 0.25) * (1 - ex);
   ctx.translate(w / 2, cy0 + ch / 2 + (1 - Math.min(1, k)) * 50 * u);
@@ -947,6 +965,7 @@ function marquee(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 2 });
   const layout = sentence(sc, { text: accented(scene.text), cy: h * 0.33, sizeFrac: 0.08, widthFrac: 0.84, maxLines: 2 });
+  chapter(sc, layout.ys[0] - layout.size * 0.6);
   const n = blurInLayout(sc, layout, 0.15, stagger(sc), { exitAt: d - 0.4 });
   const logos = (brand?.clientLogos ?? []).map((s) => getImage(s)).filter((i): i is HTMLImageElement => !!i && i.naturalWidth > 0);
   const ex = ease.inCubic(exitT(sc, 0.4));
@@ -1077,6 +1096,209 @@ function ctaLockup(sc: SkillContext) {
   }
 }
 
+/* ───────────────────────── Website Scroll ───────────────────────── */
+
+function scrollTiming(d: number) {
+  return { first: 0.9, second: Math.max(2.2, d * 0.5) };
+}
+
+function siteScroll(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
+  saasBackground(sc, { beams: 2 });
+  const portrait = h > w;
+  topHeadline(sc);
+  const ex = ease.inCubic(exitT(sc, 0.4));
+  const ww = portrait ? w * 0.88 : w * 0.7;
+  const top = h * (scene.eyebrow ? 0.28 : 0.25);
+  const wh = Math.min(h * 0.7, h - top - 24 * u);
+  const x0 = w / 2 - ww / 2;
+  const bar = 34 * u;
+  // Tilted in from below, settling flat (a faux 3D rotateX).
+  const k = clamp(spring(t - 0.05, 8, 6), 0, 1.04);
+  const tilt = (1 - Math.min(1, k)) * 0.35;
+  ctx.save();
+  ctx.globalAlpha = clamp(t / 0.3) * (1 - ex);
+  ctx.translate(w / 2, top + wh / 2 + (1 - Math.min(1, k)) * h * 0.2 + Math.sin(t * 1.1) * 4 * u);
+  ctx.transform(1, 0, 0, 1 - tilt * 0.5, 0, 0);
+  ctx.scale(0.92 + 0.08 * Math.min(1, k), 0.92 + 0.08 * Math.min(1, k));
+  ctx.translate(-w / 2, -(top + wh / 2));
+  glassCard(sc, x0 - 1, top - 1, ww + 2, wh + 2, { r: 16 * u });
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x0, top, ww, wh, 16 * u);
+  ctx.clip();
+  ctx.fillStyle = "#121019";
+  ctx.fillRect(x0, top, ww, bar);
+  ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(x0 + 20 * u + i * 18 * u, top + bar / 2, 5.5 * u, 0, TAU);
+    ctx.fill();
+  });
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.beginPath();
+  ctx.roundRect(w / 2 - ww * 0.2, top + bar * 0.2, ww * 0.4, bar * 0.6, bar * 0.3);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.font = subFont(13 * u, 500);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(brand?.domain ?? "yourproduct.com", w / 2, top + bar / 2);
+  // Smoothly scroll the real full-page screenshot, with pauses to read.
+  const vx = x0;
+  const vy = top + bar;
+  const vw = ww;
+  const vh = wh - bar;
+  const img = getMedia(scene.media, t);
+  const T = scrollTiming(d);
+  const p1 = ease.inOutCubic(range(t, T.first, T.first + 1.1)) * 0.4;
+  const p2 = ease.inOutCubic(range(t, T.second, T.second + 1.2)) * 0.45;
+  const p = p1 + p2;
+  if (img) {
+    const iw = "naturalWidth" in img ? img.naturalWidth : img.videoWidth;
+    const ih = "naturalHeight" in img ? img.naturalHeight : img.videoHeight;
+    const sc2 = vw / iw;
+    const maxScroll = Math.max(0, ih * sc2 - vh);
+    const sy = (p * maxScroll) / sc2;
+    ctx.drawImage(img, 0, sy, iw, Math.min(ih - sy, vh / sc2), vx, vy, vw, Math.min(vh, (ih - sy) * sc2));
+    // Scrollbar.
+    const thumbH = Math.max(40 * u, (vh * vh) / (ih * sc2));
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.roundRect(vx + vw - 10 * u, vy + 6 * u + (vh - thumbH - 12 * u) * (maxScroll ? (p * maxScroll) / maxScroll : 0), 5 * u, thumbH, 3 * u);
+    ctx.fill();
+  } else mockUi(sc, vx, vy, vw, vh);
+  // Soft fade at the bottom edge of the viewport.
+  const fade = ctx.createLinearGradient(0, vy + vh * 0.8, 0, vy + vh);
+  fade.addColorStop(0, rgba(palette.bg0, 0));
+  fade.addColorStop(1, rgba(palette.bg0, 0.55));
+  ctx.fillStyle = fade;
+  ctx.fillRect(vx, vy + vh * 0.8, vw, vh * 0.2);
+  ctx.restore();
+  borderBeam(sc, x0, top, ww, wh, t * 0.3, { r: 16 * u, alpha: 0.7 });
+  ctx.restore();
+  // Cursor exploring the page.
+  if (t > 0.5) {
+    const cx = w / 2 + ww * (0.12 + 0.1 * Math.sin(t * 0.9));
+    const cy = top + wh * (0.45 + 0.12 * Math.sin(t * 0.7 + 1));
+    ctx.save();
+    ctx.globalAlpha = clamp((t - 0.5) / 0.3) * (1 - ex);
+    drawCursor(sc, cx, cy);
+    ctx.restore();
+  }
+}
+
+/* ───────────────────────── How It Works ───────────────────────── */
+
+function stepsTiming(scene: Scene, beat: number) {
+  const n = Math.max(2, Math.min(4, (scene.items ?? []).length || 3));
+  const step = Math.max(0.6, beat * 2);
+  return Array.from({ length: n }, (_, i) => 0.6 + i * step);
+}
+
+function steps(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene } = sc;
+  saasBackground(sc, { beams: 2 });
+  const portrait = h > w;
+  topHeadline(sc);
+  const items = (scene.items ?? []).filter(Boolean).slice(0, 4);
+  const labels = items.length >= 2 ? items : ["Connect", "Customize", "Launch"];
+  const times = stepsTiming({ ...scene, items: labels }, sc.beat);
+  const n = labels.length;
+  const ex = ease.inCubic(exitT(sc, 0.4));
+  const R = 40 * u;
+  const pts = labels.map((_, i) =>
+    portrait
+      ? { x: w * 0.17, y: h * 0.3 + (i * h * 0.6) / Math.max(1, n - 1) * (n > 1 ? 0.95 : 0) }
+      : { x: w * 0.14 + (i * w * 0.72) / Math.max(1, n - 1), y: h * 0.47 },
+  );
+  const g = ctx.createLinearGradient(pts[0].x, pts[0].y, pts[n - 1].x, pts[n - 1].y);
+  g.addColorStop(0, palette.primary);
+  g.addColorStop(1, palette.secondary);
+  ctx.save();
+  ctx.globalAlpha = (1 - ex) * clamp(t / 0.4);
+  // Track + progress fill.
+  ctx.lineCap = "round";
+  ctx.lineWidth = 4 * u;
+  ctx.strokeStyle = rgba(palette.text, 0.12);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  ctx.lineTo(pts[n - 1].x, pts[n - 1].y);
+  ctx.stroke();
+  let prog = 0;
+  for (let i = 1; i < n; i++) prog += ease.inOutCubic(range(t, times[i - 1] + 0.2, times[i]));
+  const segF = prog / Math.max(1, n - 1);
+  ctx.strokeStyle = g;
+  ctx.shadowColor = palette.primary;
+  ctx.shadowBlur = 16 * u;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  ctx.lineTo(lerp(pts[0].x, pts[n - 1].x, segF), lerp(pts[0].y, pts[n - 1].y, segF));
+  ctx.stroke();
+  ctx.restore();
+  labels.forEach((label, i) => {
+    const lt = t - times[i];
+    const on = clamp(spring(lt, 12, 7), 0, 1.15);
+    const p = pts[i];
+    const colW = portrait ? w * 0.66 : (w * 0.72) / Math.max(1, n - 1) * 0.9;
+    ctx.save();
+    ctx.globalAlpha = (1 - ex) * clamp(0.35 + clamp(lt / 0.3) * 0.65);
+    // Card with the step title.
+    const cw = Math.min(colW, 380 * u);
+    const ch = 130 * u;
+    const cx = portrait ? p.x + R + 24 * u : p.x - cw / 2;
+    const cy = portrait ? p.y - ch / 2 : p.y + R + 26 * u;
+    const ck = lt > 0 ? Math.min(1, on) : 0;
+    ctx.save();
+    ctx.globalAlpha *= 0.5 + 0.5 * ck;
+    ctx.translate(0, (1 - ck) * 18 * u);
+    glassCard(sc, cx, cy, cw, ch, { r: 18 * u, tint: lt > 0 ? palette.bg1 : undefined });
+    if (lt > 0 && lt < 2.2) borderBeam(sc, cx, cy, cw, ch, lt * 0.5, { r: 18 * u, alpha: 1 - clamp((lt - 1.6) / 0.6) });
+    ctx.fillStyle = palette.text;
+    ctx.font = `700 ${Math.round(Math.min(30 * u, cw / 10))}px Inter, sans-serif`;
+    ctx.textAlign = portrait ? "left" : "center";
+    ctx.textBaseline = "middle";
+    const words = label.split(" ");
+    const lines: string[] = [];
+    let line = "";
+    for (const wd of words) {
+      const next = line ? `${line} ${wd}` : wd;
+      if (ctx.measureText(next).width > cw - 40 * u && line) {
+        lines.push(line);
+        line = wd;
+      } else line = next;
+    }
+    lines.push(line);
+    const lh = Math.min(30 * u, cw / 10) * 1.25;
+    lines.slice(0, 2).forEach((l, li, arr) =>
+      ctx.fillText(l, portrait ? cx + 24 * u : cx + cw / 2, cy + ch / 2 + (li - (arr.length - 1) / 2) * lh),
+    );
+    ctx.restore();
+    // Numbered node.
+    ctx.translate(p.x, p.y);
+    const sk = lt > 0 ? on : 0.85;
+    ctx.scale(sk, sk);
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, TAU);
+    if (lt > 0) {
+      ctx.fillStyle = g;
+      ctx.shadowColor = palette.primary;
+      ctx.shadowBlur = 30 * u;
+    } else ctx.fillStyle = palette.bg1;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = rgba(palette.text, lt > 0 ? 0.6 : 0.2);
+    ctx.lineWidth = 2 * u;
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = `800 ${Math.round(R * 0.9)}px Inter, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(i + 1), 0, 2 * u);
+    ctx.restore();
+  });
+}
+
 /* ───────── registry ───────── */
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
@@ -1173,6 +1395,28 @@ export const saasSkills: Skill[] = [
     sample: { text: "Trusted by *12,000+* teams", subtext: "From startups to the Fortune 500" },
     render: marquee,
     sfx: () => [at(0.15, "swoosh")],
+  },
+  {
+    id: "site-scroll",
+    name: "Website Scroll",
+    tagline: "Your real website scrolls smoothly inside a floating browser while a cursor explores.",
+    bestFor: "Showing the actual site right after the brand reveal. Uses the full-page screenshot from live capture.",
+    sample: { text: "Meet your new *workspace*" },
+    render: siteScroll,
+    sfx: (scene) => {
+      const T = scrollTiming(scene.duration);
+      return [at(0.05, "swoosh"), at(T.first, "swoosh"), at(T.second, "swoosh")];
+    },
+  },
+  {
+    id: "steps",
+    name: "How It Works",
+    tagline: "Numbered steps light up in sequence along a glowing progress line.",
+    bestFor: "'How it works' / onboarding flows. items = 2–4 short step titles.",
+    sample: { text: "Up and running in *minutes*", items: ["Connect your data", "Invite your team", "Close more deals"] },
+    itemsHint: "2–4 steps, comma separated",
+    render: steps,
+    sfx: (scene, beat) => stepsTiming(scene, beat).map((s) => at(s, "pop")),
   },
   {
     id: "cta",

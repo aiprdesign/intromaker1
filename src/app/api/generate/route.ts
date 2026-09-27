@@ -1,7 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod/v4";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { assetUrl } from "@/engine/assets";
+import { SHOT_DIR } from "@/lib/capture";
 import { PALETTES } from "@/engine/palettes";
 import {
   beatSync,
@@ -27,7 +30,8 @@ const MODEL = process.env.INTROMAKER_MODEL || "claude-opus-5";
 const SceneSchema = z.object({
   skill: z.enum(SKILL_IDS),
   text: z.string().describe("Headline. Trailer style: UPPERCASE 1-4 words. SaaS style: sentence case, 3-9 words, *accent* key word"),
-  items: z.array(z.string()).describe("List content for bento/ui-tour/ui-cards/pain-strike/word-swap/blur-reveal eyebrow; else []"),
+  items: z.array(z.string()).describe("List content for bento/ui-tour/ui-cards/pain-strike/steps/word-swap; else []"),
+  eyebrow: z.string().describe("SaaS chapter label shown above the headline (e.g. 'How it works'), or empty"),
   subtext: z.string().describe("Optional supporting line, max ~40 characters, or empty string"),
   duration: z.number().describe("Seconds, 2-5"),
   transition: z.enum(TRANSITIONS),
@@ -77,7 +81,7 @@ TRAILER: epic cinematic trailer. UPPERCASE 1-4 word cards, anton/grotesk font, s
 SAAS: a world-class product-launch film in the style of Linear, Vercel, Stripe and Apple keynotes. Rules:
 - Font "inter". Copy in sentence case, 3-9 words, confident and concrete; wrap the key word in *asterisks* for the brand gradient ("Close deals at the speed of *thought*").
 - Narrative: hook (the promise, or pain-strike with 2-4 real pains → the better way) → brand (logo-reveal or particle-assemble) → product (ui-tour with 2 callout items, or ui-cards) → features (bento with 3-6 short feature items) → proof (testimonial ONLY with a real quote; logo-marquee ONLY with real customer logos; stats in ui-cards/number-ticker) → integrations if relevant → cta (subtext = the button label) last.
-- Prefer these skills: blur-reveal, word-swap ("Ship faster|smarter|together"), pain-strike, ui-tour, bento, ui-cards, integrations, testimonial, logo-marquee, cta, logo-reveal. Avoid neon/retro/glitch/shockwave/kinetic-slam.
+- Prefer these skills: site-scroll, steps, blur-reveal, word-swap ("Ship faster|smarter|together"), pain-strike, ui-tour, bento, ui-cards, integrations, testimonial, logo-marquee, cta, logo-reveal. Avoid neon/retro/glitch/shockwave/kinetic-slam.
 - Transitions: dolly, whip, cut, leak. bpm 112-126. Durations: hooks 3-3.5s, ui-tour 5.5-6.5s, bento 4.5-5s, others 3.5-4.5s.
 - Never invent customer names, quotes, logos or statistics.
 - Vary skills so no two consecutive scenes use the same one, and pick skills whose aesthetic fits the prompt's mood. Save the most spectacular skills (god-rays, shockwave, particle-assemble, glass-shatter, warp-tunnel) for the hook, title and outro.
@@ -93,11 +97,20 @@ export async function GET() {
   return Response.json({ ai: hasCredentials(), model: hasCredentials() ? MODEL : null });
 }
 
-function siteBrief(site: SiteData) {
-  const assets = [
-    ...site.images.map((u, i) => `[${i}] image${i === 0 ? " (hero / social card)" : ""}: ${u}`),
-    ...site.videos.map((u, i) => `[${site.images.length + i}] video: ${u}`),
+function siteAssets(site: SiteData): { media: Media; label: string }[] {
+  const brand = brandFromSite(site);
+  const sh = site.shots ?? { hero: null, full: null, sections: [] };
+  return [
+    ...(sh.full ? [{ media: { src: sh.full, kind: "image" as const }, label: "FULL-PAGE screenshot of the website (use with site-scroll)" }] : []),
+    ...(sh.hero ? [{ media: { src: sh.hero, kind: "image" as const }, label: "hero screenshot of the website (above the fold)" }] : []),
+    ...sh.sections.map((src, i) => ({ media: { src, kind: "image" as const }, label: `screenshot of page section ${i + 1}` })),
+    ...brand.images.map((src, i) => ({ media: { src, kind: "image" as const }, label: `image from the page${i === 0 ? " (social card / hero)" : ""}: ${site.images[i]}` })),
+    ...brand.videos.map((src, i) => ({ media: { src, kind: "video" as const }, label: `product video: ${site.videos[i]}` })),
   ];
+}
+
+function siteBrief(site: SiteData) {
+  const assets = siteAssets(site).map((a, i) => `[${i}] ${a.label}`);
   return [
     `WEBSITE: ${site.url}`,
     `Brand name: ${site.name}`,
@@ -109,6 +122,8 @@ function siteBrief(site: SiteData) {
     `Feature descriptions: ${site.features.filter(Boolean).map((f) => `"${f}"`).join(", ") || "(none)"}`,
     `TESTIMONIALS: ${site.testimonials.map((q) => `"${q.quote}" — ${q.author}${q.role ? `, ${q.role}` : ""}`).join(" | ") || "(none)"}`,
     `CUSTOMER LOGOS: ${site.clientLogos.length}`,
+    `HOW IT WORKS steps: ${site.steps.join(" → ") || "(none)"}`,
+    `Pains the product removes: ${site.pains.join(", ") || "(none)"}`,
     `Logo available: ${site.logo ? "yes (logo-reveal will use it automatically)" : "no"}`,
     `ASSETS:\n${assets.join("\n") || "(none)"}`,
   ].join("\n");
@@ -121,7 +136,35 @@ This storyboard is a product intro for the website below, built from its own bra
 - Show the real product: include a product-showcase scene with the best hero image or video (set "media" to its ASSETS index).
 - Use photo-montage for feature beats over other images (each with its own "media" index), and screen-wall once when there are 3+ images.
 - For every other skill set "media" to -1. End with a cta scene whose subtext is the site's real call-to-action label.
-- testimonial: use a quote from TESTIMONIALS verbatim (text = quote, subtext = "Name · Role"). logo-marquee only if CUSTOMER LOGOS > 0.`;
+- testimonial: use a quote from TESTIMONIALS verbatim (text = quote, subtext = "Name · Role"). logo-marquee only if CUSTOMER LOGOS > 0.
+- Tell ONE coherent story with a clear arc, each scene setting up the next, with an "eyebrow" chapter label:
+  1 Hook ("The old way": pain-strike with the real pains → "There's a *better* way", or blur-reveal with the promise)
+  2 Reveal (logo-reveal, subtext = the promise) 3 Meet (site-scroll on the FULL-PAGE screenshot, eyebrow "Meet <Name>")
+  4 How it works (steps with the real steps) 5 Features (ui-tour on the best product image/video with 2 callouts; bento)
+  6 Proof ("Loved by teams" testimonial, "Customers" logo-marquee, "Results" ui-cards with real stats) 7 Integrations 8 CTA.
+  Skip beats the site has no material for. Keep copy consistent: one voice, one promise, recurring brand name.`;
+
+/** Screenshots Claude should look at: the hero plus a few page sections (vision input). */
+async function siteImages(site: SiteData) {
+  const sh = site.shots ?? { hero: null, full: null, sections: [] };
+  const assets = siteAssets(site);
+  const picks = [sh.hero, ...sh.sections.slice(0, 3)].filter((x): x is string => !!x);
+  const blocks: Anthropic.Beta.BetaContentBlockParam[] = [];
+  for (const src of picks) {
+    const id = src.match(/id=([a-f0-9]{16}-(?:hero|full|s\d))$/)?.[1];
+    if (!id) continue;
+    try {
+      const data = await readFile(join(SHOT_DIR, `${id}.jpg`));
+      if (data.length > 4_500_000) continue;
+      const idx = assets.findIndex((a) => a.media.src === src);
+      blocks.push({ type: "text", text: `Screenshot ASSET [${idx}]:` });
+      blocks.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: data.toString("base64") } });
+    } catch {
+      /* screenshot expired */
+    }
+  }
+  return blocks;
+}
 
 export async function POST(req: Request) {
   let body: Partial<PlanRequest> & { site?: unknown; colors?: Brand["colors"]; style?: StyleChoice };
@@ -167,12 +210,18 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "user",
-          content:
-            (site ? `${siteBrief(site)}\n\n` : "") +
+          content: [
+            ...(site ? await siteImages(site) : []),
+            {
+              type: "text",
+              text:
+            (site ? `${site.shots?.hero ? "Above are screenshots of the website — use them to understand the product, its look and which assets best show it.\n\n" : ""}${siteBrief(site)}\n\n` : "") +
             (prompt ? `Prompt: ${prompt}\n\n` : "") +
             `Style: ${wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${aspect}. Target total length: ${LENGTH_SECONDS[length]} seconds.` +
             (palette !== "auto" ? ` Use the "${palette}" palette.` : "") +
             (seed ? ` Variation #${seed % 1000}: take a fresh creative angle.` : ""),
+            },
+          ],
         },
       ],
     });
@@ -182,9 +231,7 @@ export async function POST(req: Request) {
     }
     const out = response.parsed_output;
     const brand = site ? brandFromSite(site, colors) : undefined;
-    const assets: Media[] = brand
-      ? [...brand.images.map((src) => ({ src, kind: "image" as const })), ...brand.videos.map((src) => ({ src, kind: "video" as const }))]
-      : [];
+    const assets: Media[] = site ? siteAssets(site).map((a) => a.media) : [];
     const plan = beatSync(
       sanitizePlan({
         ...out,
@@ -198,7 +245,7 @@ export async function POST(req: Request) {
           // Testimonials get the real author's avatar when the quote matches the site's.
           const q = site?.testimonials.find((x) => s.skill === "testimonial" && x.avatar && s.text.includes(x.quote.slice(0, 40)));
           const media = q?.avatar ? { src: assetUrl(q.avatar), kind: "image" as const } : assets[idx];
-          return { ...s, subtext: s.subtext || undefined, items: s.items?.length ? s.items : undefined, media };
+          return { ...s, subtext: s.subtext || undefined, items: s.items?.length ? s.items : undefined, eyebrow: s.eyebrow || undefined, media };
         }),
       }),
     );

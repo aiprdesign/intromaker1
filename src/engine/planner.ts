@@ -18,7 +18,7 @@ import {
 } from "./types";
 
 export type Length = "short" | "standard" | "long";
-export const LENGTH_SECONDS: Record<Length, number> = { short: 10, standard: 16, long: 26 };
+export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20, long: 34 };
 
 export type StyleChoice = "auto" | "saas" | "trailer";
 
@@ -469,6 +469,7 @@ export function brandFromSite(site: SiteData, colors?: Brand["colors"]): Brand {
     images: site.images.map(assetUrl),
     videos: site.videos.map(assetUrl),
     clientLogos: site.clientLogos.map(assetUrl),
+    font: site.font ?? undefined,
     colors,
   };
 }
@@ -499,6 +500,17 @@ export function readSite(raw: unknown): SiteData | null {
         avatar: http(q.avatar) ? (q.avatar as string) : null,
       })),
     clientLogos: (Array.isArray(r.clientLogos) ? r.clientLogos : []).filter(http).slice(0, 16) as string[],
+    steps: strs(r.steps, 4, 60),
+    pains: strs(r.pains, 4, 50),
+    font: typeof r.font === "string" && /^[A-Za-z0-9 ]{2,40}$/.test(r.font) ? r.font : null,
+    shots: (() => {
+      const sh = (r.shots ?? {}) as Record<string, unknown>;
+      return {
+        hero: isShot(sh.hero) ? sh.hero : null,
+        full: isShot(sh.full) ? sh.full : null,
+        sections: (Array.isArray(sh.sections) ? sh.sections : []).filter(isShot).slice(0, 6),
+      };
+    })(),
     cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
     logo: http(r.logo) ? (r.logo as string) : null,
     images: (Array.isArray(r.images) ? r.images : []).filter(http).slice(0, 14) as string[],
@@ -541,9 +553,16 @@ function sentenceCopy(text: string, maxWords: number) {
 }
 
 /**
- * The SaaS launch-film structure used by best-in-class product videos:
- * hook statement → logo → product tour → features bento → live product → proof → integrations → CTA.
- * Only real site content is used for claims, quotes and logos.
+ * The launch-film story arc used by best-in-class SaaS videos, built only from the site's
+ * real content, with chapter labels so every scene reads as part of one story:
+ *   1. Hook      — the problem (struck-through pains) or the product's promise
+ *   2. Reveal    — the logo, with the promise as its line
+ *   3. Meet      — the real website scrolling in a browser
+ *   4. How       — "how it works" steps
+ *   5. Features  — a cursor tour of the product, then a bento of features
+ *   6. Proof     — real testimonial, customer logos, real stats
+ *   7. Ecosystem — integrations, if the site mentions them
+ *   8. CTA       — closing line + the site's own button, clicked
  */
 function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const seed = (req.seed ?? hashString(site.url)) >>> 0;
@@ -554,9 +573,10 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const beats = (n: number) => n * beat;
   const target = LENGTH_SECONDS[req.length];
   const brand = brandFromSite(site, req.colors);
+  const img = (src: string | null | undefined): Media | undefined => (src ? { src, kind: "image" } : undefined);
   const images = brand.images.map((src): Media => ({ src, kind: "image" }));
   const video: Media | undefined = brand.videos[0] ? { src: brand.videos[0], kind: "video" } : undefined;
-  const hero = video ?? images[0];
+  const shots = site.shots ?? { hero: null, full: null, sections: [] };
 
   const tagline = sentenceCopy(site.tagline, 10) || sentenceCopy(site.description, 12) || `Meet ${site.name}`;
   const shortFeatures = site.headlines.map((h) => sentenceCopy(h, 6)).filter((h) => h && h !== tagline);
@@ -564,86 +584,123 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const stat = site.stats.find((st) => /team|customer|compan|user|business|developer|people|brand|org/i.test(st));
   const quote = site.testimonials.find((q) => q.quote.length <= 190 && q.author);
   const integrationLine = site.headlines.find((h) => /integrat|connect|tools|apps|stack|plug/i.test(h));
+  const pains = (site.pains ?? []).slice(0, 3);
 
   type Beat = { scene: Scene; priority: number };
   const candidates: Beat[] = [];
   const add = (priority: number, scene: Scene) => candidates.push({ priority, scene });
 
-  // 1. Hook: the site's own promise, blurred in word by word.
+  // 1. Hook: the problem, or the promise.
+  const painHook = pains.length >= 2;
+  if (painHook) {
+    add(1, {
+      skill: "pain-strike",
+      text: "There's a *better* way.",
+      items: pains,
+      eyebrow: "The old way",
+      duration: beats(pains.length * 2 + 5),
+      transition: "cut",
+    });
+  } else {
+    add(1, { skill: "blur-reveal", text: tagline, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
+  }
+  // 2. Reveal.
   add(1, {
-    skill: "blur-reveal",
-    text: tagline,
-    items: [`Introducing ${site.name}`],
-    duration: beats(7),
-    transition: "cut",
-  });
-  // 2. Brand lock-up.
-  add(2, {
     skill: brand.logo ? "logo-reveal" : "particle-assemble",
     text: site.name,
-    subtext: site.domain,
+    subtext: painHook ? tagline : site.domain,
     duration: beats(6),
     transition: "dolly",
   });
-  // 3. Product tour on the real product.
-  if (hero) {
+  // 3. Meet: the real website.
+  if (shots.full) {
     add(3, {
+      skill: "site-scroll",
+      text: painHook ? tagline : sentenceCopy(site.description, 10) || tagline,
+      eyebrow: `Meet ${site.name}`,
+      duration: Math.max(5, beats(10)),
+      transition: "whip",
+      media: img(shots.full),
+    });
+  }
+  // 4. How it works.
+  if (site.steps && site.steps.length >= 2) {
+    add(5, {
+      skill: "steps",
+      text: `Get started in *${site.steps.length} steps*`,
+      items: site.steps.slice(0, 4),
+      eyebrow: "How it works",
+      duration: Math.max(4.4, beats(site.steps.length * 2 + 4)),
+      transition: "dolly",
+    });
+  }
+  // 5. Features: cursor tour on the product, then a bento.
+  const tourMedia = video ?? images[0] ?? img(shots.sections[0]) ?? img(shots.hero);
+  if (tourMedia) {
+    add(4, {
       skill: "ui-tour",
       text: longFeatures[0] ?? `See ${site.name} in action`,
       items: shortFeatures.slice(1, 3),
+      eyebrow: "Features",
       duration: Math.max(5.6, beats(12)),
       transition: "whip",
-      media: hero,
+      media: tourMedia,
     });
   }
-  // 4. Feature bento from the site's own feature headings.
   if (shortFeatures.length >= 3) {
-    add(4, {
+    add(6, {
       skill: "bento",
       text: `Everything in *${site.name}*`,
       items: shortFeatures.slice(0, 6),
+      eyebrow: "All-in-one",
       duration: Math.max(4.4, beats(10)),
       transition: "dolly",
     });
   }
-  // 5. The product, alive, with real stats in the widgets.
-  const second = images[hero === images[0] ? 1 : 0] ?? hero;
-  if (second && (site.stats.length || shortFeatures.length)) {
-    add(6, {
-      skill: "ui-cards",
-      text: longFeatures[1] ?? tagline,
-      items: [shortFeatures[0] ?? site.name, site.stats[0] ?? "", shortFeatures[1] ?? "", shortFeatures[2] ?? ""].filter((x, i) => x || i < 2),
-      duration: Math.max(4.2, beats(9)),
-      transition: "whip",
-      media: second,
-    });
-  }
-  // 6. Social proof: only real quotes and real customer logos.
+  // 6. Proof — only real quotes, logos and numbers.
   if (quote) {
     add(5, {
       skill: "testimonial",
       text: quote.quote,
       subtext: [quote.author, quote.role].filter(Boolean).join(" · "),
+      eyebrow: "Loved by teams",
       duration: Math.max(4.6, beats(10)),
       transition: "leak",
       ...(quote.avatar ? { media: { src: assetUrl(quote.avatar), kind: "image" as const } } : {}),
     });
   }
   if (brand.clientLogos && brand.clientLogos.length >= 4) {
-    add(5, {
+    add(6, {
       skill: "logo-marquee",
       text: stat ? `Trusted by *${stat.toLowerCase()}*` : "Trusted by *leading teams*",
+      eyebrow: "Customers",
       duration: beats(7),
       transition: "dolly",
     });
-  } else if (stat) {
-    add(7, { skill: "number-ticker", text: stat, duration: beats(6), transition: "dolly" });
   }
-  // 7. Integrations, if the site talks about them.
+  const cardsMedia = img(shots.sections[1]) ?? images[1] ?? img(shots.hero) ?? images[0];
+  if (site.stats.length && cardsMedia) {
+    add(7, {
+      skill: "ui-cards",
+      text: longFeatures[1] ?? `${site.name}, *in action*`,
+      items: [shortFeatures[0] ?? site.name, site.stats[0], shortFeatures[1] ?? "", shortFeatures[2] ?? ""],
+      eyebrow: "Results",
+      duration: Math.max(4.2, beats(9)),
+      transition: "whip",
+      media: cardsMedia,
+    });
+  }
+  // 7. Ecosystem.
   if (integrationLine) {
-    add(7, { skill: "integrations", text: sentenceCopy(integrationLine, 9) || integrationLine, duration: beats(8), transition: "whip" });
+    add(8, {
+      skill: "integrations",
+      text: sentenceCopy(integrationLine, 9) || integrationLine,
+      eyebrow: "Integrations",
+      duration: beats(8),
+      transition: "whip",
+    });
   }
-  // 8. CTA with the site's real button label.
+  // 8. CTA.
   add(1, {
     skill: "cta",
     text: `Try *${site.name}* today`,
@@ -652,12 +709,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     transition: "dolly",
   });
 
-  // Keep the highest-priority beats that fit the target length, in story order.
+  // Keep the highest-priority beats that fit, in story order.
   const order = candidates.map((c, i) => ({ ...c, i }));
   const chosen = new Set<number>();
   let used = 0;
   for (const c of [...order].sort((a, b) => a.priority - b.priority || a.i - b.i)) {
-    if (used + c.scene.duration <= target + 1.5 || c.priority <= 1) {
+    if (c.priority <= 1 || used + c.scene.duration <= target + 1.5) {
       chosen.add(c.i);
       used += c.scene.duration;
     }
@@ -790,7 +847,9 @@ export function beatSync(plan: VideoPlan): VideoPlan {
 }
 
 /** Only same-origin proxied assets may be referenced by a plan. */
-const isAsset = (s: unknown): s is string => typeof s === "string" && s.startsWith("/api/asset?url=") && s.length < 2100;
+const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d)$/.test(s);
+const isAsset = (s: unknown): s is string =>
+  (typeof s === "string" && s.startsWith("/api/asset?url=") && s.length < 2100) || isShot(s);
 const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0-9a-f]{6}$/i.test(s);
 
 function sanitizeMedia(m: unknown): Media | undefined {
@@ -809,6 +868,7 @@ function sanitizeBrand(b: unknown): Brand | undefined {
     images: (brand.images ?? []).filter(isAsset).slice(0, 14),
     videos: (brand.videos ?? []).filter(isAsset).slice(0, 4),
     clientLogos: (brand.clientLogos ?? []).filter(isAsset).slice(0, 16),
+    font: typeof brand.font === "string" && /^[A-Za-z0-9 ]{2,40}$/.test(brand.font) ? brand.font : undefined,
     colors: brand.colors && isHex(brand.colors.primary) && isHex(brand.colors.secondary) ? brand.colors : undefined,
   };
 }
@@ -826,6 +886,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
         ? (s.transition as Transition)
         : "cut",
       media: sanitizeMedia(s.media),
+      eyebrow: typeof s.eyebrow === "string" && s.eyebrow.trim() ? s.eyebrow.slice(0, 40) : undefined,
       items: Array.isArray(s.items)
         ? s.items.filter((i) => typeof i === "string" && i.trim()).slice(0, 8).map((i) => String(i).slice(0, 70))
         : undefined,

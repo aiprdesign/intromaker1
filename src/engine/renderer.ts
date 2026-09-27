@@ -1,6 +1,8 @@
 import { clamp, ease, mixHex, noise1, range, rgba, rng } from "./math";
 import { PALETTES } from "./palettes";
+import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
+import { setBrandFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import type { Aspect, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
@@ -65,6 +67,7 @@ export function renderScene(
   globalT = t,
 ) {
   const palette = brandPalette(plan.palette, plan.brand);
+  setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
   const beat = 60 / (plan.bpm ?? 120);
   const buffered = t < TRANSITION_LEN && BUFFERED.has(scene.transition);
   const target = buffered ? scratch("scene-buffer", w, h).ctx : ctx;
