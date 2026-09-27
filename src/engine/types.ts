@@ -56,7 +56,7 @@ export const PALETTE_IDS = [
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
 
-export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter"] as const;
+export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
 export const FONTS = ["anton", "grotesk", "inter"] as const;

@@ -8,8 +8,10 @@ import type { Aspect, Palette, Scene, SkillContext, Transition, VideoPlan } from
 
 export const TRANSITION_LEN = 0.45;
 
-/** Transitions that need the incoming scene rendered to a buffer first. */
-const BUFFERED = new Set<Transition>(["whip", "dolly"]);
+/** Transitions where outgoing and incoming shots overlap on screen. */
+export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak"]);
+/** How long past its end an overlapped scene keeps rendering (exit suppressed). */
+const OVERLAP_EXTEND = TRANSITION_LEN + 0.25;
 
 export function aspectSize(aspect: Aspect, long: number) {
   if (aspect === "9:16") return { w: Math.round((long * 9) / 16), h: long };
@@ -54,41 +56,42 @@ export interface RenderOptions {
   watermark?: string;
 }
 
-/** Render a single scene at local time t (used directly by the skill showcase). */
-export function renderScene(
-  ctx: CanvasRenderingContext2D,
+type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
+  bpm?: number;
+  brand?: VideoPlan["brand"];
+  style?: VideoPlan["style"];
+  look?: VideoPlan["look"];
+};
+
+/** Draw a scene's content (camera + skill), without transitions or post, into `target`. */
+function drawScene(
+  target: CanvasRenderingContext2D,
   scene: Scene,
-  plan: Pick<VideoPlan, "palette" | "font" | "seed"> & {
-    bpm?: number;
-    brand?: VideoPlan["brand"];
-    style?: VideoPlan["style"];
-    look?: VideoPlan["look"];
-  },
+  plan: PlanLike,
   t: number,
   w: number,
   h: number,
-  index = 0,
-  opts: RenderOptions = {},
-  globalT = t,
+  index: number,
+  opts: RenderOptions,
+  globalT: number,
+  /** Pretend-duration: extended when the next scene overlaps, so this one doesn't play its exit. */
+  d = scene.duration,
+  transitionIn = true,
 ) {
   const palette = brandPalette(plan.palette, plan.brand);
-  setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
-  const beat = 60 / (plan.bpm ?? 120);
-  const buffered = t < TRANSITION_LEN && BUFFERED.has(scene.transition);
-  const target = buffered ? scratch("scene-buffer", w, h).ctx : ctx;
   const sc: SkillContext = {
     ctx: target,
     w,
     h,
     t,
-    d: scene.duration,
-    p: clamp(t / scene.duration),
+    d,
+    p: clamp(t / d),
     u: Math.min(w, h) / 1080,
     scene,
     palette,
     font: plan.font,
     seed: (plan.seed + index * 7919) >>> 0,
-    beat,
+    beat: 60 / (plan.bpm ?? 120),
     brand: plan.brand,
     style: plan.style,
     look: plan.look,
@@ -96,14 +99,46 @@ export function renderScene(
   resetCtx(target);
   target.save();
   if (opts.camera !== false) applyCamera(sc, globalT);
-  applyTransitionIn(sc);
+  if (transitionIn) applyTransitionIn(sc);
   SKILL_MAP[scene.skill].render(sc);
   target.restore();
   resetCtx(target);
+  return sc;
+}
+
+/** Render a single scene at local time t (used directly by the skill showcase). */
+export function renderScene(
+  ctx: CanvasRenderingContext2D,
+  scene: Scene,
+  plan: PlanLike,
+  t: number,
+  w: number,
+  h: number,
+  index = 0,
+  opts: RenderOptions = {},
+  globalT = t,
+  context: { prev?: { scene: Scene; index: number }; extendSelf?: boolean } = {},
+) {
+  const palette = brandPalette(plan.palette, plan.brand);
+  setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
+  const d = context.extendSelf ? scene.duration + OVERLAP_EXTEND : scene.duration;
+  const overlapping = !!context.prev && t < TRANSITION_LEN && OVERLAP.has(scene.transition);
+  let sc: SkillContext;
+  if (overlapping) {
+    // Both shots on screen: the outgoing scene keeps running (exit suppressed) under the incoming one.
+    const prev = context.prev!;
+    const a = scratch("overlap-prev", w, h).ctx;
+    drawScene(a, prev.scene, plan, prev.scene.duration + t, w, h, prev.index, opts, globalT, prev.scene.duration + OVERLAP_EXTEND);
+    const b = scratch("overlap-next", w, h).ctx;
+    sc = drawScene(b, scene, plan, t, w, h, index, opts, globalT, d, false);
+    compositeOverlap({ ...sc, ctx }, a.canvas, b.canvas);
+  } else {
+    sc = drawScene(ctx, scene, plan, t, w, h, index, opts, globalT, d);
+  }
   const out = { ...sc, ctx };
-  if (buffered) compositeTransition(out, target.canvas);
   resetCtx(ctx);
-  transitionOverlay(out);
+  if (!overlapping) transitionOverlay(out);
+  else if (scene.transition === "leak") transitionOverlay(out);
   post(ctx, w, h, t, sc.seed, palette, opts, globalT);
 }
 
@@ -136,7 +171,11 @@ export function renderFrame(
     ctx.fillRect(0, 0, w, h);
     return;
   }
-  renderScene(ctx, at.scene, plan, at.local, w, h, at.index, opts, time);
+  const next = plan.scenes[at.index + 1];
+  renderScene(ctx, at.scene, plan, at.local, w, h, at.index, opts, time, {
+    prev: at.index > 0 ? { scene: plan.scenes[at.index - 1], index: at.index - 1 } : undefined,
+    extendSelf: !!next && OVERLAP.has(next.transition),
+  });
 }
 
 /**
@@ -158,34 +197,52 @@ function applyCamera(sc: SkillContext, globalT: number) {
   ctx.translate(-w / 2, -h / 2);
 }
 
-/** Composite a buffered incoming scene with a motion-blurred move. */
-function compositeTransition(sc: SkillContext, frame: HTMLCanvasElement) {
-  const { ctx, w, h, t, palette, seed } = sc;
+/**
+ * Composite outgoing (a) and incoming (b) shots — both on screen at once, like an edit:
+ * whip pan, dolly zoom-through, push, cross-dissolve with blur, light-leak dissolve.
+ */
+function compositeOverlap(sc: SkillContext, a: HTMLCanvasElement, b: HTMLCanvasElement) {
+  const { ctx, w, h, t, u, palette, seed } = sc;
   const k = range(t, 0, TRANSITION_LEN);
   ctx.fillStyle = palette.bg0;
   ctx.fillRect(0, 0, w, h);
-  if (sc.scene.transition === "whip") {
-    // Whip pan: slide in with a smeared motion-blur trail.
-    const e = ease.outExpo(k);
+  const kind = sc.scene.transition;
+  if (kind === "whip" || kind === "push") {
+    const e = kind === "whip" ? ease.inOutExpo(k) : ease.inOutCubic(k);
     const dir = seed % 2 ? 1 : -1;
-    const off = (1 - e) * w * 0.9 * dir;
-    const smear = (1 - e) * w * 0.35 * dir;
-    const n = 8;
-    for (let i = n; i >= 1; i--) {
-      ctx.globalAlpha = 0.22;
-      ctx.drawImage(frame, off + (smear * i) / n, 0);
+    const smear = kind === "whip" ? Math.sin(Math.PI * k) * w * 0.12 : 0;
+    const n = kind === "whip" ? 6 : 1;
+    for (const [img, x0] of [
+      [a, -e * w * dir],
+      [b, (1 - e) * w * dir],
+    ] as [HTMLCanvasElement, number][]) {
+      for (let i = n; i >= 1; i--) {
+        ctx.globalAlpha = i === 1 ? 1 : 0.18;
+        ctx.drawImage(img, x0 + ((smear * (i - 1)) / n) * dir, 0);
+      }
     }
-    ctx.globalAlpha = 1;
-    ctx.drawImage(frame, off, 0);
+  } else if (kind === "dolly") {
+    // Zoom through: fly into the outgoing shot while the incoming one resolves behind it.
+    const e = ease.inOutCubic(k);
+    const sb = 0.85 + 0.15 * ease.outCubic(k);
+    ctx.globalAlpha = clamp(e * 1.6);
+    ctx.drawImage(b, (w - w * sb) / 2, (h - h * sb) / 2, w * sb, h * sb);
+    const sa = 1 + e * 1.4;
+    for (let i = 4; i >= 0; i--) {
+      const z = sa * (1 + i * 0.04 * e);
+      ctx.globalAlpha = (1 - e) * (i === 0 ? 1 : 0.2);
+      ctx.drawImage(a, (w - w * z) / 2, (h - h * z) / 2, w * z, h * z);
+    }
   } else {
-    // Dolly: rush in through a radial zoom blur.
-    const e = ease.outCubic(k);
-    const n = 8;
-    for (let i = n; i >= 0; i--) {
-      const sz = 1 + (1 - e) * (0.12 + (0.9 * i) / n);
-      ctx.globalAlpha = i === 0 ? 1 : 0.16;
-      ctx.drawImage(frame, (w - w * sz) / 2, (h - h * sz) / 2, w * sz, h * sz);
-    }
+    // Cross-dissolve: outgoing blurs away as the incoming sharpens in.
+    const e = ease.inOutCubic(k);
+    ctx.globalAlpha = 1;
+    if ((1 - e) * 10 * u > 0.5) ctx.filter = `blur(${(e * 12 * u).toFixed(1)}px)`;
+    ctx.drawImage(a, 0, 0);
+    ctx.filter = (1 - e) * 10 * u > 0.5 ? `blur(${((1 - e) * 10 * u).toFixed(1)}px)` : "none";
+    ctx.globalAlpha = e;
+    ctx.drawImage(b, 0, 0);
+    ctx.filter = "none";
   }
   ctx.globalAlpha = 1;
 }
