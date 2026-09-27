@@ -477,8 +477,10 @@ export function blurInLayout(
         const s = Math.max(0, spring(t - t0, 13, 6));
         ctx.globalAlpha = (opts.alpha ?? 1) * clamp((t - t0) / 0.12) * (1 - exit);
         const cx = x + widths[i] / 2;
+        // Overshoot only as far as the word gap allows, so neighbours never collide.
+        const sz = Math.min(0.3 + 0.7 * s * (1 - exit * 0.5), 1 + (space * 0.9) / Math.max(1, widths[i]));
         ctx.translate(cx, y);
-        ctx.scale(0.3 + 0.7 * s * (1 - exit * 0.5), 0.3 + 0.7 * s * (1 - exit * 0.5));
+        ctx.scale(sz, sz);
         ctx.rotate((1 - Math.min(1, s)) * (wi % 2 ? 0.12 : -0.12));
         ctx.translate(-cx, -y);
       } else {

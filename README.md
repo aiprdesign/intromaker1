@@ -11,7 +11,18 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Generated trailer score**: a WebAudio synth follows the storyboard, playing a minor chord progression with bass, sidechain-pumped pads, a half-time hook that builds into the full groove, trailer braams on the title and outro, risers and reverse swells into each cut, and a reverb tail at the end.
 - **Beat-synced direction**: scene lengths snap to whole beats, so every cut lands on the kick. A virtual camera drifts handheld and punches in on each beat.
 - **Cinematic finishing**: two-scale highlight bloom, a colour grade, light leaks, lens bokeh, extruded 3D type, vignette and film grain.
-- **Export**: records 1080p or 720p video at 60 fps (MP4 where the browser supports it, WebM otherwise) with the soundtrack mixed in. Rendering happens entirely in the browser.
+- **Export presets**: YouTube 1080p60, Reels/TikTok/Shorts 9:16, LinkedIn/Instagram 1:1 and web 720p. The same storyboard re-lays itself out for each format, so nothing is cropped. There's also a one-click PNG thumbnail of the end card. Output is MP4 where the browser supports it (WebM otherwise) with the soundtrack mixed in, rendered entirely in the browser.
+
+### What makes the SaaS films look pro
+
+- **Style templates**: Midnight Grid, Aurora Gradient, Minimal Light, Mono Pro, Bold Pop, Cinematic Keynote and Neon Tech. Each has its own palette, type, text motion, transition language, music flavour and pacing. Switching restyles the film instantly.
+- **Edited like a real film**: whip pans, dolly zoom-throughs, pushes, dissolves and light leaks show the outgoing and incoming shots at the same time, and every cut lands on the beat.
+- **A product tour that clicks real UI**: the screenshot (or first video frame) is analysed for its busiest interface regions, and the camera zooms and the cursor clicks there.
+- **Brand polish**: an anamorphic logo reveal, a corner brand bug through the body of the film, and an end card that holds on the logo, closing line, button and URL.
+- **Copy that reads like a designer wrote it**: the site's headlines are ranked for on-screen quality, the emphasis word is chosen by meaning ("*300+ tools*", "*whole team*"), bento cards carry the site's own one-line feature descriptions, and CTAs vary, including social proof ("Join *12,000+ teams*").
+- **Takes**: "3 more takes" directs alternative cuts (product-first, proof-first, a fresh story) in parallel. They appear as live previews, and you click one to use it.
+- **AI self-review**: the AI's draft is checked against a storyboard checklist covering arc, copy length, pacing, and invented quotes, logos or numbers. *Best* mode always critiques and revises its draft. *Balanced* revises only when the checklist fails. Anything invented that remains is removed.
+- **Every format**: all SaaS scenes are laid out for 16:9, 9:16 and 1:1.
 
 ## Run it
 
@@ -42,8 +53,11 @@ src/engine/
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass
   planner.ts      built-in director + plan sanitising + share-link encoding
   audio.ts        procedural trailer score arranged to the storyboard (WebAudio)
-  export.ts       MediaRecorder capture of canvas + audio
+  templates.ts    style templates (look, motion, music, pacing, role → skill)
+  export.ts       WebCodecs offline export, export presets, PNG thumbnail
 src/app/api/generate/route.ts   Claude AI Director (structured output), falls back to planner.ts
+src/lib/ai.ts                   multi-provider AI (Claude, OpenAI, Gemini, OpenRouter, custom)
+src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/scrape.ts               website extraction (name, copy, features, stats, CTA, testimonials, customer logos, logo, images, videos, theme colour)
 src/lib/netguard.ts             SSRF guard: only public http(s) hosts, re-checked on every redirect
 ```
@@ -59,7 +73,8 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 ## Notes
 
 - **Live website capture** uses the Chrome or Edge already installed on your computer to take screenshots (hero, full page, sections) and render JavaScript-heavy sites. If neither is installed it falls back to a plain HTML fetch. Set `INTROMAKER_BROWSER` to a browser executable to use a specific one.
-- **AI that reads the site**: with `ANTHROPIC_API_KEY` set, Claude receives the extracted copy, features, steps, pains, stats, testimonials and asset list, plus the site's screenshots as images, and writes the storyboard. Without a key, the built-in director uses the same story arc.
+- **Bring any AI**: in the studio's ⚙ settings, pick Anthropic Claude, OpenAI, Google Gemini, OpenRouter or any OpenAI-compatible endpoint (Ollama, Groq and others), paste a key, choose a model and a Fast/Balanced/Best mode. The key stays in your browser.
+- **AI that reads the site**: with a key (or `ANTHROPIC_API_KEY` on the server), Claude receives the extracted copy, features, steps, pains, stats, testimonials and asset list, plus the site's screenshots as images, and writes the storyboard. Without a key, the built-in director uses the same story arc.
 
 - Website import fetches pages server-side and blocks private and internal addresses. For local testing against `localhost` sites, set `INTROMAKER_ALLOW_PRIVATE_URLS=1`.
 

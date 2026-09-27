@@ -1,4 +1,4 @@
-import { hashString, rng } from "./math";
+import { clamp, hashString, rng } from "./math";
 import type { FontId, Look, PaletteId, Scene, SkillId, Transition, VideoPlan } from "./types";
 
 /**
@@ -276,6 +276,16 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     last = transition;
     return { ...scene, role, skill, duration, transition };
   });
+  // Templates change the feel, not the runtime: keep the film within -12%/+10% of the length
+  // the same storyboard runs at a neutral 120 bpm, scaling every scene proportionally.
+  const neutral = plan.scenes.reduce((a, scene, i, all) => {
+    const role = roleOf(scene, i, all.length);
+    if (!role) return a + scene.duration;
+    const [beats, floor] = roleLength(scene, role);
+    return a + Math.max(floor, beats * 0.5);
+  }, 0);
+  const styled = scenes.reduce((a, sc) => a + sc.duration, 0);
+  const fit = styled > 0 ? clamp(styled, neutral * 0.88, neutral * 1.1) / styled : 1;
   return {
     ...plan,
     template: tpl.id,
@@ -286,6 +296,6 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     music: tpl.music,
     flavor: tpl.flavor,
     look: tpl.look,
-    scenes: scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round(s.duration / beat)) * beat })),
+    scenes: scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round((s.duration * fit) / beat)) * beat })),
   };
 }
