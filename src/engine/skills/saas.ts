@@ -1031,7 +1031,13 @@ function ctaLockup(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 3 });
   const T = ctaTiming(d);
-  const ex = range(t, d - 0.5, d);
+  // The end card holds (its last frame doubles as the thumbnail) with a slow settle push-in.
+  const ex = 0;
+  const push = 1 + 0.035 * ease.outCubic(range(t, T.click, d));
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.scale(push, push);
+  ctx.translate(-w / 2, -h / 2);
   const hasLogo = !!brand?.logo;
   // Logo mark.
   const lk = clamp(spring(t - 0.05, 9, 7), 0, 1.05);
@@ -1046,7 +1052,7 @@ function ctaLockup(sc: SkillContext) {
     ctx.restore();
   }
   const layout = sentence(sc, { text: accented(scene.text), cy: h * (hasLogo ? 0.44 : 0.4), sizeFrac: 0.1, widthFrac: 0.8, maxLines: 2 });
-  blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt: d - 0.5 });
+  blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt: d + 1 });
   // Button.
   const label = scene.subtext || "Get started";
   const bk = clamp(spring(t - T.button, 11, 7), 0, 1.08);
@@ -1092,8 +1098,19 @@ function ctaLockup(sc: SkillContext) {
   ctx.restore();
   borderBeam(sc, w / 2 - bw / 2 - 6 * u, by - bh / 2 - 6 * u, bw + 12 * u, bh + 12 * u, t * 0.6, { r: bh / 2 + 6 * u, alpha: clamp(bk) * (1 - ex) });
   clickRipple(sc, w / 2 + bw * 0.1, by, range(t, T.click, T.click + 0.6), "#ffffff");
-  // Domain.
-  subText(sc, brand?.domain, by + bh / 2 + 50 * u, range(t, T.click + 0.2, T.click + 0.7) * (1 - ex), { size: 24 * u });
+  // Domain pill.
+  const dk = ease.outCubic(range(t, T.click + 0.2, T.click + 0.7));
+  if (brand?.domain && dk > 0) {
+    ctx.save();
+    ctx.globalAlpha = dk;
+    pill(sc, brand.domain, w / 2, by + bh / 2 + 62 * u + (1 - dk) * 14 * u, {
+      size: 26 * u,
+      fill: rgba(palette.light ? "#ffffff" : palette.bg0, 0.6),
+      border: rgba(palette.text, 0.18),
+    });
+    ctx.restore();
+  }
+  ctx.restore();
   // Cursor.
   const start = { x: w * 0.82, y: h * 1.05 };
   const target = { x: w / 2 + bw * 0.1, y: by + 4 * u };

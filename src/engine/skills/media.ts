@@ -81,7 +81,28 @@ function logoReveal(sc: SkillContext) {
     ctx.fillRect(0, 0, w, h);
   }
   // Rotating light burst behind the mark.
-  const burst = clamp(range(t, hit - 0.3, hit + 0.2)) * (1 - ex) * (saas ? 0.45 : 1);
+  const burst = clamp(range(t, hit - 0.3, hit + 0.2)) * (1 - ex) * (saas ? 0.18 : 1);
+  // SaaS: an anamorphic light streak blooms horizontally through the mark on the hit.
+  if (saas) {
+    const sk = range(t, hit - 0.15, hit + 1.4);
+    if (sk > 0 && sk < 1) {
+      const sw = w * ease.outExpo(sk) * 0.55;
+      const sa = Math.sin(Math.PI * Math.min(1, sk * 1.6)) * (1 - ex) * (palette.light ? 0.45 : 0.8);
+      ctx.save();
+      ctx.globalCompositeOperation = palette.light ? "source-over" : "lighter";
+      for (const [th, al] of [[2.2, 1], [14, 0.35], [60, 0.12]] as const) {
+        const g = ctx.createLinearGradient(cx - sw, 0, cx + sw, 0);
+        g.addColorStop(0, rgba(palette.primary, 0));
+        g.addColorStop(0.5, rgba(palette.light ? palette.primary : "#ffffff", sa * al));
+        g.addColorStop(1, rgba(palette.primary, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, sw, th * u, 0, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
   if (burst > 0) {
     ctx.save();
     ctx.translate(cx, cy);

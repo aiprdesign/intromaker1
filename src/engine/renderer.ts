@@ -2,7 +2,8 @@ import { clamp, ease, mixHex, noise1, range, rgba, rng } from "./math";
 import { PALETTES } from "./palettes";
 import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
-import { setBrandFont } from "./text";
+import { getImage, isDarkLogo } from "./media";
+import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import type { Aspect, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
@@ -176,6 +177,59 @@ export function renderFrame(
     prev: at.index > 0 ? { scene: plan.scenes[at.index - 1], index: at.index - 1 } : undefined,
     extendSelf: !!next && OVERLAP.has(next.transition),
   });
+  brandBug(ctx, plan, time, w, h);
+}
+
+const BUG_SKIP = new Set(["hook", "pain", "reveal", "cta"]);
+
+/**
+ * Persistent brand bug: a small logo lock-up in the top-left corner through the body of a
+ * SaaS film (after the brand reveal, before the end card), like a broadcast network bug.
+ */
+function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, w: number, h: number) {
+  const brand = plan.brand;
+  if (plan.style !== "saas" || !brand || (!brand.logo && !brand.name)) return;
+  const reveal = plan.scenes.findIndex((s) => s.role === "reveal");
+  if (reveal < 0) return;
+  let acc = 0;
+  let start = -1;
+  let end = -1;
+  plan.scenes.forEach((s, i) => {
+    if (i > reveal && !BUG_SKIP.has(s.role ?? "")) {
+      if (start < 0) start = acc;
+      end = acc + s.duration;
+    }
+    acc += s.duration;
+  });
+  if (start < 0) return;
+  const a = ease.inOutCubic(range(time, start + 0.35, start + 0.95)) * (1 - ease.inCubic(range(time, end - 0.45, end - 0.05)));
+  if (a <= 0) return;
+  const palette = brandPalette(plan.palette, brand);
+  const u = Math.min(w, h) / 1080;
+  const x = 52 * u;
+  const y = 54 * u;
+  resetCtx(ctx);
+  ctx.save();
+  ctx.globalAlpha = a * 0.78;
+  const logo = getImage(brand.logo);
+  let lx = x;
+  const wordmark = !!logo?.naturalWidth && logo.naturalWidth / logo.naturalHeight >= 1.8;
+  if (logo?.naturalWidth) {
+    const lh = (wordmark ? 30 : 38) * u;
+    const lw = (logo.naturalWidth / logo.naturalHeight) * lh;
+    if (!palette.light && isDarkLogo(logo)) ctx.filter = "brightness(0) invert(1)";
+    ctx.drawImage(logo, x, y - lh / 2, lw, lh);
+    ctx.filter = "none";
+    lx = x + lw + 12 * u;
+  }
+  if (!wordmark && brand.name) {
+    ctx.font = subFont(28 * u, 650);
+    ctx.fillStyle = palette.text;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(brand.name, lx, y + 1 * u);
+  }
+  ctx.restore();
 }
 
 /**
