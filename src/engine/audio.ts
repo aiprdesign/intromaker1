@@ -54,16 +54,25 @@ export class Soundtrack {
     this.ctx = ctx ?? new AudioContext();
     const c = this.ctx;
     this.out = c.createGain();
-    this.out.gain.value = 0.8;
+    this.out.gain.value = 1;
+    // Mastering chain: glue compressor → makeup gain → brick-wall-ish limiter (≈ -14 dB RMS, web loudness).
     const comp = c.createDynamicsCompressor();
-    comp.threshold.value = -12;
-    comp.ratio.value = 4;
-    comp.attack.value = 0.005;
+    comp.threshold.value = -18;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.008;
     comp.release.value = 0.2;
-    this.out.connect(comp);
-    comp.connect(c.destination);
+    const makeup = c.createGain();
+    makeup.gain.value = 2.4;
+    const limiter = c.createDynamicsCompressor();
+    limiter.threshold.value = -2;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.001;
+    limiter.release.value = 0.08;
+    this.out.connect(comp).connect(makeup).connect(limiter);
+    limiter.connect(c.destination);
     this.stream = c instanceof AudioContext ? c.createMediaStreamDestination() : null;
-    if (this.stream) comp.connect(this.stream);
+    if (this.stream) limiter.connect(this.stream);
 
     const len = c.sampleRate * 2;
     this.noise = c.createBuffer(1, len, c.sampleRate);
@@ -100,7 +109,7 @@ export class Soundtrack {
   }
 
   setMuted(muted: boolean) {
-    this.out.gain.setTargetAtTime(muted ? 0 : 0.8, this.ctx.currentTime, 0.02);
+    this.out.gain.setTargetAtTime(muted ? 0 : 1, this.ctx.currentTime, 0.02);
   }
 
   stop() {
