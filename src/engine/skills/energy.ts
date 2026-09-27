@@ -1,6 +1,8 @@
 import {
   background,
+  bevel,
   drawLayout,
+  extrude,
   dust,
   exitT,
   flash,
@@ -168,9 +170,12 @@ function hyperspace(sc: SkillContext) {
     }
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = clamp(k * 1.4) * (1 - ex);
+    extrude(sc, layout);
     ctx.fillStyle = headlineGradient(sc, layout, palette.text, mix(palette.text, palette.primary, 0.6));
     glow(ctx, palette.primary, 30 * u);
     drawLayout(sc, layout);
+    noGlow(ctx);
+    bevel(sc, layout);
     ctx.restore();
     const bottom = layout.ys[layout.ys.length - 1] + layout.size * 0.5;
     subline(sc, bottom + 60 * u, range(t, tp + 0.4, tp + 1), { alpha: 1 - ex });
@@ -274,9 +279,12 @@ function shockwave(sc: SkillContext) {
     drawLayout(sc, layout);
     ctx.restore();
     ctx.globalCompositeOperation = "source-over";
+    extrude(sc, layout);
     ctx.fillStyle = palette.text;
     glow(ctx, palette.primary, (20 + 30 * (0.5 + 0.5 * Math.sin(t * 5))) * u);
     drawLayout(sc, layout);
+    noGlow(ctx);
+    bevel(sc, layout);
     ctx.restore();
     const bottom = layout.ys[layout.ys.length - 1] + layout.size * 0.5;
     subline(sc, bottom + 60 * u, range(after, 0.5, 1.1), { alpha: 1 - ex });

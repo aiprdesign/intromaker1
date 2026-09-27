@@ -2,7 +2,7 @@ import { clamp, ease, noise1, range, rgba, rng } from "./math";
 import { PALETTES } from "./palettes";
 import { scratch } from "./scratch";
 import { SKILL_MAP } from "./skills";
-import type { Aspect, Scene, SkillContext, Transition, VideoPlan } from "./types";
+import type { Aspect, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
 export const TRANSITION_LEN = 0.45;
 
@@ -47,6 +47,7 @@ export interface RenderOptions {
   /** Handheld drift + beat pulse camera. */
   camera?: boolean;
   bloom?: boolean;
+  grade?: boolean;
   grain?: boolean;
   watermark?: string;
 }
@@ -92,7 +93,7 @@ export function renderScene(
   if (buffered) compositeTransition(out, target.canvas);
   resetCtx(ctx);
   transitionOverlay(out);
-  post(ctx, w, h, t, sc.seed, palette.primary, opts);
+  post(ctx, w, h, t, sc.seed, palette, opts, globalT);
 }
 
 /** Render the whole plan at absolute time `time`. */
@@ -289,36 +290,93 @@ function getGrain() {
   return c;
 }
 
-/** Bloom, vignette and film grain. */
+/**
+ * Finishing pass: thresholded two-scale bloom, colour grade, drifting light leaks,
+ * foreground lens bokeh, vignette and film grain.
+ */
 function post(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
   t: number,
   seed: number,
-  tint: string,
+  palette: Palette,
   opts: RenderOptions,
+  globalT: number,
 ) {
+  const u = Math.min(w, h) / 1080;
   if (opts.bloom !== false) {
-    // Downsample → upscale gives a cheap soft glow.
-    const bw = Math.max(1, Math.round(w / 8));
-    const bh = Math.max(1, Math.round(h / 8));
-    const b = scratch("bloom", bw, bh);
-    b.ctx.imageSmoothingEnabled = true;
-    b.ctx.drawImage(ctx.canvas, 0, 0, bw, bh);
+    // Highlights only (contrast/brightness filter acts as a soft threshold), at two radii.
+    const passes: [number, number][] = [
+      [6, 0.38],
+      [20, 0.34],
+    ];
+    for (const [div, alpha] of passes) {
+      const bw = Math.max(1, Math.round(w / div));
+      const bh = Math.max(1, Math.round(h / div));
+      const b = scratch(`bloom-${div}`, bw, bh);
+      b.ctx.imageSmoothingEnabled = true;
+      b.ctx.filter = "brightness(0.85) contrast(2.2) saturate(1.3)";
+      b.ctx.drawImage(ctx.canvas, 0, 0, bw, bh);
+      b.ctx.filter = "none";
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = alpha;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(b.canvas, 0, 0, w, h);
+      ctx.restore();
+    }
+  }
+
+  // Colour grade: punchier contrast and saturation.
+  if (opts.grade !== false) {
+    const g = scratch("grade", w, h, false);
+    g.ctx.drawImage(ctx.canvas, 0, 0);
     ctx.save();
-    ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.45;
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(b.canvas, 0, 0, w, h);
+    ctx.filter = "contrast(1.1) saturate(1.18)";
+    ctx.drawImage(g.canvas, 0, 0);
     ctx.restore();
   }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  // Slow light leaks drifting in from the edges.
+  const leaks: [number, number, string, number][] = [
+    [0.05 + 0.08 * Math.sin(globalT * 0.3), 0.0, palette.secondary, 0.16],
+    [0.95 + 0.06 * Math.cos(globalT * 0.25), 1.0, palette.primary, 0.12],
+  ];
+  for (const [x, y, c, a] of leaks) {
+    const r = Math.max(w, h) * 0.55;
+    const g = ctx.createRadialGradient(x * w, y * h, 0, x * w, y * h, r);
+    const breathe = a * (0.75 + 0.25 * Math.sin(globalT * 0.9 + x * 5));
+    g.addColorStop(0, rgba(c, breathe));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  // Out-of-focus foreground bokeh for depth.
+  const r = rng(seed * 3 + 17);
+  for (let i = 0; i < 7; i++) {
+    const bx = (r() * 1.2 - 0.1 + globalT * (0.01 + r() * 0.02)) % 1.2;
+    const by = r();
+    const br = (60 + r() * 140) * u;
+    const c = r() > 0.5 ? palette.primary : palette.secondary;
+    const a = 0.05 + 0.07 * (0.5 + 0.5 * Math.sin(globalT * (0.5 + r()) + i));
+    const g = ctx.createRadialGradient(bx * w, by * h, br * 0.6, bx * w, by * h, br);
+    g.addColorStop(0, rgba(c, a));
+    g.addColorStop(0.85, rgba(c, a * 0.8));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(bx * w, by * h, br, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
   const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.62);
   v.addColorStop(0, "rgba(0,0,0,0)");
-  v.addColorStop(1, "rgba(0,0,0,0.55)");
+  v.addColorStop(1, "rgba(0,0,0,0.6)");
   ctx.fillStyle = v;
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = rgba(tint, 0.02);
   ctx.fillRect(0, 0, w, h);
   if (opts.grain !== false) {
     const g = getGrain();
@@ -331,7 +389,6 @@ function post(
     ctx.restore();
   }
   if (opts.watermark) {
-    const u = Math.min(w, h) / 1080;
     ctx.save();
     ctx.globalAlpha = 0.55;
     ctx.fillStyle = "#fff";

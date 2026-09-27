@@ -1,6 +1,8 @@
 import {
   background,
+  bevel,
   drawLayout,
+  extrude,
   exitT,
   flash,
   glow,
@@ -69,14 +71,18 @@ function kineticSlam(sc: SkillContext) {
       }
       ctx.restore();
     }
+    extrude(sc, layout, { color: invert ? palette.secondary : undefined });
     ctx.fillStyle = invert ? palette.bg0 : palette.text;
     drawLayout(sc, layout);
+    bevel(sc, layout);
   } else {
     const layout = headline(sc, { cy: h * 0.47, sizeFrac: 0.3 });
+    extrude(sc, layout);
     ctx.fillStyle = headlineGradient(sc, layout, palette.text, palette.primary);
     glow(ctx, rgba(palette.primary, 0.6), 30 * u);
     drawLayout(sc, layout);
     noGlow(ctx);
+    bevel(sc, layout);
     const bottom = layout.ys[layout.ys.length - 1] + layout.size * 0.5;
     ctx.globalAlpha = 1 - ex;
     ctx.fillStyle = palette.secondary;
@@ -344,6 +350,7 @@ function splitWipe(sc: SkillContext) {
     ctx.clip();
     const dir = half ? 1 : -1;
     ctx.translate(dir * (1 - reveal) * w * 0.6 + dir * ex * -w * 0.1, 0);
+    extrude(sc, layout, { depth: 10 });
     ctx.fillStyle = half ? palette.primary : palette.text;
     drawLayout(sc, layout);
     ctx.restore();

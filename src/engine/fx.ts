@@ -1,4 +1,4 @@
-import { clamp, ease, range, rgba, rng, TAU } from "./math";
+import { clamp, ease, mix, range, rgba, rng, TAU } from "./math";
 import { displayFont, drawTracked, layoutHeadline, subFont, type HeadlineLayout } from "./text";
 import type { SkillContext } from "./types";
 
@@ -14,6 +14,12 @@ export function background(sc: SkillContext, opts: { hot?: string; hotAlpha?: nu
   g.addColorStop(0, palette.bg1);
   g.addColorStop(1, palette.bg0);
   ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  // Soft overhead key light for depth.
+  const kl = ctx.createRadialGradient(w / 2, -h * 0.25, 0, w / 2, -h * 0.25, h * 1.1);
+  kl.addColorStop(0, rgba(palette.primary, 0.1));
+  kl.addColorStop(1, rgba(palette.primary, 0));
+  ctx.fillStyle = kl;
   ctx.fillRect(0, 0, w, h);
   if (opts.hot) {
     const g2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.6);
@@ -168,4 +174,51 @@ export function glow(ctx: CanvasRenderingContext2D, color: string, blur: number)
 export function noGlow(ctx: CanvasRenderingContext2D) {
   ctx.shadowBlur = 0;
   ctx.shadowColor = "transparent";
+}
+
+/**
+ * Solid 3D extrusion behind a headline: stacked, progressively darker copies plus a soft
+ * contact shadow. Call before drawing the face of the text.
+ */
+export function extrude(
+  sc: SkillContext,
+  layout: HeadlineLayout,
+  opts: { depth?: number; color?: string; dx?: number; dy?: number } = {},
+) {
+  const { ctx, u, palette } = sc;
+  const depth = (opts.depth ?? 16) * u * (layout.size / (200 * u));
+  const side = opts.color ?? mix(palette.primary, palette.bg0, 0.55);
+  const dx = opts.dx ?? 0.35;
+  const dy = opts.dy ?? 1;
+  const steps = Math.max(4, Math.min(24, Math.round(depth / (1.2 * u))));
+  ctx.save();
+  // Contact shadow under the whole block.
+  ctx.shadowColor = "rgba(0,0,0,0.7)";
+  ctx.shadowBlur = 40 * u;
+  ctx.shadowOffsetY = 24 * u;
+  for (let i = steps; i >= 1; i--) {
+    const k = i / steps;
+    ctx.save();
+    ctx.translate(dx * depth * k, dy * depth * k);
+    ctx.fillStyle = mix(side, "#000000", k * 0.65);
+    drawLayout(sc, layout);
+    ctx.restore();
+    if (i === steps) noGlow(ctx);
+  }
+  ctx.restore();
+}
+
+/** Thin bright highlight along the top edge of the glyphs (a bevel catch-light). */
+export function bevel(sc: SkillContext, layout: HeadlineLayout, alpha = 0.55) {
+  const { ctx, u } = sc;
+  ctx.save();
+  ctx.beginPath();
+  layout.ys.forEach((y) => ctx.rect(0, y - layout.size * 0.6, sc.w, layout.size * 0.35));
+  ctx.clip();
+  ctx.globalAlpha *= alpha;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.translate(0, -1.5 * u);
+  drawLayout(sc, layout);
+  ctx.restore();
 }
