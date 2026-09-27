@@ -542,7 +542,21 @@ export interface SiteRequest {
   colors?: Brand["colors"];
   style?: StyleChoice;
   template?: string;
+  /** Creative angle for the story: problem-led (default), product-first or proof-first. */
+  angle?: Angle;
 }
+
+export type Angle = "story" | "product" | "proof";
+export const ANGLES: { id: Angle; name: string; brief: string }[] = [
+  { id: "story", name: "Story-led", brief: "Problem → solution: open on the pain, reveal the product as the better way." },
+  { id: "product", name: "Product-first", brief: "Open on the promise and get to the product in action within seconds; demo-heavy." },
+  { id: "proof", name: "Proof-first", brief: "Lead with social proof (customers, real numbers, a real quote), then show why." },
+];
+const ANGLE_ORDER: Record<Angle, string[]> = {
+  story: ["pain", "hook", "reveal", "meet", "how", "tour", "bento", "quote", "logos", "cards", "integrations", "cta"],
+  product: ["hook", "pain", "reveal", "tour", "meet", "bento", "how", "cards", "quote", "logos", "integrations", "cta"],
+  proof: ["hook", "pain", "reveal", "quote", "logos", "meet", "tour", "how", "bento", "cards", "integrations", "cta"],
+};
 
 /** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
 export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
@@ -620,9 +634,17 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const candidates: Beat[] = [];
   const add = (priority: number, scene: Scene) => candidates.push({ priority, scene });
 
-  // 1. Hook: the problem, or the promise.
-  const painHook = pains.length >= 2;
-  if (painHook) {
+  const angle: Angle = req.angle ?? "story";
+  const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
+  // 1. Hook: the problem, the promise, or the proof.
+  const painHook = angle === "story" && pains.length >= 2;
+  const proofHook = angle === "proof" && !!teamStat;
+  // The tagline is used once: in the hook, or (if the hook is pains/proof) under the logo.
+  const taglineFree = painHook || proofHook;
+  const descClause = sentenceCopy(site.description.split(/\s(?:so|because|that|which|to help)\s|\s[—–]\s/)[0], 10);
+  if (proofHook) {
+    add(1, { role: "hook", skill: "blur-reveal", text: `Trusted by *${teamStat.toLowerCase()}*`, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
+  } else if (painHook) {
     add(1, {
       role: "pain", skill: "pain-strike",
       text: pick(["There's a *better* way.", "It doesn't have to be *this hard*.", "Time for a *better* way."]),
@@ -638,7 +660,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   add(1, {
     role: "reveal", skill: brand.logo ? "logo-reveal" : "particle-assemble",
     text: site.name,
-    subtext: painHook ? tagline : site.domain,
+    subtext: taglineFree ? tagline : site.domain,
     duration: beats(6),
     transition: "dolly",
   });
@@ -646,7 +668,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (shots.full) {
     add(3, {
       role: "meet", skill: "site-scroll",
-      text: painHook ? tagline : sentenceCopy(site.description, 10) || tagline,
+      text: taglineFree ? tagline : descClause || `Say hello to *${site.name}*`,
       eyebrow: `Meet ${site.name}`,
       duration: Math.max(5, beats(10)),
       transition: "whip",
@@ -667,7 +689,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 5. Features: cursor tour on the product, then a bento.
   const tourMedia = video ?? images[0] ?? img(shots.sections[0]) ?? img(shots.hero);
   if (tourMedia) {
-    add(4, {
+    add(angle === "product" ? 1 : 4, {
       role: "tour", skill: "ui-tour",
       text: longFeatures[0] ?? `See ${site.name} in action`,
       items: shortFeatures.slice(1, 3),
@@ -689,7 +711,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // 6. Proof — only real quotes, logos and numbers.
   if (quote) {
-    add(5, {
+    add(angle === "proof" ? 1 : 5, {
       role: "quote", skill: "testimonial",
       text: quote.quote,
       subtext: [quote.author, quote.role].filter(Boolean).join(" · "),
@@ -702,7 +724,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (brand.clientLogos && brand.clientLogos.length >= 4) {
     add(6, {
       role: "logos", skill: "logo-marquee",
-      text: stat ? `Trusted by *${stat.toLowerCase()}*` : "Trusted by *leading teams*",
+      text: angle === "proof" && teamStat ? "In good *company*" : stat ? `Trusted by *${stat.toLowerCase()}*` : "Trusted by *leading teams*",
       eyebrow: "Customers",
       duration: beats(7),
       transition: "dolly",
@@ -749,14 +771,20 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       used += c.scene.duration;
     }
   }
-  const scenes = order.filter((c) => chosen.has(c.i)).map((c) => c.scene);
+  const rank = ANGLE_ORDER[angle];
+  const scenes = order
+    .filter((c) => chosen.has(c.i))
+    .sort((a, b) => rank.indexOf(a.scene.role ?? "") - rank.indexOf(b.scene.role ?? "") || a.i - b.i)
+    .map((c) => c.scene);
+  // Transitions follow the new order: the opener cuts in.
+  if (scenes[0]) scenes[0] = { ...scenes[0], transition: "cut" };
   // Closing line: social proof when the film hasn't used it yet, else a varied call to action.
   const cta = scenes[scenes.length - 1];
-  const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
+  const usedStat = scenes.some((sc) => sc.role === "logos") || (angle === "proof" && !!teamStat);
   const lines = [`Try *${site.name}* today`, `Get started with *${site.name}*`, `Start building with *${site.name}*`];
   if (/free/i.test(site.cta ?? "")) lines.push("Start *free* today");
   if (cta?.role === "cta") {
-    cta.text = teamStat && !scenes.some((sc) => sc.role === "logos") ? `Join *${teamStat.toLowerCase()}*` : pick(lines);
+    cta.text = teamStat && !usedStat ? `Join *${teamStat.toLowerCase()}*` : pick(lines);
   }
 
   const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas" });

@@ -1157,3 +1157,71 @@ textarea {
   letter-spacing: 0;
   margin-left: 6px;
 }
+
+/* ───────── Takes (alternative cuts) ───────── */
+
+.takes {
+  margin-top: 14px;
+}
+.takes-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.takes-head h2 {
+  margin: 0;
+}
+.takes-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 2px 6px;
+}
+.take-card {
+  flex: 0 0 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.take-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-2);
+}
+.take-card.active {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15);
+}
+.take-card canvas {
+  width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+  background: #000;
+}
+.take-name {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+.take-card.more {
+  align-items: center;
+  justify-content: center;
+  min-height: 110px;
+  border-style: dashed;
+  font-weight: 600;
+  color: var(--cyan);
+}
+.take-card.more:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

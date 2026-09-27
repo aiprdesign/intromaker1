@@ -12,6 +12,8 @@ import {
   LENGTH_SECONDS,
   planFromPrompt,
   isSaasPrompt,
+  ANGLES,
+  type Angle,
   planFromSite,
   readSite,
   sanitizePlan,
@@ -164,7 +166,7 @@ async function siteImages(site: SiteData) {
 }
 
 export async function POST(req: Request) {
-  let body: Partial<PlanRequest> & { site?: unknown; colors?: Brand["colors"]; style?: StyleChoice; ai?: unknown; template?: string };
+  let body: Partial<PlanRequest> & { site?: unknown; colors?: Brand["colors"]; style?: StyleChoice; ai?: unknown; template?: string; angle?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -184,11 +186,12 @@ export async function POST(req: Request) {
       : undefined;
   const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
   const template = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
+  const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
   const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template };
   const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
 
   const builtin = () =>
-    site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template }) : planFromPrompt(request);
+    site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle }) : planFromPrompt(request);
 
   // Which AI runs the director: the user's own key/provider, else a server Claude key, else built-in.
   const userAi = readAiConfig(body.ai);
@@ -211,6 +214,7 @@ export async function POST(req: Request) {
       `Style: ${wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${aspect}. Target total length: ${LENGTH_SECONDS[length]} seconds.` +
       (wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[template].name}": ${TEMPLATE_MAP[template].vibe} Write copy in this voice.` : "") +
       (palette !== "auto" ? ` Use the "${palette}" palette.` : "") +
+      (angle ? `\nCREATIVE ANGLE "${ANGLES.find((a) => a.id === angle)!.name}": ${ANGLES.find((a) => a.id === angle)!.brief}` : "") +
       (seed ? ` Variation #${seed % 1000}: take a fresh creative angle.` : "");
     const system = site ? SYSTEM + "\n" + SITE_RULES : SYSTEM;
     const result = await runDirector(ai, { system, text, images, schema });

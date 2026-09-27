@@ -4,17 +4,19 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import AiSettings, { aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
+import LoopCanvas from "@/components/LoopCanvas";
 import TemplatePicker from "@/components/TemplatePicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import Player from "@/components/Player";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors } from "@/engine/media";
-import { decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Length, type StyleChoice } from "@/engine/planner";
+import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { SKILL_MAP, SKILLS } from "@/engine/skills";
 import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
+type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
 
 export default function Studio() {
   const params = useSearchParams();
@@ -34,6 +36,8 @@ export default function Studio() {
   const [aiOpen, setAiOpen] = useState(false);
   const [engineLabel, setEngineLabel] = useState("");
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
+  const [takes, setTakes] = useState<Take[]>([]);
+  const [takesLoading, setTakesLoading] = useState(false);
   useEffect(() => {
     try {
       const saved = localStorage.getItem("intromaker.template");
@@ -70,49 +74,76 @@ export default function Studio() {
       .catch(() => setAiAvailable(false));
   }, []);
 
-  const generate = async (
-    opts: {
-      prompt?: string;
-      seed?: number;
-      aspect?: Aspect;
-      palette?: PaletteId | "auto";
-      site?: SiteData | null;
-      colors?: Brand["colors"];
-      length?: Length;
-    } = {},
-  ) => {
+  type GenOpts = {
+    prompt?: string;
+    seed?: number;
+    aspect?: Aspect;
+    palette?: PaletteId | "auto";
+    site?: SiteData | null;
+    colors?: Brand["colors"];
+    length?: Length;
+    angle?: Angle;
+  };
+
+  /** One storyboard from the director (server AI or built-in; falls back to in-browser). */
+  const direct = async (opts: GenOpts): Promise<Take> => {
     const s = opts.site !== undefined ? opts.site : site;
     const colors = opts.colors !== undefined ? opts.colors : useBrandColors ? brandColors : undefined;
     const p = (opts.prompt ?? prompt).trim() || (s ? "" : EXAMPLE_PROMPTS[0]);
     const a = opts.aspect ?? aspect;
     const pal = opts.palette ?? palette;
     const len = opts.length ?? length;
-    setLoading(true);
-    setNote(null);
+    const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: loadAiSettings(), template }),
+        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: loadAiSettings(), template, angle: opts.angle }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setPlan(sanitizePlan(data.plan));
-      setVersion((v) => v + 1);
-      setEngine(data.engine);
-      setEngineLabel(data.engineLabel ?? "");
-      if (data.note) setNote(data.note);
+      return { plan: sanitizePlan(data.plan), engine: data.engine, engineLabel: data.engineLabel ?? "", note: data.note, label };
     } catch {
       // Offline or API unavailable: the director also runs in the browser.
-      setPlan(
-        s
-          ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template })
-          : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template }),
-      );
-      setVersion((v) => v + 1);
-      setEngine("builtin");
+      const plan = s
+        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle })
+        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template });
+      return { plan, engine: "builtin", engineLabel: "", label };
+    }
+  };
+
+  const show = (take: Take) => {
+    setPlan(take.plan);
+    setVersion((v) => v + 1);
+    setEngine(take.engine);
+    setEngineLabel(take.engineLabel);
+  };
+
+  const generate = async (opts: GenOpts = {}) => {
+    setLoading(true);
+    setNote(null);
+    try {
+      const take = await direct(opts);
+      show(take);
+      setTakes([{ ...take, label: "Take 1" }]);
+      if (take.note) setNote(take.note);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** Three alternative cuts (different story angles / creative seeds) to choose from. */
+  const moreTakes = async () => {
+    setTakesLoading(true);
+    try {
+      const angles: (Angle | undefined)[] = site ? ["product", "proof", "story"] : [undefined, undefined, undefined];
+      const results = await Promise.all(angles.map((angle) => direct({ angle, seed: Math.floor(Math.random() * 1e9) })));
+      setTakes((prev) => {
+        const base = prev.length ? prev : [{ plan, engine, engineLabel, label: "Take 1" }];
+        return [...base, ...results.map((r, i) => ({ ...r, label: `Take ${base.length + i + 1}${r.label !== "Take" ? ` · ${r.label}` : ""}` }))].slice(-8);
+      });
+    } finally {
+      setTakesLoading(false);
     }
   };
 
@@ -463,14 +494,33 @@ export default function Studio() {
             <Player plan={plan} resetKey={version} />
           </div>
 
+          <div className="takes">
+            <div className="takes-head">
+              <h2>Takes</h2>
+              <span className="hint">{site ? "Alternative cuts: product-first, proof-first and a fresh story." : "Alternative creative takes on the same brief."}</span>
+            </div>
+            <div className="takes-row">
+              {takes.map((t, i) => (
+                <button key={i} className={`take-card ${t.plan === plan ? "active" : ""}`} onClick={() => show(t)} title="Use this take">
+                  <LoopCanvas plan={t.plan} long={300} fps={15} />
+                  <span className="take-name">{t.label}</span>
+                </button>
+              ))}
+              <button className="take-card more" onClick={moreTakes} disabled={takesLoading || loading}>
+                <span>{takesLoading ? "Directing 3 takes…" : "✦ 3 more takes"}</span>
+              </button>
+            </div>
+          </div>
+
           <div className="storyboard-head">
             <h2>Storyboard</h2>
             <div className="global-opts">
               <label>
                 Type
                 <select className="select sm" value={plan.font} onChange={(e) => setGlobal({ font: e.target.value as VideoPlan["font"] })}>
-                  <option value="anton">Impact (Anton)</option>
+                  <option value="inter">Clean (Inter)</option>
                   <option value="grotesk">Modern (Grotesk)</option>
+                  <option value="anton">Impact (Anton)</option>
                 </select>
               </label>
               <label>
