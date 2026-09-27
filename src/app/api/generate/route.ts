@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { assetUrl } from "@/engine/assets";
 import { AiError, describe, envClaudeAvailable, readAiConfig, runDirector, type AiConfig } from "@/lib/ai";
 import { SHOT_DIR } from "@/lib/capture";
+import { lintStoryboard, repairStoryboard, reviewBrief } from "@/lib/review";
 import { PALETTES } from "@/engine/palettes";
 import {
   beatSync,
@@ -131,11 +132,11 @@ function siteBrief(site: SiteData) {
 
 const SITE_RULES = `
 This storyboard is a product intro for the website below, built from its own brand assets. Use the SAAS style unless told otherwise.
-- Use the site's real name, claims, features and stats as copy (shortened into trailer cards).
-- If a logo is available, use logo-reveal for the brand reveal and the outro (headline = brand name).
-- Show the real product: include a product-showcase scene with the best hero image or video (set "media" to its ASSETS index).
-- Use photo-montage for feature beats over other images (each with its own "media" index), and screen-wall once when there are 3+ images.
-- For every other skill set "media" to -1. End with a cta scene whose subtext is the site's real call-to-action label.
+- Use the site's real name, claims, features and stats as copy. Never invent numbers, quotes or customers.
+- If a logo is available, use logo-reveal for the brand reveal (headline = brand name).
+- Show the real product: site-scroll, ui-tour and ui-cards take "media" = the ASSETS index of the best screenshot/video for them.
+- TRAILER style only: product-showcase with the hero image/video, photo-montage feature beats over other images, screen-wall once with 3+ images, logo-reveal again as the outro.
+- For skills without media set "media" to -1. End with a cta scene whose subtext is the site's real call-to-action label.
 - testimonial: use a quote from TESTIMONIALS verbatim (text = quote, subtext = "Name · Role"). logo-marquee only if CUSTOMER LOGOS > 0.
 - Tell ONE coherent story with a clear arc, each scene setting up the next, with an "eyebrow" chapter label:
   1 Hook ("The old way": pain-strike with the real pains → "There's a *better* way", or blur-reveal with the promise)
@@ -211,11 +212,34 @@ export async function POST(req: Request) {
       (wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[template].name}": ${TEMPLATE_MAP[template].vibe} Write copy in this voice.` : "") +
       (palette !== "auto" ? ` Use the "${palette}" palette.` : "") +
       (seed ? ` Variation #${seed % 1000}: take a fresh creative angle.` : "");
-    const result = await runDirector(ai, { system: site ? SYSTEM + "\n" + SITE_RULES : SYSTEM, text, images, schema });
+    const system = site ? SYSTEM + "\n" + SITE_RULES : SYSTEM;
+    const result = await runDirector(ai, { system, text, images, schema });
     if (result === "refusal") {
       return Response.json({ plan: builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
     }
-    const out = result as z.infer<typeof SitePlanSchema>;
+    // Self-review: Best mode always critiques and revises its draft; Balanced revises only
+    // when the checklist finds real problems; Fast ships the first draft.
+    const lintCtx = { site, targetSeconds: LENGTH_SECONDS[length] };
+    let out = result as z.infer<typeof SitePlanSchema>;
+    const issues = lintStoryboard(out, lintCtx);
+    const mode = ai.mode ?? "balanced";
+    let reviewed = "";
+    if (mode === "best" || (mode === "balanced" && issues.length)) {
+      try {
+        const revised = await runDirector(ai, { system, text: text + "\n" + reviewBrief(out, issues), images: [], schema });
+        if (revised !== "refusal") {
+          const left = lintStoryboard(revised as typeof out, lintCtx).length;
+          if (left <= issues.length) {
+            out = revised as typeof out;
+            const fixed = issues.length - left;
+            reviewed = fixed > 0 ? ` · self-reviewed, fixed ${fixed} issue${fixed > 1 ? "s" : ""}` : " · self-reviewed";
+          }
+        }
+      } catch (err) {
+        console.error("[generate] review pass failed, keeping draft:", err instanceof AiError ? err.message : (err as Error).name);
+      }
+    }
+    out = repairStoryboard(out, lintCtx);
     const brand = site ? brandFromSite(site, colors) : undefined;
     const assets: Media[] = site ? siteAssets(site).map((a) => a.media) : [];
     const directed = beatSync(
@@ -239,7 +263,7 @@ export async function POST(req: Request) {
     const plan = wantSaas
       ? applyTemplate({ ...directed, brand: directed.brand }, template, { palette: palette !== "auto" ? palette : undefined })
       : directed;
-    return Response.json({ plan, engine: "ai", engineLabel: describe(ai) });
+    return Response.json({ plan, engine: "ai", engineLabel: describe(ai) + reviewed });
   } catch (err) {
     const message = err instanceof AiError ? err.message : (err as Error).name === "TimeoutError" ? "AI request timed out" : "AI director unavailable";
     console.error("[generate] falling back to built-in director:", message);

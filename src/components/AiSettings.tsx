@@ -212,7 +212,10 @@ export default function AiSettings({
                 </button>
               ))}
             </div>
-            <p className="hint">Mode sets how deeply the AI thinks (Claude effort). Best is slower but more considered.</p>
+            <p className="hint">
+              Fast ships the first draft. Balanced fixes drafts that fail the quality checklist. Best always has the AI
+              critique and revise its storyboard (two calls, slower, noticeably better).
+            </p>
 
             <label className="check-row">
               <input type="checkbox" checked={draft.images} onChange={(e) => setDraft({ ...draft, images: e.target.checked })} />
