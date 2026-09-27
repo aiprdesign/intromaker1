@@ -1,9 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod/v4";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { assetUrl } from "@/engine/assets";
+import { AiError, describe, envClaudeAvailable, readAiConfig, runDirector, type AiConfig } from "@/lib/ai";
 import { SHOT_DIR } from "@/lib/capture";
 import { PALETTES } from "@/engine/palettes";
 import {
@@ -20,12 +19,13 @@ import {
   type StyleChoice,
 } from "@/engine/planner";
 import { SKILLS } from "@/engine/skills";
+import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData } from "@/engine/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const MODEL = process.env.INTROMAKER_MODEL || "claude-opus-5";
+
 
 const SceneSchema = z.object({
   skill: z.enum(SKILL_IDS),
@@ -90,11 +90,11 @@ SAAS: a world-class product-launch film in the style of Linear, Vercel, Stripe a
 - Hit the requested total length (sum of durations) within ±1.5 seconds.`;
 
 function hasCredentials() {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+  return envClaudeAvailable();
 }
 
 export async function GET() {
-  return Response.json({ ai: hasCredentials(), model: hasCredentials() ? MODEL : null });
+  return Response.json({ ai: hasCredentials(), model: hasCredentials() ? process.env.INTROMAKER_MODEL || "claude-opus-5" : null });
 }
 
 function siteAssets(site: SiteData): { media: Media; label: string }[] {
@@ -144,30 +144,26 @@ This storyboard is a product intro for the website below, built from its own bra
   6 Proof ("Loved by teams" testimonial, "Customers" logo-marquee, "Results" ui-cards with real stats) 7 Integrations 8 CTA.
   Skip beats the site has no material for. Keep copy consistent: one voice, one promise, recurring brand name.`;
 
-/** Screenshots Claude should look at: the hero plus a few page sections (vision input). */
+/** Screenshots the AI should look at: the hero plus a few page sections (vision input). */
 async function siteImages(site: SiteData) {
   const sh = site.shots ?? { hero: null, full: null, sections: [] };
-  const assets = siteAssets(site);
   const picks = [sh.hero, ...sh.sections.slice(0, 3)].filter((x): x is string => !!x);
-  const blocks: Anthropic.Beta.BetaContentBlockParam[] = [];
+  const out: { data: string; mediaType: "image/jpeg" }[] = [];
   for (const src of picks) {
     const id = src.match(/id=([a-f0-9]{16}-(?:hero|full|s\d))$/)?.[1];
     if (!id) continue;
     try {
       const data = await readFile(join(SHOT_DIR, `${id}.jpg`));
-      if (data.length > 4_500_000) continue;
-      const idx = assets.findIndex((a) => a.media.src === src);
-      blocks.push({ type: "text", text: `Screenshot ASSET [${idx}]:` });
-      blocks.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: data.toString("base64") } });
+      if (data.length <= 4_500_000) out.push({ data: data.toString("base64"), mediaType: "image/jpeg" });
     } catch {
       /* screenshot expired */
     }
   }
-  return blocks;
+  return out;
 }
 
 export async function POST(req: Request) {
-  let body: Partial<PlanRequest> & { site?: unknown; colors?: Brand["colors"]; style?: StyleChoice };
+  let body: Partial<PlanRequest> & { site?: unknown; colors?: Brand["colors"]; style?: StyleChoice; ai?: unknown; template?: string };
   try {
     body = await req.json();
   } catch {
@@ -186,53 +182,43 @@ export async function POST(req: Request) {
       ? body.colors
       : undefined;
   const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
-  const request: PlanRequest = { prompt, aspect, length, palette, seed, style };
+  const template = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
+  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template };
   const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
 
-  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style }) : planFromPrompt(request));
+  const builtin = () =>
+    site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template }) : planFromPrompt(request);
 
-  if (!hasCredentials() || (!prompt.trim() && !site)) {
+  // Which AI runs the director: the user's own key/provider, else a server Claude key, else built-in.
+  const userAi = readAiConfig(body.ai);
+  const ai: AiConfig | null =
+    userAi && userAi.provider !== "builtin"
+      ? userAi
+      : !userAi && hasCredentials()
+        ? { provider: "anthropic", mode: "balanced", images: true }
+        : null;
+  if (!ai || (!prompt.trim() && !site)) {
     return Response.json({ plan: builtin(), engine: "builtin" });
   }
 
   try {
-    const client = new Anthropic();
     const schema = site ? SitePlanSchema : PlanSchema;
-    const response = await client.beta.messages.parse({
-      model: MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: betaZodOutputFormat(schema) },
-      // Server-side fallback: if the model declines, Anthropic re-runs on its recommended fallback model.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      system: site ? SYSTEM + "\n" + SITE_RULES : SYSTEM,
-      messages: [
-        {
-          role: "user",
-          content: [
-            ...(site ? await siteImages(site) : []),
-            {
-              type: "text",
-              text:
-            (site ? `${site.shots?.hero ? "Above are screenshots of the website — use them to understand the product, its look and which assets best show it.\n\n" : ""}${siteBrief(site)}\n\n` : "") +
-            (prompt ? `Prompt: ${prompt}\n\n` : "") +
-            `Style: ${wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${aspect}. Target total length: ${LENGTH_SECONDS[length]} seconds.` +
-            (palette !== "auto" ? ` Use the "${palette}" palette.` : "") +
-            (seed ? ` Variation #${seed % 1000}: take a fresh creative angle.` : ""),
-            },
-          ],
-        },
-      ],
-    });
-
-    if (response.stop_reason === "refusal" || !response.parsed_output) {
+    const images = site ? await siteImages(site) : [];
+    const text =
+      (site ? `${images.length ? "The attached images are screenshots of the website — use them to understand the product, its look and which assets best show it. Screenshot order matches ASSETS: hero first, then sections.\n\n" : ""}${siteBrief(site)}\n\n` : "") +
+      (prompt ? `Prompt: ${prompt}\n\n` : "") +
+      `Style: ${wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${aspect}. Target total length: ${LENGTH_SECONDS[length]} seconds.` +
+      (wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[template].name}": ${TEMPLATE_MAP[template].vibe} Write copy in this voice.` : "") +
+      (palette !== "auto" ? ` Use the "${palette}" palette.` : "") +
+      (seed ? ` Variation #${seed % 1000}: take a fresh creative angle.` : "");
+    const result = await runDirector(ai, { system: site ? SYSTEM + "\n" + SITE_RULES : SYSTEM, text, images, schema });
+    if (result === "refusal") {
       return Response.json({ plan: builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
     }
-    const out = response.parsed_output;
+    const out = result as z.infer<typeof SitePlanSchema>;
     const brand = site ? brandFromSite(site, colors) : undefined;
     const assets: Media[] = site ? siteAssets(site).map((a) => a.media) : [];
-    const plan = beatSync(
+    const directed = beatSync(
       sanitizePlan({
         ...out,
         aspect,
@@ -249,10 +235,13 @@ export async function POST(req: Request) {
         }),
       }),
     );
-    return Response.json({ plan, engine: "claude" });
+    // SaaS films get the chosen template's look, music, pacing and role skills.
+    const plan = wantSaas
+      ? applyTemplate({ ...directed, brand: directed.brand }, template, { palette: palette !== "auto" ? palette : undefined })
+      : directed;
+    return Response.json({ plan, engine: "ai", engineLabel: describe(ai) });
   } catch (err) {
-    const message =
-      err instanceof Anthropic.APIError ? `${err.status ?? ""} ${err.message}`.trim() : "AI director unavailable";
+    const message = err instanceof AiError ? err.message : (err as Error).name === "TimeoutError" ? "AI request timed out" : "AI director unavailable";
     console.error("[generate] falling back to built-in director:", message);
     return Response.json({ plan: builtin(), engine: "builtin", note: `AI director error (${message}); used built-in director.` });
   }

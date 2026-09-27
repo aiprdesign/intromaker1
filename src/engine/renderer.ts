@@ -58,7 +58,12 @@ export interface RenderOptions {
 export function renderScene(
   ctx: CanvasRenderingContext2D,
   scene: Scene,
-  plan: Pick<VideoPlan, "palette" | "font" | "seed"> & { bpm?: number; brand?: VideoPlan["brand"]; style?: VideoPlan["style"] },
+  plan: Pick<VideoPlan, "palette" | "font" | "seed"> & {
+    bpm?: number;
+    brand?: VideoPlan["brand"];
+    style?: VideoPlan["style"];
+    look?: VideoPlan["look"];
+  },
   t: number,
   w: number,
   h: number,
@@ -86,6 +91,7 @@ export function renderScene(
     beat,
     brand: plan.brand,
     style: plan.style,
+    look: plan.look,
   };
   resetCtx(target);
   target.save();
@@ -327,8 +333,8 @@ function post(
   if (opts.bloom !== false) {
     // Highlights only (contrast/brightness filter acts as a soft threshold), at two radii.
     const passes: [number, number][] = [
-      [6, 0.38],
-      [20, 0.34],
+      [6, palette.light ? 0.12 : 0.38],
+      [20, palette.light ? 0.1 : 0.34],
     ];
     for (const [div, alpha] of passes) {
       const bw = Math.max(1, Math.round(w / div));
@@ -394,7 +400,7 @@ function post(
 
   const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.62);
   v.addColorStop(0, "rgba(0,0,0,0)");
-  v.addColorStop(1, "rgba(0,0,0,0.6)");
+  v.addColorStop(1, palette.light ? "rgba(20,20,40,0.12)" : "rgba(0,0,0,0.6)");
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, w, h);
   if (opts.grain !== false) {

@@ -136,7 +136,7 @@ export class Soundtrack {
     const now = this.ctx.currentTime + lead;
     const at = (videoT: number) => now + (videoT - from);
     this.scheduleSfx(plan, from, at);
-    if (plan.style === "saas") {
+    if ((plan.music ?? plan.style) === "saas") {
       this.playSaas(plan, from, at);
       return;
     }

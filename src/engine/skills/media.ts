@@ -124,7 +124,7 @@ function logoReveal(sc: SkillContext) {
     // Render the mark (inverted to white if it's dark ink) with a glint sweeping across it.
     const pad = 4;
     const buf = scratch("logo", Math.ceil(lw) + pad * 2, Math.ceil(lh) + pad * 2);
-    if (isDarkLogo(logo)) buf.ctx.filter = "brightness(0) invert(1)";
+    if (!palette.light && isDarkLogo(logo)) buf.ctx.filter = "brightness(0) invert(1)";
     buf.ctx.drawImage(logo, pad, pad, lw, lh);
     buf.ctx.filter = "none";
     const gx = lerp(-lw * 0.6, lw * 1.6, range(t, hit + 0.3, hit + 1.2));

@@ -2,7 +2,10 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import AiSettings, { aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
+import TemplatePicker from "@/components/TemplatePicker";
+import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import Player from "@/components/Player";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
@@ -11,7 +14,7 @@ import { decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, typ
 import { SKILL_MAP, SKILLS } from "@/engine/skills";
 import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan } from "@/engine/types";
 
-type Engine = "claude" | "builtin" | "manual";
+type Engine = "ai" | "builtin" | "manual";
 
 export default function Studio() {
   const params = useSearchParams();
@@ -27,6 +30,31 @@ export default function Studio() {
   const [copied, setCopied] = useState(false);
   const [version, setVersion] = useState(0);
   const [style, setStyle] = useState<StyleChoice>("auto");
+  const [ai, setAi] = useState<AiSettingsValue>(DEFAULT_AI);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [engineLabel, setEngineLabel] = useState("");
+  const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("intromaker.template");
+      if (saved && TEMPLATE_MAP[saved]) setTemplate(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  /** Switch template: restyles the current SaaS storyboard instantly (no regeneration). */
+  const chooseTemplate = (id: string) => {
+    setTemplate(id);
+    try {
+      localStorage.setItem("intromaker.template", id);
+    } catch {
+      /* ignore */
+    }
+    setPalette("auto");
+    setPlan((p) => (p.style === "saas" ? applyTemplate(p, id) : p));
+    setVersion((v) => v + 1);
+  };
+  useEffect(() => setAi(loadAiSettings()), []);
   const [siteUrl, setSiteUrl] = useState("");
   const [site, setSite] = useState<SiteData | null>(null);
   const [brandColors, setBrandColors] = useState<Brand["colors"]>(undefined);
@@ -65,20 +93,21 @@ export default function Studio() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style }),
+        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: loadAiSettings(), template }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setPlan(sanitizePlan(data.plan));
       setVersion((v) => v + 1);
       setEngine(data.engine);
+      setEngineLabel(data.engineLabel ?? "");
       if (data.note) setNote(data.note);
     } catch {
       // Offline or API unavailable: the director also runs in the browser.
       setPlan(
         s
-          ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style })
-          : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style }),
+          ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template })
+          : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template }),
       );
       setVersion((v) => v + 1);
       setEngine("builtin");
@@ -212,13 +241,17 @@ export default function Studio() {
         <Logo />
         <span className="studio-title">{plan.title}</span>
         <span className={`engine-badge ${engine}`}>
-          {engine === "claude" ? "✦ Directed by Claude" : engine === "builtin" ? "Built-in director" : "Manual edit"}
+          {engine === "ai" ? `✦ ${engineLabel || "AI director"}` : engine === "builtin" ? "Built-in director" : "Manual edit"}
         </span>
+        <button className="btn btn-ghost" onClick={() => setAiOpen(true)} title="Choose AI provider, key, model and mode">
+          ⚙ {aiLabel(ai)}
+        </button>
         <button className="btn btn-ghost" onClick={share}>
           {copied ? "Link copied ✓" : "Share link"}
         </button>
       </header>
 
+      {aiOpen && <AiSettings value={ai} onChange={setAi} onClose={() => setAiOpen(false)} serverClaude={!!aiAvailable} />}
       <div className="studio-body">
         <aside className="panel">
           <h2>From a website</h2>
@@ -359,6 +392,16 @@ export default function Studio() {
             ))}
           </div>
 
+          {style !== "trailer" && (
+            <>
+              <label className="field-label">
+                SaaS template <span className="tpl-desc">{TEMPLATE_MAP[template]?.name}</span>
+              </label>
+              <TemplatePicker value={template} onChange={chooseTemplate} />
+              <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
+            </>
+          )}
+
           <label className="field-label">Length</label>
           <div className="seg-control">
             {(["short", "standard", "long"] as Length[]).map((l) => (
@@ -401,11 +444,16 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">
-            {aiAvailable === null
-              ? ""
+            {ai.provider !== "builtin"
+              ? `AI director: ${aiLabel(ai)}.`
               : aiAvailable
-                ? "Claude AI Director is on."
-                : "Running the built-in director. Set ANTHROPIC_API_KEY on the server to enable the Claude AI Director."}
+                ? "AI director: Claude (server key)."
+                : "Built-in director. "}
+            {ai.provider === "builtin" && !aiAvailable && (
+              <button className="link-btn" onClick={() => setAiOpen(true)}>
+                Add an AI key
+              </button>
+            )}
           </p>
           {note && <p className="hint warn">{note}</p>}
         </aside>

@@ -1,5 +1,6 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
+import { applyTemplate, DEFAULT_TEMPLATE } from "./templates";
 import {
   FONTS,
   PALETTE_IDS,
@@ -29,6 +30,7 @@ export interface PlanRequest {
   palette?: PaletteId | "auto";
   seed?: number;
   style?: StyleChoice;
+  template?: string;
 }
 
 interface Mood {
@@ -314,17 +316,17 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const features = body.filter((b) => !tagline.toLowerCase().includes(b.toLowerCase()));
   const target = LENGTH_SECONDS[req.length];
   const scenes: Scene[] = [
-    { skill: "blur-reveal", text: tagline, items: [`Introducing ${brand}`], duration: 7 * beat, transition: "cut" },
-    { skill: "particle-assemble", text: brand, duration: 6 * beat, transition: "dolly" },
+    { role: "hook", skill: "blur-reveal", text: tagline, items: [`Introducing ${brand}`], duration: 7 * beat, transition: "cut" },
+    { role: "reveal", skill: "particle-assemble", text: brand, duration: 6 * beat, transition: "dolly" },
   ];
   if (features.length >= 3) {
-    scenes.push({ skill: "bento", text: `Everything in *${brand}*`, items: features.slice(0, 6), duration: Math.max(4.4, 10 * beat), transition: "whip" });
+    scenes.push({ role: "bento", skill: "bento", text: `Everything in *${brand}*`, items: features.slice(0, 6), duration: Math.max(4.4, 10 * beat), transition: "whip" });
   } else if (features.length) {
     scenes.push({ skill: "blur-reveal", text: features.join(". "), duration: 7 * beat, transition: "whip" });
   }
   if (numbers.length) {
     scenes.push({
-      skill: "ui-cards",
+      role: "cards", skill: "ui-cards",
       text: `See ${brand} *in action*`,
       items: [features[0] ?? brand, naturalCase(numbers[0], prompt), features[1] ?? "", features[2] ?? ""],
       duration: Math.max(4.2, 9 * beat),
@@ -335,9 +337,11 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   if (used + 8 * beat < target && features.length >= 2) {
     scenes.push({ skill: "word-swap", text: `Built for ${features.slice(0, 3).map((f) => f.toLowerCase()).join("|")}`, duration: 8 * beat, transition: "whip" });
   }
-  scenes.push({ skill: "cta", text: `Try *${brand}* today`, subtext: "Get started", duration: Math.max(3.6, 8 * beat), transition: "dolly" });
-  const palette = req.palette && req.palette !== "auto" ? req.palette : "cosmos";
-  return beatSync(sanitizePlan({ title: brand, palette, font: "inter", aspect: req.aspect, bpm, seed, scenes, style: "saas" }));
+  scenes.push({ role: "cta", skill: "cta", text: `Try *${brand}* today`, subtext: "Get started", duration: Math.max(3.6, 8 * beat), transition: "dolly" });
+  const plan = sanitizePlan({ title: brand, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, style: "saas" });
+  return applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
+    palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
+  });
 }
 
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
@@ -537,6 +541,7 @@ export interface SiteRequest {
   seed?: number;
   colors?: Brand["colors"];
   style?: StyleChoice;
+  template?: string;
 }
 
 /** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
@@ -594,7 +599,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const painHook = pains.length >= 2;
   if (painHook) {
     add(1, {
-      skill: "pain-strike",
+      role: "pain", skill: "pain-strike",
       text: "There's a *better* way.",
       items: pains,
       eyebrow: "The old way",
@@ -602,11 +607,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       transition: "cut",
     });
   } else {
-    add(1, { skill: "blur-reveal", text: tagline, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
+    add(1, { role: "hook", skill: "blur-reveal", text: tagline, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
   }
   // 2. Reveal.
   add(1, {
-    skill: brand.logo ? "logo-reveal" : "particle-assemble",
+    role: "reveal", skill: brand.logo ? "logo-reveal" : "particle-assemble",
     text: site.name,
     subtext: painHook ? tagline : site.domain,
     duration: beats(6),
@@ -615,7 +620,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 3. Meet: the real website.
   if (shots.full) {
     add(3, {
-      skill: "site-scroll",
+      role: "meet", skill: "site-scroll",
       text: painHook ? tagline : sentenceCopy(site.description, 10) || tagline,
       eyebrow: `Meet ${site.name}`,
       duration: Math.max(5, beats(10)),
@@ -626,7 +631,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 4. How it works.
   if (site.steps && site.steps.length >= 2) {
     add(5, {
-      skill: "steps",
+      role: "how", skill: "steps",
       text: `Get started in *${site.steps.length} steps*`,
       items: site.steps.slice(0, 4),
       eyebrow: "How it works",
@@ -638,7 +643,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const tourMedia = video ?? images[0] ?? img(shots.sections[0]) ?? img(shots.hero);
   if (tourMedia) {
     add(4, {
-      skill: "ui-tour",
+      role: "tour", skill: "ui-tour",
       text: longFeatures[0] ?? `See ${site.name} in action`,
       items: shortFeatures.slice(1, 3),
       eyebrow: "Features",
@@ -649,7 +654,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   if (shortFeatures.length >= 3) {
     add(6, {
-      skill: "bento",
+      role: "bento", skill: "bento",
       text: `Everything in *${site.name}*`,
       items: shortFeatures.slice(0, 6),
       eyebrow: "All-in-one",
@@ -660,7 +665,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 6. Proof — only real quotes, logos and numbers.
   if (quote) {
     add(5, {
-      skill: "testimonial",
+      role: "quote", skill: "testimonial",
       text: quote.quote,
       subtext: [quote.author, quote.role].filter(Boolean).join(" · "),
       eyebrow: "Loved by teams",
@@ -671,7 +676,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   if (brand.clientLogos && brand.clientLogos.length >= 4) {
     add(6, {
-      skill: "logo-marquee",
+      role: "logos", skill: "logo-marquee",
       text: stat ? `Trusted by *${stat.toLowerCase()}*` : "Trusted by *leading teams*",
       eyebrow: "Customers",
       duration: beats(7),
@@ -681,7 +686,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const cardsMedia = img(shots.sections[1]) ?? images[1] ?? img(shots.hero) ?? images[0];
   if (site.stats.length && cardsMedia) {
     add(7, {
-      skill: "ui-cards",
+      role: "cards", skill: "ui-cards",
       text: longFeatures[1] ?? `${site.name}, *in action*`,
       items: [shortFeatures[0] ?? site.name, site.stats[0], shortFeatures[1] ?? "", shortFeatures[2] ?? ""],
       eyebrow: "Results",
@@ -693,7 +698,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 7. Ecosystem.
   if (integrationLine) {
     add(8, {
-      skill: "integrations",
+      role: "integrations", skill: "integrations",
       text: sentenceCopy(integrationLine, 9) || integrationLine,
       eyebrow: "Integrations",
       duration: beats(8),
@@ -702,7 +707,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // 8. CTA.
   add(1, {
-    skill: "cta",
+    role: "cta", skill: "cta",
     text: `Try *${site.name}* today`,
     subtext: site.cta ?? "Get started",
     duration: Math.max(3.6, beats(8)),
@@ -721,10 +726,10 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   const scenes = order.filter((c) => chosen.has(c.i)).map((c) => c.scene);
 
-  const palette = req.palette && req.palette !== "auto" ? req.palette : "cosmos";
-  return beatSync(
-    sanitizePlan({ title: site.name, palette, font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas" }),
-  );
+  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas" });
+  return applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
+    palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
+  });
 }
 
 function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
@@ -887,6 +892,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
         : "cut",
       media: sanitizeMedia(s.media),
       eyebrow: typeof s.eyebrow === "string" && s.eyebrow.trim() ? s.eyebrow.slice(0, 40) : undefined,
+      role: typeof s.role === "string" && /^[a-z]{2,14}$/.test(s.role) ? s.role : undefined,
       items: Array.isArray(s.items)
         ? s.items.filter((i) => typeof i === "string" && i.trim()).slice(0, 8).map((i) => String(i).slice(0, 70))
         : undefined,
@@ -902,6 +908,16 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     scenes,
     brand: sanitizeBrand(raw.brand),
     style: raw.style === "saas" ? "saas" : "trailer",
+    template: typeof raw.template === "string" && /^[a-z]{2,20}$/.test(raw.template) ? raw.template : undefined,
+    music: raw.music === "saas" || raw.music === "trailer" ? raw.music : undefined,
+    look:
+      raw.look && typeof raw.look === "object"
+        ? {
+            grid: raw.look.grid !== false,
+            beams: Math.min(8, Math.max(0, Number(raw.look.beams) || 0)),
+            aurora: Math.min(3, Math.max(0, Number(raw.look.aurora) || 0)),
+          }
+        : undefined,
   };
 }
 

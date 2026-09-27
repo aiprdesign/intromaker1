@@ -1026,3 +1026,134 @@ textarea {
   padding: 5px 9px;
   color: var(--cyan);
 }
+
+/* ───────── AI settings modal ───────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(3, 2, 8, 0.7);
+  backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: 20px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 40px 120px -30px rgba(124, 77, 255, 0.6);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-head h2 {
+  font-size: 20px;
+}
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.provider {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--muted);
+}
+.provider.active {
+  color: var(--text);
+  border-color: var(--cyan);
+  background: rgba(0, 240, 255, 0.08);
+}
+.key-link {
+  color: var(--cyan);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.hint.ok {
+  color: #2effc0;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--cyan);
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+/* ───────── Template gallery ───────── */
+
+.template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: var(--panel);
+  text-align: left;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.template-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-2);
+}
+.template-card.active {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15);
+}
+.template-card canvas {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  display: block;
+  background: #000;
+}
+.template-name {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+.tpl-desc {
+  color: var(--cyan);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 6px;
+}

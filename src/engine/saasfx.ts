@@ -30,13 +30,17 @@ export function sentence(sc: SkillContext, opts: Parameters<typeof headline>[1] 
  */
 export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?: number; aurora?: number } = {}) {
   const { ctx, w, h, t, u, palette, seed } = sc;
+  const look = sc.look;
+  const light = !!palette.light;
+  // Additive light only reads on dark stages; light themes paint solid colour instead.
+  const glowOp: GlobalCompositeOperation = light ? "source-over" : "lighter";
   ctx.fillStyle = palette.bg0;
   ctx.fillRect(0, 0, w, h);
 
   // Aurora: soft moving colour fields bleeding from the top edge.
-  const aur = opts.aurora ?? 1;
+  const aur = (opts.aurora ?? 1) * (look?.aurora ?? 1) * (light ? 0.7 : 1);
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = glowOp;
   const fields: [number, string, number][] = [
     [0.3 + 0.12 * Math.sin(t * 0.35), palette.primary, 0.22],
     [0.7 + 0.1 * Math.cos(t * 0.3), palette.secondary, 0.18],
@@ -51,7 +55,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   }
   ctx.restore();
 
-  if (opts.grid !== false) {
+  if (opts.grid !== false && look?.grid !== false) {
     const step = 72 * u;
     const ox = (w / 2) % step;
     const oy = (h / 2) % step;
@@ -73,8 +77,8 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
 
     // Travelling beams along grid lines.
     const r = rng(seed + 404);
-    const beams = opts.beams ?? 4;
-    ctx.globalCompositeOperation = "lighter";
+    const beams = Math.round((opts.beams ?? 4) * (look ? look.beams : 1));
+    ctx.globalCompositeOperation = glowOp;
     for (let i = 0; i < beams; i++) {
       const vertical = r() > 0.5;
       const lineIdx = Math.floor(r() * (vertical ? w / step : h / step));
@@ -111,6 +115,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   }
 
   // Spotlight cone from above.
+  if (light) return;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const sp = ctx.createRadialGradient(w / 2, -h * 0.1, 0, w / 2, -h * 0.1, h * 0.9);
@@ -153,8 +158,9 @@ export function glassCard(
   ctx.fillStyle = sheen;
   ctx.fill();
   const border = ctx.createLinearGradient(x, y, x, y + ch);
-  border.addColorStop(0, "rgba(255,255,255,0.22)");
-  border.addColorStop(1, "rgba(255,255,255,0.06)");
+  const edge = palette.light ? palette.text : "#ffffff";
+  border.addColorStop(0, rgba(edge, palette.light ? 0.14 : 0.22));
+  border.addColorStop(1, rgba(edge, palette.light ? 0.08 : 0.06));
   ctx.strokeStyle = border;
   ctx.lineWidth = Math.max(1, 1.2 * u);
   ctx.stroke();
@@ -169,7 +175,7 @@ export function borderBeam(sc: SkillContext, x: number, y: number, cw: number, c
   const len = perim * 0.22;
   ctx.save();
   ctx.globalAlpha *= opts.alpha ?? 1;
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = palette.light ? "source-over" : "lighter";
   ctx.beginPath();
   ctx.roundRect(x, y, cw, ch, r);
   ctx.setLineDash([len, perim - len]);
@@ -238,8 +244,9 @@ export function pill(
   cy: number,
   opts: { size?: number; fill?: string; color?: string; border?: string; weight?: number; padX?: number } = {},
 ) {
-  const { ctx, u } = sc;
+  const { ctx, u, palette } = sc;
   const size = opts.size ?? 22 * u;
+  const light = !!palette.light;
   ctx.save();
   ctx.font = subFont(size, opts.weight ?? 600);
   const tw = ctx.measureText(text).width;
@@ -248,14 +255,14 @@ export function pill(
   const ph = size * 2;
   ctx.beginPath();
   ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
-  ctx.fillStyle = opts.fill ?? "rgba(255,255,255,0.08)";
+  ctx.fillStyle = opts.fill ?? (light ? rgba(palette.text, 0.05) : "rgba(255,255,255,0.08)");
   ctx.fill();
   if (opts.border !== "none") {
-    ctx.strokeStyle = opts.border ?? "rgba(255,255,255,0.18)";
+    ctx.strokeStyle = opts.border ?? (light ? rgba(palette.text, 0.16) : "rgba(255,255,255,0.18)");
     ctx.lineWidth = Math.max(1, 1.2 * u);
     ctx.stroke();
   }
-  ctx.fillStyle = opts.color ?? "#fff";
+  ctx.fillStyle = opts.color ?? (light ? palette.text : "#fff");
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, cx, cy + size * 0.04);

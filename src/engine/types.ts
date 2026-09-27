@@ -48,6 +48,10 @@ export const PALETTE_IDS = [
   "ice",
   "toxic",
   "mono",
+  "midnight",
+  "paper",
+  "sunset",
+  "ocean",
 ] as const;
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
@@ -130,6 +134,8 @@ export interface Scene {
   items?: string[];
   /** Chapter label shown above the headline ("How it works", "Loved by teams"). */
   eyebrow?: string;
+  /** Story role, so a style template can restyle the scene ("hook", "reveal", "cta"…). */
+  role?: string;
 }
 
 export interface VideoPlan {
@@ -144,6 +150,11 @@ export interface VideoPlan {
   brand?: Brand;
   /** "saas": clean product-launch look and upbeat score; "trailer": epic cinematic. */
   style?: "saas" | "trailer";
+  /** Style template id (see templates.ts). */
+  template?: string;
+  look?: Look;
+  /** Score style; defaults to follow `style`. */
+  music?: "saas" | "trailer";
 }
 
 export interface Palette {
@@ -155,6 +166,15 @@ export interface Palette {
   secondary: string;
   accent: string;
   text: string;
+  /** Light-background theme: glows become solid, borders darken, logos stay as-is. */
+  light?: boolean;
+}
+
+/** Background treatment for SaaS scenes, set by the style template. */
+export interface Look {
+  grid: boolean;
+  beams: number;
+  aurora: number;
 }
 
 export interface SkillContext {
@@ -177,6 +197,7 @@ export interface SkillContext {
   beat: number;
   brand?: Brand;
   style?: "saas" | "trailer";
+  look?: Look;
 }
 
 export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike";

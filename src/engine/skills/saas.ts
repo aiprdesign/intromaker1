@@ -96,7 +96,7 @@ function drawLogoMark(sc: SkillContext, src: string | undefined, cx: number, cy:
   const lh = lw / ar;
   ctx.save();
   ctx.globalAlpha *= alpha;
-  if (isDarkLogo(img)) ctx.filter = "brightness(0) invert(1)";
+  if (!sc.palette.light && isDarkLogo(img)) ctx.filter = "brightness(0) invert(1)";
   ctx.drawImage(img, cx - lw / 2, cy - lh / 2, lw, lh);
   ctx.restore();
   return true;
@@ -281,7 +281,7 @@ function uiTour(sc: SkillContext) {
   ctx.beginPath();
   ctx.roundRect(fx0, fy0, ww, wh, 16 * u);
   ctx.clip();
-  ctx.fillStyle = "#121019";
+  ctx.fillStyle = palette.light ? "#e8e8ef" : "#121019";
   ctx.fillRect(fx0, fy0, ww, bar);
   ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
     ctx.fillStyle = c;
@@ -289,11 +289,11 @@ function uiTour(sc: SkillContext) {
     ctx.arc(fx0 + 18 * u + i * 16 * u, fy0 + bar / 2, 5 * u, 0, TAU);
     ctx.fill();
   });
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillStyle = palette.light ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)";
   ctx.beginPath();
   ctx.roundRect(fcx - ww * 0.18, fy0 + bar * 0.2, ww * 0.36, bar * 0.6, bar * 0.3);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillStyle = palette.light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.6)";
   ctx.font = subFont(11 * u, 500);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -987,7 +987,7 @@ function marquee(sc: SkillContext) {
         row.forEach((img, i) => {
           if (x + widths[i] > -50 && x < w + 50) {
             ctx.save();
-            if (isDarkLogo(img)) ctx.filter = "brightness(0) invert(1)";
+            if (!palette.light && isDarkLogo(img)) ctx.filter = "brightness(0) invert(1)";
             ctx.drawImage(img, x, ry - (widths[i] / (img.naturalWidth / img.naturalHeight)) / 2, widths[i], widths[i] / (img.naturalWidth / img.naturalHeight));
             ctx.restore();
           }
@@ -1127,7 +1127,7 @@ function siteScroll(sc: SkillContext) {
   ctx.beginPath();
   ctx.roundRect(x0, top, ww, wh, 16 * u);
   ctx.clip();
-  ctx.fillStyle = "#121019";
+  ctx.fillStyle = palette.light ? "#e8e8ef" : "#121019";
   ctx.fillRect(x0, top, ww, bar);
   ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
     ctx.fillStyle = c;
@@ -1135,11 +1135,11 @@ function siteScroll(sc: SkillContext) {
     ctx.arc(x0 + 20 * u + i * 18 * u, top + bar / 2, 5.5 * u, 0, TAU);
     ctx.fill();
   });
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillStyle = palette.light ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)";
   ctx.beginPath();
   ctx.roundRect(w / 2 - ww * 0.2, top + bar * 0.2, ww * 0.4, bar * 0.6, bar * 0.3);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.fillStyle = palette.light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.65)";
   ctx.font = subFont(13 * u, 500);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
