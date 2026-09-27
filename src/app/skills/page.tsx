@@ -1,0 +1,20 @@
+import Nav from "@/components/Nav";
+import SkillGrid from "@/components/SkillGrid";
+
+export const metadata = { title: "Motion skills — IntroMaker" };
+
+export default function SkillsPage() {
+  return (
+    <main>
+      <Nav />
+      <section className="section">
+        <div className="section-head">
+          <span className="eyebrow">Skill showcase</span>
+          <h2>Every effect, every palette.</h2>
+          <p>Switch palettes to see each skill re-skin instantly. Pick one to start a project with it.</p>
+        </div>
+        <SkillGrid pickers />
+      </section>
+    </main>
+  );
+}
