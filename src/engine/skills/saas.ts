@@ -582,7 +582,7 @@ function bento(sc: SkillContext) {
     const [title, desc] = items[i].split(/\s+[—–]\s+/);
     drawIcon(ctx, iconFor(title, i) as IconKind, x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.52, "#fff");
     // Label, with the feature's one-line description under it in roomy cells.
-    const fs = Math.min(30 * u, bw / 11);
+    const fs = portrait ? Math.min(46 * u, bw / 14) : Math.min(30 * u, bw / 11);
     const wrap = (text: string, font: string) => {
       ctx.font = font;
       const lines: string[] = [];
@@ -1041,6 +1041,7 @@ function ctaLockup(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 3 });
   const T = ctaTiming(d);
+  const S = h > w ? 1.3 : 1; // vertical frames: bigger lock-up
   // The end card holds (its last frame doubles as the thumbnail) with a slow settle push-in.
   const ex = 0;
   const push = 1 + 0.035 * ease.outCubic(range(t, T.click, d));
@@ -1058,7 +1059,7 @@ function ctaLockup(sc: SkillContext) {
     ctx.scale(0.85 + 0.15 * lk, 0.85 + 0.15 * lk);
     ctx.shadowColor = rgba(palette.primary, 0.8);
     ctx.shadowBlur = 40 * u;
-    drawLogoMark(sc, brand?.logo, 0, 0, Math.min(w, h) * 0.11);
+    drawLogoMark(sc, brand?.logo, 0, 0, Math.min(w, h) * 0.11 * S);
     ctx.restore();
   }
   const layout = sentence(sc, { text: accented(scene.text), cy: h * (hasLogo ? 0.44 : 0.4), sizeFrac: 0.1, widthFrac: 0.8, maxLines: 2 });
@@ -1072,9 +1073,9 @@ function ctaLockup(sc: SkillContext) {
   const hover = ease.outCubic(range(t, T.hover, T.hover + 0.25));
   const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + 80 * u;
   ctx.save();
-  ctx.font = subFont(32 * u, 700);
-  const bw = ctx.measureText(`${label}  →`).width + 84 * u;
-  const bh = 82 * u;
+  ctx.font = subFont(32 * u * S, 700);
+  const bw = ctx.measureText(`${label}  →`).width + 84 * u * S;
+  const bh = 82 * u * S;
   ctx.globalAlpha = clamp(bk * 2) * (1 - ex);
   ctx.translate(w / 2, by);
   ctx.scale(bScale, bScale);
@@ -1113,8 +1114,8 @@ function ctaLockup(sc: SkillContext) {
   if (brand?.domain && dk > 0) {
     ctx.save();
     ctx.globalAlpha = dk;
-    pill(sc, brand.domain, w / 2, by + bh / 2 + 62 * u + (1 - dk) * 14 * u, {
-      size: 26 * u,
+    pill(sc, brand.domain, w / 2, by + bh / 2 + 62 * u * S + (1 - dk) * 14 * u, {
+      size: 26 * u * S,
       fill: rgba(palette.light ? "#ffffff" : palette.bg0, 0.6),
       border: rgba(palette.text, 0.18),
     });
@@ -1234,17 +1235,19 @@ function stepsTiming(scene: Scene, beat: number) {
 function steps(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene } = sc;
   saasBackground(sc, { beams: 2 });
-  const portrait = h > w;
+  // Square and vertical frames stack the steps; tall frames also scale them up.
+  const portrait = h > w * 0.85;
+  const S = h > w ? 1.35 : 1;
   topHeadline(sc);
   const items = (scene.items ?? []).filter(Boolean).slice(0, 4);
   const labels = items.length >= 2 ? items : ["Connect", "Customize", "Launch"];
   const times = stepsTiming({ ...scene, items: labels }, sc.beat);
   const n = labels.length;
   const ex = ease.inCubic(exitT(sc, 0.4));
-  const R = 40 * u;
+  const R = 40 * u * S;
   const pts = labels.map((_, i) =>
     portrait
-      ? { x: w * 0.17, y: h * 0.3 + (i * h * 0.6) / Math.max(1, n - 1) * (n > 1 ? 0.95 : 0) }
+      ? { x: w * (h > w ? 0.15 : 0.2), y: h * 0.32 + (i * h * (h > w ? 0.55 : 0.52)) / Math.max(1, n - 1) }
       : { x: w * 0.14 + (i * w * 0.72) / Math.max(1, n - 1), y: h * 0.47 },
   );
   const g = ctx.createLinearGradient(pts[0].x, pts[0].y, pts[n - 1].x, pts[n - 1].y);
@@ -1275,12 +1278,12 @@ function steps(sc: SkillContext) {
     const lt = t - times[i];
     const on = clamp(spring(lt, 12, 7), 0, 1.15);
     const p = pts[i];
-    const colW = portrait ? w * 0.66 : (w * 0.72) / Math.max(1, n - 1) * 0.9;
+    const colW = portrait ? w * (h > w ? 0.7 : 0.62) : (w * 0.72) / Math.max(1, n - 1) * 0.9;
     ctx.save();
     ctx.globalAlpha = (1 - ex) * clamp(0.35 + clamp(lt / 0.3) * 0.65);
     // Card with the step title.
-    const cw = Math.min(colW, 380 * u);
-    const ch = 130 * u;
+    const cw = Math.min(colW, (portrait ? 620 : 380) * u);
+    const ch = 130 * u * S;
     const cx = portrait ? p.x + R + 24 * u : p.x - cw / 2;
     const cy = portrait ? p.y - ch / 2 : p.y + R + 26 * u;
     const ck = lt > 0 ? Math.min(1, on) : 0;
@@ -1290,7 +1293,8 @@ function steps(sc: SkillContext) {
     glassCard(sc, cx, cy, cw, ch, { r: 18 * u, tint: lt > 0 ? palette.bg1 : undefined });
     if (lt > 0 && lt < 2.2) borderBeam(sc, cx, cy, cw, ch, lt * 0.5, { r: 18 * u, alpha: 1 - clamp((lt - 1.6) / 0.6) });
     ctx.fillStyle = palette.text;
-    ctx.font = `700 ${Math.round(Math.min(30 * u, cw / 10))}px Inter, sans-serif`;
+    const fsz = Math.min(30 * u * S, cw / 10);
+    ctx.font = `700 ${Math.round(fsz)}px Inter, sans-serif`;
     ctx.textAlign = portrait ? "left" : "center";
     ctx.textBaseline = "middle";
     const words = label.split(" ");
@@ -1304,7 +1308,7 @@ function steps(sc: SkillContext) {
       } else line = next;
     }
     lines.push(line);
-    const lh = Math.min(30 * u, cw / 10) * 1.25;
+    const lh = fsz * 1.25;
     lines.slice(0, 2).forEach((l, li, arr) =>
       ctx.fillText(l, portrait ? cx + 24 * u : cx + cw / 2, cy + ch / 2 + (li - (arr.length - 1) / 2) * lh),
     );
