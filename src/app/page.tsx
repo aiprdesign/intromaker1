@@ -8,8 +8,8 @@ import { HERO_PLAN } from "@/engine/demos";
 const STEPS = [
   {
     n: "01",
-    title: "Prompt",
-    body: "Describe the vibe, brand, claims and numbers. “Epic cyberpunk trailer for NOVA AI, 10M+ users.”",
+    title: "Prompt or paste a URL",
+    body: "Describe the vibe, brand, claims and numbers — or paste your website and we'll import your logo, product shots, video, copy and colours.",
   },
   {
     n: "02",
@@ -28,7 +28,7 @@ const PLANS = [
     name: "Free",
     price: "$0",
     period: "forever",
-    features: ["All 19 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
+    features: ["All 23 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
     cta: "Start creating",
   },
   {
@@ -65,8 +65,8 @@ export default function Home() {
             <span className="grad">from a single prompt.</span>
           </h1>
           <p className="lede">
-            IntroMaker turns words into cinematic intros, trailers and promos — particle reveals, glitch decodes, hyperspace punches,
-            shockwaves and more, scored with a generated soundtrack.
+            IntroMaker turns a prompt — or your website — into cinematic intros, trailers and SaaS promos. Paste a URL and it pulls
+            your logo, screenshots, video, copy and brand colours into a beat-synced motion-graphics video.
           </p>
           <HeroPrompt />
         </div>
@@ -75,13 +75,13 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>19 pro motion skills. All rendered live.</h2>
+          <h2>23 pro motion skills. All rendered live.</h2>
           <p>Every card below is real-time output of the engine — the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See all 19 skills →
+            See all 23 skills →
           </Link>
         </div>
       </section>

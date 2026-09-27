@@ -1,5 +1,5 @@
 import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
-import { clamp, ease, lerp, mix, range, rgba, rng, TAU } from "../math";
+import { clamp, ease, lerp, mix, mixHex, range, rgba, rng, TAU } from "../math";
 import { scratch } from "../scratch";
 import { displayFont, drawTracked, layoutChars } from "../text";
 import type { Skill, SkillContext } from "../types";
@@ -363,7 +363,7 @@ function flip3d(sc: SkillContext) {
 
   const layout = headline(sc, { cy: h * 0.44, sizeFrac: 0.27 });
   const depth = layout.size * 0.16;
-  const side = mix(palette.primary, palette.bg0, 0.5);
+  const side = mixHex(palette.primary, palette.bg0, 0.5);
   let wi = 0;
   layout.lines.forEach((line, li) => {
     const chars = layoutChars(ctx, line, w / 2, layout.tracking);

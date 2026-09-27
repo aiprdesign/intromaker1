@@ -1,4 +1,4 @@
-import { clamp, ease, mix, range, rgba, rng, TAU } from "./math";
+import { clamp, ease, mix, mixHex, range, rgba, rng, TAU } from "./math";
 import { displayFont, drawTracked, layoutHeadline, subFont, type HeadlineLayout } from "./text";
 import type { SkillContext } from "./types";
 
@@ -187,7 +187,7 @@ export function extrude(
 ) {
   const { ctx, u, palette } = sc;
   const depth = (opts.depth ?? 16) * u * (layout.size / (200 * u));
-  const side = opts.color ?? mix(palette.primary, palette.bg0, 0.55);
+  const side = opts.color ?? mixHex(palette.primary, palette.bg0, 0.55);
   const dx = opts.dx ?? 0.35;
   const dy = opts.dy ?? 1;
   const steps = Math.max(4, Math.min(24, Math.round(depth / (1.2 * u))));

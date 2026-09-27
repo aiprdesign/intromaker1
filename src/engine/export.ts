@@ -10,7 +10,8 @@ import {
 } from "mediabunny";
 import { Soundtrack } from "./audio";
 import { ensureFonts } from "./fonts";
-import { aspectSize, renderFrame, totalDuration } from "./renderer";
+import { mediaState, preloadPlanMedia, syncVideos } from "./media";
+import { aspectSize, renderFrame, sceneAt, totalDuration } from "./renderer";
 import type { VideoPlan } from "./types";
 
 const MIME_CANDIDATES = [
@@ -61,7 +62,7 @@ export async function exportVideo(plan: VideoPlan, opts: ExportOptions): Promise
 }
 
 async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<ExportResult> {
-  await ensureFonts();
+  await Promise.all([ensureFonts(), preloadPlanMedia(plan)]);
   const { w, h } = aspectSize(plan.aspect, opts.long);
   const videoCodec = await getFirstEncodableVideoCodec(["avc", "vp9", "av1"], { width: w, height: h });
   if (!videoCodec) throw new Error("No video encoder available");
@@ -80,6 +81,7 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
   const audio = audioCodec ? new AudioBufferSource({ codec: audioCodec, quality: QUALITY_HIGH }) : null;
   if (audio) output.addAudioTrack(audio);
 
+  mediaState.exporting = true;
   try {
     await output.start();
     if (audio) {
@@ -91,6 +93,8 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
     const dt = 1 / opts.fps;
     for (let i = 0; i < frames; i++) {
       if (opts.signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
+      const at = sceneAt(plan, i * dt);
+      if (at) await syncVideos(plan, at.index, at.local);
       renderFrame(ctx, plan, i * dt, w, h);
       await video.add(i * dt, dt);
       opts.onProgress((i + 1) / frames);
@@ -102,6 +106,8 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
   } catch (e) {
     if (output.state !== "finalized") await output.cancel().catch(() => {});
     throw e;
+  } finally {
+    mediaState.exporting = false;
   }
   const buffer = (output.target as BufferTarget).buffer;
   if (!buffer) throw new Error("Encoder produced no data");
@@ -112,7 +118,7 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
 async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<ExportResult> {
   const mime = pickMime();
   if (!mime) throw new Error("This browser can't export video. Try the latest Chrome or Edge.");
-  await ensureFonts();
+  await Promise.all([ensureFonts(), preloadPlanMedia(plan)]);
 
   const { w, h } = aspectSize(plan.aspect, opts.long);
   const canvas = document.createElement("canvas");

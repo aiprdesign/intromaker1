@@ -6,9 +6,10 @@ import { Logo } from "@/components/Nav";
 import Player from "@/components/Player";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
-import { decodePlan, encodePlan, planFromPrompt, sanitizePlan, type Length } from "@/engine/planner";
+import { assetUrl, extractBrandColors } from "@/engine/media";
+import { decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Length } from "@/engine/planner";
 import { SKILL_MAP, SKILLS } from "@/engine/skills";
-import { PALETTE_IDS, TRANSITIONS, type Aspect, type PaletteId, type Scene, type SkillId, type VideoPlan } from "@/engine/types";
+import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan } from "@/engine/types";
 
 type Engine = "claude" | "builtin" | "manual";
 
@@ -25,6 +26,12 @@ export default function Studio() {
   const [note, setNote] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [version, setVersion] = useState(0);
+  const [siteUrl, setSiteUrl] = useState("");
+  const [site, setSite] = useState<SiteData | null>(null);
+  const [brandColors, setBrandColors] = useState<Brand["colors"]>(undefined);
+  const [useBrandColors, setUseBrandColors] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const booted = useRef(false);
 
   useEffect(() => {
@@ -34,8 +41,19 @@ export default function Studio() {
       .catch(() => setAiAvailable(false));
   }, []);
 
-  const generate = async (opts: { prompt?: string; seed?: number; aspect?: Aspect; palette?: PaletteId | "auto" } = {}) => {
-    const p = (opts.prompt ?? prompt).trim() || EXAMPLE_PROMPTS[0];
+  const generate = async (
+    opts: {
+      prompt?: string;
+      seed?: number;
+      aspect?: Aspect;
+      palette?: PaletteId | "auto";
+      site?: SiteData | null;
+      colors?: Brand["colors"];
+    } = {},
+  ) => {
+    const s = opts.site !== undefined ? opts.site : site;
+    const colors = opts.colors !== undefined ? opts.colors : useBrandColors ? brandColors : undefined;
+    const p = (opts.prompt ?? prompt).trim() || (s ? "" : EXAMPLE_PROMPTS[0]);
     const a = opts.aspect ?? aspect;
     const pal = opts.palette ?? palette;
     setLoading(true);
@@ -44,7 +62,7 @@ export default function Studio() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed }),
+        body: JSON.stringify({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed, site: s, colors }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -54,7 +72,11 @@ export default function Studio() {
       if (data.note) setNote(data.note);
     } catch {
       // Offline or API unavailable: the director also runs in the browser.
-      setPlan(planFromPrompt({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed }));
+      setPlan(
+        s
+          ? planFromSite(s, { aspect: a, length, palette: pal, seed: opts.seed, colors })
+          : planFromPrompt({ prompt: p, aspect: a, length, palette: pal, seed: opts.seed }),
+      );
       setVersion((v) => v + 1);
       setEngine("builtin");
     } finally {
@@ -62,7 +84,41 @@ export default function Studio() {
     }
   };
 
-  // Boot from URL: #plan=… (shared link), ?prompt=…, or ?skill=… from the showcase.
+  /** Scrape a website, pull its brand colours, then storyboard an intro from it. */
+  const importSite = async (raw?: string) => {
+    const url = (raw ?? siteUrl).trim();
+    if (!url) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const res = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const s: SiteData = data.site;
+      setSite(s);
+      setSiteUrl(s.url);
+      const colorSources = [s.logo, ...s.images.slice(0, 2)].filter(Boolean).map((u) => assetUrl(u as string));
+      const colors = (await extractBrandColors(colorSources, s.themeColor)) ?? undefined;
+      setBrandColors(colors);
+      await generate({ site: s, colors: useBrandColors ? colors : undefined });
+    } catch (e) {
+      setImportError((e as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const clearSite = () => {
+    setSite(null);
+    setBrandColors(undefined);
+    setImportError(null);
+  };
+
+  // Boot from URL: #plan=… (shared link), ?url=… (website), ?prompt=…, or ?skill=… from the showcase.
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
@@ -90,6 +146,12 @@ export default function Studio() {
           scenes: [{ skill, text: s.sample.text, subtext: s.sample.subtext, duration: 4.5, transition: "cut" }],
         }),
       );
+      return;
+    }
+    const web = params.get("url");
+    if (web) {
+      setSiteUrl(web);
+      importSite(web);
       return;
     }
     const q = params.get("prompt");
@@ -153,11 +215,84 @@ export default function Studio() {
 
       <div className="studio-body">
         <aside className="panel">
-          <h2>Prompt</h2>
+          <h2>From a website</h2>
+          <form
+            className="url-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              importSite();
+            }}
+          >
+            <input
+              className="input"
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+              placeholder="yourproduct.com"
+              aria-label="Website URL"
+              inputMode="url"
+            />
+            <button className="btn btn-ghost" type="submit" disabled={importing || loading}>
+              {importing ? "Importing…" : "Import"}
+            </button>
+          </form>
+          {importError && <p className="hint warn">{importError}</p>}
+          {site && (
+            <div className="site-card">
+              <div className="site-head">
+                {site.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={assetUrl(site.logo)} alt="" className="site-logo" />
+                ) : (
+                  <span className="site-logo placeholder">{site.name.slice(0, 1)}</span>
+                )}
+                <div className="site-meta">
+                  <strong>{site.name}</strong>
+                  <span>{site.domain}</span>
+                </div>
+                <button className="icon-btn sm" onClick={clearSite} aria-label="Remove website">
+                  ✕
+                </button>
+              </div>
+              {site.tagline && <p className="site-tagline">{site.tagline}</p>}
+              {site.images.length > 0 && (
+                <div className="site-thumbs">
+                  {site.images.slice(0, 8).map((src) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={src} src={assetUrl(src)} alt="" loading="lazy" />
+                  ))}
+                </div>
+              )}
+              <div className="site-stats">
+                <span>{site.images.length} images</span>
+                <span>{site.videos.length} videos</span>
+                <span>{site.headlines.length} headlines</span>
+                <span>{site.stats.length} stats</span>
+              </div>
+              {brandColors && (
+                <label className="brand-colors">
+                  <input
+                    type="checkbox"
+                    checked={useBrandColors}
+                    onChange={(e) => {
+                      setUseBrandColors(e.target.checked);
+                      setPlan((p) =>
+                        p.brand ? { ...p, brand: { ...p.brand, colors: e.target.checked ? brandColors : undefined } } : p,
+                      );
+                    }}
+                  />
+                  <span className="swatch lg" style={{ background: brandColors.primary }} />
+                  <span className="swatch lg" style={{ background: brandColors.secondary }} />
+                  Use brand colours
+                </label>
+              )}
+            </div>
+          )}
+
+          <h2 className="mt">{site ? "Extra direction (optional)" : "Prompt"}</h2>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe your video: brand, vibe, claims, numbers…"
+            placeholder={site ? "e.g. focus on speed, end with 'Start free trial'" : "Describe your video: brand, vibe, claims, numbers…"}
             rows={5}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) generate();

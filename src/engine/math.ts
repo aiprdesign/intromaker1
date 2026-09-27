@@ -67,6 +67,13 @@ export function rgba(hex: string, a: number) {
   return `rgba(${r},${g},${b},${clamp(a)})`;
 }
 
+/** Like mix() but returns #rrggbb, so the result can be fed back into rgba()/mix(). */
+export function mixHex(hexA: string, hexB: string, t: number) {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  return `#${a.map((v, i) => Math.round(lerp(v, b[i], t)).toString(16).padStart(2, "0")).join("")}`;
+}
+
 export function mix(hexA: string, hexB: string, t: number) {
   const a = hexToRgb(hexA);
   const b = hexToRgb(hexB);

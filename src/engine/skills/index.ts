@@ -1,5 +1,6 @@
 import type { Skill, SkillId } from "../types";
 import { energySkills } from "./energy";
+import { mediaSkills } from "./media";
 import { signatureSkills } from "./signature";
 import { typographySkills } from "./typography";
 import { worldSkills } from "./worlds";
@@ -24,6 +25,7 @@ export const SKILLS: Skill[] = [
   worldSkills[5],
   signatureSkills[2],
   signatureSkills[3],
+  ...mediaSkills,
 ];
 
 export const SKILL_MAP = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Record<SkillId, Skill>;

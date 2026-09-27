@@ -1,4 +1,4 @@
-import { clamp, ease, noise1, range, rgba, rng } from "./math";
+import { clamp, ease, mixHex, noise1, range, rgba, rng } from "./math";
 import { PALETTES } from "./palettes";
 import { scratch } from "./scratch";
 import { SKILL_MAP } from "./skills";
@@ -56,7 +56,7 @@ export interface RenderOptions {
 export function renderScene(
   ctx: CanvasRenderingContext2D,
   scene: Scene,
-  plan: Pick<VideoPlan, "palette" | "font" | "seed"> & { bpm?: number },
+  plan: Pick<VideoPlan, "palette" | "font" | "seed"> & { bpm?: number; brand?: VideoPlan["brand"] },
   t: number,
   w: number,
   h: number,
@@ -64,7 +64,7 @@ export function renderScene(
   opts: RenderOptions = {},
   globalT = t,
 ) {
-  const palette = PALETTES[plan.palette];
+  const palette = brandPalette(plan.palette, plan.brand);
   const beat = 60 / (plan.bpm ?? 120);
   const buffered = t < TRANSITION_LEN && BUFFERED.has(scene.transition);
   const target = buffered ? scratch("scene-buffer", w, h).ctx : ctx;
@@ -81,6 +81,7 @@ export function renderScene(
     font: plan.font,
     seed: (plan.seed + index * 7919) >>> 0,
     beat,
+    brand: plan.brand,
   };
   resetCtx(target);
   target.save();
@@ -94,6 +95,20 @@ export function renderScene(
   resetCtx(ctx);
   transitionOverlay(out);
   post(ctx, w, h, t, sc.seed, palette, opts, globalT);
+}
+
+/** Base palette with the brand's colours swapped in (backgrounds keep the base's darkness). */
+export function brandPalette(id: VideoPlan["palette"], brand?: VideoPlan["brand"]): Palette {
+  const base = PALETTES[id];
+  const c = brand?.colors;
+  if (!c) return base;
+  return {
+    ...base,
+    primary: c.primary,
+    secondary: c.secondary,
+    accent: mixHex(c.primary, c.secondary, 0.5),
+    bg1: mixHex(base.bg0, c.primary, 0.22),
+  };
 }
 
 /** Render the whole plan at absolute time `time`. */

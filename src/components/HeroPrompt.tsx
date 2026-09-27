@@ -7,7 +7,11 @@ import { EXAMPLE_PROMPTS } from "@/engine/demos";
 export default function HeroPrompt() {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
-  const go = (p: string) => router.push(`/studio?prompt=${encodeURIComponent(p)}`);
+  // A bare domain or URL imports that website; anything else is a prompt.
+  const isUrl = (s: string) =>
+    /^https?:\/\/\S+$/i.test(s.trim()) || /^([\w-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(s.trim());
+  const go = (p: string) =>
+    router.push(isUrl(p) ? `/studio?url=${encodeURIComponent(p.trim())}` : `/studio?prompt=${encodeURIComponent(p)}`);
   return (
     <div className="hero-prompt">
       <form
@@ -20,7 +24,7 @@ export default function HeroPrompt() {
         <input
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder='Describe your video… e.g. "Epic launch trailer for NOVA AI"'
+          placeholder="Describe your video — or paste your website URL"
           aria-label="Video prompt"
         />
         <button className="btn btn-primary btn-lg" type="submit">

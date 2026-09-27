@@ -1,3 +1,4 @@
+import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import {
   FONTS,
@@ -5,9 +6,12 @@ import {
   SKILL_IDS,
   TRANSITIONS,
   type Aspect,
+  type Brand,
   type FontId,
+  type Media,
   type PaletteId,
   type Scene,
+  type SiteData,
   type SkillId,
   type Transition,
   type VideoPlan,
@@ -386,12 +390,193 @@ export function planFromPrompt(req: PlanRequest): VideoPlan {
   }));
 }
 
+export function brandFromSite(site: SiteData, colors?: Brand["colors"]): Brand {
+  return {
+    name: site.name,
+    domain: site.domain,
+    logo: site.logo ? assetUrl(site.logo) : undefined,
+    images: site.images.map(assetUrl),
+    videos: site.videos.map(assetUrl),
+    colors,
+  };
+}
+
+/** Coerce untrusted JSON into SiteData (only http(s) asset URLs survive). */
+export function readSite(raw: unknown): SiteData | null {
+  const r = raw as Record<string, unknown> | null;
+  if (!r || typeof r !== "object" || typeof r.url !== "string" || typeof r.name !== "string") return null;
+  const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+  const http = (v: unknown) => typeof v === "string" && /^https?:\/\//i.test(v) && v.length < 2000;
+  const strs = (v: unknown, n: number, max: number) => (Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, n).map((x) => x.slice(0, max)) : []);
+  return {
+    url: str(r.url, 2000),
+    domain: str(r.domain, 120),
+    name: str(r.name, 60) || "Your brand",
+    tagline: str(r.tagline, 200),
+    description: str(r.description, 400),
+    headlines: strs(r.headlines, 14, 80),
+    stats: strs(r.stats, 6, 40),
+    cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
+    logo: http(r.logo) ? (r.logo as string) : null,
+    images: (Array.isArray(r.images) ? r.images : []).filter(http).slice(0, 14) as string[],
+    videos: (Array.isArray(r.videos) ? r.videos : []).filter(http).slice(0, 4) as string[],
+    themeColor: typeof r.themeColor === "string" && /^#[0-9a-f]{3,8}$/i.test(r.themeColor) ? r.themeColor : null,
+  };
+}
+
+/** Trim marketing copy to a punchy headline of at most `max` words. */
+function punchy(text: string, max: number) {
+  const first = text.split(/[.!?;:—–|]|\s-\s|,\s/)[0].trim();
+  const words = first.split(/\s+/).filter(Boolean);
+  return words.length <= max ? first : "";
+}
+
+/**
+ * Built-in director for an imported website: logo reveal, the real product in a 3D browser,
+ * feature beats over the site's own imagery, stats, a screen wall and a CTA outro.
+ */
+export function planFromSite(
+  site: SiteData,
+  req: { aspect: Aspect; length: Length; palette?: PaletteId | "auto"; seed?: number; colors?: Brand["colors"] },
+): VideoPlan {
+  const text = [site.name, site.tagline, site.description, ...site.headlines].join(" ").toLowerCase();
+  const seed = (req.seed ?? hashString(site.url)) >>> 0;
+  const r = rng(seed);
+  const pick = <T,>(arr: readonly T[]) => arr[Math.floor(r() * arr.length)];
+  let mood = MOODS[1].mood; // SaaS default: tech
+  let best = 0;
+  for (const m of MOODS) {
+    const hits = text.match(new RegExp(m.keys.source, "g"))?.length ?? 0;
+    if (hits > best) {
+      best = hits;
+      mood = m.mood;
+    }
+  }
+  const beat = 60 / mood.bpm;
+  const beats = (n: number, minSec: number) => Math.max(n, Math.ceil(minSec / beat)) * beat;
+  const target = LENGTH_SECONDS[req.length];
+
+  const brand = brandFromSite(site, req.colors);
+  const name = site.name.toUpperCase();
+  const tagline = punchy(site.tagline, 9) || punchy(site.description, 9);
+  const features = site.headlines.map((h) => punchy(h, 6)).filter((h) => h && h.toLowerCase() !== tagline.toLowerCase());
+  const images = brand.images.map((src): Media => ({ src, kind: "image" }));
+  const video: Media | undefined = brand.videos[0] ? { src: brand.videos[0], kind: "video" } : undefined;
+
+  const scenes: Scene[] = [];
+  let lastT: Transition = "cut";
+  const tr = (pool: readonly Transition[]) => {
+    const options = pool.filter((t) => t !== lastT);
+    lastT = pick(options.length ? options : pool);
+    return lastT;
+  };
+
+  scenes.push({ skill: pick(["warp-tunnel", "hyperspace", "god-rays"] as const), text: "INTRODUCING", duration: beats(6, 2.6), transition: "cut" });
+  scenes.push({
+    skill: brand.logo ? "logo-reveal" : pick(["particle-assemble", "god-rays"] as const),
+    text: name,
+    subtext: tagline || undefined,
+    duration: beats(8, 3.6),
+    transition: tr(["flash", "dolly"]),
+  });
+  const hero = video ?? images[0];
+  if (hero) {
+    scenes.push({
+      skill: "product-showcase",
+      text: features.shift() ?? (tagline || "SEE IT IN ACTION"),
+      subtext: site.domain,
+      duration: beats(10, 4.2),
+      transition: tr(["whip", "dolly", "zoom"]),
+    });
+    scenes[scenes.length - 1].media = hero;
+  }
+
+  const outroLen = beats(8, 3.6);
+  let used = scenes.reduce((a, s) => a + s.duration, 0) + outroLen;
+  const BEAT = beats(6, 2.6);
+  const body = [...mood.body];
+  let imgIdx = hero === images[0] ? 1 : 0;
+  let last = scenes[scenes.length - 1].skill;
+  const stats = site.stats.slice(0, 2);
+  const queue: { text: string; stat?: boolean }[] = [];
+  // Interleave stats between features.
+  features.forEach((f, i) => {
+    queue.push({ text: f });
+    if (stats[i]) queue.push({ text: stats[i], stat: true });
+  });
+  stats.slice(features.length).forEach((s) => queue.push({ text: s, stat: true }));
+  let featureCount = 0;
+  const wall = images.length >= 3;
+  const reserve = wall ? BEAT : 0;
+  for (const item of queue) {
+    if (used + BEAT + reserve > target + 1 && scenes.length > 3) break;
+    let skill: SkillId;
+    let media: Media | undefined;
+    if (item.stat) skill = "number-ticker";
+    else if (images[imgIdx] && featureCount % 2 === 0) {
+      skill = "photo-montage";
+      media = images[imgIdx++];
+    } else {
+      const opts = body.filter((s) => s !== last);
+      skill = pick(opts.length ? opts : body);
+    }
+    if (!item.stat) featureCount++;
+    scenes.push({ skill, text: item.text, duration: BEAT, transition: tr(mood.transitions), ...(media ? { media } : {}) });
+    last = skill;
+    used += BEAT;
+  }
+  if (wall) {
+    scenes.push({
+      skill: "screen-wall",
+      text: pick(["ALL IN ONE PLACE", "BUILT FOR SCALE", "EVERYTHING YOU NEED"] as const),
+      subtext: site.domain,
+      duration: BEAT,
+      transition: tr(["dolly", "whip", "zoom"]),
+    });
+  }
+  scenes.push({
+    skill: brand.logo ? "logo-reveal" : pick(["god-rays", "cinematic-title"] as const),
+    text: name,
+    subtext: `${site.cta ?? "Get started"} · ${site.domain}`,
+    duration: outroLen,
+    transition: tr(["leak", "shutter", "dolly"]),
+  });
+
+  const palette = req.palette && req.palette !== "auto" ? req.palette : mood.palette;
+  return beatSync(
+    sanitizePlan({ title: site.name, palette, font: mood.font, aspect: req.aspect, bpm: mood.bpm, seed, scenes, brand }),
+  );
+}
+
 /** Snap scene lengths to whole beats so every cut lands on a kick drum. */
 export function beatSync(plan: VideoPlan): VideoPlan {
   const beat = 60 / plan.bpm;
   return {
     ...plan,
     scenes: plan.scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round(s.duration / beat)) * beat })),
+  };
+}
+
+/** Only same-origin proxied assets may be referenced by a plan. */
+const isAsset = (s: unknown): s is string => typeof s === "string" && s.startsWith("/api/asset?url=") && s.length < 2100;
+const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0-9a-f]{6}$/i.test(s);
+
+function sanitizeMedia(m: unknown): Media | undefined {
+  const media = m as Partial<Media> | undefined;
+  if (!media || !isAsset(media.src)) return undefined;
+  return { src: media.src, kind: media.kind === "video" ? "video" : "image" };
+}
+
+function sanitizeBrand(b: unknown): Brand | undefined {
+  const brand = b as Partial<Brand> | undefined;
+  if (!brand || typeof brand.name !== "string") return undefined;
+  return {
+    name: brand.name.slice(0, 60),
+    domain: typeof brand.domain === "string" ? brand.domain.slice(0, 80) : undefined,
+    logo: isAsset(brand.logo) ? brand.logo : undefined,
+    images: (brand.images ?? []).filter(isAsset).slice(0, 14),
+    videos: (brand.videos ?? []).filter(isAsset).slice(0, 4),
+    colors: brand.colors && isHex(brand.colors.primary) && isHex(brand.colors.secondary) ? brand.colors : undefined,
   };
 }
 
@@ -407,6 +592,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
       transition: (TRANSITIONS as readonly string[]).includes(s.transition as string)
         ? (s.transition as Transition)
         : "cut",
+      media: sanitizeMedia(s.media),
     }));
   if (!scenes.length) scenes.push({ skill: "particle-assemble", text: "HELLO", duration: 3, transition: "cut" });
   return {
@@ -417,6 +603,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     bpm: Math.min(160, Math.max(70, Number(raw.bpm) || 120)),
     seed: (Number(raw.seed) || 1) >>> 0,
     scenes,
+    brand: sanitizeBrand(raw.brand),
   };
 }
 

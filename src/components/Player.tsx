@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Soundtrack } from "@/engine/audio";
 import { canExport, exportVideo } from "@/engine/export";
 import { ensureFonts } from "@/engine/fonts";
+import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
 import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
 import { SKILL_MAP } from "@/engine/skills";
@@ -56,7 +57,9 @@ export default function Player({
   useEffect(() => {
     timeRef.current = Math.min(timeRef.current, duration);
     ensureFonts().then(() => draw(timeRef.current));
-  }, [draw, duration]);
+    // Redraw once imported website media has arrived.
+    preloadPlanMedia(plan).then(() => draw(timeRef.current));
+  }, [draw, duration, plan]);
 
   // Playback loop.
   useEffect(() => {
@@ -106,6 +109,10 @@ export default function Player({
   }, [playing, plan, draw, duration]);
 
   useEffect(() => soundRef.current?.setMuted(muted), [muted]);
+  // While paused, repaint when a website image/video frame becomes available.
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
+  useEffect(() => onMediaReady(() => !playingRef.current && draw(timeRef.current)), [draw]);
   useEffect(() => () => void soundRef.current?.close(), []);
 
   const toggle = () => {

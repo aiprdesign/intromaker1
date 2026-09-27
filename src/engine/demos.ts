@@ -11,7 +11,7 @@ export const HERO_PLAN: VideoPlan = {
     { skill: "hyperspace", text: "TYPE A PROMPT", duration: 2.6, transition: "cut" },
     { skill: "particle-assemble", text: "GET EPIC", subtext: "motion graphics", duration: 3.4, transition: "flash" },
     { skill: "kinetic-slam", text: "IN SECONDS", duration: 2.6, transition: "zoom" },
-    { skill: "glitch-reveal", text: "19 SKILLS", subtext: "one prompt", duration: 2.6, transition: "glitch" },
+    { skill: "glitch-reveal", text: "23 SKILLS", subtext: "one prompt", duration: 2.6, transition: "glitch" },
     { skill: "cinematic-title", text: "INTROMAKER", subtext: "Prompt to motion", duration: 3.4, transition: "zoom" },
   ],
 };

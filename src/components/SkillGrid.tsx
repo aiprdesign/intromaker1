@@ -10,6 +10,7 @@ import LoopCanvas from "./LoopCanvas";
 const DEFAULT_PALETTES: PaletteId[] = [
   "gold", "ice", "cosmos", "cyber", "inferno", "toxic", "inferno", "aurora", "synthwave", "synthwave",
   "cosmos", "ice", "gold", "mono", "cyber", "synthwave", "cyber", "cyber", "inferno",
+  "cosmos", "aurora", "ice", "synthwave",
 ];
 
 export default function SkillGrid({ limit, pickers = false }: { limit?: number; pickers?: boolean }) {

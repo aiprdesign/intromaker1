@@ -2,7 +2,8 @@
 
 IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-graphics video. You can use it for intros, trailers, launch promos and social reels.
 
-- **19 motion skills**: God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
+- **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, logo, screenshots, product videos and brand colours, then storyboards a SaaS intro around them: logo reveal, the real product in a 3D browser window, feature beats over the site's own imagery, a 3D screen wall, and a CTA outro.
+- **23 motion skills**: Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
 - **AI Director**: Claude storyboards the prompt into a hook, a title reveal, feature beats and an outro. It picks the skills, palette, typeface and tempo. When no API key is set, a built-in rule-based director does the same job offline.
 - **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remix, and share a link.
 - **Generated trailer score**: a WebAudio synth follows the storyboard, playing a minor chord progression with bass, sidechain-pumped pads, a half-time hook that builds into the full groove, trailer braams on the title and outro, risers and reverse swells into each cut, and a reverb tail at the end.
@@ -21,21 +22,27 @@ npm run dev                  # http://localhost:3000
 | Route | What it is |
 |---|---|
 | `/` | Landing page with a live hero render, the skill showcase, how it works and pricing |
-| `/skills` | All 19 skills rendered live, with a palette switcher |
+| `/skills` | All 23 skills rendered live, with a palette switcher |
 | `/studio` | The editor. Accepts `?prompt=…`, `?skill=…&palette=…`, or `#plan=…` (shared links) |
-| `POST /api/generate` | `{ prompt, aspect, length, palette?, seed? }` → `{ plan, engine }` |
+| `/studio?url=…` | Imports a website and generates an intro from it |
+| `POST /api/scrape` | `{ url }` → `{ site }`: brand, copy and asset URLs extracted from a web page |
+| `GET /api/asset?url=…` | Same-origin image/video proxy (with Range support) so website media can be drawn and exported |
+| `POST /api/generate` | `{ prompt, aspect, length, palette?, seed?, site?, colors? }` → `{ plan, engine }` |
 
 ## Architecture
 
 ```
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
-  skills/         the 19 skills (typography.ts, energy.ts, worlds.ts, signature.ts); each is a pure render(ctx, t)
+  skills/         the 23 skills (typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass
   planner.ts      built-in director + plan sanitising + share-link encoding
   audio.ts        procedural trailer score arranged to the storyboard (WebAudio)
   export.ts       MediaRecorder capture of canvas + audio
 src/app/api/generate/route.ts   Claude AI Director (structured output), falls back to planner.ts
+src/lib/scrape.ts               website extraction (name, copy, stats, CTA, logo, images, videos, theme colour)
+src/lib/netguard.ts             SSRF guard: only public http(s) hosts, re-checked on every redirect
 ```
 
 Every skill is a deterministic function of time: it takes a seeded RNG and no per-frame state. That means scrubbing, looping previews and export all produce identical frames.
@@ -48,5 +55,7 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 
 ## Notes
 
+- Website import fetches pages server-side and blocks private and internal addresses. For local testing against `localhost` sites, set `INTROMAKER_ALLOW_PRIVATE_URLS=1`.
+
 - The pricing tiers on the landing page are marketing UI only. Auth and billing are not wired up.
-- Export records in real time, so keep the tab visible while it renders.
+- Export renders every frame offline with WebCodecs (Chrome, Edge, Safari 17+), so videos come out smooth and exactly the right length on any machine. Other browsers fall back to real-time recording.

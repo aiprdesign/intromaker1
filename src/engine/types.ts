@@ -18,6 +18,10 @@ export const SKILL_IDS = [
   "glass-shatter",
   "warp-tunnel",
   "flip-3d",
+  "logo-reveal",
+  "product-showcase",
+  "photo-montage",
+  "screen-wall",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -44,6 +48,40 @@ export type FontId = (typeof FONTS)[number];
 
 export type Aspect = "16:9" | "9:16" | "1:1";
 
+export interface Media {
+  /** Same-origin URL (proxied through /api/asset) so frames can be exported. */
+  src: string;
+  kind: "image" | "video";
+}
+
+/** Brand kit imported from a website. */
+export interface Brand {
+  name: string;
+  /** Display domain, e.g. "acme.com". */
+  domain?: string;
+  logo?: string;
+  images: string[];
+  videos: string[];
+  /** Brand colours; override the palette's accent colours. */
+  colors?: { primary: string; secondary: string };
+}
+
+/** Everything extracted from a website by /api/scrape (absolute, un-proxied URLs). */
+export interface SiteData {
+  url: string;
+  domain: string;
+  name: string;
+  tagline: string;
+  description: string;
+  headlines: string[];
+  stats: string[];
+  cta: string | null;
+  logo: string | null;
+  images: string[];
+  videos: string[];
+  themeColor: string | null;
+}
+
 export interface Scene {
   skill: SkillId;
   /** Main headline for the scene. Short and punchy: 1–4 words works best. */
@@ -54,6 +92,8 @@ export interface Scene {
   duration: number;
   /** How this scene enters. */
   transition: Transition;
+  /** Image or video shown by media skills. */
+  media?: Media;
 }
 
 export interface VideoPlan {
@@ -65,6 +105,7 @@ export interface VideoPlan {
   bpm: number;
   seed: number;
   scenes: Scene[];
+  brand?: Brand;
 }
 
 export interface Palette {
@@ -96,6 +137,7 @@ export interface SkillContext {
   seed: number;
   /** Seconds per beat of the soundtrack; scenes start on a beat, so impacts can land on kicks. */
   beat: number;
+  brand?: Brand;
 }
 
 export interface Skill {
