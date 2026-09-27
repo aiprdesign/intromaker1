@@ -58,6 +58,9 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 
 ## Notes
 
+- **Live website capture** uses the Chrome or Edge already installed on your computer to take screenshots (hero, full page, sections) and render JavaScript-heavy sites. If neither is installed it falls back to a plain HTML fetch. Set `INTROMAKER_BROWSER` to a browser executable to use a specific one.
+- **AI that reads the site**: with `ANTHROPIC_API_KEY` set, Claude receives the extracted copy, features, steps, pains, stats, testimonials and asset list, plus the site's screenshots as images, and writes the storyboard. Without a key, the built-in director uses the same story arc.
+
 - Website import fetches pages server-side and blocks private and internal addresses. For local testing against `localhost` sites, set `INTROMAKER_ALLOW_PRIVATE_URLS=1`.
 
 - The pricing tiers on the landing page are marketing UI only. Auth and billing are not wired up.
