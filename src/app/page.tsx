@@ -28,7 +28,7 @@ const PLANS = [
     name: "Free",
     price: "$0",
     period: "forever",
-    features: ["All 15 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
+    features: ["All 19 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
     cta: "Start creating",
   },
   {
@@ -75,13 +75,13 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>15 pro motion skills. All rendered live.</h2>
+          <h2>19 pro motion skills. All rendered live.</h2>
           <p>Every card below is real-time output of the engine — the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See all 15 skills →
+            See all 19 skills →
           </Link>
         </div>
       </section>

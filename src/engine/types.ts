@@ -14,6 +14,10 @@ export const SKILL_IDS = [
   "shockwave",
   "type-cascade",
   "hud-scan",
+  "god-rays",
+  "glass-shatter",
+  "warp-tunnel",
+  "flip-3d",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];

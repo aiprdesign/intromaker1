@@ -8,8 +8,8 @@ import { PALETTE_IDS, type PaletteId } from "@/engine/types";
 import LoopCanvas from "./LoopCanvas";
 
 const DEFAULT_PALETTES: PaletteId[] = [
-  "cosmos", "cyber", "inferno", "toxic", "inferno", "aurora", "synthwave", "synthwave",
-  "cosmos", "ice", "gold", "mono", "cyber", "synthwave", "cyber",
+  "gold", "ice", "cosmos", "cyber", "inferno", "toxic", "inferno", "aurora", "synthwave", "synthwave",
+  "cosmos", "ice", "gold", "mono", "cyber", "synthwave", "cyber", "cyber", "inferno",
 ];
 
 export default function SkillGrid({ limit, pickers = false }: { limit?: number; pickers?: boolean }) {
