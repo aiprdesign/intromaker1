@@ -17,6 +17,55 @@ const PROGRESSION_MAJOR = [
   [53, 57, 60],
 ];
 const BASS_MAJOR = [36, 43, 45, 41];
+/** Cmaj7 – Am7 – Fmaj7 – G7: warm, soft-keys feel. */
+const PROGRESSION_MAJ7 = [
+  [60, 64, 67, 71],
+  [57, 60, 64, 67],
+  [53, 57, 60, 64],
+  [55, 59, 62, 65],
+];
+const BASS_MAJ7 = [36, 45, 41, 43];
+
+interface Flavor {
+  prog: number[][];
+  bass: number[];
+  pad: number;
+  arp: { wave: OscillatorType; div: number; level: number; decay: number; pattern: number[] } | null;
+  stabs: boolean;
+  kick: { vel: number; every: number };
+  clap: boolean;
+  hats: { div: number; vel: [number, number] };
+  bassDiv: number;
+}
+
+/** Score flavours for SaaS templates. */
+const FLAVORS: Record<NonNullable<VideoPlan["flavor"]>, Flavor> = {
+  tech: {
+    prog: PROGRESSION_MAJOR, bass: BASS_MAJOR, pad: 0.03,
+    arp: { wave: "square", div: 2, level: 0.055, decay: 0.22, pattern: [0, 1, 2, 1, 0, 2, 1, 2] },
+    stabs: false, kick: { vel: 0.6, every: 1 }, clap: true, hats: { div: 4, vel: [0.06, 0.035] }, bassDiv: 2,
+  },
+  soft: {
+    prog: PROGRESSION_MAJ7, bass: BASS_MAJ7, pad: 0.045,
+    arp: { wave: "triangle", div: 2, level: 0.06, decay: 0.5, pattern: [0, 2, 1, 3, 2, 1, 3, 2] },
+    stabs: false, kick: { vel: 0.35, every: 2 }, clap: false, hats: { div: 2, vel: [0.025, 0.015] }, bassDiv: 4,
+  },
+  pop: {
+    prog: PROGRESSION_MAJOR, bass: BASS_MAJOR, pad: 0.03,
+    arp: { wave: "square", div: 2, level: 0.06, decay: 0.16, pattern: [0, 2, 1, 2, 0, 2, 1, 2] },
+    stabs: false, kick: { vel: 0.72, every: 1 }, clap: true, hats: { div: 4, vel: [0.07, 0.04] }, bassDiv: 0.5,
+  },
+  minimal: {
+    prog: PROGRESSION, bass: BASS, pad: 0.018,
+    arp: null,
+    stabs: true, kick: { vel: 0.8, every: 1 }, clap: false, hats: { div: 4, vel: [0.08, 0.04] }, bassDiv: 1,
+  },
+  neon: {
+    prog: PROGRESSION, bass: BASS, pad: 0.035,
+    arp: { wave: "sawtooth", div: 4, level: 0.035, decay: 0.14, pattern: [0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 2, 1, 2] },
+    stabs: false, kick: { vel: 0.7, every: 1 }, clap: true, hats: { div: 2, vel: [0.06, 0.06] }, bassDiv: 0.5,
+  },
+};
 const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 
 /**
@@ -430,38 +479,52 @@ export class Soundtrack {
     const dropIn = plan.scenes.length > 2 ? starts[1] : 0;
     const ending = Math.max(dropIn, total - beat * 2);
 
+    const F = FLAVORS[plan.flavor ?? "tech"];
     for (let b = Math.floor(from / bar); b * bar < total; b++) {
       const t0 = b * bar;
-      const chord = PROGRESSION_MAJOR[b % 4];
+      const chord = F.prog[b % 4];
       const start = Math.max(t0, from);
       const len = Math.min(bar, total - t0) - (start - t0);
-      if (len > 0.05) this.pad(at(start), len, chord, t0 + bar >= total - 0.01 ? 2.4 : 0.15, 0.03);
-      // Plucked arpeggio in 8ths; filtered during the hook build.
-      for (let k = 0; k < 8; k++) {
-        const nt = t0 + k * (beat / 2);
-        if (nt < from || nt >= Math.min(total, ending + beat)) continue;
-        const note = chord[[0, 1, 2, 1, 0, 2, 1, 2][k]] + 12 + (k === 7 ? 12 : 0);
-        const build = nt < dropIn ? 0.25 + 0.75 * (nt / Math.max(0.01, dropIn)) : 1;
-        this.pluck(at(nt), note, build);
+      if (len > 0.05) this.pad(at(start), len, chord, t0 + bar >= total - 0.01 ? 2.4 : 0.15, F.pad);
+      // Arpeggio (filtered during the hook build).
+      if (F.arp) {
+        const steps = 4 * F.arp.div;
+        for (let k = 0; k < steps; k++) {
+          const nt = t0 + k * (beat / F.arp.div);
+          if (nt < from || nt >= Math.min(total, ending + beat)) continue;
+          const idx = F.arp.pattern[k % F.arp.pattern.length] % chord.length;
+          const note = chord[idx] + 12 + (k === steps - 1 ? 12 : 0);
+          const build = nt < dropIn ? 0.25 + 0.75 * (nt / Math.max(0.01, dropIn)) : 1;
+          this.pluck(at(nt), note, build, F.arp.wave, F.arp.level, F.arp.decay);
+        }
+      }
+      // Off-beat chord stabs (minimal techno).
+      if (F.stabs && t0 >= dropIn) {
+        for (let k = 0; k < 4; k++) {
+          const nt = t0 + k * beat + beat / 2;
+          if (nt >= from && nt < ending) chord.forEach((n) => this.pluck(at(nt), n, 0.6, "sawtooth", 0.03, 0.12));
+        }
       }
       if (t0 >= dropIn) {
-        for (let k = 0; k < 4; k += 2) {
-          const bt = t0 + k * beat;
-          if (bt >= from && bt < ending && bt < total) this.bass(at(bt), beat * 1.6, BASS_MAJOR[b % 4] + 12);
+        const bars = F.bass[b % 4];
+        for (let bt = t0; bt < t0 + bar - 1e-6; bt += beat * F.bassDiv) {
+          const off = F.bassDiv <= 0.5 ? (Math.round((bt - t0) / (beat * F.bassDiv)) % 2 ? 12 : 0) : 0;
+          if (bt >= from && bt < ending && bt < total) this.bass(at(bt), beat * Math.max(0.45, F.bassDiv * 0.8), bars + 12 + off);
         }
       }
     }
-    for (let bt = Math.ceil(from / (beat / 4) - 1e-6) * (beat / 4); bt < total - 0.05; bt += beat / 4) {
-      const sixteenth = Math.round(bt / (beat / 4));
-      const onBeat = sixteenth % 4 === 0;
+    const step = beat / F.hats.div;
+    for (let bt = Math.ceil(from / step - 1e-6) * step; bt < total - 0.05; bt += step) {
+      const idx = Math.round(bt / step);
+      const onBeat = idx % F.hats.div === 0;
       const n = Math.round(bt / beat);
       if (bt < dropIn || bt >= ending) continue;
-      if (onBeat) {
-        this.kick(at(bt), 0.6);
+      if (onBeat && n % F.kick.every === 0) {
+        this.kick(at(bt), F.kick.vel);
         this.duckAt(at(bt), beat);
-        if (n % 2 === 1) this.clap(at(bt));
       }
-      this.hat(at(bt), sixteenth % 2 ? 0.035 : 0.06);
+      if (onBeat && F.clap && n % 2 === 1) this.clap(at(bt));
+      this.hat(at(bt), idx % 2 ? F.hats.vel[1] : F.hats.vel[0]);
     }
     // Build into the drop and a soft hit on each cut.
     plan.scenes.forEach((sc, i) => {
@@ -472,10 +535,10 @@ export class Soundtrack {
     if (total - 0.02 >= from) this.impact(at(total - beat * 2), 0.45);
   }
 
-  private pluck(t: number, note: number, bright: number) {
+  private pluck(t: number, note: number, bright: number, wave: OscillatorType = "square", level = 0.055, decay = 0.22) {
     const c = this.ctx;
     const o = this.track(c.createOscillator());
-    o.type = "square";
+    o.type = wave;
     o.frequency.value = hz(note);
     const lp = c.createBiquadFilter();
     lp.type = "lowpass";
@@ -483,13 +546,13 @@ export class Soundtrack {
     lp.frequency.exponentialRampToValueAtTime(500, t + 0.2);
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.055, t + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
     o.connect(lp).connect(g);
     g.connect(this.duck);
     g.connect(this.delayIn);
     o.start(t);
-    o.stop(t + 0.25);
+    o.stop(t + decay + 0.03);
   }
 
   private clap(t: number) {

@@ -155,6 +155,8 @@ export interface VideoPlan {
   look?: Look;
   /** Score style; defaults to follow `style`. */
   music?: "saas" | "trailer";
+  /** Flavour of the SaaS score. */
+  flavor?: "tech" | "soft" | "pop" | "minimal" | "neon";
 }
 
 export interface Palette {
@@ -175,6 +177,14 @@ export interface Look {
   grid: boolean;
   beams: number;
   aurora: number;
+  /** Headline animation: blur-in, crisp mask slide, bouncy pop, or slow glowing reveal. */
+  text?: "blur" | "mask" | "pop" | "glow";
+  /** Foreground lens bokeh. */
+  bokeh?: boolean;
+  /** Film grain strength multiplier. */
+  grain?: number;
+  /** Vignette strength multiplier. */
+  vignette?: number;
 }
 
 export interface SkillContext {

@@ -139,7 +139,7 @@ export function renderScene(
   resetCtx(ctx);
   if (!overlapping) transitionOverlay(out);
   else if (scene.transition === "leak") transitionOverlay(out);
-  post(ctx, w, h, t, sc.seed, palette, opts, globalT);
+  post(ctx, w, h, t, sc.seed, palette, opts, globalT, plan.look);
 }
 
 /** Base palette with the brand's colours swapped in (backgrounds keep the base's darkness). */
@@ -385,6 +385,7 @@ function post(
   palette: Palette,
   opts: RenderOptions,
   globalT: number,
+  look?: VideoPlan["look"],
 ) {
   const u = Math.min(w, h) / 1080;
   if (opts.bloom !== false) {
@@ -438,7 +439,7 @@ function post(
   }
   // Out-of-focus foreground bokeh for depth.
   const r = rng(seed * 3 + 17);
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < (look?.bokeh === false ? 0 : 7); i++) {
     const bx = (r() * 1.2 - 0.1 + globalT * (0.01 + r() * 0.02)) % 1.2;
     const by = r();
     const br = (60 + r() * 140) * u;
@@ -457,13 +458,14 @@ function post(
 
   const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.62);
   v.addColorStop(0, "rgba(0,0,0,0)");
-  v.addColorStop(1, palette.light ? "rgba(20,20,40,0.12)" : "rgba(0,0,0,0.6)");
+  v.addColorStop(1, palette.light ? "rgba(20,20,40,0.12)" : `rgba(0,0,0,${Math.min(0.9, 0.6 * (look?.vignette ?? 1))})`);
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, w, h);
-  if (opts.grain !== false) {
+  if (opts.grain !== false && (look?.grain ?? 1) > 0) {
     const g = getGrain();
     const r = rng(seed + Math.floor(t * 24));
     ctx.save();
+    ctx.globalAlpha = Math.min(1, look?.grain ?? 1);
     ctx.globalCompositeOperation = "overlay";
     ctx.translate(-r() * 256, -r() * 256);
     ctx.fillStyle = ctx.createPattern(g, "repeat")!;

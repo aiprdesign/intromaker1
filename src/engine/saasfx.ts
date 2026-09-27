@@ -459,13 +459,38 @@ export function blurInLayout(
     words.forEach((word, i) => {
       const accent = /^\*.*\*$/.test(word) || word.startsWith("*") || word.endsWith("*");
       const clean = word.replace(/\*/g, "");
-      const k = clamp(range(t, start + wi * stagger, start + wi * stagger + 0.7));
-      const e = 1 - Math.pow(1 - k, 3);
-      const blur = (1 - e) * 14 * u + exit * 10 * u;
+      const mode = sc.look?.text ?? "blur";
+      const t0 = start + wi * stagger * (mode === "glow" ? 1.6 : 1);
+      const k = clamp(range(t, t0, t0 + (mode === "glow" ? 1.2 : 0.7)));
+      const e = mode === "glow" ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 3);
       ctx.save();
-      ctx.globalAlpha = (opts.alpha ?? 1) * e * (1 - exit);
-      if (blur > 0.6) ctx.filter = `blur(${blur.toFixed(1)}px)`;
-      ctx.translate(0, (1 - e) * layout.size * 0.35 - exit * layout.size * 0.2);
+      if (mode === "mask") {
+        // Crisp editorial reveal: each word slides up out of a mask.
+        const m = 1 - Math.pow(1 - clamp(range(t, t0, t0 + 0.55)), 4);
+        ctx.beginPath();
+        ctx.rect(x - layout.size * 0.1, y - layout.size * 0.62, widths[i] + layout.size * 0.2, layout.size * 1.24);
+        ctx.clip();
+        ctx.globalAlpha = (opts.alpha ?? 1) * (1 - exit);
+        ctx.translate(0, (1 - m) * layout.size * 1.1 - exit * layout.size * 1.1);
+      } else if (mode === "pop") {
+        // Bouncy: words spring up from small.
+        const s = Math.max(0, spring(t - t0, 13, 6));
+        ctx.globalAlpha = (opts.alpha ?? 1) * clamp((t - t0) / 0.12) * (1 - exit);
+        const cx = x + widths[i] / 2;
+        ctx.translate(cx, y);
+        ctx.scale(0.3 + 0.7 * s * (1 - exit * 0.5), 0.3 + 0.7 * s * (1 - exit * 0.5));
+        ctx.rotate((1 - Math.min(1, s)) * (wi % 2 ? 0.12 : -0.12));
+        ctx.translate(-cx, -y);
+      } else {
+        const blur = (1 - e) * (mode === "glow" ? 22 : 14) * u + exit * 10 * u;
+        ctx.globalAlpha = (opts.alpha ?? 1) * e * (1 - exit);
+        if (blur > 0.6) ctx.filter = `blur(${blur.toFixed(1)}px)`;
+        if (mode === "glow") {
+          ctx.shadowColor = rgba(palette.primary, 0.8 * (1 - e * 0.6));
+          ctx.shadowBlur = 30 * u;
+        }
+        ctx.translate(0, (1 - e) * layout.size * (mode === "glow" ? 0.12 : 0.35) - exit * layout.size * 0.2);
+      }
       if (accent) {
         const g = ctx.createLinearGradient(x, y - layout.size / 2, x + widths[i], y + layout.size / 2);
         g.addColorStop(0, (opts.gradient ?? [palette.primary, palette.secondary])[0]);

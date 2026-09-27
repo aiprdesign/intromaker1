@@ -33,6 +33,7 @@ export interface Template {
   font: FontId;
   bpm: number;
   music: "saas" | "trailer";
+  flavor: NonNullable<VideoPlan["flavor"]>;
   look: Look;
   transitions: Transition[];
   /** Duration multiplier: <1 snappier, >1 more breathing room. */
@@ -112,7 +113,8 @@ export const TEMPLATES: Template[] = [
     font: "inter",
     bpm: 120,
     music: "saas",
-    look: { grid: true, beams: 1, aurora: 1 },
+    flavor: "tech",
+    look: { grid: true, beams: 1, aurora: 1, text: "blur", grain: 0.8 },
     transitions: ["dolly", "whip", "push", "dissolve"],
     pace: 1,
     roles: {},
@@ -128,7 +130,8 @@ export const TEMPLATES: Template[] = [
     font: "inter",
     bpm: 116,
     music: "saas",
-    look: { grid: false, beams: 0, aurora: 1.9 },
+    flavor: "soft",
+    look: { grid: false, beams: 0, aurora: 1.9, text: "blur", grain: 0.6 },
     transitions: ["leak", "dissolve", "dolly"],
     pace: 1.1,
     roles: { integrations: "integrations" },
@@ -144,7 +147,8 @@ export const TEMPLATES: Template[] = [
     font: "inter",
     bpm: 104,
     music: "saas",
-    look: { grid: true, beams: 0, aurora: 0.6 },
+    flavor: "soft",
+    look: { grid: true, beams: 0, aurora: 0.6, text: "mask", bokeh: false, grain: 0.3 },
     transitions: ["dissolve", "push", "cut"],
     pace: 1.15,
     roles: {},
@@ -160,7 +164,8 @@ export const TEMPLATES: Template[] = [
     font: "grotesk",
     bpm: 118,
     music: "saas",
-    look: { grid: true, beams: 2, aurora: 0.25 },
+    flavor: "minimal",
+    look: { grid: true, beams: 2, aurora: 0.25, text: "mask", bokeh: false, grain: 1.4, vignette: 1.2 },
     transitions: ["cut", "shutter", "push"],
     pace: 0.9,
     roles: {},
@@ -176,7 +181,8 @@ export const TEMPLATES: Template[] = [
     font: "inter",
     bpm: 128,
     music: "saas",
-    look: { grid: false, beams: 0, aurora: 1.4 },
+    flavor: "pop",
+    look: { grid: false, beams: 0, aurora: 1.4, text: "pop", grain: 0.5 },
     transitions: ["whip", "push", "zoom"],
     pace: 0.85,
     roles: {},
@@ -192,7 +198,8 @@ export const TEMPLATES: Template[] = [
     font: "inter",
     bpm: 96,
     music: "trailer",
-    look: { grid: false, beams: 0, aurora: 0.8 },
+    flavor: "tech",
+    look: { grid: false, beams: 0, aurora: 0.8, text: "glow", grain: 1, vignette: 1.4 },
     transitions: ["dissolve", "leak", "dolly"],
     pace: 1.2,
     roles: {},
@@ -208,7 +215,8 @@ export const TEMPLATES: Template[] = [
     font: "grotesk",
     bpm: 128,
     music: "saas",
-    look: { grid: true, beams: 2.5, aurora: 1.2 },
+    flavor: "neon",
+    look: { grid: true, beams: 2.5, aurora: 1.2, text: "blur", grain: 1 },
     transitions: ["glitch", "whip", "dolly"],
     pace: 0.95,
     roles: {},
@@ -276,6 +284,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     bpm: tpl.bpm,
     style: "saas",
     music: tpl.music,
+    flavor: tpl.flavor,
     look: tpl.look,
     scenes: scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round(s.duration / beat)) * beat })),
   };

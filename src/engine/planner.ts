@@ -910,12 +910,17 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     style: raw.style === "saas" ? "saas" : "trailer",
     template: typeof raw.template === "string" && /^[a-z]{2,20}$/.test(raw.template) ? raw.template : undefined,
     music: raw.music === "saas" || raw.music === "trailer" ? raw.music : undefined,
+    flavor: ["tech", "soft", "pop", "minimal", "neon"].includes(raw.flavor as string) ? raw.flavor : undefined,
     look:
       raw.look && typeof raw.look === "object"
         ? {
             grid: raw.look.grid !== false,
             beams: Math.min(8, Math.max(0, Number(raw.look.beams) || 0)),
             aurora: Math.min(3, Math.max(0, Number(raw.look.aurora) || 0)),
+            text: ["blur", "mask", "pop", "glow"].includes(raw.look.text as string) ? raw.look.text : undefined,
+            bokeh: raw.look.bokeh === false ? false : undefined,
+            grain: raw.look.grain !== undefined ? Math.min(2, Math.max(0, Number(raw.look.grain) || 0)) : undefined,
+            vignette: raw.look.vignette !== undefined ? Math.min(1.6, Math.max(0, Number(raw.look.vignette) || 0)) : undefined,
           }
         : undefined,
   };
