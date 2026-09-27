@@ -264,3 +264,85 @@ export async function extractBrandColors(srcs: string[], themeColor?: string | n
     secondary: hslToHex(h2, Math.max(0.65, second ? second.s / second.w : 0.8), 0.62),
   };
 }
+
+const hotCache = new Map<string, { x: number; y: number }[] | null>();
+
+/**
+ * Find the two busiest UI regions (buttons, cards, charts) in a screenshot, as fractions
+ * of a `frameW`×`frameH` window the image is cover-fitted into with focal point (fx, fy).
+ * Used by the product tour so the zooms and clicks land on real interface elements.
+ * Returns null until the media has a readable frame (or if it can't be read).
+ */
+export function findHotspots(d: Drawable, frameW: number, frameH: number, fx = 0.5, fy = 0.2) {
+  // Videos are analysed once, from their first decoded frame.
+  if (d instanceof HTMLVideoElement ? d.readyState < 2 || !d.videoWidth : !d.naturalWidth) return null;
+  const aspect = frameW / frameH;
+  const key = `${d.src}|${aspect.toFixed(3)}|${fx}|${fy}`;
+  if (hotCache.has(key)) return hotCache.get(key)!;
+  let out: { x: number; y: number }[] | null = null;
+  try {
+    const { w: iw, h: ih } = mediaSize(d);
+    // Visible crop of the source image (same maths as drawCover).
+    const s = Math.max(frameW / iw, frameH / ih);
+    const cw = frameW / s;
+    const ch = frameH / s;
+    const cx = (iw - cw) * fx;
+    const cy = (ih - ch) * fy;
+    const GW = 96;
+    const GH = Math.max(24, Math.round(GW / aspect));
+    const c = document.createElement("canvas");
+    c.width = GW;
+    c.height = GH;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(d, cx, cy, cw, ch, 0, 0, GW, GH);
+    const px = g.getImageData(0, 0, GW, GH).data;
+    const lum = new Float32Array(GW * GH);
+    for (let i = 0; i < GW * GH; i++) lum[i] = 0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2];
+    // Edge energy per pixel, accumulated into a coarse grid.
+    const CX = 8;
+    const CY = 6;
+    const grid = new Float32Array(CX * CY);
+    for (let y = 1; y < GH - 1; y++) {
+      for (let x = 1; x < GW - 1; x++) {
+        const i = y * GW + x;
+        const e = Math.abs(lum[i + 1] - lum[i - 1]) + Math.abs(lum[i + GW] - lum[i - GW]);
+        if (e < 18) continue; // ignore gradients/noise, keep crisp UI edges
+        grid[Math.min(CY - 1, Math.floor((y / GH) * CY)) * CX + Math.min(CX - 1, Math.floor((x / GW) * CX))] += Math.min(e, 120);
+      }
+    }
+    const cells: { x: number; y: number; score: number }[] = [];
+    for (let gy = 0; gy < CY; gy++) {
+      for (let gx = 0; gx < CX; gx++) {
+        const x = (gx + 0.5) / CX;
+        const y = (gy + 0.5) / CY;
+        // Avoid the frame edges and the top nav band; favour the content area.
+        const centre = 1 - 0.55 * Math.abs(x - 0.5) - 0.35 * Math.abs(y - 0.55);
+        const nav = y < 0.14 ? 0.35 : 1;
+        // Smooth with neighbours so a cluster beats a single noisy cell.
+        let sum = 0;
+        for (let oy = -1; oy <= 1; oy++)
+          for (let ox = -1; ox <= 1; ox++) {
+            const nx = gx + ox;
+            const ny = gy + oy;
+            if (nx >= 0 && ny >= 0 && nx < CX && ny < CY) sum += grid[ny * CX + nx] * (ox || oy ? 0.35 : 1);
+          }
+        cells.push({ x, y, score: sum * centre * nav });
+      }
+    }
+    cells.sort((a, b) => b.score - a.score);
+    const best = cells[0];
+    const second = cells.find((c) => Math.hypot((c.x - best.x) * aspect, c.y - best.y) > 0.45);
+    if (best && best.score > 0 && second && second.score > best.score * 0.15) {
+      const clampP = (p: { x: number; y: number }) => ({
+        x: Math.min(0.84, Math.max(0.16, p.x)),
+        y: Math.min(0.84, Math.max(0.18, p.y)),
+      });
+      // Tour reads left-to-right / top-to-bottom.
+      out = [best, second].sort((a, b) => a.x + a.y * 0.5 - (b.x + b.y * 0.5)).map(clampP);
+    }
+  } catch {
+    out = null;
+  }
+  hotCache.set(key, out);
+  return out;
+}

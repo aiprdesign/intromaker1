@@ -7,7 +7,7 @@
  */
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
-import { getImage, getMedia, isDarkLogo } from "../media";
+import { findHotspots, getImage, getMedia, isDarkLogo } from "../media";
 import {
   blurInLayout,
   borderBeam,
@@ -251,10 +251,15 @@ function uiTour(sc: SkillContext) {
   const fy0 = fcy - wh / 2;
   const bar = 30 * u;
   const r = rng(seed);
-  const hot = [
-    { x: 0.26 + r() * 0.12, y: 0.32 + r() * 0.12 },
-    { x: 0.62 + r() * 0.12, y: 0.55 + r() * 0.15 },
-  ].map((p) => ({ x: fx0 + p.x * ww, y: fy0 + bar + p.y * (wh - bar) }));
+  const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
+  // Zoom to the busiest real UI regions of the screenshot; seeded spots otherwise.
+  const found = media ? findHotspots(media, ww, wh - bar, 0.5, 0.2) : null;
+  const hot = (
+    found ?? [
+      { x: 0.26 + r() * 0.12, y: 0.32 + r() * 0.12 },
+      { x: 0.62 + r() * 0.12, y: 0.55 + r() * 0.15 },
+    ]
+  ).map((p) => ({ x: fx0 + p.x * ww, y: fy0 + bar + p.y * (wh - bar) }));
   const Z = 1.85;
 
   // Camera keyframes.
@@ -298,7 +303,6 @@ function uiTour(sc: SkillContext) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(brand?.domain ?? "app.yourproduct.com", fcx, fy0 + bar / 2);
-  const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
   if (media) drawCover(ctx, media, fx0, fy0 + bar, ww, wh - bar, 1, 0.5, 0.2);
   else mockUi(sc, fx0, fy0 + bar, ww, wh - bar);
   ctx.restore();
@@ -362,11 +366,15 @@ function uiTour(sc: SkillContext) {
   if (t > T.zoomA) drawCursor(sc, cur.x, cur.y, press);
 
   // Pinned headline on a shade band.
-  const band = ctx.createLinearGradient(0, 0, 0, h * 0.26);
+  // Deepens while zoomed so the headline stays legible over bright screenshots.
+  const zk = (z - 1) / (Z - 1);
+  const bandH = h * lerp(0.26, 0.34, zk);
+  const band = ctx.createLinearGradient(0, 0, 0, bandH);
   band.addColorStop(0, rgba(palette.bg0, 0.95));
+  band.addColorStop(lerp(0.3, 0.62, zk), rgba(palette.bg0, lerp(0.75, 0.94, zk)));
   band.addColorStop(1, rgba(palette.bg0, 0));
   ctx.fillStyle = band;
-  ctx.fillRect(0, 0, w, h * 0.26);
+  ctx.fillRect(0, 0, w, bandH);
   topHeadline(sc);
 }
 
