@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Soundtrack } from "@/engine/audio";
-import { exportVideo, pickMime } from "@/engine/export";
+import { canExport, exportVideo } from "@/engine/export";
 import { ensureFonts } from "@/engine/fonts";
 import { PALETTES } from "@/engine/palettes";
 import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
@@ -29,7 +29,7 @@ export default function Player({
   const [exportRes, setExportRes] = useState(1920);
   const [error, setError] = useState<string | null>(null);
   const [canRecord, setCanRecord] = useState(true);
-  useEffect(() => setCanRecord(pickMime() !== null), []);
+  useEffect(() => setCanRecord(canExport()), []);
   const timeRef = useRef(0);
   const soundRef = useRef<Soundtrack | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -183,7 +183,7 @@ export default function Player({
           <div className="stage-export">
             <div className="spinner" />
             <div>Rendering {Math.round(exporting * 100)}%</div>
-            <small>Keep this tab visible — video records in real time.</small>
+            <small>Rendering every frame at full quality.</small>
             <button className="btn btn-ghost" onClick={() => abortRef.current?.abort()}>Cancel</button>
           </div>
         )}

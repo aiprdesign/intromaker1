@@ -15,7 +15,7 @@ const PlanSchema = z.object({
   title: z.string().describe("Short project title"),
   palette: z.enum(PALETTE_IDS),
   font: z.enum(FONTS),
-  bpm: z.number().int().describe("Soundtrack tempo, 80-150"),
+  bpm: z.number().int().describe("Soundtrack tempo, 85-145"),
   scenes: z.array(
     z.object({
       skill: z.enum(SKILL_IDS),
@@ -37,11 +37,14 @@ Fonts: anton (tall condensed, trailer/impact), grotesk (modern geometric, tech/p
 Transitions (how a scene enters): cut, flash, zoom, glitch, wipe, whip (motion-blurred whip pan), dolly (zoom-blur rush-in), leak (warm light-leak burn), shutter (letterbox shutters snap open).
 
 How to direct an epic, modern piece:
-- Structure: a hook that builds anticipation → the main title/brand reveal → 2-5 punchy beats (features, benefits, stats, emotions) → a final brand lock-up outro with a call to action in the subtext.
-- Headlines are short and punchy (1-4 words). Pull real names, claims and numbers from the prompt; invent tasteful copy only where the prompt is thin.
+- Structure with an energy arc: a short hook that builds anticipation → the main title/brand reveal (the biggest hit) → 2-5 punchy beats (features, benefits, stats, emotions) → a final brand lock-up outro with a call to action in the subtext.
+- The engine snaps every scene to whole beats of the soundtrack and the camera pulses on each kick, so think in beats: hook ≈ 6 beats, title ≈ 8 beats, each feature beat ≈ 5-6 beats, outro ≈ 8 beats. The soundtrack's arrangement follows the storyboard (sparse hook, full groove on the title, trailer braams on the title and outro).
+- Copy: headlines are short and punchy (1-4 words, ideally ≤ 16 characters), written like trailer cards. Use strong verbs and concrete claims. Pull real names, claims and numbers from the prompt; never put style words from the prompt (e.g. "cyberpunk", "hype", "retro 80s") on screen. Invent tasteful copy only where the prompt is thin.
+- Put the brand's one-line descriptor in the title scene's subtext and a clear call to action in the outro subtext.
 - Use number-ticker only when the headline contains a number.
-- Vary skills so no two consecutive scenes use the same one, and pick skills whose aesthetic fits the prompt's mood.
-- Choose the palette, font and bpm that match the mood. Faster bpm for hype, slower for luxury/calm.
+- Vary skills so no two consecutive scenes use the same one, and pick skills whose aesthetic fits the prompt's mood. Save the most spectacular skills (god-rays, shockwave, particle-assemble, glass-shatter, warp-tunnel) for the hook, title and outro.
+- Vary transitions; don't repeat the same one back to back. Use whip/flash/glitch for energy, dolly/leak/shutter for cinematic moments.
+- Choose the palette, font and bpm that match the mood: 128-145 bpm for hype/action/gaming, 110-125 for tech/launches, 85-100 for luxury/calm/documentary.
 - Hit the requested total length (sum of durations) within ±1.5 seconds.`;
 
 function hasCredentials() {

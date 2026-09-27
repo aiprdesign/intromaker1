@@ -286,7 +286,17 @@ export function planFromPrompt(req: PlanRequest): VideoPlan {
   }
   const brand = extractBrand(prompt);
   const numbers = stats(prompt);
-  let body = phrases(prompt, brand).filter((p) => !numbers.some((n) => n.includes(p)));
+  // Drop phrases that only describe the video's style ("retro 80s synthwave", "hype gaming channel").
+  const STYLE =
+    /^(hype|hyped|channel|documentary|opener|opening|playful|colorful|colourful|dark|bright|energetic|dramatic|dynamic|bold|sleek|clean|minimal|minimalist|vibrant|glowing|futuristic|aesthetic|themed|theme|looking|style|80s|90s|neon|retro|cyberpunk|synthwave|luxury|premium|gaming|sci-fi|scifi)$/i;
+  const isStyle = (w: string) => STYLE.test(w);
+  const styleOnly = (p: string) => {
+    const words = p.split(" ");
+    return words.filter(isStyle).length * 2 >= words.length;
+  };
+  const allPhrases = phrases(prompt, brand).filter((p) => !numbers.some((n) => n.includes(p)));
+  const content = allPhrases.filter((p) => !styleOnly(p));
+  let body = content.length ? content : allPhrases;
   const target = LENGTH_SECONDS[req.length];
   const year = prompt.match(/\b(19|20)\d\d\b/)?.[0];
 
@@ -300,48 +310,68 @@ export function planFromPrompt(req: PlanRequest): VideoPlan {
     usedSkills.add(skill);
     return skill;
   };
-  const hookText = /\blaunch|release|drop|coming/.test(lower) ? "THE WAIT IS OVER" : pick(HOOKS);
-  scenes.push({ skill: pickSkill(mood.hook, null), text: hookText, duration: 2.4, transition: "cut" });
+  // Pacing in beats: a short hook, a long title hold, snappy beats, a long outro.
+  const beat = 60 / mood.bpm;
+  const beats = (n: number, minSec: number) => Math.max(n, Math.ceil(minSec / beat)) * beat;
+  const HOOK = beats(6, 2.6);
+  const TITLE = beats(8, 3.4);
+  const BEAT = beats(mood.bpm >= 124 ? 5 : 6, 2.4);
+  const STAT = beats(6, 2.8);
+  const OUTRO = beats(8, 3.6);
+  let lastTransition: Transition = "cut";
+  const nextTransition = (pool: readonly Transition[]) => {
+    const options = pool.filter((t) => t !== lastTransition);
+    lastTransition = pick(options.length ? options : [...pool]);
+    return lastTransition;
+  };
 
+  const hookText = /\blaunch|release|drop|coming/.test(lower) ? "THE WAIT IS OVER" : pick(HOOKS);
+  scenes.push({ skill: pickSkill(mood.hook, null), text: hookText, duration: HOOK, transition: "cut" });
+
+  // The phrase right after the brand usually describes it ("NOVA AI, an AI copilot for…").
+  const afterBrand = brand ? phrases(prompt.slice(prompt.indexOf(brand) + brand.length), null)[0] : undefined;
   const title = (brand ?? body.shift() ?? "YOUR BRAND").toUpperCase();
-  const tagline = body.length ? body[0] : undefined;
+  const tagline = afterBrand ?? body[0];
+  body = body.filter((b) => b !== tagline);
   scenes.push({
     skill: pickSkill(mood.title, scenes[0].skill),
     text: title,
     subtext: tagline ? tagline.toLowerCase() : undefined,
-    duration: 3.6,
-    transition: pick(mood.transitions),
+    duration: TITLE,
+    transition: nextTransition(mood.transitions),
   });
-  if (tagline) body = body.slice(1);
 
-  const outroLen = 3.6;
-  let used = scenes.reduce((a, s) => a + s.duration, 0) + outroLen;
+  let used = HOOK + TITLE + OUTRO;
   const bodyPool = [...mood.body];
   let last: SkillId | null = scenes[1].skill;
   const queue = [...numbers.map((n) => ({ text: n, stat: true })), ...body.map((b) => ({ text: b, stat: false }))];
-  while (queue.length && used + 2.6 <= target + 0.5) {
-    const item = queue.shift()!;
+  while (queue.length) {
+    const item = queue[0];
+    const dur = item.stat ? STAT : BEAT;
+    // Always keep at least one feature beat, even at slow tempos.
+    if (used + dur > target + 1 && scenes.length > 2) break;
+    queue.shift();
     const skill: SkillId = item.stat ? "number-ticker" : pickSkill(bodyPool, last);
-    scenes.push({ skill, text: item.text, duration: 2.8, transition: pick(mood.transitions) });
+    scenes.push({ skill, text: item.text, duration: dur, transition: nextTransition(mood.transitions) });
     last = skill;
-    used += 2.8;
+    used += dur;
   }
   // Pad short prompts with brand-flavoured beats.
   const fillers = ["BIGGER", "BOLDER", "NEXT LEVEL", "NO LIMITS", "BUILT DIFFERENT", "UNSTOPPABLE"];
-  while (used + 2.6 <= target && fillers.length) {
+  while (used + BEAT <= target + 0.5 && fillers.length) {
     const skill = pickSkill(bodyPool, last);
     const text = fillers.splice(Math.floor(r() * fillers.length), 1)[0];
-    scenes.push({ skill, text, duration: 2.6, transition: pick(mood.transitions) });
+    scenes.push({ skill, text, duration: BEAT, transition: nextTransition(mood.transitions) });
     last = skill;
-    used += 2.6;
+    used += BEAT;
   }
 
   scenes.push({
     skill: pickSkill(mood.outro, last),
     text: title,
     subtext: year ? `${pick(OUTRO_SUBS)} · ${year}` : pick(OUTRO_SUBS),
-    duration: outroLen,
-    transition: pick(["leak", "dolly", "shutter"] as const),
+    duration: OUTRO,
+    transition: nextTransition(["leak", "dolly", "shutter"]),
   });
 
   const palette = req.palette && req.palette !== "auto" ? req.palette : mood.palette;

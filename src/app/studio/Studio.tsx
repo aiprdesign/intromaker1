@@ -303,7 +303,7 @@ export default function Studio() {
                       step={0.1}
                       min={1.6}
                       max={8}
-                      value={s.duration}
+                      value={Number(s.duration.toFixed(2))}
                       onChange={(e) => updateScene(i, { duration: Number(e.target.value) })}
                     />
                     s
