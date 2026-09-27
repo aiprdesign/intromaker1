@@ -24,7 +24,7 @@ import {
   spring,
   type IconKind,
 } from "../saasfx";
-import { displayFont, subFont } from "../text";
+import { autoAccent, displayFont, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { parseStat } from "./worlds";
 import { drawCover, mockUi } from "./media";
@@ -57,12 +57,7 @@ function subText(sc: SkillContext, text: string | undefined, y: number, k: numbe
 
 /** Auto-highlight the last word with the brand gradient when the copy has no *accent*. */
 function accented(text: string) {
-  if (text.includes("*")) return text;
-  const words = text.trim().split(/\s+/);
-  if (words.length < 3) return text;
-  const last = words.pop()!;
-  const m = last.match(/^(.*?)([.!?,]*)$/)!;
-  return `${words.join(" ")} *${m[1]}*${m[2]}`;
+  return autoAccent(text);
 }
 
 function stagger(sc: SkillContext) {
@@ -584,30 +579,45 @@ function bento(sc: SkillContext) {
     ctx.beginPath();
     ctx.roundRect(x + 22 * u, y + 22 * u, it, it, 14 * u);
     ctx.fill();
-    drawIcon(ctx, iconFor(items[i], i) as IconKind, x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.52, "#fff");
-    // Label.
+    const [title, desc] = items[i].split(/\s+[—–]\s+/);
+    drawIcon(ctx, iconFor(title, i) as IconKind, x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.52, "#fff");
+    // Label, with the feature's one-line description under it in roomy cells.
     const fs = Math.min(30 * u, bw / 11);
-    ctx.font = `700 ${Math.round(fs)}px Inter, sans-serif`;
-    ctx.fillStyle = palette.text;
+    const wrap = (text: string, font: string) => {
+      ctx.font = font;
+      const lines: string[] = [];
+      let line = "";
+      for (const wd of text.split(" ")) {
+        const next = line ? `${line} ${wd}` : wd;
+        if (ctx.measureText(next).width > bw - 44 * u && line) {
+          lines.push(line);
+          line = wd;
+        } else line = next;
+      }
+      lines.push(line);
+      if (lines.length > 2) lines[1] = `${lines[1].replace(/[\s,.;:]+$/, "")}…`;
+      return lines.slice(0, 2);
+    };
+    const ds = fs * 0.66;
+    const dFont = `500 ${Math.round(ds)}px Inter, sans-serif`;
+    const dLines = desc && bh > 170 * u && bw > 260 * u ? wrap(desc, dFont) : [];
+    const tFont = `700 ${Math.round(fs)}px Inter, sans-serif`;
+    const lines = wrap(title, tFont);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    const words = items[i].split(" ");
-    const lines: string[] = [];
-    let line = "";
-    for (const wd of words) {
-      const next = line ? `${line} ${wd}` : wd;
-      if (ctx.measureText(next).width > bw - 44 * u && line) {
-        lines.push(line);
-        line = wd;
-      } else line = next;
-    }
-    lines.push(line);
-    lines.slice(-2).forEach((l, li, arr) => ctx.fillText(l, x + 22 * u, y + bh - 24 * u - (arr.length - 1 - li) * fs * 1.2));
+    const baseY = y + bh - 24 * u;
+    ctx.font = dFont;
+    ctx.fillStyle = rgba(palette.text, 0.62);
+    dLines.forEach((l, li) => ctx.fillText(l, x + 22 * u, baseY - (dLines.length - 1 - li) * ds * 1.3));
+    const titleBase = dLines.length ? baseY - dLines.length * ds * 1.3 - fs * 0.25 : baseY;
+    ctx.font = tFont;
+    ctx.fillStyle = palette.text;
+    lines.forEach((l, li, arr) => ctx.fillText(l, x + 22 * u, titleBase - (arr.length - 1 - li) * fs * 1.2));
     // Micro visual in the upper-right area.
     const mx = x + bw * 0.45;
     const my = y + 22 * u;
     const mw = bw * 0.5 - 22 * u;
-    const mh = Math.max(40 * u, bh - 22 * u - (lines.length > 1 ? fs * 2.6 : fs * 1.5) - 40 * u);
+    const mh = Math.max(40 * u, bh - 22 * u - (lines.length > 1 ? fs * 2.6 : fs * 1.5) - dLines.length * ds * 1.3 - 40 * u);
     microVisual(sc, i, mx, my, mw, Math.min(mh, bh * 0.55), lt);
     ctx.restore();
   });
@@ -1365,7 +1375,7 @@ export const saasSkills: Skill[] = [
     id: "bento",
     name: "Bento Grid",
     tagline: "Feature cards spring into a bento grid, each with an icon and a live micro-animation.",
-    bestFor: "Feature overviews. Headline = section title; items = 3–6 short feature names.",
+    bestFor: 'Feature overviews. Headline = section title; items = 3–6 features, each "Title" or "Title — one-line description".',
     sample: { text: "Everything your team *needs*", items: ["Lightning-fast search", "Real-time analytics", "Team spaces", "Enterprise security", "AI assistant", "200+ integrations"] },
     itemsHint: "3–6 features, comma separated",
     render: bento,

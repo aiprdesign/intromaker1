@@ -205,3 +205,45 @@ export function textPoints(
   pointCache.set(key, out);
   return out;
 }
+
+const ACCENT_BOOST =
+  /^(\d[\d,.]*[kmx%+]*|faster|fastest|fast|smarter|better|instantly|instant|automatically|automatic|effortless(ly)?|everything|everyone|anyone|seconds|minutes|trust|themselves|free|ai|zero|never|always|speed|scale|thought|together|anywhere|superpowers?|magic|simple|minutes)$/i;
+const ACCENT_WEAK = new Set(
+  "use do it them you us today now need needs want love know get go can will is are be for with of to the a an and or in on at by your our my their that this".split(" "),
+);
+const ACCENT_LEAD = new Set(["whole", "every", "all", "one", "single", "real", "entire"]);
+
+/**
+ * Pick the word(s) a designer would highlight and wrap them in *…*: a benefit word or number
+ * if there is one ("*300+ tools*", "trust"), else the last meaningful word ("whole *team*" →
+ * "*whole team*"), never a filler like "use" or "today". Text already marked is unchanged.
+ */
+export function autoAccent(text: string) {
+  if (text.includes("*")) return text;
+  const words = text.trim().split(/\s+/);
+  if (words.length < 3) return text;
+  const bare = (w: string) => w.replace(/^[^\w\d]+|[^\w\d%+]+$/g, "");
+  let from = -1;
+  let to = -1;
+  for (let i = words.length - 1; i >= 1; i--) {
+    if (ACCENT_BOOST.test(bare(words[i]))) {
+      from = to = i;
+      // "300+ tools", "10x faster": carry the number's noun.
+      if (/^\d/.test(bare(words[i])) && i + 1 < words.length && !ACCENT_WEAK.has(bare(words[i + 1]).toLowerCase())) to = i + 1;
+      break;
+    }
+  }
+  if (from < 0) {
+    let i = words.length - 1;
+    while (i > 0 && ACCENT_WEAK.has(bare(words[i]).toLowerCase())) i--;
+    if (i < 1) return text;
+    from = to = i;
+    // Walk back over filler to the noun ("team can use" → "team").
+    if (i > 1 && ACCENT_LEAD.has(bare(words[i - 1]).toLowerCase())) from = i - 1;
+  }
+  const last = words[to].match(/^(.*?)([.!?,:;]*)$/)!;
+  const out = [...words];
+  out[to] = `${last[1]}*${last[2]}`;
+  out[from] = `*${out[from]}`;
+  return out.join(" ");
+}

@@ -557,6 +557,18 @@ function sentenceCopy(text: string, maxWords: number) {
   return first;
 }
 
+/** How good a site headline is as on-screen copy: short, concrete, benefit-led. */
+function scoreHeadline(text: string) {
+  const words = text.split(/\s+/).filter(Boolean).length;
+  let s = 2 - Math.abs(words - 5) * 0.35;
+  if (/\d/.test(text)) s += 0.6;
+  if (/\b(fast|faster|automat\w*|ai|every\w*|trust\w*|instant\w*|without|never|save\w*|scale\w*|secur\w*|real-time|one place|themselves|minutes|seconds)\b/i.test(text)) s += 0.8;
+  if (/^(our|we|welcome|about|blog|pricing|faq|features|resources|contact|log ?in|sign ?up|learn more)\b/i.test(text)) s -= 3;
+  if (/\?$/.test(text)) s -= 0.5;
+  if (text === text.toUpperCase() && /[A-Z]/.test(text)) s -= 0.5;
+  return s;
+}
+
 /**
  * The launch-film story arc used by best-in-class SaaS videos, built only from the site's
  * real content, with chapter labels so every scene reads as part of one story:
@@ -584,8 +596,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const shots = site.shots ?? { hero: null, full: null, sections: [] };
 
   const tagline = sentenceCopy(site.tagline, 10) || sentenceCopy(site.description, 12) || `Meet ${site.name}`;
-  const shortFeatures = site.headlines.map((h) => sentenceCopy(h, 6)).filter((h) => h && h !== tagline);
-  const longFeatures = site.headlines.map((h) => sentenceCopy(h, 9)).filter((h) => h && h !== tagline);
+  // Best headlines first; each keeps its feature description from the page.
+  const ranked = site.headlines
+    .map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title), i }))
+    .sort((a, b) => b.score - a.score || a.i - b.i);
+  const shortFeatures = ranked.map((f) => sentenceCopy(f.title, 6)).filter((h) => h && h !== tagline);
+  const longFeatures = ranked.map((f) => sentenceCopy(f.title, 9)).filter((h) => h && h !== tagline);
+  // Bento cards: "Title — one-line description" when the page has one.
+  const bentoItems = ranked
+    .map((f) => {
+      const title = sentenceCopy(f.title, 6);
+      if (!title || title === tagline) return "";
+      const desc = sentenceCopy(f.desc, 10).replace(/\.$/, "");
+      return desc && desc.toLowerCase() !== title.toLowerCase() ? `${title} — ${desc}` : title;
+    })
+    .filter(Boolean);
   const stat = site.stats.find((st) => /team|customer|compan|user|business|developer|people|brand|org/i.test(st));
   const quote = site.testimonials.find((q) => q.quote.length <= 190 && q.author);
   const integrationLine = site.headlines.find((h) => /integrat|connect|tools|apps|stack|plug/i.test(h));
@@ -600,7 +625,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (painHook) {
     add(1, {
       role: "pain", skill: "pain-strike",
-      text: "There's a *better* way.",
+      text: pick(["There's a *better* way.", "It doesn't have to be *this hard*.", "Time for a *better* way."]),
       items: pains,
       eyebrow: "The old way",
       duration: beats(pains.length * 2 + 5),
@@ -656,7 +681,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     add(6, {
       role: "bento", skill: "bento",
       text: `Everything in *${site.name}*`,
-      items: shortFeatures.slice(0, 6),
+      items: bentoItems.slice(0, 6),
       eyebrow: "All-in-one",
       duration: Math.max(4.4, beats(10)),
       transition: "dolly",
@@ -725,6 +750,14 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     }
   }
   const scenes = order.filter((c) => chosen.has(c.i)).map((c) => c.scene);
+  // Closing line: social proof when the film hasn't used it yet, else a varied call to action.
+  const cta = scenes[scenes.length - 1];
+  const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
+  const lines = [`Try *${site.name}* today`, `Get started with *${site.name}*`, `Start building with *${site.name}*`];
+  if (/free/i.test(site.cta ?? "")) lines.push("Start *free* today");
+  if (cta?.role === "cta") {
+    cta.text = teamStat && !scenes.some((sc) => sc.role === "logos") ? `Join *${teamStat.toLowerCase()}*` : pick(lines);
+  }
 
   const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas" });
   return applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
@@ -894,7 +927,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
       eyebrow: typeof s.eyebrow === "string" && s.eyebrow.trim() ? s.eyebrow.slice(0, 40) : undefined,
       role: typeof s.role === "string" && /^[a-z]{2,14}$/.test(s.role) ? s.role : undefined,
       items: Array.isArray(s.items)
-        ? s.items.filter((i) => typeof i === "string" && i.trim()).slice(0, 8).map((i) => String(i).slice(0, 70))
+        ? s.items.filter((i) => typeof i === "string" && i.trim()).slice(0, 8).map((i) => String(i).slice(0, 140))
         : undefined,
     }));
   if (!scenes.length) scenes.push({ skill: "particle-assemble", text: "HELLO", duration: 3, transition: "cut" });
