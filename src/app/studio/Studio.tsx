@@ -36,12 +36,18 @@ export default function Studio() {
   const [aiOpen, setAiOpen] = useState(false);
   const [engineLabel, setEngineLabel] = useState("");
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
+  // Read at call time: boot-time generation (?url=…) must see the saved template, not the default.
+  const templateRef = useRef(template);
+  templateRef.current = template;
   const [takes, setTakes] = useState<Take[]>([]);
   const [takesLoading, setTakesLoading] = useState(false);
   useEffect(() => {
     try {
       const saved = localStorage.getItem("intromaker.template");
-      if (saved && TEMPLATE_MAP[saved]) setTemplate(saved);
+      if (saved && TEMPLATE_MAP[saved]) {
+        templateRef.current = saved;
+        setTemplate(saved);
+      }
     } catch {
       /* ignore */
     }
@@ -93,6 +99,7 @@ export default function Studio() {
     const a = opts.aspect ?? aspect;
     const pal = opts.palette ?? palette;
     const len = opts.length ?? length;
+    const template = templateRef.current;
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     try {
       const res = await fetch("/api/generate", {

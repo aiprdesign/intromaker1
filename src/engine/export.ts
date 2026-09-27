@@ -173,3 +173,32 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
 
   return { blob: new Blob(chunks, { type: mime.split(";")[0] }), ext: mime.startsWith("video/mp4") ? "mp4" : "webm" };
 }
+
+/** Export presets: one storyboard, re-framed for each platform. */
+export const EXPORT_PRESETS = [
+  { id: "youtube", name: "YouTube · 1080p", aspect: "16:9", long: 1920, fps: 60 },
+  { id: "reels", name: "Reels / TikTok / Shorts · 9:16", aspect: "9:16", long: 1920, fps: 30 },
+  { id: "square", name: "LinkedIn / Instagram · 1:1", aspect: "1:1", long: 1080, fps: 30 },
+  { id: "web", name: "Website / X · 720p", aspect: "16:9", long: 1280, fps: 30 },
+  { id: "current", name: "Current frame · 1080p", aspect: null, long: 1920, fps: 60 },
+] as const;
+export type ExportPreset = (typeof EXPORT_PRESETS)[number];
+
+/** The plan re-framed for a preset (aspect changes re-layout every scene; nothing is cropped). */
+export function planForPreset(plan: VideoPlan, preset: ExportPreset): VideoPlan {
+  return preset.aspect ? { ...plan, aspect: preset.aspect } : plan;
+}
+
+/** PNG thumbnail/poster: the held end card (logo, closing line and button). */
+export async function exportThumbnail(plan: VideoPlan, long: number): Promise<Blob> {
+  await Promise.all([ensureFonts(), preloadPlanMedia(plan)]);
+  const { w, h } = aspectSize(plan.aspect, long);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const t = Math.max(0, totalDuration(plan) - 0.05);
+  const at = sceneAt(plan, t);
+  if (at) await syncVideos(plan, at.index, at.local);
+  renderFrame(canvas.getContext("2d")!, plan, t, w, h);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Thumbnail failed"))), "image/png"));
+}

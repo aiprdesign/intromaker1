@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Soundtrack } from "@/engine/audio";
-import { canExport, exportVideo } from "@/engine/export";
+import { canExport, EXPORT_PRESETS, exportThumbnail, exportVideo, planForPreset } from "@/engine/export";
 import { ensureFonts } from "@/engine/fonts";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
@@ -27,7 +27,33 @@ export default function Player({
   const [time, setTime] = useState(0);
   const [muted, setMuted] = useState(false);
   const [exporting, setExporting] = useState<number | null>(null);
-  const [exportRes, setExportRes] = useState(1920);
+  const [presetId, setPresetId] = useState<string>("current");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("intromaker.preset");
+      if (saved && EXPORT_PRESETS.some((p) => p.id === saved)) setPresetId(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const preset = EXPORT_PRESETS.find((p) => p.id === presetId) ?? EXPORT_PRESETS[0];
+  const choosePreset = (id: string) => {
+    setPresetId(id);
+    try {
+      localStorage.setItem("intromaker.preset", id);
+    } catch {
+      /* ignore */
+    }
+  };
+  const fileBase = (p: VideoPlan) => `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "intro"}-${p.aspect.replace(":", "x")}`;
+  const download = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
   const [error, setError] = useState<string | null>(null);
   const [canRecord, setCanRecord] = useState(true);
   useEffect(() => setCanRecord(canExport()), []);
@@ -153,19 +179,15 @@ export default function Player({
     abortRef.current = ac;
     setExporting(0);
     try {
-      const { blob, ext } = await exportVideo(plan, {
-        long: exportRes,
-        fps: 60,
+      const out = planForPreset(plan, preset);
+      const { blob, ext } = await exportVideo(out, {
+        long: preset.long,
+        fps: preset.fps,
         audio: !muted,
         onProgress: setExporting,
         signal: ac.signal,
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${plan.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "intro"}-${plan.aspect.replace(":", "x")}.${ext}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      download(blob, `${fileBase(out)}.${ext}`);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError((e as Error).message);
     } finally {
@@ -240,10 +262,28 @@ export default function Player({
             <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 9v6h4l5 4V5L8 9H4zm11.5 3A4.5 4.5 0 0 0 13 8v8a4.5 4.5 0 0 0 2.5-4zM13 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" fill="currentColor" /></svg>
           )}
         </button>
-        <select value={exportRes} onChange={(e) => setExportRes(Number(e.target.value))} className="select sm" disabled={exporting !== null}>
-          <option value={1920}>1080p</option>
-          <option value={1280}>720p</option>
+        <select value={presetId} onChange={(e) => choosePreset(e.target.value)} className="select sm" disabled={exporting !== null} title="Export preset: the film re-frames itself for each platform">
+          {EXPORT_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
         </select>
+        <button
+          className="btn btn-ghost"
+          onClick={async () => {
+            try {
+              const out = planForPreset(plan, preset);
+              download(await exportThumbnail(out, preset.long), `${fileBase(out)}-thumbnail.png`);
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}
+          disabled={exporting !== null}
+          title="Download a PNG thumbnail / poster (the end card)"
+        >
+          PNG
+        </button>
         <button className="btn btn-primary" onClick={onExport} disabled={exporting !== null || !canRecord} title={canRecord ? "" : "Recording not supported in this browser"}>
           Export video
         </button>
