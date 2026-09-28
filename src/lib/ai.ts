@@ -70,7 +70,7 @@ export function envClaudeAvailable() {
 }
 
 /** Strip anything that looks like a secret from provider error text before showing it. */
-function redact(msg: string, key?: string) {
+export function redact(msg: string, key?: string) {
   let out = msg.slice(0, 300);
   if (key && key.length > 6) out = out.split(key).join("•••");
   return out.replace(/\b(sk|gsk|AIza|xai|or|hf|pplx|nvapi|csk|fw)[-_]?[A-Za-z0-9_\-]{8,}/g, "•••");
@@ -160,7 +160,7 @@ export async function scanLocal() {
   return found;
 }
 
-async function checkBaseUrl(base: string) {
+export async function checkBaseUrl(base: string) {
   const allowLocal = serverReachesLocal();
   const url = new URL(base);
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new AiError("Base URL must be http(s).");

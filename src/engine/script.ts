@@ -1,0 +1,101 @@
+/**
+ * Voice-over script: one narrator line per scene, written from what the scene shows (the site's
+ * own copy, never new claims), in the rhythm of a launch-film narrator: short, warm sentences
+ * that fit the scene at a comfortable pace. Testimonials stay unvoiced so the quote reads, and
+ * the brand reveal gets its name said on the hit.
+ */
+import type { Scene, VideoPlan } from "./types";
+import { speakable, wordBudget } from "./voice";
+
+/** Copy as a narrator reads it: no markup, and SHOUTED stat labels in normal case (acronyms kept). */
+const clean = (s?: string) =>
+  (s ?? "")
+    .replace(/\*/g, "")
+    .replace(/\b[A-Z]{4,}\b/g, (w) => (/^(GDPR|HIPAA|SAML|SOC|HTML|JSON|CRUD|OKRS?)$/.test(w) ? w : w.toLowerCase()))
+    .replace(/\s+/g, " ")
+    .trim();
+const title = (item: string) => clean(item.split(/\s+[—–]\s+/)[0]);
+const sentence = (s: string) => {
+  const t = clean(s).replace(/[.!?]+$/, "");
+  return t ? `${t.charAt(0).toUpperCase()}${t.slice(1)}.` : "";
+};
+const lower = (s: string) => (/^[A-Z][a-z]/.test(s) && !/^[A-Z][a-z]+[A-Z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+
+/** "a, b and c" from up to `n` items. */
+function list(items: string[], n: number) {
+  const xs = items.map(title).filter(Boolean).slice(0, n).map(lower);
+  if (xs.length <= 1) return xs[0] ?? "";
+  return `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+}
+
+const count = (s: string) => speakable(s).split(/\s+/).filter(Boolean).length;
+
+/** Trim a line to the scene's word budget, dropping list items first, then whole clauses. */
+function fit(candidates: string[], budget: number) {
+  for (const c of candidates) if (c && count(c) <= budget) return c;
+  const last = candidates.filter(Boolean).pop() ?? "";
+  const words = last.split(" ").slice(0, budget);
+  // Numbers read longer than they look ("10,000+" → "more than 10,000").
+  while (words.length > 2 && count(words.join(" ")) > budget) words.pop();
+  while (words.length > 2 && /^(and|or|the|a|an|to|of|for|with|your)$/i.test(words[words.length - 1])) words.pop();
+  return words.length ? `${words.join(" ").replace(/[,;:]$/, "")}.` : "";
+}
+
+function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
+  const name = plan.brand?.name ?? plan.title;
+  const budget = wordBudget(s.duration);
+  const items = s.items ?? [];
+  const head = clean(s.text);
+  switch (s.role) {
+    case "quote":
+      return undefined;
+    case "pain":
+      return fit(
+        items.length >= 2
+          ? [`${sentence(`No more ${list(items, 3)}`)} ${sentence(head)}`, `${sentence(`No more ${list(items, 2)}`)} ${sentence(head)}`, sentence(`No more ${list(items, 3)}`), sentence(`No more ${list(items, 2)}`), sentence(head)]
+          : [sentence(head)],
+        budget,
+      );
+    case "hook":
+      return fit([sentence(head)], budget);
+    case "reveal":
+      // The reveal's subtext is sometimes just the web address: that's shown, not said.
+      return fit([s.subtext && /\s/.test(s.subtext.trim()) ? `Meet ${name}. ${sentence(s.subtext)}` : "", `Meet ${name}.`], budget);
+    case "meet":
+      return fit([sentence(head)], budget);
+    case "promise":
+      return fit([head.split("|").map((w, k) => (k ? sentence(w.trim()) : sentence(w.trim()))).join(" ")], budget);
+    case "demo":
+      return fit([sentence(head)], budget);
+    case "features":
+    case "bento":
+      return fit([`${sentence(head)} ${sentence(list(items, 3))}`, `${sentence(head)} ${sentence(list(items, 2))}`, sentence(head)], budget);
+    case "how":
+      return fit([items.length >= 2 ? `${sentence(head)} ${sentence(list(items, 3))}` : "", sentence(head)], budget);
+    case "tour":
+      return fit([items[0] ? `${sentence(head)} ${sentence(title(items[0]))}` : "", sentence(head)], budget);
+    case "metric":
+      return fit([s.subtext ? `${sentence(s.subtext)}` : "", sentence(head)], budget);
+    case "logos":
+    case "cards":
+    case "integrations":
+    case "stat":
+      return fit([sentence(head)], budget);
+    case "cta": {
+      const domain = plan.brand?.domain && !/localhost/.test(plan.brand.domain) ? plan.brand.domain : "";
+      const button = clean(s.subtext);
+      return fit([button && domain ? `${sentence(head)} ${button.replace(/[.!]+$/, "")} at ${domain}.` : "", button ? `${sentence(head)} ${sentence(button)}` : "", sentence(head)], budget);
+    }
+    default:
+      // Trailer films and scenes without a role: the card's own words.
+      return i === 0 || head.split(" ").length >= 2 ? fit([sentence(head.toLowerCase().replace(/^./, (c) => c.toUpperCase()))], budget) : undefined;
+  }
+}
+
+/** Fill in a narrator line for every scene that doesn't have one (keeps lines you've edited). */
+export function writeVoiceover(plan: VideoPlan, opts: { overwrite?: boolean } = {}): VideoPlan {
+  return {
+    ...plan,
+    scenes: plan.scenes.map((s, i) => (s.vo && !opts.overwrite ? s : { ...s, vo: lineFor(s, plan, i) || undefined })),
+  };
+}

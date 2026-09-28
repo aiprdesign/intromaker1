@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import ArcStrip from "@/components/ArcStrip";
@@ -14,12 +14,15 @@ import TemplatePicker from "@/components/TemplatePicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import { CONCEPT_MAP } from "@/engine/concepts";
 import Player from "@/components/Player";
+import VoicePanel, { loadVoiceSettings } from "@/components/VoicePanel";
+import { writeVoiceover } from "@/engine/script";
+import { DEFAULT_VOICE, speakable, wordBudget } from "@/engine/voice";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors } from "@/engine/media";
 import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { SKILL_MAP, SKILLS } from "@/engine/skills";
-import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan } from "@/engine/types";
+import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
@@ -92,6 +95,15 @@ export default function Studio() {
     setVersion((v) => v + 1);
   };
   useEffect(() => setAi(loadAiSettings()), []);
+  // Voice-over settings are the studio's (they follow you across storyboards); the lines live on scenes.
+  const [voice, setVoice] = useState<VoiceSettings>(DEFAULT_VOICE);
+  useEffect(() => setVoice(loadVoiceSettings(DEFAULT_VOICE)), []);
+  const onVoice = (v: VoiceSettings) => {
+    if (v.enabled && !voice.enabled) setPlan((p) => writeVoiceover(p));
+    setVoice(v);
+  };
+  const narrating = voice.enabled && voice.source !== "upload";
+  const playPlan = useMemo(() => ({ ...plan, voiceover: voice }), [plan, voice]);
   const [siteUrl, setSiteUrl] = useState("");
   const [site, setSite] = useState<SiteData | null>(null);
   const [brandColors, setBrandColors] = useState<Brand["colors"]>(undefined);
@@ -583,11 +595,20 @@ export default function Studio() {
             )}
           </p>
           {note && <p className="hint warn">{note}</p>}
+
+          <h2 className="mt">Voice-over</h2>
+          <VoicePanel
+            voice={voice}
+            onVoice={onVoice}
+            plan={plan}
+            onPlan={(p) => setPlan(p)}
+            onRewrite={() => setPlan((p) => writeVoiceover(p, { overwrite: true }))}
+          />
         </aside>
 
         <section className="main">
           <div className={loading ? "dim" : ""}>
-            <Player plan={plan} resetKey={version} />
+            <Player plan={playPlan} resetKey={version} />
           </div>
 
           {plan.style === "saas" && (
@@ -693,6 +714,24 @@ export default function Studio() {
                   onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })}
                   aria-label="Subtext"
                 />
+                {narrating && (
+                  <div className="vo-line">
+                    <textarea
+                      className="input"
+                      rows={2}
+                      value={s.vo ?? ""}
+                      maxLength={240}
+                      placeholder="Narration (leave empty for no voice here)"
+                      onChange={(e) => updateScene(i, { vo: e.target.value || undefined })}
+                      aria-label="Narration"
+                    />
+                    {(() => {
+                      const n = s.vo ? speakable(s.vo).split(/\s+/).filter(Boolean).length : 0;
+                      const max = wordBudget(Math.min(8, s.duration + 1));
+                      return <span className={`vo-count ${n > max ? "over" : ""}`}>🎙 {n}/{wordBudget(s.duration)} words{n > max ? " · too long for this scene" : ""}</span>;
+                    })()}
+                  </div>
+                )}
                 <div className="scene-row">
                   <label>
                     <input

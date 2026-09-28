@@ -1,6 +1,7 @@
 import { arrange, energyAt, sinceDrop, sinceKick, type Arrangement } from "./arrange";
 import { clamp, ease, mixHex, noise1, range, rgba, rng } from "./math";
 import { styleOf } from "./music";
+import { captionAt } from "./voice";
 import { PALETTES } from "./palettes";
 import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
@@ -324,6 +325,76 @@ export function renderFrame(
   });
   if (plan.style === "saas" && plan.look?.overlay) filmOverlay(ctx, plan, time, w, h, at.index);
   else brandBug(ctx, plan, time, w, h);
+  drawCaptions(ctx, plan, time, w, h);
+}
+
+/**
+ * Word-by-word captions for the voice-over (most social video is watched muted): the phrase
+ * being said on a soft pill near the bottom, the current word lit in the accent colour.
+ */
+function drawCaptions(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, w: number, h: number) {
+  const cap = captionAt(plan, time);
+  if (!cap || !cap.words.length) return;
+  const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  const u = Math.min(w, h) / 1080;
+  const portrait = h > w;
+  const size = (portrait ? 46 : 38) * u;
+  resetCtx(ctx);
+  ctx.save();
+  ctx.font = `800 ${Math.round(size)}px Inter, sans-serif`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  const space = ctx.measureText(" ").width * 1.2;
+  const widths = cap.words.map((wd) => ctx.measureText(wd).width);
+  const total = widths.reduce((a, b) => a + b, 0) + space * (cap.words.length - 1);
+  const padX = size * 0.7;
+  const pw = Math.min(w * 0.92, total + padX * 2);
+  const ph = size * 1.75;
+  const cx = w / 2;
+  const cy = h * (portrait ? 0.855 : 0.9);
+  const k = ease.outCubic(clamp(cap.since / 0.18 + 0.01));
+  // Frosted pill: whatever is behind it (cards, screenshots, headlines) is blurred and dimmed,
+  // so the caption reads on any layout.
+  const px = Math.max(0, Math.round(cx - pw / 2));
+  const py = Math.max(0, Math.round(cy - ph / 2));
+  const bw = Math.min(w - px, Math.round(pw));
+  const bh = Math.min(h - py, Math.round(ph));
+  const frost = scratch("caption-frost", Math.max(1, bw), Math.max(1, bh));
+  frost.ctx.setTransform(1, 0, 0, 1, 0, 0);
+  frost.ctx.filter = `blur(${Math.round(14 * u)}px)`;
+  frost.ctx.drawImage(ctx.canvas, px - 20, py - 20, bw + 40, bh + 40, -20, -20, bw + 40, bh + 40);
+  frost.ctx.filter = "none";
+  ctx.globalAlpha = k;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 24 * u;
+  ctx.fillStyle = palette.light ? "rgba(255,255,255,0.72)" : "rgba(6,6,12,0.55)";
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.clip();
+  ctx.drawImage(frost.canvas, px, py);
+  ctx.fillStyle = palette.light ? "rgba(255,255,255,0.72)" : "rgba(6,6,12,0.62)";
+  ctx.fillRect(px, py, bw, bh);
+  ctx.restore();
+  ctx.beginPath();
+  ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
+  ctx.strokeStyle = palette.light ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.14)";
+  ctx.lineWidth = Math.max(1, 1.2 * u);
+  ctx.stroke();
+  ctx.translate(cx, cy + (1 - k) * 10 * u);
+  const fit = total > pw - padX * 2 ? (pw - padX * 2) / total : 1;
+  ctx.scale(fit, fit);
+  let x = -total / 2;
+  cap.words.forEach((wd, i) => {
+    const on = i === cap.active;
+    ctx.fillStyle = on ? palette.primary : i < cap.active || cap.active < 0 ? palette.text : rgba(palette.text, 0.55);
+    ctx.fillText(wd, x, size * 0.04 - (on ? 2 * u : 0));
+    x += widths[i] + space;
+  });
+  ctx.restore();
+  resetCtx(ctx);
 }
 
 /** Frame-level overlays: a sci-fi HUD or a Swiss-style layout frame (they carry the brand name). */

@@ -24,6 +24,7 @@ import {
 import { SKILLS } from "@/engine/skills";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import { DEMOS, detectConcept } from "@/engine/concepts";
+import { writeVoiceover } from "@/engine/script";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData } from "@/engine/types";
 
 export const runtime = "nodejs";
@@ -39,6 +40,9 @@ const SceneSchema = z.object({
   subtext: z.string().describe("Optional supporting line, max ~40 characters, or empty string"),
   duration: z.number().describe("Seconds, 2-5"),
   transition: z.enum(TRANSITIONS),
+  vo: z
+    .string()
+    .describe("Voice-over: the narrator's spoken line for this scene, conversational sentence case, at most ~2.5 words per second of the scene, only real claims; empty for testimonial scenes"),
 });
 
 const SitePlanSchema = z.object({
@@ -92,7 +96,8 @@ SAAS: a world-class product-launch film in the style of Linear, Vercel, Stripe a
 - Vary skills so no two consecutive scenes use the same one, and pick skills whose aesthetic fits the prompt's mood. Save the most spectacular skills (god-rays, shockwave, particle-assemble, glass-shatter, warp-tunnel) for the hook, title and outro.
 - Vary transitions; don't repeat the same one back to back. Use whip/flash/glitch for energy, dolly/leak/shutter for cinematic moments.
 - Choose the palette, font and bpm that match the mood: 128-145 bpm for hype/action/gaming, 110-125 for tech/launches, 85-100 for luxury/calm/documentary.
-- Hit the requested total length (sum of durations) within ±1.5 seconds.`;
+- Hit the requested total length (sum of durations) within ±1.5 seconds.
+- Voice-over ("vo"): write the narrator's line for every scene as one flowing script, like a launch-film voice-over: warm, confident, second person, plain words. Each line must be speakable within its scene (about 2.5 words per second, minus half a second), may paraphrase but never add claims, and should complement rather than just read out the headline where there's room. Say the brand name on the reveal ("Meet Nimbus."). Leave vo empty on testimonial scenes so the quote reads.`;
 
 function hasCredentials() {
   return envClaudeAvailable();
@@ -254,12 +259,14 @@ function finishPlan(c: Ctx, raw: z.infer<typeof SitePlanSchema>) {
         // Testimonials get the real author's avatar when the quote matches the site's.
         const q = c.site?.testimonials.find((x) => s.skill === "testimonial" && x.avatar && s.text.includes(x.quote.slice(0, 40)));
         const media = q?.avatar ? { src: assetUrl(q.avatar), kind: "image" as const } : assets[idx];
-        return { ...s, subtext: s.subtext || undefined, items: s.items?.length ? s.items : undefined, eyebrow: s.eyebrow || undefined, media };
+        return { ...s, subtext: s.subtext || undefined, items: s.items?.length ? s.items : undefined, eyebrow: s.eyebrow || undefined, vo: s.vo || undefined, media };
       }),
     }),
   );
   // SaaS films get the chosen template's look, music, pacing and role skills.
-  return c.wantSaas ? applyTemplate({ ...directed, brand: directed.brand }, c.template, { palette: c.palette !== "auto" ? c.palette : undefined }) : directed;
+  const styled = c.wantSaas ? applyTemplate({ ...directed, brand: directed.brand }, c.template, { palette: c.palette !== "auto" ? c.palette : undefined }) : directed;
+  // Any scene the AI left without a narrator line gets one from the built-in script writer.
+  return writeVoiceover(styled);
 }
 
 /** Validate model output against the storyboard schema (tolerating small deviations). */

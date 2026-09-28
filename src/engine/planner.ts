@@ -1,6 +1,7 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, DEMOS, detectConcept } from "./concepts";
+import { writeVoiceover } from "./script";
 import { applyTemplate, DEFAULT_TEMPLATE } from "./templates";
 import {
   FONTS,
@@ -382,7 +383,12 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
 }
 
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
+/** Prompt → intro, with a narrator line on every scene (used when voice-over is on). */
 export function planFromPrompt(req: PlanRequest): VideoPlan {
+  return writeVoiceover(planFromPromptRaw(req));
+}
+
+function planFromPromptRaw(req: PlanRequest): VideoPlan {
   if (req.style === "saas" || (req.style !== "trailer" && isSaasPrompt(req.prompt))) return planFromPromptSaas(req);
   const prompt = req.prompt.trim() || "Epic intro";
   const lower = prompt.toLowerCase();
@@ -619,7 +625,7 @@ export function aiSelfIntro(text: string, name: string): { answer: string; first
 
 /** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
 export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
-  return req.style === "trailer" ? planFromSiteTrailer(site, req) : planFromSiteSaas(site, req);
+  return writeVoiceover(req.style === "trailer" ? planFromSiteTrailer(site, req) : planFromSiteSaas(site, req));
 }
 
 /**
@@ -1173,6 +1179,21 @@ function sanitizeBrand(b: unknown): Brand | undefined {
   };
 }
 
+const VOICE_SOURCES_OK = new Set(["local", "openai", "elevenlabs", "custom", "upload"]);
+function sanitizeVoice(v: unknown): VideoPlan["voiceover"] {
+  if (!v || typeof v !== "object") return undefined;
+  const r = v as Record<string, unknown>;
+  if (!VOICE_SOURCES_OK.has(String(r.source))) return undefined;
+  return {
+    enabled: r.enabled === true,
+    source: r.source as NonNullable<VideoPlan["voiceover"]>["source"],
+    voice: typeof r.voice === "string" && /^[\w.-]{1,64}$/.test(r.voice) ? r.voice : "af_heart",
+    captions: r.captions !== false,
+    model: typeof r.model === "string" && /^[\w.:/-]{1,64}$/.test(r.model) ? r.model : undefined,
+    offset: Number(r.offset) > 0 ? Math.min(60, Number(r.offset)) : undefined,
+  };
+}
+
 /** Clamp and repair a plan from any source (AI, URL, user edits). */
 export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>[] }): VideoPlan {
   const scenes: Scene[] = (raw.scenes ?? [])
@@ -1191,6 +1212,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
       items: Array.isArray(s.items)
         ? s.items.filter((i) => typeof i === "string" && i.trim()).slice(0, 8).map((i) => String(i).slice(0, 140))
         : undefined,
+      vo: typeof s.vo === "string" && s.vo.trim() ? s.vo.trim().slice(0, 240) : undefined,
     }));
   if (!scenes.length) scenes.push({ skill: "particle-assemble", text: "HELLO", duration: 3, transition: "cut" });
   return {
@@ -1208,6 +1230,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     flavor: ["tech", "soft", "pop", "minimal", "neon"].includes(raw.flavor as string) ? raw.flavor : undefined,
     scheme: raw.scheme === "vibrant" || raw.scheme === "60-30-10" ? raw.scheme : undefined,
     concept: typeof raw.concept === "string" && CONCEPT_MAP[raw.concept] ? raw.concept : undefined,
+    voiceover: sanitizeVoice(raw.voiceover),
     target: Number(raw.target) > 0 ? Math.min(120, Math.max(6, Number(raw.target))) : undefined,
     notes: Array.isArray(raw.notes) ? raw.notes.filter((n): n is string => typeof n === "string").slice(0, 3).map((n) => n.slice(0, 300)) : undefined,
     look:

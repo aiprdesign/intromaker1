@@ -176,6 +176,23 @@ export interface Scene {
   eyebrow?: string;
   /** Story role, so a style template can restyle the scene ("hook", "reveal", "cta"…). */
   role?: string;
+  /** Narrator's line for this scene (voice-over), in speakable sentence case. */
+  vo?: string;
+}
+
+export type VoiceSource = "local" | "openai" | "elevenlabs" | "custom" | "upload";
+
+export interface VoiceSettings {
+  enabled: boolean;
+  source: VoiceSource;
+  /** Voice id for the source (Kokoro voice, OpenAI voice, ElevenLabs voice id…). */
+  voice: string;
+  /** Word-by-word captions. */
+  captions: boolean;
+  /** Model override for cloud / custom sources. */
+  model?: string;
+  /** Uploaded narration: where it starts in the film (seconds). */
+  offset?: number;
 }
 
 export interface VideoPlan {
@@ -205,6 +222,8 @@ export interface VideoPlan {
   scheme?: "60-30-10" | "vibrant";
   /** Flavour of the SaaS score. */
   flavor?: "tech" | "soft" | "pop" | "minimal" | "neon";
+  /** Voice-over settings (the lines live on the scenes; audio in the clip store). */
+  voiceover?: VoiceSettings;
 }
 
 export interface Palette {

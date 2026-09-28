@@ -1506,3 +1506,45 @@ button.brand-colors.on {
   height: 12px;
   border-width: 2px;
 }
+
+/* ───────── Voice-over ───────── */
+
+.voice-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.voice-toggle strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.hint.inline {
+  margin: 0;
+}
+.voice-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.voice-row .grow {
+  flex: 1;
+  min-width: 0;
+}
+.vo-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vo-line textarea {
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.vo-count {
+  font-size: 11px;
+  color: var(--muted);
+}
+.vo-count.over {
+  color: #ffb14d;
+}

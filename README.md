@@ -16,6 +16,13 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - a final chord that **lands on the CTA button click** and rings out under the end card.
 
   There are five production styles, one per template family: deep house (Rhodes chords, off-beat bass), lo-fi chill keys, future bass (chopped supersaw chords), tech-house stabs and synthwave. The mix goes through a saturated drum bus, a glue compressor, a limiter and a clip-free ceiling. Trailer films keep the epic trailer score.
+- **Voice-over, with word-by-word captions**: turn on *Voice-over* in the studio and the director writes a narrator line for every scene from the site's own copy. Lines are sized to fit each scene at a natural pace, numbers and web addresses are said properly ("more than 10,000 teams", "nimbus dot dev"), the reveal says the brand name, and testimonials are left silent so the quote reads. Edit any line in the storyboard, then press *Record*. Choose the voice:
+  - **Free, on your computer (default)**: the open-source [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) voice (Apache-2.0) runs in your browser via kokoro-js, using WebGPU when available and WebAssembly otherwise. No key, nothing leaves your machine. It needs a one-time download of about 90 MB.
+  - **OpenAI** (gpt-4o-mini-tts, directed as a warm launch-film narrator) or **ElevenLabs**, which returns exact word timings for the captions. Paste a key in the voice settings (the OpenAI key from AI settings is reused), or set `OPENAI_API_KEY` / `ELEVENLABS_API_KEY` on the server.
+  - **Any OpenAI-compatible voice server**, such as Kokoro-FastAPI or openedai-speech running on your own machine.
+  - **Your own recording**: upload an MP3/WAV/M4A and set where it starts.
+
+  The narration goes through a voice chain (rumble filter, presence lift, compression), and the music ducks under every line. Scenes stretch to the next beat when a line needs more time. Captions sit on a frosted pill that reads over any layout, with the spoken word lit in the accent colour. Voice and captions are included in every export.
 - **Beat-synced direction**: scene lengths snap to whole beats, so every cut lands on the kick. The picture and the score share one arrangement: the camera punches on the kicks the music actually plays, holds still in the breakdown and hits harder on each drop. Component entrances land on the eighth-note grid.
 - **Cinematic finishing**: two-scale highlight bloom, a colour grade, light leaks, lens bokeh, extruded 3D type, vignette and film grain.
 - **Export presets**: YouTube 1080p60, Reels/TikTok/Shorts 9:16, LinkedIn/Instagram 1:1 and web 720p. The same storyboard re-lays itself out for each format, so nothing is cropped. There's also a one-click PNG thumbnail of the end card. Output is MP4 where the browser supports it (WebM otherwise) with the soundtrack mixed in, rendered entirely in the browser.
@@ -58,7 +65,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ## Quality: Kaizen scorecard
 
-`npm run kaizen` generates 744 storyboards and scores each out of 100. The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+`npm run kaizen` generates 744 storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
 
 ## Run it
 
@@ -91,6 +98,8 @@ src/engine/
   audio.ts        the synthesiser: produced SaaS cue + trailer score + UI sound design (WebAudio)
   music.ts        production sheets per music style (harmony, instruments, groove, mix)
   arrange.ts      the film's musical arrangement (intro, builds, drops, breakdown, ending) shared by score and camera
+  voice.ts        voice-over: voices, clip store, speakable text, word timings, timeline, captions
+  script.ts       narrator script writer (one line per scene, sized to the scene)
   shaderbg.ts     WebGL2 runner for Paper Shaders gradients (frame-exact, shared context)
   templates.ts    style templates (look, motion, music, pacing, role → skill)
   export.ts       WebCodecs offline export, export presets, PNG thumbnail
@@ -100,6 +109,8 @@ src/lib/ai.ts                   AI director over 3 protocols (Anthropic SDK, Ope
 src/lib/localai.ts              browser-side local AI (scan, test, director) for online deployments
 src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/capture.ts              live browser capture: hero/full/section screenshots + the page's UI components cut out one by one
+src/lib/tts.ts                  voice generation: Kokoro in the browser, cloud voices via /api/tts, uploads
+src/app/api/tts/route.ts        OpenAI / ElevenLabs / OpenAI-compatible text-to-speech (keys stay server-side)
 src/lib/scrape.ts               website extraction (name, copy, features, stats, CTA, testimonials, customer logos, logo, images, videos, theme colour)
 src/lib/netguard.ts             SSRF guard: only public http(s) hosts, re-checked on every redirect
 ```
@@ -141,3 +152,4 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 - [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0) by Paper Design. `src/engine/shaderbg.ts` includes their vertex shader source.
 - Fonts via Fontsource: Inter, Space Grotesk, Anton, Instrument Serif and JetBrains Mono (SIL Open Font License).
 - [Lucide](https://lucide.dev) icons (ISC).
+- Voice-over (optional, loaded at runtime when chosen): [kokoro-js](https://github.com/hexgrad/kokoro) and the Kokoro-82M voice model (Apache-2.0).

@@ -1,6 +1,7 @@
 import { arrange, sectionAt, type Arrangement } from "./arrange";
 import { styleOf, type SaasStyle } from "./music";
 import { SKILL_MAP } from "./skills";
+import { voiceTimeline } from "./voice";
 import type { SfxKind, VideoPlan } from "./types";
 
 /** A minor: i – VI – III – VII, one chord per bar (MIDI notes). */
@@ -64,6 +65,8 @@ export class Soundtrack {
   /** Drum bus with gentle tape-style saturation. */
   private drums: GainNode;
   private musicBus: GainNode;
+  /** Narrator chain: rumble filter → presence lift → broadcast-style compression. */
+  private voiceBus: GainNode;
 
   /** Render the full score for `plan` offline, faster than realtime. */
   static async renderOffline(plan: VideoPlan, sampleRate = 48000): Promise<AudioBuffer> {
@@ -134,6 +137,23 @@ export class Soundtrack {
     this.duck.connect(this.musicFilter);
     this.duck.connect(this.reverbSend);
 
+    this.voiceBus = c.createGain();
+    this.voiceBus.gain.value = 1.35;
+    const vHp = c.createBiquadFilter();
+    vHp.type = "highpass";
+    vHp.frequency.value = 85;
+    const vPresence = c.createBiquadFilter();
+    vPresence.type = "peaking";
+    vPresence.frequency.value = 3200;
+    vPresence.Q.value = 0.9;
+    vPresence.gain.value = 3;
+    const vComp = c.createDynamicsCompressor();
+    vComp.threshold.value = -22;
+    vComp.ratio.value = 3.5;
+    vComp.attack.value = 0.004;
+    vComp.release.value = 0.12;
+    this.voiceBus.connect(vHp).connect(vPresence).connect(vComp).connect(this.out);
+
     this.drums = c.createGain();
     const sat = c.createWaveShaper();
     sat.curve = softClip(1.8);
@@ -192,7 +212,10 @@ export class Soundtrack {
     this.musicFilter.frequency.cancelScheduledValues(0);
     this.musicFilter.frequency.setValueAtTime(20000, this.ctx.currentTime);
     // The produced SaaS cue is denser than the trailer score: trim it to the same loudness.
-    this.musicBus.gain.value = (plan.music ?? plan.style) === "saas" ? 0.36 : 1;
+    const musicLevel = (plan.music ?? plan.style) === "saas" ? 0.36 : 1;
+    this.musicBus.gain.cancelScheduledValues(0);
+    this.musicBus.gain.setValueAtTime(musicLevel, this.ctx.currentTime);
+    this.scheduleVoice(plan, from, at, musicLevel);
     if ((plan.music ?? plan.style) === "saas") {
       this.playSaas(plan, from, at);
       return;
@@ -259,6 +282,41 @@ export class Soundtrack {
     });
     // Final tail hit.
     if (total - 0.02 >= from) this.impact(at(total - 0.02), 0.6);
+  }
+
+  /** Narration clips on the timeline, with the music ducking smoothly under every line. */
+  private scheduleVoice(plan: VideoPlan, from: number, at: (t: number) => number, musicLevel: number) {
+    const cues = voiceTimeline(plan);
+    if (!cues.length) return;
+    const c = this.ctx;
+    const spans: [number, number][] = [];
+    for (const cue of cues) {
+      const end = cue.start + cue.clip.duration;
+      if (end <= from) continue;
+      const buf = c.createBuffer(1, cue.clip.samples.length, cue.clip.rate);
+      buf.copyToChannel(cue.clip.samples as Float32Array<ArrayBuffer>, 0);
+      const src = this.track(c.createBufferSource());
+      src.buffer = buf;
+      src.connect(this.voiceBus);
+      const offset = Math.max(0, from - cue.start);
+      src.start(at(Math.max(from, cue.start)), offset);
+      const last = spans[spans.length - 1];
+      if (last && cue.start - last[1] < 0.6) last[1] = end;
+      else spans.push([cue.start, end]);
+    }
+    const g = this.musicBus.gain;
+    const ducked = musicLevel * 0.32;
+    for (const [a, b] of spans) {
+      const s0 = Math.max(from, a - 0.12);
+      if (b <= from) continue;
+      if (a <= from) g.setValueAtTime(ducked, at(from));
+      else {
+        g.setValueAtTime(musicLevel, at(s0));
+        g.linearRampToValueAtTime(ducked, at(a + 0.02));
+      }
+      g.setValueAtTime(ducked, at(b + 0.05));
+      g.linearRampToValueAtTime(musicLevel, at(b + 0.45));
+    }
   }
 
   private track<T extends AudioScheduledSourceNode>(n: T) {

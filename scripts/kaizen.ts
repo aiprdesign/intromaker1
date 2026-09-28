@@ -13,6 +13,7 @@ import { CONCEPT_MAP } from "../src/engine/concepts";
 import { iconsFor } from "../src/engine/icons";
 import { LENGTH_SECONDS, planFromPrompt, planFromSite, type Angle, type Length } from "../src/engine/planner";
 import { TEMPLATES } from "../src/engine/templates";
+import { speakable, wordBudget } from "../src/engine/voice";
 import type { SiteData, VideoPlan } from "../src/engine/types";
 import { PROMPTS, SITES } from "./kaizen-corpus";
 
@@ -119,6 +120,19 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null): { sco
     const icons = iconsFor((s.items ?? []).map((it) => it.split(/\s+[—–]\s+/)[0]), family);
     if (new Set(icons).size < icons.length) add("icons", 3, `${s.role} repeats an icon (${icons.join(",")})`);
   }
+
+  // ── Voice-over (5): a narrator line that fits each scene, names the brand on the reveal,
+  // closes on the call to action and leaves the testimonial to read on its own.
+  for (const s of sc) {
+    if (!s.vo) continue;
+    const n = speakable(s.vo).split(/\s+/).filter(Boolean).length;
+    if (n > wordBudget(s.duration) + 1) add("voice", 1, `${s.role} voice line ${n} words for ${s.duration.toFixed(1)}s`);
+    if (/\*|\|/.test(s.vo)) add("voice", 1, `${s.role} voice line has markup`);
+  }
+  const revealScene = sc.find((s) => s.role === "reveal");
+  if (revealScene && !(revealScene.vo ?? "").includes(plan.brand?.name ?? plan.title)) add("voice", 1, "reveal doesn't say the brand name");
+  if (sc.some((s) => s.role === "quote" && s.vo)) add("voice", 1, "testimonial is talked over");
+  if (sc[sc.length - 1]?.role === "cta" && !sc[sc.length - 1].vo) add("voice", 1, "CTA has no voice line");
 
   // ── CTA (5).
   const cta = sc.find((s) => s.role === "cta");
