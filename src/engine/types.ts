@@ -220,6 +220,8 @@ export interface VideoPlan {
   concept?: string;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */
   scheme?: "60-30-10" | "vibrant";
+  /** Glow on type and the highlight bloom (default on). Off gives crisp, halo-free text. */
+  glow?: boolean;
   /** Flavour of the SaaS score. */
   flavor?: "tech" | "soft" | "pop" | "minimal" | "neon";
   /** Voice-over settings (the lines live on the scenes; audio in the clip store). */

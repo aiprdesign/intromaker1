@@ -173,6 +173,33 @@ export function glow(ctx: CanvasRenderingContext2D, color: string, blur: number)
   ctx.shadowOffsetY = 0;
 }
 
+/**
+ * Crisp text: with glow switched off, text is drawn without its halo. Every glow on type is a
+ * centred canvas shadow, so text draws simply skip a shadow that has no offset (drop shadows
+ * with an offset stay). Set per frame by the renderer from the plan's `glow` setting.
+ */
+let crisp = false;
+let patched = false;
+export function setCrispText(on: boolean) {
+  crisp = on;
+  if (!on || patched || typeof CanvasRenderingContext2D === "undefined") return;
+  patched = true;
+  const protos: { fillText: CanvasText["fillText"]; strokeText: CanvasText["strokeText"] }[] = [CanvasRenderingContext2D.prototype];
+  if (typeof OffscreenCanvasRenderingContext2D !== "undefined") protos.push(OffscreenCanvasRenderingContext2D.prototype);
+  for (const proto of protos) {
+    for (const name of ["fillText", "strokeText"] as const) {
+      const draw = proto[name];
+      proto[name] = function (this: CanvasRenderingContext2D, ...args: Parameters<CanvasText["fillText"]>) {
+        if (!crisp || this.shadowBlur <= 0 || this.shadowOffsetX || this.shadowOffsetY) return draw.apply(this, args);
+        const blur = this.shadowBlur;
+        this.shadowBlur = 0;
+        draw.apply(this, args);
+        this.shadowBlur = blur;
+      };
+    }
+  }
+}
+
 export function noGlow(ctx: CanvasRenderingContext2D) {
   ctx.shadowBlur = 0;
   ctx.shadowColor = "transparent";

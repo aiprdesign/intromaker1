@@ -61,6 +61,27 @@ export default function Studio() {
     schemeRef.current = sc;
     setPlan((p) => ({ ...p, scheme: sc }));
   };
+  // Glow on type and the highlight bloom. Off by default: crisp, halo-free text.
+  const [glow, setGlow] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.glow") === "on") setGlow(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseGlow = (on: boolean) => {
+    setGlow(on);
+    try {
+      localStorage.setItem("intromaker.glow", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  // Every storyboard (new takes, template switches, shared links) follows the switch.
+  useEffect(() => {
+    if ((plan.glow !== false) !== glow) setPlan((p) => ({ ...p, glow: glow ? undefined : false }));
+  }, [plan, glow]);
   const [bg, setBg] = useState<BgChoice>("template");
   const bgRef = useRef(bg);
   bgRef.current = bg;
@@ -592,6 +613,18 @@ export default function Studio() {
               ? "Designer's 60-30-10 rule: 60% dominant background, 30% supporting colour for cards and gradients, 10% accent for highlights and buttons."
               : "Every palette colour at full strength: louder, more colourful."}
           </p>
+          <label className="field-label">
+            Text glow <span className="tpl-desc">{glow ? "On" : "Off"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={!glow ? "active" : ""} onClick={() => chooseGlow(false)}>
+              Crisp (no glow)
+            </button>
+            <button className={glow ? "active" : ""} onClick={() => chooseGlow(true)}>
+              Glow
+            </button>
+          </div>
+          <p className="hint">{glow ? "Soft glow around text and highlights. Can look blurred on small or busy text." : "Sharp text with no halo, and no highlight bloom."}</p>
           <PaletteChooser
             value={colourChoice}
             onChange={chooseColours}

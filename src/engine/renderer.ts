@@ -9,6 +9,7 @@ import { getImage, stageLogo } from "./media";
 import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
+import { setCrispText } from "./fx";
 import type { Aspect, MusicPulse, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
 export const TRANSITION_LEN = 0.45;
@@ -67,6 +68,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
+  glow?: VideoPlan["glow"];
   concept?: VideoPlan["concept"];
 };
 
@@ -194,6 +196,9 @@ export function renderScene(
 ) {
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
+  // Glow off: halo-free type and no highlight bloom.
+  setCrispText(plan.glow === false);
+  if (plan.glow === false) opts = { ...opts, bloom: false };
   const d = context.extendSelf ? scene.duration + OVERLAP_EXTEND : scene.duration;
   const overlapping = !!context.prev && t < TRANSITION_LEN && OVERLAP.has(scene.transition);
   let sc: SkillContext;

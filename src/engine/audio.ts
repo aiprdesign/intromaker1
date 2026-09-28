@@ -234,7 +234,7 @@ export class Soundtrack {
     const outroStart = plan.scenes.length > 1 ? starts[starts.length - 1] : total;
 
     // Harmony: pad + bass per bar.
-    for (let b = Math.floor(from / bar); b * bar < total; b++) {
+    for (let b = Math.max(0, Math.floor(from / bar)); b * bar < total; b++) {
       const t0 = b * bar;
       const dur = Math.min(bar, total - t0);
       const chord = PROGRESSION[b % PROGRESSION.length];
@@ -555,7 +555,7 @@ export class Soundtrack {
     const building = (t: number) => A.builds.some(([b0, b1]) => t >= b0 && t < b1);
 
     // Harmony, arpeggio and bass, bar by bar.
-    for (let b = Math.floor(from / bar); b * bar < A.ending; b++) {
+    for (let b = Math.max(0, Math.floor(from / bar)); b * bar < A.ending; b++) {
       const t0 = b * bar;
       const chord = S.prog[b % S.prog.length];
       const root = S.roots[b % S.roots.length];
