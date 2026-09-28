@@ -14,6 +14,7 @@ import {
   type PaletteId,
   type Scene,
   type SiteData,
+  type SitePart,
   type SkillId,
   type Transition,
   type VideoPlan,
@@ -511,6 +512,7 @@ export function brandFromSite(site: SiteData, colors?: Brand["colors"]): Brand {
     clientLogos: site.clientLogos.map(assetUrl),
     font: site.font ?? undefined,
     colors,
+    parts: site.shots?.parts ?? [],
   };
 }
 
@@ -549,6 +551,7 @@ export function readSite(raw: unknown): SiteData | null {
         hero: isShot(sh.hero) ? sh.hero : null,
         full: isShot(sh.full) ? sh.full : null,
         sections: (Array.isArray(sh.sections) ? sh.sections : []).filter(isShot).slice(0, 6),
+        parts: sanitizeParts(sh.parts),
       };
     })(),
     cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
@@ -686,9 +689,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
 
   const tagline = sentenceCopy(site.tagline, 10) || shortenCopy(site.tagline, 9) || sentenceCopy(site.description, 12) || shortenCopy(site.description, 9) || `Meet ${site.name}`;
   // Best headlines first; each keeps its feature description from the page.
-  const ranked = site.headlines
-    .map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title), i }))
-    .sort((a, b) => b.score - a.score || a.i - b.i);
+  const allHeads = site.headlines.map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title), i }));
+  // When the page's features come with descriptions (feature cards), headings without one are
+  // section titles ("Start understanding your users today"), not features.
+  const described = allHeads.filter((f) => f.desc.trim().split(/\s+/).length >= 4);
+  const ranked = (described.length >= 3 ? described : allHeads).sort((a, b) => b.score - a.score || a.i - b.i);
   const shortFeatures = ranked.map((f) => sentenceCopy(f.title, 6) || shortenCopy(f.title, 6)).filter((h) => h && h !== tagline);
   const longFeatures = ranked.map((f) => sentenceCopy(f.title, 9) || shortenCopy(f.title, 9)).filter((h) => h && h !== tagline);
   // Bento cards: "Title — one-line description" when the page has one.
@@ -745,15 +750,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     duration: beats(6),
     transition: "dolly",
   });
-  // 3. Meet: the real website.
-  if (shots.full) {
-    add(!(video ?? images[0] ?? shots.sections[0] ?? shots.hero) && target >= 20 ? 2 : 3, {
-      role: "meet", skill: "site-scroll",
+  // 3. Meet: the real product, rebuilt from its own UI components (or the page scrolling by).
+  if (shots.hero || shots.full) {
+    const assemble = !!shots.hero;
+    add(!(video ?? images[0] ?? shots.sections[0] ?? shots.hero) && target >= 20 ? 2 : assemble && target >= 20 ? 2 : 3, {
+      role: "meet", skill: assemble ? "ui-assemble" : "site-scroll",
       text: taglineFree ? tagline : descClause || `Say hello to *${site.name}*`,
       eyebrow: `Meet ${site.name}`,
       duration: Math.max(5, beats(10)),
       transition: "whip",
-      media: img(shots.full),
+      media: img(assemble ? shots.hero : shots.full),
     });
   }
   // 4. How it works.
@@ -768,7 +774,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     });
   }
   // 5. Features: cursor tour on the product, then a bento.
-  const tourMedia = video ?? images[0] ?? img(shots.sections[0]) ?? img(shots.hero);
+  // (The hero screenshot belongs to the assembled "meet" beat in 20s+ films, so it isn't shown twice.)
+  // With the page's components captured, a raw page-section screenshot isn't product footage:
+  // the tour is kept for real product images and video.
+  const hasParts = (shots.parts?.length ?? 0) >= 3;
+  const tourMedia = video ?? images[0] ?? (hasParts ? undefined : img(shots.sections[0])) ?? (target >= 20 ? undefined : img(shots.hero));
   // Each beat gets its own copy: the tour's headline and callouts are not reused by the
   // feature tiles or result cards (repetition reads as filler).
   const tourHead = longFeatures[0] ?? `See *${site.name}* in action`;
@@ -827,11 +837,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     demoScene = { role: "demo", skill: "command-k", text: demo.title, items: lead ? [lead, ...demo.items].slice(0, 4) : demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
   } else if (demo.skill === "ai-prompt") {
     // Ask the product what it does; it answers in its own words (the site's copy, first person).
-    const said = aiSelfIntro(sentenceCopy(site.description, 16) || descClause || tagline, site.name);
+    const said = aiSelfIntro(shortenCopy(site.description.split(/(?<=[.!?])\s/)[0] ?? "", 24) || descClause || tagline, site.name);
+    // The answer's points are the features' own one-line benefits (the tiles carry their titles).
+    const points = ranked
+      .map((f) => sentenceCopy(f.desc, 12).replace(/\.$/, ""))
+      .filter((x) => x && x.split(" ").length >= 4)
+      .slice(0, 3);
     demoScene = {
       role: "demo", skill: "ai-prompt", text: demo.title,
       subtext: said.answer,
-      items: [(said.firstPerson ? demo.items[0] : "Tell me about {name}").replace(/\{name\}/g, site.name), ...spareFeatures.slice(0, 3)],
+      items: [(said.firstPerson ? demo.items[0] : "Tell me about {name}").replace(/\{name\}/g, site.name), ...(points.length >= 2 ? points : spareFeatures.slice(0, 3))],
       eyebrow: demo.eyebrow, duration: beats(12), transition: "whip",
     };
   } else if (demo.skill === "click-flow") {
@@ -840,7 +855,9 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     demoScene = { role: "demo", skill: "notify-stack", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(demo.items.length * 1.2 + 5), transition: "whip" };
   }
   // A product-first or media-less film leans on it; teasers keep it only when it is the product.
-  add(target < 20 ? (angle === "product" && !tourMedia ? 3 : 6) : !tourMedia ? 2 : 3, demoScene);
+  // (When the film already shows the real product — a tour or the assembled page — it's optional.)
+  const productShown = !!tourMedia || !!shots.hero;
+  add(target < 20 ? (angle === "product" && !productShown ? 3 : 6) : !productShown ? 2 : target >= 30 ? 3 : 4, demoScene);
 
   // 6. Proof — only real quotes, logos and numbers.
   // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
@@ -933,9 +950,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     }
   }
   const rank: string[] = angle === "story" ? concept.arc : ANGLE_ORDER[angle];
+  const scenes0 = candidates.map((c) => c.scene);
   // Beats an arc doesn't list (the positioning line) sit right after the reveal.
   const rankOf = (role?: string) => {
     if (role === "demo") return rank.indexOf("tour") - 0.5;
+    // The product assembled from its own components is the first thing after the reveal.
+    if (role === "meet" && scenes0.some((c) => c.role === "meet" && c.skill === "ui-assemble")) return rank.indexOf("reveal") + 0.3;
     if (role === "metric") return rank.indexOf("cards") - 0.25;
     const i = rank.indexOf(role ?? "");
     return i >= 0 ? i : rank.indexOf("reveal") + 0.5;
@@ -957,7 +977,13 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const lines = concept.cta.map((l) => l.replace(/\{name\}/g, site.name));
   if (/free/i.test(site.cta ?? "")) lines.push("Start *free* today");
   if (cta?.role === "cta") {
-    cta.text = teamStat && !usedStat ? `Join *${teamStat.toLowerCase()}*` : pick(lines);
+    // The closing line mustn't just repeat the button under it ("Start free" / "Start free trial").
+    const button = norm(site.cta ?? "");
+    const fresh = lines.filter((l) => {
+      const n = norm(l);
+      return !button || !(button.startsWith(n) || n.startsWith(button) || n.split(" ").filter((wd) => button.includes(wd)).length >= 2);
+    });
+    cta.text = teamStat && !usedStat ? `Join *${teamStat.toLowerCase()}*` : pick(fresh.length ? fresh : lines);
   }
 
   // Thin material (a one-line prompt, a sparse page) makes a tight shorter cut rather than
@@ -1101,7 +1127,26 @@ export function beatSync(plan: VideoPlan): VideoPlan {
 }
 
 /** Only same-origin proxied assets may be referenced by a plan. */
-const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d)$/.test(s);
+const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d|p\d{1,2})$/.test(s);
+const PART_KINDS = new Set(["media", "panel", "card", "button"]);
+function sanitizeParts(v: unknown): SitePart[] {
+  if (!Array.isArray(v)) return [];
+  const num = (x: unknown, max: number) => (typeof x === "number" && Number.isFinite(x) ? Math.max(0, Math.min(max, x)) : 0);
+  return v
+    .filter((p): p is Record<string, unknown> => !!p && typeof p === "object" && isShot((p as { src?: unknown }).src) && PART_KINDS.has(String((p as { kind?: unknown }).kind)))
+    .slice(0, 16)
+    .map((p) => ({
+      src: p.src as string,
+      kind: p.kind as SitePart["kind"],
+      x: num(p.x, 4000),
+      y: num(p.y, 20000),
+      w: num(p.w, 4000),
+      h: num(p.h, 4000),
+      r: num(p.r, 200),
+      ...(typeof p.text === "string" ? { text: p.text.slice(0, 90) } : {}),
+    }))
+    .filter((p) => p.w >= 20 && p.h >= 16);
+}
 const isAsset = (s: unknown): s is string =>
   (typeof s === "string" && s.startsWith("/api/asset?url=") && s.length < 2100) || isShot(s);
 const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0-9a-f]{6}$/i.test(s);
@@ -1124,6 +1169,7 @@ function sanitizeBrand(b: unknown): Brand | undefined {
     clientLogos: (brand.clientLogos ?? []).filter(isAsset).slice(0, 16),
     font: typeof brand.font === "string" && /^[A-Za-z0-9 ]{2,40}$/.test(brand.font) ? brand.font : undefined,
     colors: brand.colors && isHex(brand.colors.primary) && isHex(brand.colors.secondary) ? brand.colors : undefined,
+    parts: sanitizeParts(brand.parts),
   };
 }
 

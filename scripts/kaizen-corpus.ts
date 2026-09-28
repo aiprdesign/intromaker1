@@ -4,6 +4,7 @@
  */
 import type { SiteData } from "../src/engine/types";
 import flowbaseJson from "./kaizen-flowbase.json";
+import orbitJson from "./kaizen-orbit.json";
 
 const flowbase = { ...(flowbaseJson as unknown as { site: SiteData }).site, shots: { hero: null, full: null, sections: [] } } as SiteData;
 const media = { images: flowbase.images.slice(0, 4), videos: flowbase.videos, logo: flowbase.logo };
@@ -33,8 +34,12 @@ const base = (over: Partial<SiteData>): SiteData => ({
   ...over,
 });
 
+// A live capture with the page's UI components cut out (hero + parts), no product images.
+const orbit = (orbitJson as unknown as { site: SiteData }).site;
+
 export const SITES: { id: string; site: SiteData }[] = [
   { id: "flowbase (sales)", site: flowbase },
+  { id: "orbit (analytics, components)", site: orbit },
   {
     id: "nimbus (devtools)",
     site: base({

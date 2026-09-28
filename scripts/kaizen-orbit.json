@@ -1,0 +1,183 @@
+{
+ "site": {
+  "url": "https://orbit.example",
+  "domain": "orbit.example",
+  "name": "Orbit",
+  "tagline": "Know exactly what your users need",
+  "description": "Orbit is the product analytics platform that shows you what users do, why they churn and what to build next.",
+  "headlines": [
+   "Everything you need to understand users",
+   "Real-time dashboards",
+   "Funnels and retention",
+   "AI insights",
+   "Session replays",
+   "Privacy first",
+   "200+ integrations",
+   "Start understanding your users today"
+  ],
+  "features": [
+   "",
+   "See every signup, event and conversion the moment it happens.",
+   "Find exactly where users drop off and what brings them back.",
+   "Ask questions in plain English and get answers in seconds.",
+   "Watch real sessions to understand the why behind the numbers.",
+   "GDPR-ready, EU hosting and no cookies required.",
+   "Connect your warehouse, CRM and product stack in minutes.",
+   ""
+  ],
+  "stats": [
+   "200+ INTEGRATIONS",
+   "10,000+ PRODUCT TEAMS",
+   "2B+ EVENTS",
+   "99.99% UPTIME"
+  ],
+  "testimonials": [
+   {
+    "quote": "Orbit told us why users churned in week one. We fixed onboarding and retention jumped 30%.",
+    "author": "Maya Chen",
+    "role": "Head of Product,  Lumen",
+    "avatar": null
+   }
+  ],
+  "clientLogos": [],
+  "steps": [],
+  "pains": [],
+  "font": null,
+  "shots": {
+   "hero": "/api/shot?id=d8b1bf98929aa884-hero",
+   "full": "/api/shot?id=d8b1bf98929aa884-full",
+   "sections": [
+    "/api/shot?id=d8b1bf98929aa884-s0",
+    "/api/shot?id=d8b1bf98929aa884-s1",
+    "/api/shot?id=d8b1bf98929aa884-s2"
+   ],
+   "parts": [
+    {
+     "x": 130,
+     "y": 434.375,
+     "w": 1180,
+     "h": 520,
+     "r": 16,
+     "kind": "panel",
+     "text": "Active users 48,210 \u25b2 12.4% Retention (D30) 41% \u25b2 3.1% Conversion 6.8% \u25b2 0.9% Weekly activ",
+     "src": "/api/shot?id=d8b1bf98929aa884-p0"
+    },
+    {
+     "x": 355,
+     "y": 459.375,
+     "w": 298,
+     "h": 120,
+     "r": 12,
+     "kind": "card",
+     "text": "Active users 48,210 \u25b2 12.4%",
+     "src": "/api/shot?id=d8b1bf98929aa884-p1"
+    },
+    {
+     "x": 671,
+     "y": 459.375,
+     "w": 298,
+     "h": 120,
+     "r": 12,
+     "kind": "card",
+     "text": "Retention (D30) 41% \u25b2 3.1%",
+     "src": "/api/shot?id=d8b1bf98929aa884-p2"
+    },
+    {
+     "x": 987,
+     "y": 459.375,
+     "w": 298,
+     "h": 120,
+     "r": 12,
+     "kind": "card",
+     "text": "Conversion 6.8% \u25b2 0.9%",
+     "src": "/api/shot?id=d8b1bf98929aa884-p3"
+    },
+    {
+     "x": 355,
+     "y": 597.375,
+     "w": 614,
+     "h": 332,
+     "r": 12,
+     "kind": "card",
+     "text": "Weekly active users",
+     "src": "/api/shot?id=d8b1bf98929aa884-p4"
+    },
+    {
+     "x": 987,
+     "y": 597.375,
+     "w": 298,
+     "h": 332,
+     "r": 12,
+     "kind": "card",
+     "text": "Top events Signed up Created project Invited teammate Upgraded plan",
+     "src": "/api/shot?id=d8b1bf98929aa884-p5"
+    },
+    {
+     "x": 64,
+     "y": 1165.375,
+     "w": 422.65625,
+     "h": 197,
+     "r": 16,
+     "kind": "card",
+     "text": "Real-time dashboards See every signup, event and conversion the moment it happens.",
+     "src": "/api/shot?id=d8b1bf98929aa884-p6"
+    },
+    {
+     "x": 508.65625,
+     "y": 1165.375,
+     "w": 422.671875,
+     "h": 197,
+     "r": 16,
+     "kind": "card",
+     "text": "Funnels and retention Find exactly where users drop off and what brings them back.",
+     "src": "/api/shot?id=d8b1bf98929aa884-p7"
+    },
+    {
+     "x": 953.328125,
+     "y": 1165.375,
+     "w": 422.65625,
+     "h": 197,
+     "r": 16,
+     "kind": "card",
+     "text": "AI insights Ask questions in plain English and get answers in seconds.",
+     "src": "/api/shot?id=d8b1bf98929aa884-p8"
+    },
+    {
+     "x": 64,
+     "y": 1384.375,
+     "w": 422.65625,
+     "h": 197,
+     "r": 16,
+     "kind": "card",
+     "text": "Session replays Watch real sessions to understand the why behind the numbers.",
+     "src": "/api/shot?id=d8b1bf98929aa884-p9"
+    },
+    {
+     "x": 1249.828125,
+     "y": 22,
+     "w": 126.15625,
+     "h": 42,
+     "r": 10,
+     "kind": "button",
+     "text": "Start free",
+     "src": "/api/shot?id=d8b1bf98929aa884-p10"
+    },
+    {
+     "x": 557.546875,
+     "y": 352.375,
+     "w": 166.359375,
+     "h": 42,
+     "r": 10,
+     "kind": "button",
+     "text": "Start free trial",
+     "src": "/api/shot?id=d8b1bf98929aa884-p11"
+    }
+   ]
+  },
+  "cta": "Start free",
+  "logo": null,
+  "images": [],
+  "videos": [],
+  "themeColor": "#7c5cff"
+ }
+}

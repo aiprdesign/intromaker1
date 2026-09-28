@@ -7,7 +7,7 @@
  */
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
-import { findHotspots, getImage, getMedia, isDarkLogo } from "../media";
+import { findHotspots, getImage, getMedia, isDarkLogo, mediaSize, segmentShot } from "../media";
 import {
   blurInLayout,
   borderBeam,
@@ -32,6 +32,8 @@ import { parseStat } from "./worlds";
 import { drawCover, mockUi } from "./media";
 
 /* ───────── shared helpers ───────── */
+
+const norm = (s: string) => s.toLowerCase().replace(/\*/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 
 /** Muted sentence-case supporting line with a soft blur-in. */
 function subText(sc: SkillContext, text: string | undefined, y: number, k: number, opts: { size?: number; maxWidth?: number } = {}) {
@@ -258,6 +260,26 @@ function uiTour(sc: SkillContext) {
     ]
   ).map((p) => ({ x: fx0 + p.x * ww, y: fy0 + bar + p.y * (wh - bar) }));
   const Z = 1.85;
+  // The real UI component under each hotspot (from segmenting the screenshot), so the focus ring
+  // hugs an actual card or panel and everything around it can be dimmed.
+  const comps = hot.map(() => null as { x: number; y: number; w: number; h: number } | null);
+  if (media instanceof HTMLImageElement && found) {
+    const { w: iw, h: ih } = mediaSize(media);
+    const fw = ww;
+    const fh = wh - bar;
+    const cs = Math.max(fw / iw, fh / ih);
+    const ox = fx0 + (fw - iw * cs) * 0.5;
+    const oy = fy0 + bar + (fh - ih * cs) * 0.2;
+    const segs = segmentShot(media);
+    hot.forEach((p, i) => {
+      const ix = (p.x - ox) / cs;
+      const iy = (p.y - oy) / cs;
+      const fit = segs
+        .filter((g) => ix >= g.x && ix <= g.x + g.w && iy >= g.y && iy <= g.y + g.h && g.w * g.h >= iw * ih * 0.015 && g.w * g.h <= iw * ih * 0.4)
+        .sort((a, b) => a.w * a.h - b.w * b.h)[0];
+      if (fit) comps[i] = { x: ox + fit.x * cs, y: oy + fit.y * cs, w: fit.w * cs, h: fit.h * cs };
+    });
+  }
 
   // Camera keyframes.
   const center = { x: fcx, y: fcy };
@@ -302,14 +324,33 @@ function uiTour(sc: SkillContext) {
   ctx.fillText(brand?.domain ?? "app.yourproduct.com", fcx, fy0 + bar / 2);
   if (media) drawCover(ctx, media, fx0, fy0 + bar, ww, wh - bar, 1, 0.5, 0.2);
   else mockUi(sc, fx0, fy0 + bar, ww, wh - bar);
+  // Focal isolation: once a component is clicked, the rest of the screen dims around it.
+  hot.forEach((_, i) => {
+    const c = comps[i];
+    const click = i === 0 ? T.clickA : T.clickB;
+    const until = i === 0 ? T.zoomB + 0.2 : T.out;
+    const k = ease.inOutCubic(range(t, click - 0.05, click + 0.3)) * (1 - ease.inOutCubic(range(t, until, until + 0.4)));
+    if (!c || k <= 0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(fx0, fy0 + bar, ww, wh - bar);
+    ctx.roundRect(c.x - 3 * u, c.y - 3 * u, c.w + 6 * u, c.h + 6 * u, 10 * u);
+    ctx.fillStyle = rgba(palette.light ? "#ffffff" : "#000000", (palette.light ? 0.55 : 0.58) * k);
+    ctx.fill("evenodd");
+    ctx.restore();
+  });
   ctx.restore();
-  // Highlight rings on the clicked regions.
+  // Highlight rings: hugging the real component when found, else a soft box round the click.
   hot.forEach((p, i) => {
     const click = i === 0 ? T.clickA : T.clickB;
     const k = clamp(spring(t - click, 12, 8)) * (1 - kOut * 0.6);
     if (t < click) return;
-    const rw = ww * 0.24;
-    const rh = (wh - bar) * 0.18;
+    const c = comps[i];
+    const rw = c ? c.w + 6 * u : ww * 0.24;
+    const rh = c ? c.h + 6 * u : (wh - bar) * 0.18;
+    const rcx = c ? c.x + c.w / 2 : p.x;
+    const rcy = c ? c.y + c.h / 2 : p.y;
+    const grow = 1 + (1 - Math.min(1, k)) * 0.12;
     ctx.save();
     ctx.strokeStyle = palette.primary;
     ctx.lineWidth = 2.2 * u / z;
@@ -317,9 +358,9 @@ function uiTour(sc: SkillContext) {
     ctx.shadowBlur = 18 * u;
     ctx.globalAlpha *= clamp(k);
     ctx.beginPath();
-    ctx.roundRect(p.x - (rw / 2) * k, p.y - (rh / 2) * k, rw * k, rh * k, 10 * u);
+    ctx.roundRect(rcx - (rw / 2) * grow, rcy - (rh / 2) * grow, rw * grow, rh * grow, 10 * u);
     ctx.stroke();
-    ctx.fillStyle = rgba(palette.primary, 0.08);
+    ctx.fillStyle = rgba(palette.primary, c ? 0.04 : 0.08);
     ctx.fill();
     ctx.restore();
   });
@@ -555,6 +596,14 @@ function bento(sc: SkillContext) {
   const times = bentoTiming(scene, sc.beat);
   const ex = ease.inCubic(exitT(sc, 0.4));
   const active = Math.floor(Math.max(0, t - 1.4) / Math.max(0.5, sc.beat * 2)) % n;
+  // Real product UI from the live page (KPI tiles, charts, panels) goes into the biggest cells,
+  // in place of the generic micro-visuals; the site's own feature cards aren't reused here.
+  const titles = items.map((it) => norm(it.split(/\s+[—–]\s+/)[0]));
+  const ui = (sc.brand?.parts ?? [])
+    .filter((p) => p.kind !== "button" && !titles.some((tt) => tt && norm(p.text ?? "").includes(tt)))
+    .sort((a, b) => b.w * b.h - a.w * a.h);
+  const byArea = cells.map((cell, i) => ({ i, a: cell[2] * cell[3] })).sort((a, b) => b.a - a.a || a.i - b.i);
+  const partFor = new Map(byArea.slice(0, ui.length).map((c, k) => [c.i, ui[k]]));
   cells.forEach(([c, r, cs, rs], i) => {
     const x = gx0 + c * (cw + gap);
     const y = gy0 + r * (rh + gap);
@@ -615,12 +664,40 @@ function bento(sc: SkillContext) {
     ctx.font = tFont;
     ctx.fillStyle = palette.text;
     lines.forEach((l, li, arr) => ctx.fillText(l, x + 22 * u, titleBase - (arr.length - 1 - li) * fs * 1.2));
-    // Micro visual in the upper-right area.
+    // Visual in the upper-right area: a real UI component when we have one, else a micro-animation.
     const mx = x + bw * 0.45;
     const my = y + 22 * u;
     const mw = bw * 0.5 - 22 * u;
     const mh = Math.max(40 * u, bh - 22 * u - (lines.length > 1 ? fs * 2.6 : fs * 1.5) - dLines.length * ds * 1.3 - 40 * u);
-    microVisual(sc, i, mx, my, mw, Math.min(mh, bh * 0.55), lt);
+    const part = partFor.get(i);
+    const pimg = part ? getImage(part.src) : null;
+    const titleTop = titleBase - (lines.length - 1) * fs * 1.2 - fs;
+    const ph = Math.min(titleTop - 16 * u - (y + 18 * u), bh * 0.7);
+    if (part && pimg?.naturalWidth && ph > 60 * u) {
+      // The component peeks out of the card, cropped by its edge, drifting gently.
+      const aspect = pimg.naturalWidth / pimg.naturalHeight;
+      const px0 = x + Math.max(22 * u + it + 20 * u, bw * (aspect > 2.2 ? 0.2 : 0.34));
+      const pw = Math.max(ph * aspect, x + bw - px0 + 24 * u);
+      const phh = pw / aspect;
+      const rise = (1 - ease.outCubic(range(lt, 0.1, 0.8))) * 40 * u;
+      const drift = Math.sin((sc.globalT ?? t) * 0.8 + i) * 4 * u;
+      const py0 = y + 18 * u + rise + drift;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x, y, bw, Math.max(0, titleTop - 10 * u - y), [20 * u, 20 * u, 0, 0]);
+      ctx.clip();
+      ctx.shadowColor = palette.light ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 24 * u;
+      ctx.shadowOffsetY = 8 * u;
+      ctx.beginPath();
+      ctx.roundRect(px0, py0, pw, phh, Math.max(6 * u, part.r * (pw / part.w)));
+      ctx.fillStyle = palette.bg1;
+      ctx.fill();
+      ctx.shadowColor = "transparent";
+      ctx.clip();
+      ctx.drawImage(pimg, px0, py0, pw, phh);
+      ctx.restore();
+    } else microVisual(sc, i, mx, my, mw, Math.min(mh, bh * 0.55), lt);
     ctx.restore();
   });
 }

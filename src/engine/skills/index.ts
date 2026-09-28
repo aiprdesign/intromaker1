@@ -1,4 +1,5 @@
 import type { Skill, SkillId } from "../types";
+import { componentSkills } from "./components";
 import { energySkills } from "./energy";
 import { interactionSkills } from "./interactions";
 import { mediaSkills } from "./media";
@@ -11,6 +12,7 @@ export const SKILLS: Skill[] = [
   // Ordered for the showcase: SaaS launch toolkit first.
   ...saasSkills,
   ...interactionSkills,
+  ...componentSkills,
   signatureSkills[0],
   signatureSkills[1],
   ...energySkills.slice(0, 2),

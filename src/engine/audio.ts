@@ -1,3 +1,5 @@
+import { arrange, sectionAt, type Arrangement } from "./arrange";
+import { styleOf, type SaasStyle } from "./music";
 import { SKILL_MAP } from "./skills";
 import type { SfxKind, VideoPlan } from "./types";
 
@@ -9,64 +11,30 @@ const PROGRESSION = [
   [55, 59, 62], // G
 ];
 const BASS = [45, 41, 36, 43];
-/** C major: I – V – vi – IV, bright and optimistic for product launches. */
-const PROGRESSION_MAJOR = [
-  [60, 64, 67],
-  [55, 59, 62],
-  [57, 60, 64],
-  [53, 57, 60],
-];
-const BASS_MAJOR = [36, 43, 45, 41];
-/** Cmaj7 – Am7 – Fmaj7 – G7: warm, soft-keys feel. */
-const PROGRESSION_MAJ7 = [
-  [60, 64, 67, 71],
-  [57, 60, 64, 67],
-  [53, 57, 60, 64],
-  [55, 59, 62, 65],
-];
-const BASS_MAJ7 = [36, 45, 41, 43];
+const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 
-interface Flavor {
-  prog: number[][];
-  bass: number[];
-  pad: number;
-  arp: { wave: OscillatorType; div: number; level: number; decay: number; pattern: number[] } | null;
-  stabs: boolean;
-  kick: { vel: number; every: number };
-  clap: boolean;
-  hats: { div: number; vel: [number, number] };
-  bassDiv: number;
+/** Output ceiling: identity up to 0.89 (-1 dBFS), then a soft knee that never reaches 1. */
+function ceilingCurve() {
+  const n = 4096;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / (n - 1) - 1;
+    const a = Math.abs(x);
+    curve[i] = Math.sign(x) * (a < 0.89 ? a : 0.89 + 0.09 * Math.tanh((a - 0.89) / 0.09));
+  }
+  return curve;
 }
 
-/** Score flavours for SaaS templates. */
-const FLAVORS: Record<NonNullable<VideoPlan["flavor"]>, Flavor> = {
-  tech: {
-    prog: PROGRESSION_MAJOR, bass: BASS_MAJOR, pad: 0.03,
-    arp: { wave: "square", div: 2, level: 0.055, decay: 0.22, pattern: [0, 1, 2, 1, 0, 2, 1, 2] },
-    stabs: false, kick: { vel: 0.6, every: 1 }, clap: true, hats: { div: 4, vel: [0.06, 0.035] }, bassDiv: 2,
-  },
-  soft: {
-    prog: PROGRESSION_MAJ7, bass: BASS_MAJ7, pad: 0.045,
-    arp: { wave: "triangle", div: 2, level: 0.06, decay: 0.5, pattern: [0, 2, 1, 3, 2, 1, 3, 2] },
-    stabs: false, kick: { vel: 0.35, every: 2 }, clap: false, hats: { div: 2, vel: [0.025, 0.015] }, bassDiv: 4,
-  },
-  pop: {
-    prog: PROGRESSION_MAJOR, bass: BASS_MAJOR, pad: 0.03,
-    arp: { wave: "square", div: 2, level: 0.06, decay: 0.16, pattern: [0, 2, 1, 2, 0, 2, 1, 2] },
-    stabs: false, kick: { vel: 0.72, every: 1 }, clap: true, hats: { div: 4, vel: [0.07, 0.04] }, bassDiv: 0.5,
-  },
-  minimal: {
-    prog: PROGRESSION, bass: BASS, pad: 0.018,
-    arp: null,
-    stabs: true, kick: { vel: 0.8, every: 1 }, clap: false, hats: { div: 4, vel: [0.08, 0.04] }, bassDiv: 1,
-  },
-  neon: {
-    prog: PROGRESSION, bass: BASS, pad: 0.035,
-    arp: { wave: "sawtooth", div: 4, level: 0.035, decay: 0.14, pattern: [0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 2, 1, 2] },
-    stabs: false, kick: { vel: 0.7, every: 1 }, clap: true, hats: { div: 2, vel: [0.06, 0.06] }, bassDiv: 0.5,
-  },
-};
-const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
+/** tanh soft-clip transfer curve (warmth and glue on the drum bus). */
+function softClip(k: number) {
+  const n = 2048;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = Math.tanh(k * x) / Math.tanh(k);
+  }
+  return curve;
+}
 
 /**
  * Procedural trailer score synthesised with WebAudio and arranged to the storyboard:
@@ -87,9 +55,15 @@ export class Soundtrack {
   private reverbSend: GainNode;
   /** Pads and bass route through here so kicks can duck them. */
   private duck: GainNode;
-  /** Tempo-synced echo for plucks. */
-  private delay: DelayNode;
-  private delayIn: GainNode;
+  /** Tempo-synced ping-pong echo for keys and plucks. */
+  private pingIn: GainNode;
+  private pingL: DelayNode;
+  private pingR: DelayNode;
+  /** Music-bus lowpass (intro/breakdown filtering, sweeps into drops). SFX bypass it. */
+  private musicFilter: BiquadFilterNode;
+  /** Drum bus with gentle tape-style saturation. */
+  private drums: GainNode;
+  private musicBus: GainNode;
 
   /** Render the full score for `plan` offline, faster than realtime. */
   static async renderOffline(plan: VideoPlan, sampleRate = 48000): Promise<AudioBuffer> {
@@ -118,10 +92,13 @@ export class Soundtrack {
     limiter.ratio.value = 20;
     limiter.attack.value = 0.001;
     limiter.release.value = 0.08;
-    this.out.connect(comp).connect(makeup).connect(limiter);
-    limiter.connect(c.destination);
+    // Final safety stage: transparent below -1 dBFS, soft knee above, never clips.
+    const safety = c.createWaveShaper();
+    safety.curve = ceilingCurve();
+    this.out.connect(comp).connect(makeup).connect(limiter).connect(safety);
+    safety.connect(c.destination);
     this.stream = c instanceof AudioContext ? c.createMediaStreamDestination() : null;
-    if (this.stream) limiter.connect(this.stream);
+    if (this.stream) safety.connect(this.stream);
 
     const len = c.sampleRate * 2;
     this.noise = c.createBuffer(1, len, c.sampleRate);
@@ -141,20 +118,47 @@ export class Soundtrack {
     this.reverbSend.gain.value = 0.35;
     this.reverbSend.connect(this.reverb).connect(this.out);
 
+    this.musicFilter = c.createBiquadFilter();
+    this.musicFilter.type = "lowpass";
+    this.musicFilter.frequency.value = 20000;
+    this.musicFilter.Q.value = 0.9;
+    // Music bus: a touch of "air" on top, and a trim so the score sits under the sound design.
+    const air = c.createBiquadFilter();
+    air.type = "highshelf";
+    air.frequency.value = 7000;
+    air.gain.value = 3;
+    this.musicBus = c.createGain();
+    this.musicFilter.connect(air).connect(this.musicBus).connect(this.out);
+
     this.duck = c.createGain();
-    this.duck.connect(this.out);
+    this.duck.connect(this.musicFilter);
     this.duck.connect(this.reverbSend);
 
-    this.delayIn = c.createGain();
-    this.delay = c.createDelay(2);
-    const fb = c.createGain();
-    fb.gain.value = 0.32;
+    this.drums = c.createGain();
+    const sat = c.createWaveShaper();
+    sat.curve = softClip(1.8);
+    sat.oversample = "2x";
+    this.drums.connect(sat).connect(this.musicFilter);
+
+    // Ping-pong delay: echoes bounce left → right, damped so they sit behind the dry sound.
+    this.pingIn = c.createGain();
+    this.pingIn.gain.value = 0.3;
+    this.pingL = c.createDelay(2);
+    this.pingR = c.createDelay(2);
     const damp = c.createBiquadFilter();
     damp.type = "lowpass";
-    damp.frequency.value = 3500;
-    this.delayIn.connect(this.delay);
-    this.delay.connect(damp).connect(fb).connect(this.delay);
-    damp.connect(this.duck);
+    damp.frequency.value = 3200;
+    const fb = c.createGain();
+    fb.gain.value = 0.38;
+    const panL = c.createStereoPanner();
+    panL.pan.value = -0.7;
+    const panR = c.createStereoPanner();
+    panR.pan.value = 0.7;
+    this.pingIn.connect(damp).connect(this.pingL);
+    this.pingL.connect(panL).connect(this.musicFilter);
+    this.pingL.connect(this.pingR);
+    this.pingR.connect(panR).connect(this.musicFilter);
+    this.pingR.connect(fb).connect(this.pingL);
   }
 
   setMuted(muted: boolean) {
@@ -185,6 +189,10 @@ export class Soundtrack {
     const now = this.ctx.currentTime + lead;
     const at = (videoT: number) => now + (videoT - from);
     this.scheduleSfx(plan, from, at);
+    this.musicFilter.frequency.cancelScheduledValues(0);
+    this.musicFilter.frequency.setValueAtTime(20000, this.ctx.currentTime);
+    // The produced SaaS cue is denser than the trailer score: trim it to the same loudness.
+    this.musicBus.gain.value = (plan.music ?? plan.style) === "saas" ? 0.36 : 1;
     if ((plan.music ?? plan.style) === "saas") {
       this.playSaas(plan, from, at);
       return;
@@ -265,10 +273,10 @@ export class Soundtrack {
     return src;
   }
 
-  private duckAt(t: number, beat: number) {
+  private duckAt(t: number, beat: number, depth = 0.35) {
     const g = this.duck.gain;
     g.setValueAtTime(1, t);
-    g.linearRampToValueAtTime(0.35, t + 0.01);
+    g.linearRampToValueAtTime(depth, t + 0.01);
     g.setTargetAtTime(1, t + 0.02, beat * 0.25);
   }
 
@@ -323,43 +331,49 @@ export class Soundtrack {
     sub.stop(t + dur + 0.05);
   }
 
+  /** Punchy kick: fast pitch drop for the "knock", a round sub tail and a click transient. */
   private kick(t: number, vel: number) {
     const c = this.ctx;
     const o = this.track(c.createOscillator());
     const g = c.createGain();
-    o.frequency.setValueAtTime(160, t);
-    o.frequency.exponentialRampToValueAtTime(40, t + 0.13);
+    o.frequency.setValueAtTime(190, t);
+    o.frequency.exponentialRampToValueAtTime(55, t + 0.06);
+    o.frequency.exponentialRampToValueAtTime(44, t + 0.3);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.95 * vel, t + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
-    o.connect(g).connect(this.out);
+    g.gain.exponentialRampToValueAtTime(0.95 * vel, t + 0.003);
+    g.gain.setValueAtTime(0.9 * vel, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    o.connect(g).connect(this.drums);
     o.start(t);
-    o.stop(t + 0.45);
-    // Click transient.
+    o.stop(t + 0.42);
     const n = this.noiseSource();
     const hp = c.createBiquadFilter();
     hp.type = "highpass";
-    hp.frequency.value = 3000;
+    hp.frequency.value = 2500;
     const ng = c.createGain();
-    ng.gain.setValueAtTime(0.25 * vel, t);
-    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
-    n.connect(hp).connect(ng).connect(this.out);
+    ng.gain.setValueAtTime(0.22 * vel, t);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
+    n.connect(hp).connect(ng).connect(this.drums);
     n.start(t, Math.random());
     n.stop(t + 0.03);
   }
 
-  private hat(t: number, vel: number) {
+  private hat(t: number, vel: number, open = false) {
     const c = this.ctx;
     const src = this.noiseSource();
     const hp = c.createBiquadFilter();
     hp.type = "highpass";
-    hp.frequency.value = 7500;
+    hp.frequency.value = open ? 6500 : 8000;
     const g = c.createGain();
-    g.gain.setValueAtTime(vel, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-    src.connect(hp).connect(g).connect(this.out);
+    const d = open ? 0.24 : 0.04;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vel, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    const pan = c.createStereoPanner();
+    pan.pan.value = 0.22;
+    src.connect(hp).connect(g).connect(pan).connect(this.drums);
     src.start(t, Math.random());
-    src.stop(t + 0.07);
+    src.stop(t + d + 0.02);
   }
 
   private impact(t: number, vel: number) {
@@ -462,77 +476,298 @@ export class Soundtrack {
   /* ───────── SaaS score ───────── */
 
   /**
-   * Upbeat product-launch track: a filtered pad + pluck build through the hook, then
-   * four-on-the-floor kick, claps, shakers, bass and delayed plucks; drops out for the ending.
+   * A produced launch cue, arranged to the storyboard (see arrange.ts): filtered keys under
+   * the hook, a snare-roll + riser build that drops on the brand reveal with a crash and sub
+   * hit, the groove through the product beats (sidechain-pumped keys and bass, swung hats),
+   * one breakdown mid-film with a re-drop, and a resolving final chord on the call to action.
    */
   private playSaas(plan: VideoPlan, from: number, at: (t: number) => number) {
-    const total = plan.scenes.reduce((a, s) => a + s.duration, 0);
-    const beat = 60 / plan.bpm;
-    const bar = beat * 4;
-    this.delay.delayTime.value = beat * 0.75;
-    const starts: number[] = [];
-    let acc = 0;
-    for (const sc of plan.scenes) {
-      starts.push(acc);
-      acc += sc.duration;
-    }
-    const dropIn = plan.scenes.length > 2 ? starts[1] : 0;
-    const ending = Math.max(dropIn, total - beat * 2);
+    const A = arrange(plan);
+    const S = styleOf(plan.flavor);
+    const { beat, bar, total } = A;
+    const s16 = beat / 4;
+    this.pingL.delayTime.value = beat * 0.75;
+    this.pingR.delayTime.value = beat * 0.75;
+    this.automateFilter(A, from, at);
+    const kindAt = (t: number) => sectionAt(A, t)?.kind ?? "groove";
+    const grooving = (t: number) => {
+      const k = kindAt(t);
+      return t < A.ending && (k === "drop" || k === "groove" || k === "outro");
+    };
+    const building = (t: number) => A.builds.some(([b0, b1]) => t >= b0 && t < b1);
 
-    const F = FLAVORS[plan.flavor ?? "tech"];
-    for (let b = Math.floor(from / bar); b * bar < total; b++) {
+    // Harmony, arpeggio and bass, bar by bar.
+    for (let b = Math.floor(from / bar); b * bar < A.ending; b++) {
       const t0 = b * bar;
-      const chord = F.prog[b % 4];
-      const start = Math.max(t0, from);
-      const len = Math.min(bar, total - t0) - (start - t0);
-      if (len > 0.05) this.pad(at(start), len, chord, t0 + bar >= total - 0.01 ? 2.4 : 0.15, F.pad);
-      // Arpeggio (filtered during the hook build).
-      if (F.arp) {
-        const steps = 4 * F.arp.div;
-        for (let k = 0; k < steps; k++) {
-          const nt = t0 + k * (beat / F.arp.div);
-          if (nt < from || nt >= Math.min(total, ending + beat)) continue;
-          const idx = F.arp.pattern[k % F.arp.pattern.length] % chord.length;
-          const note = chord[idx] + 12 + (k === steps - 1 ? 12 : 0);
-          const build = nt < dropIn ? 0.25 + 0.75 * (nt / Math.max(0.01, dropIn)) : 1;
-          this.pluck(at(nt), note, build, F.arp.wave, F.arp.level, F.arp.decay);
+      const chord = S.prog[b % S.prog.length];
+      const root = S.roots[b % S.roots.length];
+      const kind0 = kindAt(t0 + 0.001);
+      const hits = kind0 === "intro" ? [S.keysHits[0]] : S.keysHits;
+      hits.forEach((h, hi) => {
+        const ht = t0 + h * s16;
+        const next = hi + 1 < hits.length ? t0 + hits[hi + 1] * s16 : t0 + bar;
+        if (ht < from - 1e-6 || ht >= A.ending) return;
+        const dur = Math.min(next, A.ending) - ht;
+        if (dur > 0.04) this.keys(S, at(ht), chord, dur, S.keysLevel * (kind0 === "intro" ? 1.5 : kind0 === "break" ? 1.25 : 1));
+      });
+      if (S.pad > 0) {
+        const st = Math.max(t0, from);
+        const len = Math.min(t0 + bar, A.ending) - st;
+        if (len > 0.05) this.pad(at(st), len, chord, 0.2, S.pad);
+      }
+      if (S.arp) {
+        const step = s16 * S.arp.per16;
+        for (let k = 0; k * step < bar - 1e-6; k++) {
+          const nt = t0 + k * step + (k % 2 && S.arp.per16 === 1 ? S.swing * s16 : 0);
+          if (nt < from || nt >= A.ending) continue;
+          const kind = kindAt(nt);
+          // The arp rises through the build and carries the breakdown.
+          if (kind === "intro" && !building(nt)) continue;
+          const note = chord[S.arp.pattern[k % S.arp.pattern.length] % chord.length] + 12;
+          const bright = kind === "break" ? 0.45 : building(nt) ? 0.35 + 0.6 * this.buildProgress(A, nt) : 0.9;
+          this.pluck(at(nt), note, bright, S.arp.wave, S.arp.level, S.arp.decay);
         }
       }
-      // Off-beat chord stabs (minimal techno).
-      if (F.stabs && t0 >= dropIn) {
-        for (let k = 0; k < 4; k++) {
-          const nt = t0 + k * beat + beat / 2;
-          if (nt >= from && nt < ending) chord.forEach((n) => this.pluck(at(nt), n, 0.6, "sawtooth", 0.03, 0.12));
+      for (let k = 0; k < 16; k++) {
+        const bt = t0 + k * s16 + (k % 2 ? S.swing * s16 : 0);
+        const off = S.bass[k];
+        if (off === null || bt < from || bt >= A.ending) continue;
+        const kind = kindAt(bt);
+        if (kind === "break") {
+          // Breakdown: one long root note per bar.
+          if (k === 0) this.bassNote(at(bt), bar * 0.95, root + 12, "sine", S.bassLevel * 0.7);
+          continue;
         }
-      }
-      if (t0 >= dropIn) {
-        const bars = F.bass[b % 4];
-        for (let bt = t0; bt < t0 + bar - 1e-6; bt += beat * F.bassDiv) {
-          const off = F.bassDiv <= 0.5 ? (Math.round((bt - t0) / (beat * F.bassDiv)) % 2 ? 12 : 0) : 0;
-          if (bt >= from && bt < ending && bt < total) this.bass(at(bt), beat * Math.max(0.45, F.bassDiv * 0.8), bars + 12 + off);
-        }
+        if (!grooving(bt)) continue;
+        let len = s16;
+        for (let j = k + 1; j < 16 && S.bass[j] === null; j++) len += s16;
+        this.bassNote(at(bt), Math.min(len * 0.92, beat * 1.5), root + 12 + off, S.bassWave, S.bassLevel);
       }
     }
-    const step = beat / F.hats.div;
-    for (let bt = Math.ceil(from / step - 1e-6) * step; bt < total - 0.05; bt += step) {
-      const idx = Math.round(bt / step);
-      const onBeat = idx % F.hats.div === 0;
-      const n = Math.round(bt / beat);
-      if (bt < dropIn || bt >= ending) continue;
-      if (onBeat && n % F.kick.every === 0) {
-        this.kick(at(bt), F.kick.vel);
-        this.duckAt(at(bt), beat);
+
+    // Drums, 16th by 16th, with swing on the off-16ths.
+    for (let k = Math.ceil(from / s16 - 1e-6); k * s16 < A.ending; k++) {
+      const t = k * s16;
+      const st = k % 16;
+      const tt = t + (st % 2 ? S.swing * s16 : 0);
+      const kind = kindAt(t);
+      if (grooving(t)) {
+        if (S.kick.includes(st)) {
+          this.kick(at(t), S.kickLevel * (st === 0 ? 1 : 0.92));
+          this.duckAt(at(t), beat, S.duck);
+        }
+        if (S.snare.includes(st)) this.snare(at(t), S.snareKind, 0.9);
+        if (S.openHats.includes(st)) this.hat(at(tt), 0.11, true);
+        else if (S.hats.includes(st)) this.hat(at(tt), st % 4 === 2 ? 0.12 : st % 2 ? 0.055 : 0.08);
+        if (S.shaker) this.shaker(at(tt), S.shaker * (st % 2 ? 1 : 0.6));
+      } else if (kind === "break" && !building(t)) {
+        if (st % 4 === 2) this.hat(at(tt), 0.035);
+        if (S.shaker && st % 2 === 0) this.shaker(at(tt), S.shaker * 0.7);
       }
-      if (onBeat && F.clap && n % 2 === 1) this.clap(at(bt));
-      this.hat(at(bt), idx % 2 ? F.hats.vel[1] : F.hats.vel[0]);
     }
-    // Build into the drop and a soft hit on each cut.
-    plan.scenes.forEach((sc, i) => {
-      const st = starts[i];
-      if (i > 0 && st >= from - 0.01) this.impact(at(st), i === 1 ? 0.55 : 0.3);
-      if (i === 0 && dropIn - 1.2 >= from) this.riser(at(Math.max(0, dropIn - 1.4)), Math.min(1.4, dropIn));
+
+    // Builds into each drop: snare roll that doubles up, riser, reverse crash.
+    for (const [b0, b1] of A.builds) {
+      const len = b1 - b0;
+      if (b1 < from) continue;
+      for (let t = b0; t < b1 - 1e-6; ) {
+        const p = (t - b0) / Math.max(0.01, len);
+        const step = b1 - t <= beat + 1e-6 ? s16 / 2 : p < 0.5 ? beat / 2 : s16;
+        if (t >= from) this.snare(at(t), "snare", 0.18 + 0.55 * p * p, 1 + p * 0.5);
+        t += step;
+      }
+      if (b0 >= from) this.riser(at(b0), len);
+      if (b1 - Math.min(1.2, len) >= from) this.reverseSwell(at(b1 - Math.min(1.2, len)), Math.min(1.2, len));
+    }
+    // Drops land with a crash and a sub hit.
+    for (const d of A.drops) {
+      if (d < from - 0.01) continue;
+      this.crash(at(d), 0.22);
+      this.impact(at(d), 0.5);
+    }
+    // Other cuts get a light accent so the edit and the music feel like one thing.
+    A.starts.forEach((st, i) => {
+      if (i === 0 || st < from - 0.01 || A.drops.some((d) => Math.abs(d - st) < 0.05) || st >= A.ending) return;
+      this.crash(at(st), 0.07);
     });
-    if (total - 0.02 >= from) this.impact(at(total - beat * 2), 0.45);
+    // Resolve: the last chord rings out under the call to action.
+    if (A.ending >= from && A.ending < total) {
+      const b = Math.floor(A.ending / bar);
+      const chord = S.prog[b % S.prog.length];
+      this.keys(S, at(A.ending), chord, Math.max(beat * 2, total - A.ending) + 0.5, S.keysLevel * 1.1, true);
+      this.bassNote(at(A.ending), beat * 2, S.roots[b % S.roots.length] + 12, "sine", S.bassLevel);
+      this.kick(at(A.ending), S.kickLevel);
+      this.crash(at(A.ending), 0.16);
+      this.impact(at(A.ending), 0.35);
+    }
+  }
+
+  private buildProgress(A: Arrangement, t: number) {
+    const b = A.builds.find(([b0, b1]) => t >= b0 && t < b1);
+    return b ? (t - b[0]) / Math.max(0.01, b[1] - b[0]) : 1;
+  }
+
+  /** Music-bus lowpass: closed under the hook, sweeping open into each drop, dipping in the break. */
+  private automateFilter(A: Arrangement, from: number, at: (t: number) => number) {
+    const OPEN = 18000;
+    const INTRO = 1400;
+    const BREAK = 2000;
+    const lerpExp = (a: number, b: number, k: number) => a * Math.pow(b / a, Math.max(0, Math.min(1, k)));
+    const valueAt = (t: number) => {
+      for (const [b0, b1] of A.builds) {
+        if (t >= b0 && t < b1) {
+          const base = sectionAt(A, b0)?.kind === "intro" ? INTRO * 1.4 : BREAK;
+          return lerpExp(base, OPEN, Math.pow((t - b0) / (b1 - b0), 2));
+        }
+      }
+      const s = sectionAt(A, t);
+      if (!s) return OPEN;
+      if (s.kind === "intro") return lerpExp(INTRO, INTRO * 1.4, (t - s.start) / Math.max(0.01, s.end - s.start));
+      if (s.kind === "break") return lerpExp(OPEN, BREAK, (t - s.start) / A.beat);
+      return OPEN;
+    };
+    const f = this.musicFilter.frequency;
+    f.cancelScheduledValues(0);
+    f.setValueAtTime(valueAt(from), at(from));
+    for (let t = from + 0.05; t < A.total; t += 0.05) f.linearRampToValueAtTime(valueAt(t), at(t));
+  }
+
+  private keys(S: SaasStyle, t: number, chord: number[], dur: number, level: number, ring = false) {
+    if (S.keys === "epiano") this.epiano(t, chord, dur, level, ring);
+    else if (S.keys === "supersaw") this.supersaw(t, chord, dur, level, ring);
+    else this.stab(t, chord, dur, level);
+  }
+
+  /** FM electric piano (Rhodes-style tine): warm body, bell-like attack, gentle stereo spread. */
+  private epiano(t: number, chord: number[], dur: number, level: number, ring = false) {
+    const c = this.ctx;
+    const release = ring ? 2.4 : 0.22;
+    chord.forEach((note, i) => {
+      const f = hz(note);
+      const car = this.track(c.createOscillator());
+      car.frequency.value = f;
+      const mod = this.track(c.createOscillator());
+      mod.frequency.value = f;
+      const mg = c.createGain();
+      mg.gain.setValueAtTime(f * 2.4, t);
+      mg.gain.exponentialRampToValueAtTime(f * 0.25, t + 0.7);
+      mod.connect(mg).connect(car.frequency);
+      const tine = this.track(c.createOscillator());
+      tine.frequency.value = f * 4.02;
+      const tg = c.createGain();
+      tg.gain.setValueAtTime(level * 0.12, t);
+      tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      const g = c.createGain();
+      const v = level * (0.85 + ((i * 37) % 10) / 60);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(v, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(v * 0.4, t + Math.min(1.2, dur * 0.9 + 0.1));
+      g.gain.setValueAtTime(v * 0.4, t + dur);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur + release);
+      const pan = c.createStereoPanner();
+      pan.pan.value = chord.length > 1 ? (i / (chord.length - 1) - 0.5) * 0.5 : 0;
+      car.connect(g);
+      tine.connect(tg).connect(g);
+      g.connect(pan);
+      pan.connect(this.duck);
+      pan.connect(this.pingIn);
+      const end = t + dur + release + 0.05;
+      for (const o of [car, mod, tine]) {
+        o.start(t);
+        o.stop(end);
+      }
+    });
+  }
+
+  /** Future-bass supersaw chord: three detuned saws per note spread across the stereo field. */
+  private supersaw(t: number, chord: number[], dur: number, level: number, ring = false) {
+    const c = this.ctx;
+    const release = ring ? 2 : 0.06;
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.Q.value = 0.8;
+    lp.frequency.setValueAtTime(6500, t);
+    lp.frequency.exponentialRampToValueAtTime(2200, t + Math.max(0.1, dur));
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(level * 0.7, t + Math.min(0.25, dur));
+    g.gain.setValueAtTime(level * 0.7, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + release);
+    lp.connect(g);
+    g.connect(this.duck);
+    g.connect(this.reverbSend);
+    const pans = [-0.6, 0, 0.6].map((v) => {
+      const p = c.createStereoPanner();
+      p.pan.value = v;
+      p.connect(lp);
+      return p;
+    });
+    for (const note of chord) {
+      [-14, 0, 14].forEach((det, j) => {
+        const o = this.track(c.createOscillator());
+        o.type = "sawtooth";
+        o.frequency.value = hz(note);
+        o.detune.value = det;
+        o.connect(pans[j]);
+        o.start(t);
+        o.stop(t + dur + release + 0.03);
+      });
+    }
+  }
+
+  /** Short filtered chord stab that echoes across the stereo delay. */
+  private stab(t: number, chord: number[], dur: number, level: number) {
+    const c = this.ctx;
+    const d = Math.min(0.22, dur);
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(3200, t);
+    lp.frequency.exponentialRampToValueAtTime(700, t + d);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    lp.connect(g);
+    g.connect(this.duck);
+    g.connect(this.pingIn);
+    for (const note of chord) {
+      const o = this.track(c.createOscillator());
+      o.type = "sawtooth";
+      o.frequency.value = hz(note);
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + d + 0.03);
+    }
+  }
+
+  private bassNote(t: number, dur: number, note: number, wave: "sine" | "sawtooth", level: number) {
+    const c = this.ctx;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.008);
+    g.gain.setValueAtTime(level * 0.85, t + Math.max(0.02, dur - 0.04));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.03);
+    const sub = this.track(c.createOscillator());
+    sub.type = "sine";
+    sub.frequency.value = hz(note - 12);
+    sub.connect(g);
+    // Upper harmonic so the bass line reads on laptop and phone speakers.
+    const top = this.track(c.createOscillator());
+    top.type = wave === "sine" ? "triangle" : "sawtooth";
+    top.frequency.value = hz(note);
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(wave === "sine" ? 900 : 1600, t);
+    lp.frequency.exponentialRampToValueAtTime(wave === "sine" ? 400 : 300, t + Math.max(0.05, dur));
+    const tg = c.createGain();
+    tg.gain.value = wave === "sine" ? 0.35 : 0.55;
+    top.connect(lp).connect(tg).connect(g);
+    g.connect(this.duck);
+    for (const o of [sub, top]) {
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
   }
 
   private pluck(t: number, note: number, bright: number, wave: OscillatorType = "square", level = 0.055, decay = 0.22) {
@@ -542,40 +777,108 @@ export class Soundtrack {
     o.frequency.value = hz(note);
     const lp = c.createBiquadFilter();
     lp.type = "lowpass";
-    lp.frequency.setValueAtTime(600 + 3600 * bright, t);
-    lp.frequency.exponentialRampToValueAtTime(500, t + 0.2);
+    lp.frequency.setValueAtTime(600 + 4200 * bright, t);
+    lp.frequency.exponentialRampToValueAtTime(500, t + Math.max(0.08, decay));
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(level, t + 0.004);
     g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
     o.connect(lp).connect(g);
     g.connect(this.duck);
-    g.connect(this.delayIn);
+    g.connect(this.pingIn);
     o.start(t);
     o.stop(t + decay + 0.03);
   }
 
-  private clap(t: number) {
+  /** Clap (layered bursts), acoustic-style snare (noise + tone body) or a dry finger snap. */
+  private snare(t: number, kind: "clap" | "snare" | "snap", vel: number, pitch = 1) {
     const c = this.ctx;
+    if (kind === "clap") {
+      const bp = c.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 1500 * pitch;
+      bp.Q.value = 0.9;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      [0, 0.011, 0.022].forEach((o) => {
+        g.gain.setValueAtTime(0.34 * vel, t + o);
+        g.gain.exponentialRampToValueAtTime(0.05 * vel, t + o + 0.009);
+      });
+      g.gain.setValueAtTime(0.26 * vel, t + 0.033);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+      const n = this.noiseSource();
+      n.connect(bp).connect(g);
+      g.connect(this.drums);
+      g.connect(this.reverbSend);
+      n.start(t, Math.random());
+      n.stop(t + 0.22);
+      return;
+    }
+    const n = this.noiseSource();
+    const bp = c.createBiquadFilter();
+    bp.type = kind === "snap" ? "highpass" : "bandpass";
+    bp.frequency.value = (kind === "snap" ? 2600 : 1900) * pitch;
+    bp.Q.value = 0.8;
+    const g = c.createGain();
+    const d = kind === "snap" ? 0.07 : 0.17;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime((kind === "snap" ? 0.3 : 0.32) * vel, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    n.connect(bp).connect(g);
+    g.connect(this.drums);
+    g.connect(this.reverbSend);
+    n.start(t, Math.random());
+    n.stop(t + d + 0.02);
+    if (kind === "snare") {
+      const o = this.track(c.createOscillator());
+      o.type = "triangle";
+      o.frequency.setValueAtTime(210 * pitch, t);
+      o.frequency.exponentialRampToValueAtTime(160 * pitch, t + 0.08);
+      const og = c.createGain();
+      og.gain.setValueAtTime(0.0001, t);
+      og.gain.exponentialRampToValueAtTime(0.22 * vel, t + 0.002);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+      o.connect(og).connect(this.drums);
+      o.start(t);
+      o.stop(t + 0.12);
+    }
+  }
+
+  private shaker(t: number, vel: number) {
+    const c = this.ctx;
+    const n = this.noiseSource();
     const bp = c.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = 1500;
-    bp.Q.value = 0.9;
+    bp.frequency.value = 6500;
+    bp.Q.value = 1.4;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    // Three quick bursts, then a short tail — the classic clap shape.
-    [0, 0.011, 0.022].forEach((o) => {
-      g.gain.setValueAtTime(0.32, t + o);
-      g.gain.exponentialRampToValueAtTime(0.05, t + o + 0.009);
-    });
-    g.gain.setValueAtTime(0.25, t + 0.033);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    g.gain.exponentialRampToValueAtTime(vel, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    const pan = c.createStereoPanner();
+    pan.pan.value = -0.3;
+    n.connect(bp).connect(g).connect(pan).connect(this.drums);
+    n.start(t, Math.random());
+    n.stop(t + 0.08);
+  }
+
+  /** Crash cymbal: bright noise with a long decay into the hall. */
+  private crash(t: number, vel: number) {
+    const c = this.ctx;
     const n = this.noiseSource();
-    n.connect(bp).connect(g);
+    const hp = c.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 4200;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vel, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(vel * 0.3, t + 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
+    n.connect(hp).connect(g);
     g.connect(this.out);
     g.connect(this.reverbSend);
     n.start(t, Math.random());
-    n.stop(t + 0.2);
+    n.stop(t + 2);
   }
 
   /* ───────── Sound effects ───────── */
@@ -588,7 +891,7 @@ export class Soundtrack {
         const kind: SfxKind = sc.transition === "whip" || sc.transition === "wipe" ? "whoosh" : "swoosh";
         this.sfx(at(Math.max(from, start - 0.12)), kind);
       }
-      const cues = SKILL_MAP[sc.skill]?.sfx?.(sc, beat) ?? [];
+      const cues = SKILL_MAP[sc.skill]?.sfx?.(sc, beat, plan.brand) ?? [];
       for (const cue of cues) {
         const t = start + cue.t;
         if (cue.t >= 0 && cue.t < sc.duration && t >= from) this.sfx(at(t), cue.kind);

@@ -129,15 +129,22 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
   const bodyText = clean((root.querySelector("body") ?? root).structuredText).slice(0, 200_000);
   const stats: string[] = [];
   const statRe =
-    /(?<![\w.])([$€£]?\d[\d,.]*(?:\s?(?:million|billion|thousand)\b|[kKmMbB]\b|%|x\b)?\+?)\s+([A-Za-z][A-Za-z]+(?:\s[a-z][a-z]+)?)/g;
+    /(?<![\w.])([$€£]?\d[\d,.]*(?:\s?(?:million|billion|thousand)\b|[kKmMbB](?![a-z])|%|x\b)?\+?)\s*([A-Za-z][A-Za-z]+(?:\s[a-z][a-z]+)?)/g;
   let m: RegExpExecArray | null;
-  while ((m = statRe.exec(bodyText)) && stats.length < 4) {
+  // Claims about the company ("10,000+ teams") rank above figures that are just UI in a product
+  // mockup ("▲ 12.4%" deltas, KPI tiles), which are never used as claims.
+  const CLAIM = /team|customer|compan|user|business|developer|people|brand|merchant|countr|uptime|processed|event|download|review|integration|member|org|deploy|transaction|request/i;
+  const candidates: { s: string; score: number; i: number }[] = [];
+  while ((m = statRe.exec(bodyText)) && candidates.length < 16) {
     const num = m[1];
     if (/^(19|20)\d\d$/.test(num) || /^\d{1,2}$/.test(num) || num.replace(/\D/g, "").length > 12) continue;
     if (!/[+%kKmMbBx$€£,]|million|billion|thousand/.test(num)) continue;
+    if (/[▲▼↑↓↗↘]\s*$|[+-]\s*$/.test(bodyText.slice(Math.max(0, m.index - 3), m.index))) continue;
     const s = `${num} ${m[2]}`.toUpperCase();
-    if (!stats.includes(s)) stats.push(s);
+    if (candidates.some((c) => c.s === s)) continue;
+    candidates.push({ s, score: (CLAIM.test(m[2]) ? 2 : 0) + (/\+|[kKmMbB]\b|million|billion/.test(num) ? 1 : 0), i: candidates.length });
   }
+  stats.push(...candidates.sort((a, b) => b.score - a.score || a.i - b.i).slice(0, 4).map((c) => c.s));
 
   // Call to action.
   let cta: string | null = null;
@@ -221,7 +228,13 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
   for (const el of containers) {
     if (testimonials.length >= 3) break;
     const qEl = el.tagName === "BLOCKQUOTE" ? el : (el.querySelector("blockquote, q, p") ?? el);
-    const quote = clean(qEl.text).replace(/^["“”']+|["“”']+$/g, "");
+    // The attribution often sits inside the blockquote (<cite>, <footer>): keep it out of the quote.
+    let qText = clean(qEl.text);
+    for (const c of qEl.querySelectorAll("cite, footer, figcaption, [class*=author], [class*=name]")) {
+      const ct = clean(c.text);
+      if (ct && ct.length < qText.length) qText = clean(qText.replace(ct, ""));
+    }
+    const quote = qText.replace(/^["“”']+|["“”']+$/g, "");
     if (quote.length < 30 || quote.length > 280 || quoteSeen.has(quote)) continue;
     const scope = el.tagName === "BLOCKQUOTE" ? (el.parentNode as HTMLElement) ?? el : el;
     // Most specific selector first: a dedicated name element beats a whole caption.
@@ -315,7 +328,7 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
     steps,
     pains,
     font,
-    shots: { hero: live?.hero ?? null, full: live?.full ?? null, sections: live?.sections ?? [] },
+    shots: { hero: live?.hero ?? null, full: live?.full ?? null, sections: live?.sections ?? [], parts: live?.parts ?? [] },
     cta,
     logo,
     images,

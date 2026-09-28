@@ -423,9 +423,21 @@ function aiPrompt(sc: SkillContext) {
   const T = aiTiming(scene, d);
   const ex = ease.inCubic(exitT(sc, 0.4));
   const pw = portrait ? w * 0.9 : Math.min(w * 0.68, 1320 * u);
-  const ph = portrait ? h * 0.52 : h * 0.6;
+  // The panel fits its conversation (no dead space under a short answer).
+  const estimate = () => {
+    const pad0 = 30 * u * S;
+    const fs0 = 25 * u * S;
+    const lineH = fs0 * 1.42;
+    ctx.font = subFont(fs0, 500);
+    const tw = pw - pad0 * 2 - 56 * u * S;
+    const bubble = Math.min(2, wrap(ctx, prompt, pw * 0.68 - 44 * u * S).length) * fs0 * 1.35 + 30 * u * S;
+    const leadLines = Math.min(3, wrap(ctx, lead, tw).length);
+    const bulletLines = bullets.reduce((a, b) => a + Math.min(2, wrap(ctx, b, tw - 40 * u * S).length), 0);
+    return pad0 + bubble + 22 * u * S + 20 * u * S + (leadLines + bulletLines) * lineH + fs0 * 0.35 + 74 * u * S + pad0 * 1.6;
+  };
+  const ph = clamp(estimate(), h * 0.34, portrait ? h * 0.56 : h * 0.62);
   const px = (w - pw) / 2;
-  const py = portrait ? h * 0.29 : h * 0.3;
+  const py = portrait ? h * 0.29 : Math.max(h * 0.28, h * 0.6 - ph / 2);
   const k0 = clamp(spring(t - 0.25, 10, 7), 0, 1.05);
   if (t < 0.25) return;
   focus(sc, w / 2, py + ph / 2, pw * 0.6, clamp((t - T.think) / 0.4) * 0.8 * (1 - ex));

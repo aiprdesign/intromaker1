@@ -161,7 +161,7 @@ async function siteImages(site: SiteData) {
   const picks = [sh.hero, ...sh.sections.slice(0, 3)].filter((x): x is string => !!x);
   const out: { data: string; mediaType: "image/jpeg" }[] = [];
   for (const src of picks) {
-    const id = src.match(/id=([a-f0-9]{16}-(?:hero|full|s\d))$/)?.[1];
+    const id = src.match(/id=([a-f0-9]{16}-(?:hero|full|s\d|p\d{1,2}))$/)?.[1];
     if (!id) continue;
     try {
       const data = await readFile(join(SHOT_DIR, `${id}.jpg`));

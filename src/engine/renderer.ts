@@ -1,4 +1,6 @@
+import { arrange, energyAt, sinceDrop, sinceKick, type Arrangement } from "./arrange";
 import { clamp, ease, mixHex, noise1, range, rgba, rng } from "./math";
+import { styleOf } from "./music";
 import { PALETTES } from "./palettes";
 import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
@@ -6,7 +8,7 @@ import { getImage, isDarkLogo } from "./media";
 import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
-import type { Aspect, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
+import type { Aspect, MusicPulse, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
 export const TRANSITION_LEN = 0.45;
 
@@ -81,6 +83,7 @@ function drawScene(
   /** Pretend-duration: extended when the next scene overlaps, so this one doesn't play its exit. */
   d = scene.duration,
   transitionIn = true,
+  music?: MusicPulse,
 ) {
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   const sc: SkillContext = {
@@ -101,6 +104,7 @@ function drawScene(
     look: plan.look,
     globalT,
     concept: plan.concept,
+    music,
   };
   resetCtx(target);
   const depth = plan.style === "saas" ? plan.look?.depth ?? 0 : 0;
@@ -159,6 +163,21 @@ function projectPlane(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, w: 
   ctx.restore();
 }
 
+const arrangements = new WeakMap<VideoPlan, Arrangement>();
+
+/** Where the score is at `time`: the SaaS cue's kicks and drops, or a plain beat for trailers. */
+function musicPulse(plan: VideoPlan, time: number): MusicPulse | undefined {
+  if ((plan.music ?? plan.style) !== "saas") return undefined;
+  let a = arrangements.get(plan);
+  if (!a) {
+    a = arrange(plan);
+    arrangements.set(plan, a);
+  }
+  // The mastering chain's look-ahead delays the audio ~15 ms; the picture waits for it.
+  const heard = time - 0.015;
+  return { kick: sinceKick(a, heard, styleOf(plan.flavor).kick), drop: sinceDrop(a, heard), energy: energyAt(a, heard) };
+}
+
 /** Render a single scene at local time t (used directly by the skill showcase). */
 export function renderScene(
   ctx: CanvasRenderingContext2D,
@@ -170,7 +189,7 @@ export function renderScene(
   index = 0,
   opts: RenderOptions = {},
   globalT = t,
-  context: { prev?: { scene: Scene; index: number }; extendSelf?: boolean } = {},
+  context: { prev?: { scene: Scene; index: number }; extendSelf?: boolean; music?: MusicPulse } = {},
 ) {
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
@@ -181,12 +200,12 @@ export function renderScene(
     // Both shots on screen: the outgoing scene keeps running (exit suppressed) under the incoming one.
     const prev = context.prev!;
     const a = scratch("overlap-prev", w, h).ctx;
-    drawScene(a, prev.scene, plan, prev.scene.duration + t, w, h, prev.index, opts, globalT, prev.scene.duration + OVERLAP_EXTEND);
+    drawScene(a, prev.scene, plan, prev.scene.duration + t, w, h, prev.index, opts, globalT, prev.scene.duration + OVERLAP_EXTEND, true, context.music);
     const b = scratch("overlap-next", w, h).ctx;
-    sc = drawScene(b, scene, plan, t, w, h, index, opts, globalT, d, false);
+    sc = drawScene(b, scene, plan, t, w, h, index, opts, globalT, d, false, context.music);
     compositeOverlap({ ...sc, ctx }, a.canvas, b.canvas);
   } else {
-    sc = drawScene(ctx, scene, plan, t, w, h, index, opts, globalT, d);
+    sc = drawScene(ctx, scene, plan, t, w, h, index, opts, globalT, d, true, context.music);
   }
   const out = { ...sc, ctx };
   resetCtx(ctx);
@@ -231,6 +250,41 @@ export function ruleOf(p: Palette): Palette {
   };
 }
 
+/** WCAG relative luminance and contrast ratio. */
+function luminance(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+function contrast(a: string, b: string) {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+/** Nudge a colour lighter (dark themes) or darker (light themes) until it reads on `bg` at `min`:1. */
+function readable(hex: string, bg: string, min: number, light: boolean) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex) || !/^#[0-9a-f]{6}$/i.test(bg)) return hex;
+  let out = hex;
+  for (let k = 0.1; k <= 1 && contrast(out, bg) < min; k += 0.1) out = mixHex(hex, light ? "#000000" : "#ffffff", k);
+  return out;
+}
+/**
+ * Colour-theory guard rails: highlight words, buttons and beams keep at least 3:1 contrast with
+ * the stage (WCAG large-text AA), body text at least 7:1, whatever brand colours come in.
+ */
+function legible(p: Palette): Palette {
+  const light = !!p.light;
+  return {
+    ...p,
+    primary: readable(p.primary, p.bg0, 3.2, light),
+    secondary: readable(p.secondary, p.bg0, 3.2, light),
+    accent: readable(p.accent, p.bg0, 3, light),
+    text: readable(p.text, p.bg0, 7, light),
+  };
+}
+
 /** Base palette with the brand's colours swapped in (backgrounds keep the base's darkness). */
 export function brandPalette(id: VideoPlan["palette"], brand?: VideoPlan["brand"], scheme: VideoPlan["scheme"] = "vibrant"): Palette {
   const base = PALETTES[id];
@@ -244,7 +298,7 @@ export function brandPalette(id: VideoPlan["palette"], brand?: VideoPlan["brand"
         bg1: mixHex(base.bg0, c.primary, 0.22),
       }
     : base;
-  return scheme === "60-30-10" ? ruleOf(p) : p;
+  return legible(scheme === "60-30-10" ? ruleOf(p) : p);
 }
 
 /** Render the whole plan at absolute time `time`. */
@@ -266,6 +320,7 @@ export function renderFrame(
   renderScene(ctx, at.scene, plan, at.local, w, h, at.index, opts, time, {
     prev: at.index > 0 ? { scene: plan.scenes[at.index - 1], index: at.index - 1 } : undefined,
     extendSelf: !!next && OVERLAP.has(next.transition),
+    music: musicPulse(plan, time),
   });
   if (plan.style === "saas" && plan.look?.overlay) filmOverlay(ctx, plan, time, w, h, at.index);
   else brandBug(ctx, plan, time, w, h);
@@ -410,9 +465,19 @@ function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, 
  */
 function applyCamera(sc: SkillContext, globalT: number) {
   const { ctx, w, h, u, beat } = sc;
-  const phase = (globalT / beat) % 1;
-  const bar = Math.floor(globalT / beat) % 4 === 0 ? 1.6 : 1;
-  const pulse = Math.exp(-phase * 7) * 0.012 * bar;
+  let pulse: number;
+  if (sc.music) {
+    // Punch on the kicks the score actually plays (none under the hook or in the breakdown),
+    // with a bigger hit when the track drops.
+    const m = sc.music;
+    const kick = Number.isFinite(m.kick) ? Math.exp(-m.kick * 12) * 0.011 * m.energy : 0;
+    const drop = m.drop < 0.8 ? Math.exp(-m.drop * 6) * 0.03 : 0;
+    pulse = kick + drop;
+  } else {
+    const phase = (globalT / beat) % 1;
+    const bar = Math.floor(globalT / beat) % 4 === 0 ? 1.6 : 1;
+    pulse = Math.exp(-phase * 7) * 0.012 * bar;
+  }
   const s = 1.035 + pulse;
   const dx = noise1(globalT * 0.45, 11) * 9 * u;
   const dy = noise1(globalT * 0.37, 23) * 7 * u;

@@ -586,6 +586,7 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "click-flow": "demo",
   "notify-stack": "demo",
   "chart-grow": "metric",
+  "ui-assemble": "meet",
   cta: "cta",
 };
 
@@ -611,6 +612,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     let skill = tpl.roles[role] ?? DEFAULT_ROLE_SKILL[role];
     if (role === "reveal" && !plan.brand?.logo) skill = tpl.revealNoLogo;
     if (role === "demo" && DEMO_SKILLS.has(scene.skill)) skill = scene.skill;
+    // The product assembled from its own components beats a flat page scroll whenever it's available.
+    if (role === "meet" && scene.skill === "ui-assemble") skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

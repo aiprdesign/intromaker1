@@ -108,6 +108,7 @@ function planAssets(plan: VideoPlan) {
   const vids = new Set<string>();
   if (plan.brand?.logo) imgs.add(plan.brand.logo);
   for (const i of plan.brand?.images ?? []) imgs.add(i);
+  for (const part of plan.brand?.parts ?? []) imgs.add(part.src);
   for (const s of plan.scenes) {
     if (s.media?.kind === "image") imgs.add(s.media.src);
     if (s.media?.kind === "video") vids.add(s.media.src);
@@ -344,5 +345,98 @@ export function findHotspots(d: Drawable, frameW: number, frameH: number, fx = 0
     out = null;
   }
   hotCache.set(key, out);
+  return out;
+}
+
+export interface Region {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+const segCache = new Map<string, Region[]>();
+
+/**
+ * Split a screenshot into its UI blocks (cards, panels, media, buttons) when the page's own
+ * components weren't captured: rows of content separated by empty gutters form bands, and each
+ * band splits into columns at its vertical gutters. Returns boxes in image pixels, largest
+ * blocks first (at most 8), for animating the pieces individually.
+ */
+export function segmentShot(img: HTMLImageElement): Region[] {
+  if (!img.naturalWidth) return [];
+  const hit = segCache.get(img.src);
+  if (hit) return hit;
+  let out: Region[] = [];
+  try {
+    const W = 180;
+    const H = Math.max(40, Math.round((W * img.naturalHeight) / img.naturalWidth));
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0, W, H);
+    const px = g.getImageData(0, 0, W, H).data;
+    const lum = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) lum[i] = 0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2];
+    const busy = new Uint8Array(W * H);
+    for (let y = 1; y < H - 1; y++)
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        if (Math.abs(lum[i + 1] - lum[i - 1]) + Math.abs(lum[i + W] - lum[i - W]) > 14) busy[i] = 1;
+      }
+    const runs = (flags: boolean[], gap: number) => {
+      const res: [number, number][] = [];
+      let s0 = -1;
+      let quiet = 0;
+      flags.forEach((f, i) => {
+        if (f) {
+          if (s0 < 0) s0 = i;
+          quiet = 0;
+        } else if (s0 >= 0 && ++quiet > gap) {
+          res.push([s0, i - quiet]);
+          s0 = -1;
+          quiet = 0;
+        }
+      });
+      if (s0 >= 0) res.push([s0, flags.length - 1 - quiet]);
+      return res;
+    };
+    const rowBusy = (y: number, x0: number, x1: number) => {
+      let n = 0;
+      for (let x = x0; x <= x1; x++) n += busy[y * W + x];
+      return n;
+    };
+    const colBusy = (x: number, y0: number, y1: number) => {
+      let n = 0;
+      for (let y = y0; y <= y1; y++) n += busy[y * W + x];
+      return n;
+    };
+    const boxes: Region[] = [];
+    const split = (x0: number, y0: number, x1: number, y1: number, depth: number) => {
+      const bands = runs(Array.from({ length: y1 - y0 + 1 }, (_, i) => rowBusy(y0 + i, x0, x1) > 1), 2).map(([a, b]) => [a + y0, b + y0]);
+      for (const [by0, by1] of bands) {
+        if (by1 - by0 < 3) continue;
+        const cols = runs(Array.from({ length: x1 - x0 + 1 }, (_, i) => colBusy(x0 + i, by0, by1) > 0), 3).map(([a, b]) => [a + x0, b + x0]);
+        for (const [cx0, cx1] of cols) {
+          const w = cx1 - cx0 + 1;
+          const h = by1 - by0 + 1;
+          if (w < 6 || h < 4) continue;
+          // A big block with inner gutters is split once more (a dashboard's panels).
+          if (depth < 1 && w * h > W * H * 0.3 && (cx0 > x0 || cx1 < x1 || by0 > y0 || by1 < y1)) split(cx0 + 1, by0 + 1, cx1 - 1, by1 - 1, depth + 1);
+          else boxes.push({ x: cx0, y: by0, w, h });
+        }
+      }
+    };
+    split(0, 0, W - 1, H - 1, 0);
+    const k = img.naturalWidth / W;
+    out = boxes
+      .filter((b) => b.w * b.h >= W * H * 0.01 && b.w * b.h <= W * H * 0.7)
+      .sort((a, b) => b.w * b.h - a.w * a.h)
+      .slice(0, 8)
+      .map((b) => ({ x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k }));
+  } catch {
+    out = [];
+  }
+  segCache.set(img.src, out);
   return out;
 }

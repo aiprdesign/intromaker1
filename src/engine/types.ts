@@ -40,6 +40,7 @@ export const SKILL_IDS = [
   "click-flow",
   "notify-stack",
   "chart-grow",
+  "ui-assemble",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -91,6 +92,23 @@ export interface Media {
 }
 
 /** Brand kit imported from a website. */
+/**
+ * One UI component cut out of the live page (a product shot, an app panel, a feature card, a
+ * button), with its box in page pixels (1440px-wide layout) so it can be animated on its own
+ * and reassembled exactly where it sits on the page.
+ */
+export interface SitePart {
+  src: string;
+  kind: "media" | "panel" | "card" | "button";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Corner radius in page pixels. */
+  r: number;
+  text?: string;
+}
+
 export interface Brand {
   name: string;
   /** Display domain, e.g. "acme.com". */
@@ -102,6 +120,8 @@ export interface Brand {
   clientLogos?: string[];
   /** Brand headline font family, loaded from Google Fonts when available. */
   font?: string;
+  /** UI components cut out of the live page (see SitePart). */
+  parts?: SitePart[];
   /** Customer avatars keyed by testimonial author. */
   avatars?: Record<string, string>;
   /** Brand colours; override the palette's accent colours. */
@@ -130,7 +150,7 @@ export interface SiteData {
   /** The site's headline font family (e.g. from Google Fonts). */
   font: string | null;
   /** Screenshots from the live browser capture (same-origin /api/shot URLs). */
-  shots: { hero: string | null; full: string | null; sections: string[] };
+  shots: { hero: string | null; full: string | null; sections: string[]; parts?: SitePart[] };
   cta: string | null;
   logo: string | null;
   images: string[];
@@ -260,6 +280,17 @@ export interface SkillContext {
   noStage?: boolean;
   /** Product concept id (see concepts.ts) for on-brand icon choices. */
   concept?: string;
+  /** The score at this moment, so motion can hit with the music (full-film renders only). */
+  music?: MusicPulse;
+}
+
+export interface MusicPulse {
+  /** Seconds since the last kick the score played (Infinity when the drums are out). */
+  kick: number;
+  /** Seconds since the last drop (Infinity before the first). */
+  drop: number;
+  /** Musical energy 0..1 (intro/breakdown low, groove high). */
+  energy: number;
 }
 
 export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike" | "key" | "success";
@@ -279,7 +310,7 @@ export interface Skill {
   sample: { text: string; subtext?: string; items?: string[] };
   render: (sc: SkillContext) => void;
   /** Sound effects synced to this skill's animation. */
-  sfx?: (scene: Scene, beat: number) => SfxCue[];
+  sfx?: (scene: Scene, beat: number, brand?: Brand) => SfxCue[];
   /** Placeholder shown for the storyboard's list field when the skill uses `items`. */
   itemsHint?: string;
 }
