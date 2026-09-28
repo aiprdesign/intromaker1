@@ -45,6 +45,9 @@ export function ensureFonts() {
     document.fonts.load('600 40px "Inter"'),
     document.fonts.load('700 40px "Inter"'),
     document.fonts.load('800 100px "Inter"'),
+    document.fonts.load('400 100px "Instrument Serif"'),
+    document.fonts.load('800 100px "JetBrains Mono"'),
+    document.fonts.load('500 40px "JetBrains Mono"'),
   ])
     .then(() => undefined)
     .catch(() => undefined);

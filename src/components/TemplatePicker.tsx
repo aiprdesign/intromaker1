@@ -13,7 +13,7 @@ export default function TemplatePicker({ value, onChange }: { value: string; onC
             scene={t.sample}
             plan={{ palette: t.palette, font: t.font, seed: 300 + i, style: "saas", look: t.look, bpm: t.bpm }}
             long={320}
-            fps={24}
+            fps={15}
           />
           <span className="template-name">{t.name}</span>
         </button>

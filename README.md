@@ -15,7 +15,8 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ### What makes the SaaS films look pro
 
-- **Style templates**: Midnight Grid, Aurora Gradient, Minimal Light, Mono Pro, Bold Pop, Cinematic Keynote and Neon Tech. Each has its own palette, type, text motion, transition language, music flavour and pacing. Switching restyles the film instantly.
+- **14 style templates**, modelled on the most popular SaaS intro looks: Midnight Grid (dev-tool dark), Aurora Gradient (Stripe-style), Minimal Light (keynote), Mono Pro, Bold Pop, Cinematic Keynote, Neon Tech, Frosted Glass (glassmorphism), Enterprise Clean (B2B blue), Dev Terminal (CRT and typewriter), Kinetic Type (huge words on the beat), Neo-Brutalist (hard shadows), Editorial Serif (cream and serif) and AI Glow. Each has its own palette, typeface, backdrop (grid, dots, blobs, scanlines or plain), card style (glass, frosted, flat or brutalist), text motion (blur, mask, pop, glow or typewriter), transitions, music and pacing. Switching restyles the film instantly.
+- **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 20 dark and light palettes. A palette you pick survives template switches.
 - **Edited like a real film**: whip pans, dolly zoom-throughs, pushes, dissolves and light leaks show the outgoing and incoming shots at the same time, and every cut lands on the beat.
 - **A product tour that clicks real UI**: the screenshot (or first video frame) is analysed for its busiest interface regions, and the camera zooms and the cursor clicks there.
 - **Brand polish**: an anamorphic logo reveal, a corner brand bug through the body of the film, and an end card that holds on the logo, closing line, button and URL.

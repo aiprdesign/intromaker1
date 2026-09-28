@@ -4,7 +4,7 @@
  * glass cards with animated border beams, a macOS cursor with click ripples, and icon glyphs.
  */
 import { headline } from "./fx";
-import { clamp, range, rgba, rng, TAU } from "./math";
+import { clamp, mixHex, range, rgba, rng, TAU } from "./math";
 import { subFont, type HeadlineLayout } from "./text";
 import type { FontId, SkillContext } from "./types";
 
@@ -21,7 +21,8 @@ export function saasFont(sc: SkillContext): FontId {
 
 /** Sentence-case headline layout in the SaaS face. */
 export function sentence(sc: SkillContext, opts: Parameters<typeof headline>[1] = {}) {
-  return headline(sc, { natural: true, font: saasFont(sc), ...opts });
+  const k = sc.look?.textScale ?? 1;
+  return headline(sc, { natural: true, font: saasFont(sc), ...opts, sizeFrac: (opts.sizeFrac ?? 0.3) * k });
 }
 
 /**
@@ -55,7 +56,63 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   }
   ctx.restore();
 
-  if (opts.grid !== false && look?.grid !== false) {
+  const backdrop = look?.backdrop ?? "grid";
+  if (backdrop === "blobs") {
+    // Big soft colour blobs drifting across the whole frame (glassmorphism / AI-glow stages).
+    ctx.save();
+    ctx.globalCompositeOperation = glowOp;
+    const cols = [palette.primary, palette.secondary, palette.accent, palette.primary];
+    const R = Math.max(w, h);
+    cols.forEach((c, i) => {
+      const bx = w * (0.5 + 0.38 * Math.sin(t * (0.13 + i * 0.03) + i * 1.9));
+      const by = h * (0.5 + 0.34 * Math.cos(t * (0.11 + i * 0.025) + i * 2.7));
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, R * (0.42 - i * 0.04));
+      g.addColorStop(0, rgba(c, (light ? 0.42 : 0.3) * (look?.aurora ?? 1)));
+      g.addColorStop(1, rgba(c, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    });
+    ctx.restore();
+  } else if (backdrop === "dots") {
+    const step = 34 * u;
+    const ox = (w / 2) % step;
+    const oy = (h / 2) % step;
+    ctx.save();
+    ctx.fillStyle = rgba(palette.text, light ? 0.16 : 0.12);
+    for (let x = ox; x < w; x += step) for (let y = oy; y < h; y += step) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5 * u, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    const fade = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.3, w / 2, h * 0.45, Math.max(w, h) * 0.7);
+    fade.addColorStop(0, rgba(palette.bg0, 0));
+    fade.addColorStop(1, rgba(palette.bg0, 0.85));
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, w, h);
+  } else if (backdrop === "scanlines") {
+    // CRT terminal: phosphor glow, scanlines and a slow rolling bright band.
+    ctx.save();
+    ctx.globalCompositeOperation = glowOp;
+    const glow = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.6);
+    glow.addColorStop(0, rgba(palette.primary, 0.09));
+    glow.addColorStop(1, rgba(palette.primary, 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+    const band = ((t * 0.12) % 1.3) * h * 1.3 - h * 0.15;
+    const bg = ctx.createLinearGradient(0, band - h * 0.12, 0, band + h * 0.12);
+    bg.addColorStop(0, rgba(palette.primary, 0));
+    bg.addColorStop(0.5, rgba(palette.primary, 0.05));
+    bg.addColorStop(1, rgba(palette.primary, 0));
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, band - h * 0.12, w, h * 0.24);
+    ctx.restore();
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    const gap = Math.max(3, 4 * u);
+    for (let y = 0; y < h; y += gap) ctx.fillRect(0, y, w, gap * 0.45);
+  }
+
+  if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
     const step = 72 * u;
     const ox = (w / 2) % step;
     const oy = (h / 2) % step;
@@ -115,7 +172,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   }
 
   // Spotlight cone from above.
-  if (light) return;
+  if (light || backdrop === "plain" || backdrop === "scanlines") return;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const sp = ctx.createRadialGradient(w / 2, -h * 0.1, 0, w / 2, -h * 0.1, h * 0.9);
@@ -138,6 +195,61 @@ export function glassCard(
   const { ctx, u, palette } = sc;
   const r = opts.r ?? 18 * u;
   const a = opts.alpha ?? 1;
+  const kind = sc.look?.card ?? "glass";
+  if (kind !== "glass") {
+    ctx.save();
+    ctx.globalAlpha *= a;
+    const light = !!palette.light;
+    if (kind === "brutal") {
+      // Neo-brutalist: solid fill, thick ink border, hard offset shadow.
+      const rr = Math.min(r, 12 * u);
+      ctx.fillStyle = palette.text;
+      ctx.beginPath();
+      ctx.roundRect(x + 9 * u, y + 9 * u, cw, ch, rr);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(x, y, cw, ch, rr);
+      ctx.fillStyle = opts.tint ? mixHex(palette.bg1, opts.tint, 0.15) : palette.bg1;
+      ctx.fill();
+      ctx.strokeStyle = palette.text;
+      ctx.lineWidth = 3.5 * u;
+      ctx.stroke();
+    } else if (kind === "frost") {
+      // Frosted light glass over colour blobs.
+      ctx.shadowColor = rgba(palette.primary, light ? 0.2 : 0.35);
+      ctx.shadowBlur = 50 * u;
+      ctx.shadowOffsetY = 16 * u;
+      ctx.beginPath();
+      ctx.roundRect(x, y, cw, ch, r);
+      ctx.fillStyle = light ? "rgba(255,255,255,0.58)" : "rgba(255,255,255,0.09)";
+      ctx.fill();
+      ctx.shadowColor = "transparent";
+      const sheen = ctx.createLinearGradient(x, y, x + cw, y + ch);
+      sheen.addColorStop(0, "rgba(255,255,255,0.35)");
+      sheen.addColorStop(0.5, "rgba(255,255,255,0.05)");
+      sheen.addColorStop(1, "rgba(255,255,255,0.12)");
+      ctx.fillStyle = sheen;
+      ctx.fill();
+      ctx.strokeStyle = light ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.28)";
+      ctx.lineWidth = Math.max(1, 1.5 * u);
+      ctx.stroke();
+    } else {
+      // Flat: clean solid card, hairline border, soft drop shadow.
+      ctx.shadowColor = light ? "rgba(15,30,60,0.12)" : "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 28 * u;
+      ctx.shadowOffsetY = 10 * u;
+      ctx.beginPath();
+      ctx.roundRect(x, y, cw, ch, r);
+      ctx.fillStyle = opts.tint ? mixHex(palette.bg1, opts.tint, light ? 0.06 : 0.4) : palette.bg1;
+      ctx.fill();
+      ctx.shadowColor = "transparent";
+      ctx.strokeStyle = rgba(palette.text, light ? 0.1 : 0.14);
+      ctx.lineWidth = Math.max(1, 1.2 * u);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.globalAlpha *= a;
   ctx.shadowColor = "rgba(0,0,0,0.55)";
@@ -449,6 +561,13 @@ export function blurInLayout(
   const { ctx, t, u, w, palette } = sc;
   const exit = opts.exitAt !== undefined ? range(t, opts.exitAt, opts.exitAt + 0.4) : 0;
   let wi = 0;
+  // Typewriter mode: characters appear one by one behind a block cursor.
+  const typing = sc.look?.text === "type";
+  const totalChars = layout.lines.reduce((a, l) => a + l.replace(/\*/g, "").length + 1, 0);
+  const charDur = Math.min(0.045, 1.5 / Math.max(1, totalChars));
+  const visible = typing ? Math.floor(Math.max(0, t - start) / charDur) : Infinity;
+  let gi = 0;
+  let cursor: { x: number; y: number } | null = null;
   layout.lines.forEach((line, li) => {
     const y = layout.ys[li];
     const words = line.split(" ");
@@ -464,7 +583,9 @@ export function blurInLayout(
       const k = clamp(range(t, t0, t0 + (mode === "glow" ? 1.2 : 0.7)));
       const e = mode === "glow" ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 3);
       ctx.save();
-      if (mode === "mask") {
+      if (mode === "type") {
+        ctx.globalAlpha = (opts.alpha ?? 1) * (1 - exit);
+      } else if (mode === "mask") {
         // Crisp editorial reveal: each word slides up out of a mask.
         const m = 1 - Math.pow(1 - clamp(range(t, t0, t0 + 0.55)), 4);
         ctx.beginPath();
@@ -502,14 +623,36 @@ export function blurInLayout(
       ctx.textAlign = "left";
       let cx = x;
       for (const ch of clean) {
+        if (gi >= visible) {
+          cursor ??= { x: cx, y };
+          break;
+        }
         ctx.fillText(ch, cx, y);
         cx += ctx.measureText(ch).width + layout.tracking;
+        gi++;
       }
+      if (typing && gi >= visible) cursor ??= { x: cx, y };
       ctx.restore();
+      gi++;
       x += widths[i] + space;
       wi++;
     });
   });
+  if (typing) {
+    // Block cursor: follows the typing, then blinks at the end of the line.
+    const done = visible >= totalChars;
+    const last = layout.lines.length - 1;
+    const pos = cursor ?? { x: w / 2 + ctx.measureText(layout.lines[last].replace(/\*/g, "")).width / 2 + layout.size * 0.08, y: layout.ys[last] };
+    if (t >= start && (!done || Math.floor(t * 2) % 2 === 0)) {
+      ctx.save();
+      ctx.globalAlpha = (opts.alpha ?? 1) * (1 - exit);
+      ctx.fillStyle = palette.primary;
+      ctx.shadowColor = palette.primary;
+      ctx.shadowBlur = 14 * u;
+      ctx.fillRect(pos.x + layout.size * 0.04, pos.y - layout.size * 0.42, layout.size * 0.5, layout.size * 0.84);
+      ctx.restore();
+    }
+  }
   ctx.textAlign = "center";
   return wi;
 }

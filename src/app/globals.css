@@ -1273,3 +1273,89 @@ textarea {
   align-self: flex-start;
   font-size: 12.5px;
 }
+
+/* ───────── Colour chooser ───────── */
+
+button.brand-colors {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+button.brand-colors.on {
+  border-color: var(--cyan);
+  color: var(--text);
+}
+.pal-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+.pal-grid.top {
+  grid-template-columns: 1fr 1fr;
+}
+.pal-group {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.pal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.pal-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-2);
+}
+.pal-card.active {
+  border-color: var(--cyan);
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15);
+}
+.pal-stripes {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 30px;
+  padding: 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+}
+.pal-stripes span {
+  flex: 1;
+  height: 100%;
+  border-radius: 4px;
+}
+.pal-stripes span:nth-child(2) {
+  height: 70%;
+}
+.pal-stripes span:nth-child(3) {
+  height: 45%;
+}
+.pal-name {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

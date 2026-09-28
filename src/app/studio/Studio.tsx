@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import LoopCanvas from "@/components/LoopCanvas";
+import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
 import TemplatePicker from "@/components/TemplatePicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import Player from "@/components/Player";
@@ -60,8 +61,8 @@ export default function Studio() {
     } catch {
       /* ignore */
     }
-    setPalette("auto");
-    setPlan((p) => (p.style === "saas" ? applyTemplate(p, id) : p));
+    // A palette the user picked survives template switches; otherwise the template's colours apply.
+    setPlan((p) => (p.style === "saas" ? applyTemplate(p, id, { palette: palette !== "auto" ? palette : undefined }) : p));
     setVersion((v) => v + 1);
   };
   useEffect(() => setAi(loadAiSettings()), []);
@@ -69,6 +70,18 @@ export default function Studio() {
   const [site, setSite] = useState<SiteData | null>(null);
   const [brandColors, setBrandColors] = useState<Brand["colors"]>(undefined);
   const [useBrandColors, setUseBrandColors] = useState(true);
+  const colourChoice: ColourChoice = palette !== "auto" ? palette : useBrandColors && brandColors ? "brand" : "template";
+  /** Apply a colour choice to the current film instantly (and to future generations). */
+  const chooseColours = (c: ColourChoice) => {
+    const brandOn = c === "brand";
+    setUseBrandColors(brandOn);
+    setPalette(c === "template" || c === "brand" ? "auto" : c);
+    setPlan((p) => {
+      const tplPalette = TEMPLATE_MAP[p.template ?? templateRef.current]?.palette;
+      const pal = c === "template" || c === "brand" ? (p.style === "saas" && tplPalette ? tplPalette : p.palette) : c;
+      return { ...p, palette: pal, brand: p.brand ? { ...p.brand, colors: brandOn ? brandColors : undefined } : p.brand };
+    });
+  };
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const booted = useRef(false);
@@ -362,21 +375,11 @@ export default function Studio() {
                 <p className="hint">Tip: install Google Chrome or Microsoft Edge to capture live screenshots of the site.</p>
               )}
               {brandColors && (
-                <label className="brand-colors">
-                  <input
-                    type="checkbox"
-                    checked={useBrandColors}
-                    onChange={(e) => {
-                      setUseBrandColors(e.target.checked);
-                      setPlan((p) =>
-                        p.brand ? { ...p, brand: { ...p.brand, colors: e.target.checked ? brandColors : undefined } } : p,
-                      );
-                    }}
-                  />
+                <button className={`brand-colors ${colourChoice === "brand" ? "on" : ""}`} onClick={() => chooseColours(colourChoice === "brand" ? "template" : "brand")}>
                   <span className="swatch lg" style={{ background: brandColors.primary }} />
                   <span className="swatch lg" style={{ background: brandColors.secondary }} />
-                  Use brand colours
-                </label>
+                  {colourChoice === "brand" ? "Using brand colours ✓" : "Use brand colours"}
+                </button>
               )}
             </div>
           )}
@@ -449,24 +452,16 @@ export default function Studio() {
             ))}
           </div>
 
-          <label className="field-label">Palette</label>
-          <div className="swatches">
-            <button className={`swatch-btn auto ${palette === "auto" ? "active" : ""}`} onClick={() => setPalette("auto")} title="Auto">
-              Auto
-            </button>
-            {PALETTE_IDS.map((id) => (
-              <button
-                key={id}
-                className={`swatch-btn ${palette === id ? "active" : ""}`}
-                title={PALETTES[id].name}
-                style={{ background: `linear-gradient(135deg, ${PALETTES[id].primary}, ${PALETTES[id].secondary})` }}
-                onClick={() => {
-                  setPalette(id);
-                  setGlobal({ palette: id });
-                }}
-              />
-            ))}
-          </div>
+          <label className="field-label">
+            Colours <span className="tpl-desc">{colourChoice === "template" ? "Template" : colourChoice === "brand" ? "Brand" : PALETTES[colourChoice].name}</span>
+          </label>
+          <PaletteChooser
+            value={colourChoice}
+            onChange={chooseColours}
+            templatePalette={(style !== "trailer" && TEMPLATE_MAP[template]?.palette) || plan.palette}
+            templateName={style !== "trailer" ? TEMPLATE_MAP[template]?.name : undefined}
+            brandColors={brandColors}
+          />
 
           <div className="gen-row">
             <button className="btn btn-primary btn-lg grow" onClick={() => generate()} disabled={loading}>
@@ -527,6 +522,8 @@ export default function Studio() {
                 <select className="select sm" value={plan.font} onChange={(e) => setGlobal({ font: e.target.value as VideoPlan["font"] })}>
                   <option value="inter">Clean (Inter)</option>
                   <option value="grotesk">Modern (Grotesk)</option>
+                  <option value="serif">Editorial (Serif)</option>
+                  <option value="mono">Code (Mono)</option>
                   <option value="anton">Impact (Anton)</option>
                 </select>
               </label>

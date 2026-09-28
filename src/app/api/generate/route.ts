@@ -68,7 +68,7 @@ Available skills:
 ${SKILLS.map((s) => `- ${s.id} (${s.name}): ${s.tagline} Best for: ${s.bestFor}`).join("\n")}
 
 Palettes: ${PALETTE_IDS.map((id) => `${id} (${PALETTES[id].name})`).join(", ")}.
-Fonts: anton (tall condensed, trailer/impact), grotesk (modern geometric, tech/premium).
+Fonts: anton (tall condensed, trailer/impact), grotesk (modern geometric, tech/premium), inter (clean SaaS), serif (elegant editorial), mono (developer / code).
 Transitions (how a scene enters): cut, flash, zoom, glitch, wipe, whip (motion-blurred whip pan), dolly (zoom-blur rush-in), leak (warm light-leak burn), shutter (letterbox shutters snap open), push (both shots slide), dissolve (blurred cross-dissolve). whip, dolly, push, dissolve and leak overlap the outgoing and incoming shots like a real edit.
 
 How to direct an epic, modern piece:

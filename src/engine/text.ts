@@ -4,6 +4,8 @@ export const FONT_FAMILY: Record<FontId, { display: string; weight: number; trac
   anton: { display: "Anton", weight: 400, tracking: 0.02 },
   grotesk: { display: "Space Grotesk", weight: 700, tracking: -0.02 },
   inter: { display: "Inter", weight: 800, tracking: -0.045 },
+  serif: { display: "Instrument Serif", weight: 400, tracking: -0.01 },
+  mono: { display: "JetBrains Mono", weight: 800, tracking: -0.03 },
 };
 
 export const SUB_FONT = "Inter";

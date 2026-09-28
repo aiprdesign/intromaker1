@@ -52,6 +52,13 @@ export const PALETTE_IDS = [
   "paper",
   "sunset",
   "ocean",
+  "pastel",
+  "enterprise",
+  "terminal",
+  "brutal",
+  "cream",
+  "violet",
+  "volt",
 ] as const;
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
@@ -59,7 +66,7 @@ export type PaletteId = (typeof PALETTE_IDS)[number];
 export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
-export const FONTS = ["anton", "grotesk", "inter"] as const;
+export const FONTS = ["anton", "grotesk", "inter", "serif", "mono"] as const;
 export type FontId = (typeof FONTS)[number];
 
 export type Aspect = "16:9" | "9:16" | "1:1";
@@ -178,13 +185,19 @@ export interface Look {
   beams: number;
   aurora: number;
   /** Headline animation: blur-in, crisp mask slide, bouncy pop, or slow glowing reveal. */
-  text?: "blur" | "mask" | "pop" | "glow";
+  text?: "blur" | "mask" | "pop" | "glow" | "type";
   /** Foreground lens bokeh. */
   bokeh?: boolean;
   /** Film grain strength multiplier. */
   grain?: number;
   /** Vignette strength multiplier. */
   vignette?: number;
+  /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, or plain. */
+  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain";
+  /** UI card treatment: frosted glass (default), frosted-light, flat, or neo-brutalist. */
+  card?: "glass" | "frost" | "flat" | "brutal";
+  /** Headline size multiplier (kinetic-type styles go big). */
+  textScale?: number;
 }
 
 export interface SkillContext {

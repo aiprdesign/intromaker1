@@ -753,7 +753,7 @@ function painStrike(sc: SkillContext) {
     const top = h * 0.46 - ((items.length - 1) * lh) / 2;
     chapter(sc, top - lh * 0.4);
     ctx.save();
-    ctx.font = `700 ${Math.round(size)}px Inter, sans-serif`;
+    ctx.font = saasFont(sc) === "inter" ? `700 ${Math.round(size)}px Inter, sans-serif` : displayFont(saasFont(sc), size);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     items.forEach((it, i) => {
