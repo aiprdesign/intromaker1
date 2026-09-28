@@ -1,9 +1,14 @@
 /**
- * Component-level product motion: instead of showing a screenshot as one flat picture, the
- * page is taken apart and put back together. The site's real UI components (captured one by
- * one from the live page, or cut out of a screenshot by segmentation) fly in individually on
- * the eighth-note grid, land into skeleton placeholders with a glow, the finished page
- * resolves underneath with a light sweep, and the hero component lifts off the page.
+ * Component-level product motion, cut like a product film rather than a collage: the real page
+ * sits behind in soft focus, then its best components are pulled out one at a time and shown
+ * big and isolated (a clean close-up with a soft shadow, no outlines), each glides back into its
+ * exact slot as the next comes out, and finally the whole page racks into focus as one piece.
+ *
+ * Nothing is drawn around the sections (no skeletons, rings or borders), and a returned
+ * component lands pixel-aligned on the page it was cut from, so the combine is seamless.
+ * Components come from the live capture (cut out of the page at 2× resolution). Any other
+ * screenshot is never cut up: the camera itself zooms into its strongest blocks (found by
+ * segmentation) and pulls back, so there are no edges to show.
  */
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, TAU } from "../math";
@@ -13,74 +18,74 @@ import { subFont } from "../text";
 import type { Brand, Scene, SfxCue, Skill, SkillContext, SitePart } from "../types";
 import { topHeadline } from "./saas";
 
-interface Piece {
-  img: HTMLImageElement;
-  sx: number;
-  sy: number;
-  sw: number;
-  sh: number;
-  /** Box in base-image pixels. */
+/** Live captures are laid out at a 1440px-wide viewport; part boxes are in those page pixels. */
+const CAPTURE_WIDTH = 1440;
+
+interface Box {
   x: number;
   y: number;
   w: number;
   h: number;
   r: number;
   kind: SitePart["kind"];
+  text?: string;
+  src?: string;
 }
 
-const RANK: Record<SitePart["kind"], number> = { panel: 0, media: 1, card: 2, button: 3 };
-const MAX_PIECES = 9;
+interface Piece extends Box {
+  img: HTMLImageElement;
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+}
+
+const isCapture = (scene: Scene) => /-(hero|full)$/.test(scene.media?.src ?? "");
+
+/** Captured parts inside the base screenshot, in base-image pixels (cropped at the fold). */
+function captureBoxes(scene: Scene, brand: Brand | undefined, W: number, H: number): Box[] {
+  if (!isCapture(scene)) return [];
+  const k = W / CAPTURE_WIDTH;
+  return (brand?.parts ?? [])
+    .map((p) => ({ ...p, x: p.x * k, y: p.y * k, w: p.w * k, h: p.h * k, r: p.r * k }))
+    .filter((p) => p.x + p.w <= W + 2 && p.y < H && (H - p.y) / p.h >= 0.55)
+    .map((p) => ({ ...p, h: Math.min(p.h, H - p.y) }));
+}
+
+const area = (b: Box) => b.w * b.h;
+const inside = (a: Box, b: Box) => a.x >= b.x - 2 && a.y >= b.y - 2 && a.x + a.w <= b.x + b.w + 2 && a.y + a.h <= b.y + b.h + 2;
+function overlap(a: Box, b: Box) {
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? (w * h) / Math.min(area(a), area(b)) : 0;
+}
 
 /**
- * Captured parts that sit inside the base screenshot (hero or full page share page coordinates);
- * a part mostly above the fold is kept and cropped at the fold.
+ * The components worth a close-up: well-shaped blocks of a sensible size, the children rather
+ * than the container that holds them, never two that overlap. Product media and cards that carry
+ * numbers or charts first; returned in reading order.
  */
-function baseParts(scene: Scene, brand: Brand | undefined, W: number, H: number) {
-  if (!/-(hero|full)$/.test(scene.media?.src ?? "")) return [];
-  return (brand?.parts ?? []).filter((p) => p.x + p.w <= W + 2 && p.y < H && (H - p.y) / p.h >= 0.55 && p.w * p.h < W * H * 0.8);
-}
-
-function readingOrder<T extends { kind: SitePart["kind"]; x: number; y: number }>(list: T[]) {
-  return [...list].sort((a, b) => RANK[a.kind] - RANK[b.kind] || Math.round(a.y / 80) - Math.round(b.y / 80) || a.x - b.x);
-}
-
-function piecesFor(sc: SkillContext, base: HTMLImageElement): Piece[] {
-  const W = base.naturalWidth;
-  const H = base.naturalHeight;
-  const parts = baseParts(sc.scene, sc.brand, W, H);
-  if (parts.length >= 3) {
-    const out: Piece[] = [];
-    for (const p of readingOrder(parts).slice(0, MAX_PIECES)) {
-      const im = getImage(p.src);
-      if (!im?.naturalWidth) continue;
-      const vis = Math.min(1, (H - p.y) / p.h);
-      out.push({ img: im, sx: 0, sy: 0, sw: im.naturalWidth, sh: im.naturalHeight * vis, x: p.x, y: p.y, w: p.w, h: p.h * vis, r: p.r, kind: p.kind });
-    }
-    return out;
+function pickFeatures(boxes: Box[], W: number, H: number, max: number): Box[] {
+  const cand = boxes.filter((b) => {
+    const a = area(b) / (W * H);
+    const ar = b.w / b.h;
+    return b.kind !== "button" && a >= 0.012 && a <= 0.5 && ar >= 0.35 && ar <= 4.5;
+  });
+  const leaves = cand.filter((a) => cand.filter((b) => b !== a && inside(b, a)).length < 2);
+  const score = (b: Box) => (b.kind === "media" ? 3 : b.kind === "card" ? (/\d/.test(b.text ?? "") ? 2.5 : 2) : 1) + Math.min(1, area(b) / (W * H * 0.15));
+  const out: Box[] = [];
+  for (const b of [...leaves].sort((a, c) => score(c) - score(a))) {
+    if (out.length >= max) break;
+    if (out.some((o) => overlap(o, b) > 0.05)) continue;
+    out.push(b);
   }
-  return readingOrder(segmentShot(base).map((b) => ({ ...b, kind: "card" as const }))).map((b) => ({
-    img: base,
-    sx: b.x,
-    sy: b.y,
-    sw: b.w,
-    sh: b.h,
-    x: b.x,
-    y: b.y,
-    w: b.w,
-    h: b.h,
-    r: Math.min(14, b.h * 0.06),
-    kind: b.kind,
-  }));
+  return out.sort((a, b) => Math.round(a.y / 60) - Math.round(b.y / 60) || a.x - b.x);
 }
 
-/**
- * Frame the part of the page where the components live (the product, not the empty margins),
- * at a screen-friendly aspect; pieces outside the frame are left out.
- */
-function framing(pieces: Piece[], W: number, H: number, aspect: number) {
-  const core = pieces.filter((p) => p.kind !== "button");
-  const src = core.length ? core : pieces;
-  if (!src.length) return { x: 0, y: 0, w: W, h: H };
+/** Frame the region where the product lives, at a screen-friendly aspect (≤1.9× zoom). */
+function framing(boxes: Box[], W: number, H: number, aspect: number) {
+  const src = boxes.filter((b) => b.kind !== "button");
+  if (!src.length) return { x: 0, y: 0, w: W, h: Math.min(H, W / aspect) };
   let x0 = Math.min(...src.map((p) => p.x));
   let y0 = Math.min(...src.map((p) => p.y));
   let x1 = Math.max(...src.map((p) => p.x + p.w));
@@ -101,7 +106,6 @@ function framing(pieces: Piece[], W: number, H: number, aspect: number) {
     x0 -= (nw - w) / 2;
     w = nw;
   }
-  // Never zoom past ~1.9× or outside the screenshot.
   if (w < W / 1.9) {
     const k = W / 1.9 / w;
     x0 -= (w * (k - 1)) / 2;
@@ -111,53 +115,73 @@ function framing(pieces: Piece[], W: number, H: number, aspect: number) {
   }
   w = Math.min(w, W);
   h = Math.min(h, H);
-  x0 = clamp(x0, 0, W - w);
-  y0 = clamp(y0, 0, H - h);
-  return { x: x0, y: y0, w, h };
+  return { x: clamp(x0, 0, W - w), y: clamp(y0, 0, H - h), w, h };
 }
 
-/** How many pieces the scene will assemble (for the sound design, before images load). */
-function pieceCount(scene: Scene, brand?: Brand) {
-  // Hero captures are 1440×900; the same framing maths as the picture decides what's shown.
-  const parts = baseParts(scene, brand, 1440, 900);
-  if (parts.length < 3) return 6;
-  const ps = readingOrder(parts).slice(0, MAX_PIECES) as unknown as Piece[];
-  const f = framing(ps, 1440, 900, 1.6);
-  return ps.filter((p) => p.x >= f.x - 1 && p.y >= f.y - 1 && p.x + p.w <= f.x + f.w + 1 && p.y + p.h <= f.y + f.h + 1).length;
-}
-
-function assembleTiming(n: number, beat: number) {
-  // Land on the eighth-note grid, starting on the second beat of the scene.
-  const step = clamp(beat / 2, 0.14, 0.3);
-  const first = beat * (beat < 0.45 ? 3 : 2);
-  const lands = Array.from({ length: n }, (_, i) => first + i * step);
-  const resolve = (lands[n - 1] ?? first) + 0.25;
-  return { lands, flight: 0.5, resolve, sweep: resolve + 0.15, lift: resolve + 0.45 };
-}
-
-const colorCache = new Map<string, string>();
-/** Page colour just outside a box (what a skeleton placeholder should sit on). */
-function pageColor(base: HTMLImageElement, x: number, y: number) {
-  const key = `${base.src}|${Math.round(x)}|${Math.round(y)}`;
-  const hit = colorCache.get(key);
-  if (hit) return hit;
-  let out = "#1a1a24";
-  try {
-    const c = document.createElement("canvas");
-    c.width = 1;
-    c.height = 1;
-    const g = c.getContext("2d", { willReadFrequently: true })!;
-    g.drawImage(base, clamp(x, 0, base.naturalWidth - 1), clamp(y, 0, base.naturalHeight - 1), 1, 1, 0, 0, 1, 1);
-    const d = g.getImageData(0, 0, 1, 1).data;
-    out = `rgb(${d[0]},${d[1]},${d[2]})`;
-  } catch {
-    /* keep default */
+/** Pieces to feature, with their images, plus the framing of the page. */
+function layout(sc: SkillContext, base: HTMLImageElement, aspect: number) {
+  const W = base.naturalWidth;
+  const H = base.naturalHeight;
+  const boxes = captureBoxes(sc.scene, sc.brand, W, H);
+  if (boxes.filter((b) => b.kind !== "button").length >= 2) {
+    const frame = framing(boxes, W, H, aspect);
+    const within = boxes.filter((b) => inside(b, { ...frame, r: 0, kind: "panel" }));
+    const pieces: Piece[] = [];
+    for (const b of pickFeatures(within, W, H, 3)) {
+      const img = getImage(b.src);
+      if (!img?.naturalWidth) continue;
+      const full = sc.brand?.parts?.find((p) => p.src === b.src);
+      const vis = full ? Math.min(1, b.h / (full.h * (W / CAPTURE_WIDTH))) : 1;
+      pieces.push({ ...b, img, sx: 0, sy: 0, sw: img.naturalWidth, sh: img.naturalHeight * vis });
+    }
+    return { frame, pieces, camera: false };
   }
-  colorCache.set(key, out);
-  return out;
+  // Any other screenshot: camera moves onto its two strongest, well-shaped blocks.
+  const frame = { x: 0, y: 0, w: W, h: Math.min(H, W / aspect) };
+  const segs = segmentShot(base)
+    .map((s) => ({ ...s, r: 0, kind: "card" as const }))
+    .filter((b) => area(b) >= W * H * 0.04 && b.w / b.h >= 0.5 && b.w / b.h <= 3.2 && inside(b, { ...frame, r: 0, kind: "panel" }));
+  const pieces = pickFeatures(segs, W, H, 2).map((b) => ({ ...b, img: base, sx: b.x, sy: b.y, sw: b.w, sh: b.h }));
+  return { frame, pieces, camera: true };
 }
 
-function roundedImage(ctx: CanvasRenderingContext2D, p: Piece, x: number, y: number, w: number, h: number, r: number) {
+/** A view of the page centred on `b`, at the frame's aspect, zoomed at most 2.2×. */
+function viewOn(b: Box, frame: { x: number; y: number; w: number; h: number }, W: number, H: number) {
+  const aspect = frame.w / frame.h;
+  let w = Math.max(b.w * 1.35, (b.h * 1.35) * aspect, frame.w / 2.2);
+  w = Math.min(w, frame.w);
+  const h = w / aspect;
+  return { x: clamp(b.x + b.w / 2 - w / 2, 0, W - w), y: clamp(b.y + b.h / 2 - h / 2, 0, H - h), w, h };
+}
+
+/** How many close-ups the scene shows (sound design runs before images load). */
+function featureCount(scene: Scene, brand: Brand | undefined) {
+  const W = CAPTURE_WIDTH;
+  const H = 900;
+  const boxes = captureBoxes(scene, brand, W, H);
+  if (boxes.filter((b) => b.kind !== "button").length < 2) return 2;
+  const frame = framing(boxes, W, H, 1.6);
+  return pickFeatures(boxes.filter((b) => inside(b, { ...frame, r: 0, kind: "panel" })), W, H, 3).length;
+}
+
+/**
+ * Close-ups on a two-beat grid: each piece is pulled out on a beat, held, and returns while the
+ * next comes out; then the page racks into focus. Fewer close-ups when the scene is short.
+ */
+function assembleTiming(count: number, beat: number, d: number) {
+  const step = beat * Math.max(2, Math.round(1.1 / beat));
+  const move = 0.45;
+  const p0 = beat;
+  let n = count;
+  while (n > 0 && p0 + n * step + move + 0.9 > d - 0.3) n--;
+  const pulls = Array.from({ length: n }, (_, i) => p0 + i * step);
+  const returns = pulls.map((p) => p + step - 0.2);
+  // The rack focus starts as the last component lands, so no half-sharp page is ever seen.
+  const resolve = n ? returns[n - 1] + move * 0.45 : Math.min(0.7, d * 0.2);
+  return { n, pulls, returns, move, resolve, sharp: resolve + 0.5, sweep: resolve + 0.25 };
+}
+
+function rounded(ctx: CanvasRenderingContext2D, p: Piece, x: number, y: number, w: number, h: number, r: number) {
   ctx.save();
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
@@ -167,21 +191,19 @@ function roundedImage(ctx: CanvasRenderingContext2D, p: Piece, x: number, y: num
 }
 
 function uiAssemble(sc: SkillContext) {
-  const { ctx, w, h, t, u, palette, scene, brand, beat } = sc;
+  const { ctx, w, h, t, d, u, palette, scene, brand, beat } = sc;
   saasBackground(sc, { beams: 1 });
   topHeadline(sc);
   const portrait = h > w;
   const media = getMedia(scene.media, t);
   const base = media instanceof HTMLImageElement && media.naturalWidth ? media : null;
   const ex = ease.inCubic(exitT(sc, 0.4));
-  // Browser window below the headline, framed on the region where the components live.
-  const IW = base?.naturalWidth ?? 1440;
-  const IH = Math.min(base?.naturalHeight ?? 900, IW * 0.75);
   const aspect = portrait ? 1.15 : 1.6;
-  const all = base ? piecesFor(sc, base) : [];
-  const crop = framing(all, IW, IH, aspect);
-  const W = crop.w;
-  const H = crop.h;
+  const { frame, pieces, camera } = base ? layout(sc, base, aspect) : { frame: { x: 0, y: 0, w: 1440, h: 900 }, pieces: [] as Piece[], camera: true };
+  const T = assembleTiming(pieces.length, beat, d);
+  const shown = pieces.slice(0, T.n);
+
+  // Browser window below the headline.
   const barH = 40 * u * (portrait ? 1.1 : 1);
   const maxW = portrait ? w * 0.92 : w * 0.8;
   const maxH = portrait ? h * 0.6 : h * 0.7;
@@ -189,22 +211,22 @@ function uiAssemble(sc: SkillContext) {
   const ch = cw / aspect;
   const wx = (w - cw) / 2;
   const wy = portrait ? h * 0.3 : Math.max(h * 0.25, h * 0.6 - (ch + barH) / 2);
-  const s = cw / W;
-  const pieces = all.filter((p) => p.x >= crop.x - 1 && p.y >= crop.y - 1 && p.x + p.w <= crop.x + crop.w + 1 && p.y + p.h <= crop.y + crop.h + 1);
-  const T = assembleTiming(Math.max(1, pieces.length), beat);
+  const s = cw / frame.w;
+  const cx0 = wx;
+  const cy0 = wy + barH;
+  const slot = (p: Box) => ({ x: cx0 + (p.x - frame.x) * s, y: cy0 + (p.y - frame.y) * s, w: p.w * s, h: p.h * s, r: Math.max(4 * u, p.r * s) });
 
-  // Slow push-in on the whole window; it rises into place at the start.
+  // The window rises in and the camera pushes in slowly across the scene.
   const k0 = clamp(spring(t - 0.05, 9, 7), 0, 1.04);
-  const push = 0.97 + 0.05 * ease.inOutCubic(range(t, 0, sc.d));
-  ctx.save();
-  ctx.globalAlpha = clamp(t / 0.25) * (1 - ex);
+  const push = 0.97 + 0.05 * ease.inOutCubic(range(t, 0, d));
   const pcx = w / 2;
   const pcy = wy + (barH + ch) / 2;
+  ctx.save();
+  ctx.globalAlpha = clamp(t / 0.25) * (1 - ex);
   ctx.translate(pcx, pcy + (1 - Math.min(1, k0)) * 70 * u);
   ctx.scale(push * (0.94 + 0.06 * k0), push * (0.94 + 0.06 * k0));
   ctx.translate(-pcx, -pcy);
 
-  // Window chrome with the product's address.
   ctx.save();
   ctx.shadowColor = rgba(palette.primary, palette.light ? 0.16 : 0.32);
   ctx.shadowBlur = 70 * u;
@@ -230,179 +252,91 @@ function uiAssemble(sc: SkillContext) {
     ctx.fillText(url, wx + cw / 2, wy + barH / 2 + 1 * u);
   }
 
-  const cx0 = wx;
-  const cy0 = wy + barH;
-  const toX = (x: number) => cx0 + (x - crop.x) * s;
-  const toY = (y: number) => cy0 + (y - crop.y) * s;
+  // How far the current close-up is pulled out (0 = on the page, 1 = isolated, centre stage).
+  const pulled = shown.map((_, i) => ease.inOutCubic(range(t, T.pulls[i], T.pulls[i] + T.move)) * (1 - ease.inOutCubic(range(t, T.returns[i], T.returns[i] + T.move))));
+  // Camera mode: the page sharpens as the first zoom begins (the zoom itself is the reveal).
+  const focus = camera && T.n ? ease.inOutCubic(range(t, T.pulls[0] - 0.15, T.pulls[0] + 0.35)) : ease.inOutCubic(range(t, T.resolve, T.sharp));
+  const isolate = camera ? 0 : Math.max(0, ...pulled);
+
+  // The page: soft focus and dimmed until everything is back, then one clean rack focus.
   ctx.save();
   ctx.beginPath();
   ctx.roundRect(cx0, cy0, cw, ch, [0, 0, 16 * u, 16 * u]);
   ctx.clip();
-  // Empty page, then the finished page resolves in underneath once every piece has landed.
-  ctx.fillStyle = base ? pageColor(base, crop.x + 6, crop.y + H * 0.5) : palette.bg1;
+  ctx.fillStyle = palette.bg1;
   ctx.fillRect(cx0, cy0, cw, ch);
-  const resolveK = ease.inOutCubic(range(t, T.resolve, T.resolve + 0.45));
-  if (base && resolveK > 0) {
-    ctx.globalAlpha *= resolveK;
-    ctx.drawImage(base, crop.x, crop.y, W, H, cx0, cy0, cw, ch);
-    ctx.globalAlpha /= resolveK;
-  }
-  ctx.restore();
-
-  // Skeletons: where a piece will land, a soft placeholder shimmers until it arrives.
-  pieces.forEach((p, i) => {
-    const land = T.lands[i];
-    if (t >= land || resolveK >= 1) return;
-    const x = toX(p.x);
-    const y = toY(p.y);
-    const pw = p.w * s;
-    const ph = p.h * s;
+  if (base) {
+    const blur = (1 - focus) * 9 * u;
     ctx.save();
-    ctx.globalAlpha *= clamp((t - 0.15) / 0.3) * (1 - resolveK);
-    ctx.beginPath();
-    ctx.roundRect(x, y, pw, ph, Math.max(3 * u, p.r * s));
-    ctx.fillStyle = palette.light ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)";
-    ctx.fill();
-    ctx.strokeStyle = palette.light ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
-    ctx.lineWidth = Math.max(1, u);
-    ctx.stroke();
-    ctx.clip();
-    const sx = x + ((((t * 0.9 + i * 0.13) % 1.4) - 0.2) * pw * 1.4);
-    const g = ctx.createLinearGradient(sx - pw * 0.25, 0, sx + pw * 0.25, 0);
-    g.addColorStop(0, "rgba(255,255,255,0)");
-    g.addColorStop(0.5, palette.light ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.07)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, pw, ph);
+    if (blur > 0.4) ctx.filter = `blur(${blur.toFixed(1)}px)`;
+    let view = frame;
+    if (camera) {
+      shown.forEach((p, i) => {
+        const v = viewOn(p, frame, base.naturalWidth, base.naturalHeight);
+        const m = pulled[i];
+        view = { x: lerp(view.x, v.x, m), y: lerp(view.y, v.y, m), w: lerp(view.w, v.w, m), h: lerp(view.h, v.h, m) };
+      });
+    }
+    ctx.drawImage(base, view.x, view.y, view.w, view.h, cx0, cy0, cw, ch);
     ctx.restore();
-  });
-
-  // Pieces fly in from an exploded layout and land on the grid.
-  const centreX = crop.x + W / 2;
-  const centreY = crop.y + H / 2;
-  pieces.forEach((p, i) => {
-    const land = T.lands[i];
-    const start = land - T.flight;
-    if (t < start) return;
-    const lt = t - start;
-    const e = clamp(spring(lt, 11, 7.5), 0, 1.05);
-    const dx = p.x + p.w / 2 - centreX;
-    const dy = p.y + p.h / 2 - centreY;
-    const len = Math.hypot(dx, dy) || 1;
-    const dist = (220 + (i % 3) * 60) * u;
-    const ox = (dx / len) * dist;
-    const oy = (dy / len) * dist + 40 * u;
-    const rot = (i % 2 ? 1 : -1) * 0.07;
-    const draw = (ee: number, alpha: number) => {
-      const x = toX(p.x);
-      const y = toY(p.y);
-      const pw = p.w * s;
-      const ph = p.h * s;
-      const sc0 = 1 + 0.28 * (1 - ee);
+    // Returned components sit sharp on the soft page until the whole page is in focus.
+    shown.forEach((p, i) => {
+      const back = t >= T.returns[i] + T.move;
+      if (camera || !back || focus >= 1) return;
+      const r = slot(p);
       ctx.save();
-      ctx.globalAlpha *= alpha;
-      ctx.translate(x + pw / 2 + ox * (1 - ee), y + ph / 2 + oy * (1 - ee));
-      ctx.rotate(rot * (1 - Math.min(1, ee)));
-      ctx.scale(sc0, sc0);
-      const r = Math.max(3 * u, p.r * s);
-      ctx.save();
-      ctx.shadowColor = palette.light ? "rgba(0,0,0,0.22)" : "rgba(0,0,0,0.55)";
-      ctx.shadowBlur = (12 + 40 * (1 - Math.min(1, ee))) * u;
-      ctx.shadowOffsetY = (6 + 24 * (1 - Math.min(1, ee))) * u;
-      ctx.beginPath();
-      ctx.roundRect(-pw / 2, -ph / 2, pw, ph, r);
-      ctx.fillStyle = pageColor(p.img === base ? base : p.img, 2, 2);
-      ctx.fill();
+      ctx.globalAlpha *= 1 - focus;
+      rounded(ctx, p, r.x, r.y, r.w, r.h, r.r);
       ctx.restore();
-      roundedImage(ctx, p, -pw / 2, -ph / 2, pw, ph, r);
-      // Components that live inside this one haven't arrived yet: show their skeletons instead.
-      for (const [j, c] of pieces.entries()) {
-        if (j <= i || t >= T.lands[j] || p.img === base) continue;
-        if (c.x < p.x - 1 || c.y < p.y - 1 || c.x + c.w > p.x + p.w + 1 || c.y + c.h > p.y + p.h + 1) continue;
-        const hx = (c.x - p.x) * s - pw / 2;
-        const hy = (c.y - p.y) * s - ph / 2;
-        const hr = Math.max(3 * u, c.r * s);
-        ctx.beginPath();
-        ctx.roundRect(hx - 2 * u, hy - 2 * u, c.w * s + 4 * u, c.h * s + 4 * u, hr);
-        ctx.fillStyle = pageColor(p.img, clamp(c.x - p.x - 6, 1, p.img.naturalWidth - 2), clamp(c.y - p.y + c.h / 2, 1, p.img.naturalHeight - 2));
-        ctx.fill();
-        ctx.beginPath();
-        ctx.roundRect(hx, hy, c.w * s, c.h * s, hr);
-        ctx.fillStyle = palette.light ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.045)";
-        ctx.fill();
-      }
-      ctx.restore();
-    };
-    // Motion trail while it's moving fast.
-    if (e < 0.85) {
-      draw(Math.max(0, e - 0.16), 0.1 * (1 - resolveK));
-      draw(Math.max(0, e - 0.08), 0.2 * (1 - resolveK));
+    });
+    const dim = (palette.light ? 0.28 : 0.42) * (1 - focus) + (palette.light ? 0.2 : 0.3) * isolate;
+    if (dim > 0.01) {
+      ctx.fillStyle = rgba(palette.bg0, dim);
+      ctx.fillRect(cx0, cy0, cw, ch);
     }
-    draw(e, clamp(lt / 0.12));
-    // Landing glow on the beat.
-    const lk = range(t, land, land + 0.4);
-    if (lk > 0 && lk < 1) {
-      ctx.save();
-      ctx.globalAlpha *= (1 - lk) * 0.9;
-      ctx.strokeStyle = palette.accent;
-      ctx.lineWidth = 2.5 * u;
-      ctx.shadowColor = palette.accent;
-      ctx.shadowBlur = 18 * u;
-      const grow = 4 * u * lk;
-      ctx.beginPath();
-      ctx.roundRect(toX(p.x) - grow, toY(p.y) - grow, p.w * s + grow * 2, p.h * s + grow * 2, Math.max(3 * u, p.r * s) + grow);
-      ctx.stroke();
-      ctx.restore();
-    }
-  });
-
-  // A light sweep across the finished page.
-  const sk = range(t, T.sweep, T.sweep + 0.8);
+  }
+  // A light sweep as the page comes into focus.
+  const sk = range(t, T.sweep, T.sweep + 0.9);
   if (sk > 0 && sk < 1) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(cx0, cy0, cw, ch);
-    ctx.clip();
     const sx = lerp(cx0 - cw * 0.3, cx0 + cw * 1.3, ease.inOutCubic(sk));
     const g = ctx.createLinearGradient(sx - cw * 0.12, cy0, sx + cw * 0.12, cy0 + ch * 0.3);
     g.addColorStop(0, "rgba(255,255,255,0)");
-    g.addColorStop(0.5, `rgba(255,255,255,${palette.light ? 0.35 : 0.14})`);
+    g.addColorStop(0.5, `rgba(255,255,255,${palette.light ? 0.3 : 0.12})`);
     g.addColorStop(1, "rgba(255,255,255,0)");
     ctx.globalCompositeOperation = palette.light ? "source-over" : "lighter";
     ctx.fillStyle = g;
     ctx.fillRect(cx0, cy0, cw, ch);
-    ctx.restore();
   }
+  ctx.restore();
 
-  // The hero component lifts off the page (the product, front and centre).
-  const hero = pieces[0];
-  const lk = ease.inOutCubic(range(t, T.lift, T.lift + 0.6));
-  if (hero && lk > 0) {
-    const x = toX(hero.x);
-    const y = toY(hero.y);
-    const pw = hero.w * s;
-    const ph = hero.h * s;
-    const lift = 1 + 0.045 * lk;
+  // Close-ups: the component lifts out of its slot to centre stage, big and isolated.
+  shown.forEach((p, i) => {
+    const m = camera ? 0 : pulled[i];
+    if (m <= 0.001) return;
+    const from = slot(p);
+    // As large as the window allows, but never upscaled past what the capture holds sharply.
+    const nativeW = p.sw * 1.25;
+    const zoom = Math.min((cw * (portrait ? 0.86 : 0.68)) / from.w, (ch * 0.66) / from.h, Math.max(1, nativeW / from.w));
+    const tw = from.w * Math.max(1, zoom);
+    const th = from.h * Math.max(1, zoom);
+    const tx = cx0 + cw / 2 - tw / 2;
+    const ty = cy0 + ch * 0.5 - th / 2 + Math.sin((sc.globalT ?? t) * 1.6) * 3 * u * m;
+    const x = lerp(from.x, tx, m);
+    const y = lerp(from.y, ty, m);
+    const pw = lerp(from.w, tw, m);
+    const ph = lerp(from.h, th, m);
+    const r = lerp(from.r, Math.max(10 * u, from.r * zoom * 0.6), m);
     ctx.save();
-    ctx.translate(x + pw / 2, y + ph / 2 - 10 * u * lk);
-    ctx.scale(lift, lift);
-    ctx.shadowColor = rgba(palette.primary, palette.light ? 0.25 : 0.5);
-    ctx.shadowBlur = 50 * u * lk;
-    ctx.shadowOffsetY = 18 * u * lk;
-    const r = Math.max(4 * u, hero.r * s);
+    ctx.shadowColor = palette.light ? `rgba(15,20,40,${0.28 * m})` : `rgba(0,0,0,${0.6 * m})`;
+    ctx.shadowBlur = 60 * u * m;
+    ctx.shadowOffsetY = 26 * u * m;
     ctx.beginPath();
-    ctx.roundRect(-pw / 2, -ph / 2, pw, ph, r);
-    ctx.fillStyle = pageColor(hero.img, 2, 2);
+    ctx.roundRect(x, y, pw, ph, r);
+    ctx.fillStyle = palette.bg1;
     ctx.fill();
-    ctx.shadowColor = "transparent";
-    roundedImage(ctx, hero, -pw / 2, -ph / 2, pw, ph, r);
-    ctx.strokeStyle = rgba(palette.accent, 0.5 * lk);
-    ctx.lineWidth = 1.5 * u;
-    ctx.beginPath();
-    ctx.roundRect(-pw / 2, -ph / 2, pw, ph, r);
-    ctx.stroke();
     ctx.restore();
-  }
+    rounded(ctx, p, x, y, pw, ph, r);
+  });
   ctx.restore();
 }
 
@@ -412,13 +346,13 @@ export const componentSkills: Skill[] = [
   {
     id: "ui-assemble",
     name: "UI Assemble",
-    tagline: "Your product page is taken apart and rebuilt: its real components fly in one by one on the beat, land into skeletons, and the page resolves with a light sweep.",
+    tagline: "Your real product page in soft focus; its best components are pulled out one by one for a close-up, glide back into place, and the whole page racks into focus.",
     bestFor: "Showing the real product without a flat screenshot, right after the brand reveal. Uses the hero screenshot and the UI components captured from the live site.",
     sample: { text: "Meet your new *dashboard*" },
     render: uiAssemble,
     sfx: (scene, beat, brand) => {
-      const T = assembleTiming(pieceCount(scene, brand), beat);
-      return [at(0.05, "swoosh"), ...T.lands.map((l) => at(l, "tick")), at(T.resolve, "shimmer")];
+      const T = assembleTiming(featureCount(scene, brand), beat, scene.duration);
+      return [at(0.05, "swoosh"), ...T.pulls.map((p) => at(p, "swoosh")), ...T.returns.map((r) => at(r + T.move, "tick")), at(T.resolve, "shimmer")];
     },
   },
 ];

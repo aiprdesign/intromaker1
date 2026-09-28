@@ -113,7 +113,7 @@ async function captureParts(page: Page, key: string, maxY: number): Promise<Site
   const parts: SitePart[] = [];
   for (const [i, p] of found.slice(0, 16).entries()) {
     const shot = await page
-      .screenshot({ type: "jpeg", quality: 88, fullPage: true, clip: { x: Math.max(0, p.x), y: p.y, width: p.w, height: p.h } })
+      .screenshot({ type: "jpeg", quality: 90, scale: "device", fullPage: true, clip: { x: Math.max(0, p.x), y: p.y, width: p.w, height: p.h } })
       .catch(() => null);
     if (shot) parts.push({ ...p, src: await save(`${key}-p${i}`, shot) });
   }
@@ -127,7 +127,8 @@ export async function captureSite(url: string): Promise<Capture | null> {
   try {
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
-      deviceScaleFactor: 1,
+      // Components are cut out at 2× so close-ups stay sharp; page screenshots stay at 1×.
+      deviceScaleFactor: 2,
       colorScheme: "dark",
       locale: "en-US",
     });
@@ -163,11 +164,11 @@ export async function captureSite(url: string): Promise<Capture | null> {
     });
     await page.waitForTimeout(900);
 
-    const hero = await save(`${key}-hero`, await page.screenshot({ type: "jpeg", quality: 82 }));
+    const hero = await save(`${key}-hero`, await page.screenshot({ type: "jpeg", quality: 82, scale: "css" }));
     const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
     const full = await save(
       `${key}-full`,
-      await page.screenshot({ type: "jpeg", quality: 72, fullPage: true, clip: { x: 0, y: 0, width: 1440, height: Math.min(pageHeight, 7200) } }),
+      await page.screenshot({ type: "jpeg", quality: 72, scale: "css", fullPage: true, clip: { x: 0, y: 0, width: 1440, height: Math.min(pageHeight, 7200) } }),
     );
 
     // Distinct, reasonably sized sections below the hero.
@@ -186,7 +187,7 @@ export async function captureSite(url: string): Promise<Capture | null> {
     const sections: string[] = [];
     for (const [i, b] of boxes.entries()) {
       if (b.y + b.h > Math.min(pageHeight, 7200)) break;
-      const shot = await page.screenshot({ type: "jpeg", quality: 78, fullPage: true, clip: { x: 0, y: b.y, width: 1440, height: b.h } }).catch(() => null);
+      const shot = await page.screenshot({ type: "jpeg", quality: 78, scale: "css", fullPage: true, clip: { x: 0, y: b.y, width: 1440, height: b.h } }).catch(() => null);
       if (shot) sections.push(await save(`${key}-s${i}`, shot));
     }
     const parts = await captureParts(page, key, Math.min(pageHeight, 7200));
