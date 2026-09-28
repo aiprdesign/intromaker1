@@ -34,6 +34,7 @@ export const SKILL_IDS = [
   "cta",
   "site-scroll",
   "steps",
+  "icon-features",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -169,6 +170,8 @@ export interface VideoPlan {
   look?: Look;
   /** Score style; defaults to follow `style`. */
   music?: "saas" | "trailer";
+  /** Product concept (devtools, ai, fintech…): picks icon families and story vocabulary. */
+  concept?: string;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */
   scheme?: "60-30-10" | "vibrant";
   /** Flavour of the SaaS score. */
@@ -246,6 +249,8 @@ export interface SkillContext {
   globalT?: number;
   /** Set while rendering a 3D-stage content layer: the stage (background) is drawn separately. */
   noStage?: boolean;
+  /** Product concept id (see concepts.ts) for on-brand icon choices. */
+  concept?: string;
 }
 
 export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike";

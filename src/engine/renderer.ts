@@ -64,6 +64,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
+  concept?: VideoPlan["concept"];
 };
 
 /** Draw a scene's content (camera + skill), without transitions or post, into `target`. */
@@ -99,6 +100,7 @@ function drawScene(
     style: plan.style,
     look: plan.look,
     globalT,
+    concept: plan.concept,
   };
   resetCtx(target);
   const depth = plan.style === "saas" ? plan.look?.depth ?? 0 : 0;

@@ -25,6 +25,7 @@ import {
   type IconKind,
 } from "../saasfx";
 import { autoAccent, displayFont, subFont } from "../text";
+import { CONCEPT_MAP } from "../concepts";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { parseStat } from "./worlds";
 import { drawCover, mockUi } from "./media";
@@ -580,7 +581,7 @@ function bento(sc: SkillContext) {
     ctx.roundRect(x + 22 * u, y + 22 * u, it, it, 14 * u);
     ctx.fill();
     const [title, desc] = items[i].split(/\s+[—–]\s+/);
-    drawIcon(ctx, iconFor(title, i) as IconKind, x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.52, "#fff");
+    drawIcon(ctx, iconFor(title, i, sc), x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.56, "#fff", ease.outCubic(range(lt, 0.15, 0.9)));
     // Label, with the feature's one-line description under it in roomy cells.
     const fs = portrait ? Math.min(46 * u, bw / 14) : Math.min(30 * u, bw / 11);
     const wrap = (text: string, font: string) => {
@@ -619,6 +620,131 @@ function bento(sc: SkillContext) {
     const mw = bw * 0.5 - 22 * u;
     const mh = Math.max(40 * u, bh - 22 * u - (lines.length > 1 ? fs * 2.6 : fs * 1.5) - dLines.length * ds * 1.3 - 40 * u);
     microVisual(sc, i, mx, my, mw, Math.min(mh, bh * 0.55), lt);
+    ctx.restore();
+  });
+}
+
+/* ───────────────────────── Feature Icons ───────────────────────── */
+
+function iconFeatureItems(scene: Scene) {
+  const items = (scene.items ?? []).filter(Boolean).slice(0, 6);
+  return items.length >= 2 ? items : ["Lightning fast", "Secure by default", "Built for teams", "Real-time insights"];
+}
+
+function iconFeaturesTiming(scene: Scene, beat: number) {
+  const n = iconFeatureItems(scene).length;
+  const st = Math.max(0.18, Math.min(0.3, beat / 1.6));
+  return Array.from({ length: n }, (_, i) => 0.55 + i * st);
+}
+
+/**
+ * The classic SaaS feature row: big line-art icons draw themselves on inside glowing tiles,
+ * each with a short title and (when given as "Title — description") a one-line benefit.
+ */
+function iconFeatures(sc: SkillContext) {
+  const { ctx, w, h, t, u, palette, scene } = sc;
+  saasBackground(sc, { beams: 2 });
+  const portrait = h > w;
+  topHeadline(sc);
+  const items = iconFeatureItems(scene);
+  const n = items.length;
+  const cols = portrait ? 2 : n <= 4 ? n : 3;
+  const rows = Math.ceil(n / cols);
+  const times = iconFeaturesTiming(scene, sc.beat);
+  const ex = ease.inCubic(exitT(sc, 0.4));
+  const gx0 = w * (portrait ? 0.07 : 0.08);
+  const gw = w * (portrait ? 0.86 : 0.84);
+  const gy0 = h * (portrait ? 0.26 : 0.32);
+  const gh = h * (portrait ? 0.62 : 0.56);
+  const gap = 22 * u;
+  const cw = (gw - gap * (cols - 1)) / cols;
+  const ch = Math.min((gh - gap * (rows - 1)) / rows, cw * (portrait ? 1.15 : 0.95));
+  const S = portrait ? 1.3 : 1;
+  items.forEach((item, i) => {
+    const [title, desc] = item.split(/\s+[—–]\s+/);
+    const c = i % cols;
+    const r = Math.floor(i / cols);
+    const rowCount = r === rows - 1 ? n - r * cols : cols;
+    const rowOffset = ((cols - rowCount) * (cw + gap)) / 2;
+    const x = gx0 + rowOffset + c * (cw + gap);
+    const y = gy0 + r * (ch + gap);
+    const lt = t - times[i];
+    if (lt <= 0) return;
+    const k = clamp(spring(lt, 11, 7), 0, 1.08);
+    const float = Math.sin((sc.globalT ?? t) * 1.3 + i) * 4 * u;
+    ctx.save();
+    ctx.globalAlpha = clamp(lt / 0.25) * (1 - ex);
+    ctx.translate(x + cw / 2, y + ch / 2 + (1 - Math.min(1, k)) * 40 * u + float);
+    ctx.scale(0.88 + 0.12 * k, 0.88 + 0.12 * k);
+    ctx.translate(-(x + cw / 2), -(y + ch / 2));
+    glassCard(sc, x, y, cw, ch, { r: 22 * u });
+    // Icon tile with an accent glow; the icon draws itself on.
+    const ts = Math.min(cw * 0.36, 104 * u * S);
+    const tx = x + cw / 2;
+    const ty = y + ch * 0.36;
+    const glow = ctx.createRadialGradient(tx, ty, 0, tx, ty, ts * 1.2);
+    glow.addColorStop(0, rgba(palette.primary, palette.light ? 0.18 : 0.32));
+    glow.addColorStop(1, rgba(palette.primary, 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(tx - ts * 1.3, ty - ts * 1.3, ts * 2.6, ts * 2.6);
+    ctx.beginPath();
+    ctx.roundRect(tx - ts / 2, ty - ts / 2, ts, ts, ts * 0.28);
+    const tile = ctx.createLinearGradient(tx - ts / 2, ty - ts / 2, tx + ts / 2, ty + ts / 2);
+    tile.addColorStop(0, rgba(palette.primary, 0.95));
+    tile.addColorStop(1, rgba(palette.secondary, 0.95));
+    ctx.fillStyle = tile;
+    ctx.shadowColor = rgba(palette.primary, 0.6);
+    ctx.shadowBlur = 24 * u;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    drawIcon(ctx, iconFor(title, i, sc), tx, ty, ts * 0.56, palette.light ? "#ffffff" : palette.bg0, ease.outCubic(range(lt, 0.15, 1)));
+    // Title (wrapped to two lines, shrinking if needed) + optional description.
+    const wrapLines = (text: string, font: string, maxW: number) => {
+      ctx.font = font;
+      const out: string[] = [];
+      let line = "";
+      for (const wd of text.split(" ")) {
+        const next = line ? `${line} ${wd}` : wd;
+        if (ctx.measureText(next).width > maxW && line) {
+          out.push(line);
+          line = wd;
+        } else line = next;
+      }
+      out.push(line);
+      return out;
+    };
+    let fs = Math.min(30 * u * S, cw / 9);
+    let tl = wrapLines(title, `700 ${Math.round(fs)}px Inter, sans-serif`, cw - 36 * u);
+    while (tl.length > 2 && fs > 16 * u) {
+      fs *= 0.88;
+      tl = wrapLines(title, `700 ${Math.round(fs)}px Inter, sans-serif`, cw - 36 * u);
+    }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = palette.text;
+    ctx.font = `700 ${Math.round(fs)}px Inter, sans-serif`;
+    const titleTop = y + ch * 0.64;
+    tl.slice(0, 2).forEach((l, li) => ctx.fillText(l, tx, titleTop + li * fs * 1.15));
+    const descTop = titleTop + (Math.min(2, tl.length) - 1) * fs * 1.15;
+    if (desc && ch > 150 * u) {
+      ctx.font = `500 ${Math.round(fs * 0.66)}px Inter, sans-serif`;
+      ctx.fillStyle = rgba(palette.text, 0.62);
+      const words = desc.split(" ");
+      const lines: string[] = [];
+      let line = "";
+      for (const wd of words) {
+        const next = line ? `${line} ${wd}` : wd;
+        if (ctx.measureText(next).width > cw - 44 * u && line) {
+          lines.push(line);
+          line = wd;
+        } else line = next;
+      }
+      lines.push(line);
+      lines.slice(0, 2).forEach((l, li, arr) => {
+        const txt = li === 1 && arr.length < lines.length ? `${l.replace(/[\s,.;:]+$/, "")}…` : l;
+        ctx.fillText(txt, tx, descTop + fs * 1.1 + li * fs * 0.9);
+      });
+    }
     ctx.restore();
   });
 }
@@ -696,7 +822,7 @@ function uiCards(sc: SkillContext) {
       ctx.beginPath();
       ctx.roundRect(16 * u, wd.h / 2 - 22 * u, 44 * u, 44 * u, 12 * u);
       ctx.fill();
-      drawIcon(ctx, "sparkle", 38 * u, wd.h / 2, 24 * u, "#fff");
+      drawIcon(ctx, iconFor(items[0] ?? "", 0, sc), 38 * u, wd.h / 2, 24 * u, "#fff");
       ctx.fillStyle = palette.text;
       ctx.font = subFont(19 * u, 700);
       const title = items[0] ?? "Updated just now";
@@ -768,6 +894,8 @@ function painStrike(sc: SkillContext) {
       ctx.fillStyle = palette.text;
       ctx.fillText(it, w / 2, y + (1 - k) * 16 * u);
       const tw = ctx.measureText(it).width;
+      // A red ✕ marks each pain as it gets struck out.
+      drawIcon(ctx, "CircleX", w / 2 - tw / 2 - size * 0.75, y + (1 - k) * 16 * u, size * 0.7, "#ff4d6d", sk > 0 ? 1 : 0.001);
       if (sk > 0) {
         ctx.globalAlpha = (1 - clearK);
         ctx.fillStyle = "#ff4d6d";
@@ -792,6 +920,7 @@ function painStrike(sc: SkillContext) {
 /* ───────────────────────── Integration Orbit ───────────────────────── */
 
 const ORBIT_ICONS: IconKind[] = ["chat", "chart", "cloud", "code", "globe", "shield", "users", "clock", "layers", "bolt", "sparkle", "check"];
+const orbitIcons = (sc: SkillContext) => CONCEPT_MAP[sc.concept ?? ""]?.orbit ?? ORBIT_ICONS;
 
 function orbit(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
@@ -856,7 +985,8 @@ function orbit(sc: SkillContext) {
       ctx.globalAlpha = clamp(k) * (1 - ex);
       glassCard(sc, x - ts / 2, y - ts / 2, ts, ts, { r: 16 * u });
       const hue = [palette.primary, palette.secondary, palette.accent][idx % 3];
-      drawIcon(ctx, ORBIT_ICONS[idx % ORBIT_ICONS.length], x, y, ts * 0.46, hue);
+      const icons = orbitIcons(sc);
+      drawIcon(ctx, icons[idx % icons.length], x, y, ts * 0.46, hue);
       ctx.restore();
       idx++;
     }
@@ -1302,16 +1432,20 @@ function steps(sc: SkillContext) {
     let line = "";
     for (const wd of words) {
       const next = line ? `${line} ${wd}` : wd;
-      if (ctx.measureText(next).width > cw - 40 * u && line) {
+      if (ctx.measureText(next).width > cw - 40 * u - Math.min(ch * 0.42, 40 * u * S) - 14 * u && line) {
         lines.push(line);
         line = wd;
       } else line = next;
     }
     lines.push(line);
     const lh = fsz * 1.25;
-    lines.slice(0, 2).forEach((l, li, arr) =>
-      ctx.fillText(l, portrait ? cx + 24 * u : cx + cw / 2, cy + ch / 2 + (li - (arr.length - 1) / 2) * lh),
-    );
+    // Step icon at the card's leading edge; text makes room for it.
+    const is = Math.min(ch * 0.42, 40 * u * S);
+    const ix = cx + 20 * u + is / 2;
+    drawIcon(ctx, iconFor(label, i, sc), ix, cy + ch / 2, is, palette.primary, lt > 0 ? ease.outCubic(range(lt, 0.05, 0.7)) : 0.35);
+    const tx0 = cx + 20 * u + is + 14 * u;
+    ctx.textAlign = "left";
+    lines.slice(0, 2).forEach((l, li, arr) => ctx.fillText(l, tx0, cy + ch / 2 + (li - (arr.length - 1) / 2) * lh));
     ctx.restore();
     // Numbered node.
     ctx.translate(p.x, p.y);
@@ -1384,6 +1518,16 @@ export const saasSkills: Skill[] = [
     itemsHint: "3–6 features, comma separated",
     render: bento,
     sfx: (scene, beat) => bentoTiming(scene, beat).map((s) => at(s, "pop")),
+  },
+  {
+    id: "icon-features",
+    name: "Feature Icons",
+    tagline: "Glowing icon tiles draw themselves on, one per feature, with a title and one-line benefit.",
+    bestFor: 'Key features at a glance. Headline = section title; items = 2–6 features, each "Title" or "Title — one-line benefit". Icons are picked from the wording.',
+    sample: { text: "Built for *developers*", items: ["Deploy in seconds — Push to ship, no config", "Secure by default — SSO, audit logs, SOC 2", "Real-time logs — Watch every request live", "Scales to zero — Pay only for what you use"] },
+    itemsHint: "2–6 features, comma separated",
+    render: iconFeatures,
+    sfx: (scene, beat) => iconFeaturesTiming(scene, beat).map((s) => at(s, "pop")),
   },
   {
     id: "ui-cards",

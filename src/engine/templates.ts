@@ -21,6 +21,7 @@ export type Role =
   | "logos"
   | "stat"
   | "integrations"
+  | "features"
   | "cta";
 
 export type TemplateCategory = "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
@@ -64,6 +65,7 @@ export const DEFAULT_ROLE_SKILL: Record<Role, SkillId> = {
   logos: "logo-marquee",
   stat: "number-ticker",
   integrations: "integrations",
+  features: "icon-features",
   cta: "cta",
 };
 
@@ -94,6 +96,8 @@ function roleLength(scene: Scene, role: Role): [number, number] {
       return [6, 2.8];
     case "integrations":
       return [8, 3.8];
+    case "features":
+      return [(scene.items?.length ?? 4) * 1.5 + 6, 4.6];
     case "cta":
       return [8, 3.6];
   }
@@ -556,6 +560,7 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "ui-tour": "tour",
   bento: "bento",
   "ui-cards": "cards",
+  "icon-features": "features",
   testimonial: "quote",
   "logo-marquee": "logos",
   "number-ticker": "stat",

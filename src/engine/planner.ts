@@ -1,5 +1,6 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
+import { CONCEPT_MAP, detectConcept } from "./concepts";
 import { applyTemplate, DEFAULT_TEMPLATE } from "./templates";
 import {
   FONTS,
@@ -223,8 +224,14 @@ function extractBrand(prompt: string): string | null {
   if (quoted) return quoted[1].trim();
   const named = prompt.match(/\b(?:called|named|for|brand|channel|company|startup|product)\s+([A-Z][\w.&-]*(?:\s+[A-Z0-9][\w.&-]*){0,2})/);
   if (named) return named[1].trim();
-  const caps = prompt.match(/\b([A-Z][A-Z0-9.&-]{1,}(?:\s+[A-Z0-9][A-Z0-9.&-]+){0,2})\b/);
+  // "Ledgerly: business banking…" / "Nimbus is a developer platform…" / "Meet Nimbus, …"
+  const lead = prompt.match(/^\s*(?:meet\s+|introducing\s+)?([A-Z][\w.&-]{1,24}(?:\s+[A-Z][\w.&-]{1,24})?)\s*(?::|—|–|-\s|,|\s+(?:is|are|helps|lets|makes)\b)/i);
+  if (lead && !/^(an?|the|my|our|this|make|create|build|launch)$/i.test(lead[1])) return lead[1].trim();
+  // All-caps names ("PULSE"), ignoring common acronyms.
+  const caps = prompt.match(/\b(?!(?:AI|API|SDK|CRM|HR|SEO|SaaS|UI|UX|B2B|CEO|CTO|SQL|LLM)\b)([A-Z][A-Z0-9.&-]{1,}(?:\s+[A-Z0-9][A-Z0-9.&-]+){0,2})\b/);
   if (caps) return caps[1].trim();
+  const inner = prompt.match(/(?:^|[.!?]\s+)([A-Z][a-z][\w.&-]{1,24})\s+(?:is|helps|lets|makes)\b/);
+  if (inner) return inner[1].trim();
   return null;
 }
 
@@ -303,7 +310,7 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const body = phrases(prompt, brand)
     .filter((p) => !numbers.some((n) => n.includes(p)))
     .map((p) => naturalCase(p, prompt))
-    .filter((p) => p.split(" ").length <= 6);
+    .filter((p) => p.split(" ").length <= 6 && !/^(meet|introducing|launch|video|intro|trailer|teaser|the|a|an)$/i.test(p.trim()));
   // The clause right after the brand is usually its one-line pitch: "an analytics app for product teams".
   const pitch = prompt
     .slice(prompt.indexOf(brand) + brand.length)
@@ -315,12 +322,22 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const tagline = pitchOk ? pitch : body[0] ?? `Meet ${brand}`;
   const features = body.filter((b) => !tagline.toLowerCase().includes(b.toLowerCase()));
   const target = LENGTH_SECONDS[req.length];
+  const concept = detectConcept(prompt);
   const scenes: Scene[] = [
     { role: "hook", skill: "blur-reveal", text: tagline, items: [`Introducing ${brand}`], duration: 7 * beat, transition: "cut" },
     { role: "reveal", skill: "particle-assemble", text: brand, duration: 6 * beat, transition: "dolly" },
   ];
-  if (features.length >= 3) {
+  if (features.length >= 5) {
     scenes.push({ role: "bento", skill: "bento", text: `Everything in *${brand}*`, items: features.slice(0, 6), duration: Math.max(4.4, 10 * beat), transition: "whip" });
+  } else if (features.length >= 2) {
+    scenes.push({
+      role: "features", skill: "icon-features",
+      text: concept.featuresTitle,
+      items: features.slice(0, 4),
+      eyebrow: concept.eyebrows.features ?? "Features",
+      duration: Math.max(4.6, (features.length * 1.5 + 6) * beat),
+      transition: "whip",
+    });
   } else if (features.length) {
     scenes.push({ skill: "blur-reveal", text: features.join(". "), duration: 7 * beat, transition: "whip" });
   }
@@ -337,8 +354,8 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   if (used + 8 * beat < target && features.length >= 2) {
     scenes.push({ skill: "word-swap", text: `Built for ${features.slice(0, 3).map((f) => f.toLowerCase()).join("|")}`, duration: 8 * beat, transition: "whip" });
   }
-  scenes.push({ role: "cta", skill: "cta", text: `Try *${brand}* today`, subtext: "Get started", duration: Math.max(3.6, 8 * beat), transition: "dolly" });
-  const plan = sanitizePlan({ title: brand, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, style: "saas" });
+  scenes.push({ role: "cta", skill: "cta", text: pick(concept.cta).replace(/\{name\}/g, brand), subtext: "Get started", duration: Math.max(3.6, 8 * beat), transition: "dolly" });
+  const plan = sanitizePlan({ title: brand, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, style: "saas", concept: concept.id });
   return applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
@@ -553,9 +570,9 @@ export const ANGLES: { id: Angle; name: string; brief: string }[] = [
   { id: "proof", name: "Proof-first", brief: "Lead with social proof (customers, real numbers, a real quote), then show why." },
 ];
 const ANGLE_ORDER: Record<Angle, string[]> = {
-  story: ["pain", "hook", "reveal", "meet", "how", "tour", "bento", "quote", "logos", "cards", "integrations", "cta"],
-  product: ["hook", "pain", "reveal", "tour", "meet", "bento", "how", "cards", "quote", "logos", "integrations", "cta"],
-  proof: ["hook", "pain", "reveal", "quote", "logos", "meet", "tour", "how", "bento", "cards", "integrations", "cta"],
+  story: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
+  product: ["hook", "pain", "reveal", "tour", "features", "meet", "bento", "how", "cards", "quote", "logos", "integrations", "cta"],
+  proof: ["hook", "pain", "reveal", "quote", "logos", "meet", "tour", "features", "how", "bento", "cards", "integrations", "cta"],
 };
 
 /** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
@@ -635,9 +652,15 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const add = (priority: number, scene: Scene) => candidates.push({ priority, scene });
 
   const angle: Angle = req.angle ?? "story";
+  // What kind of product this is decides the arc, chapter labels, CTA voice and icons.
+  const concept = detectConcept(
+    `${site.name} ${site.tagline} ${site.description}`,
+    [...site.headlines, ...site.features, ...(site.steps ?? []), ...(site.pains ?? [])].join(" "),
+  );
   const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
   // 1. Hook: the problem, the promise, or the proof.
-  const painHook = angle === "story" && pains.length >= 2;
+  // Open on the problem only in categories whose films do (e-commerce / creative lead with the promise).
+  const painHook = angle === "story" && pains.length >= 2 && concept.arc.indexOf("pain") < concept.arc.indexOf("reveal");
   const proofHook = angle === "proof" && !!teamStat;
   // The tagline is used once: in the hook, or (if the hook is pains/proof) under the logo.
   const taglineFree = painHook || proofHook;
@@ -699,7 +722,18 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       media: tourMedia,
     });
   }
-  if (shortFeatures.length >= 3) {
+  // Key features as icon tiles (the classic SaaS feature row); a bento when there are many.
+  if (bentoItems.length >= 2) {
+    add(4, {
+      role: "features", skill: "icon-features",
+      text: concept.featuresTitle,
+      items: bentoItems.slice(0, 4),
+      eyebrow: "Features",
+      duration: Math.max(4.6, beats(Math.min(4, bentoItems.length) * 1.5 + 6)),
+      transition: "dolly",
+    });
+  }
+  if (shortFeatures.length >= 5) {
     add(6, {
       role: "bento", skill: "bento",
       text: `Everything in *${site.name}*`,
@@ -771,7 +805,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       used += c.scene.duration;
     }
   }
-  const rank = ANGLE_ORDER[angle];
+  const rank: string[] = angle === "story" ? concept.arc : ANGLE_ORDER[angle];
   const scenes = order
     .filter((c) => chosen.has(c.i))
     .sort((a, b) => rank.indexOf(a.scene.role ?? "") - rank.indexOf(b.scene.role ?? "") || a.i - b.i)
@@ -781,13 +815,18 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Closing line: social proof when the film hasn't used it yet, else a varied call to action.
   const cta = scenes[scenes.length - 1];
   const usedStat = scenes.some((sc) => sc.role === "logos") || (angle === "proof" && !!teamStat);
-  const lines = [`Try *${site.name}* today`, `Get started with *${site.name}*`, `Start building with *${site.name}*`];
+  // Chapter labels in the category's own voice.
+  for (const sc of scenes) {
+    const eb = concept.eyebrows[sc.role as keyof typeof concept.eyebrows];
+    if (eb && sc.role !== "reveal" && sc.role !== "cta") sc.eyebrow = eb;
+  }
+  const lines = concept.cta.map((l) => l.replace(/\{name\}/g, site.name));
   if (/free/i.test(site.cta ?? "")) lines.push("Start *free* today");
   if (cta?.role === "cta") {
     cta.text = teamStat && !usedStat ? `Join *${teamStat.toLowerCase()}*` : pick(lines);
   }
 
-  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas" });
+  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id });
   return applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
@@ -973,6 +1012,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     music: raw.music === "saas" || raw.music === "trailer" ? raw.music : undefined,
     flavor: ["tech", "soft", "pop", "minimal", "neon"].includes(raw.flavor as string) ? raw.flavor : undefined,
     scheme: raw.scheme === "vibrant" || raw.scheme === "60-30-10" ? raw.scheme : undefined,
+    concept: typeof raw.concept === "string" && CONCEPT_MAP[raw.concept] ? raw.concept : undefined,
     look:
       raw.look && typeof raw.look === "object"
         ? {

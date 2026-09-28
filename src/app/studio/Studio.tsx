@@ -11,6 +11,7 @@ import { runBrowserDirector } from "@/lib/localai";
 import { isLocalProvider } from "@/lib/providers";
 import TemplatePicker from "@/components/TemplatePicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
+import { CONCEPT_MAP } from "@/engine/concepts";
 import Player from "@/components/Player";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
@@ -482,6 +483,18 @@ export default function Studio() {
               <label className="field-label">
                 SaaS template <span className="tpl-desc">{TEMPLATE_MAP[template]?.name}</span>
               </label>
+              {plan.concept && plan.concept !== "general" && CONCEPT_MAP[plan.concept] && (
+                <div className="concept-hint">
+                  <span>
+                    Detected: <strong>{CONCEPT_MAP[plan.concept].name}</strong>. The story arc, chapters, CTA and icons are adapted.
+                  </span>
+                  {TEMPLATE_MAP[CONCEPT_MAP[plan.concept].template] && template !== CONCEPT_MAP[plan.concept].template && (
+                    <button className="btn btn-ghost sm" onClick={() => chooseTemplate(CONCEPT_MAP[plan.concept!].template)}>
+                      Use suggested style: {TEMPLATE_MAP[CONCEPT_MAP[plan.concept].template].name}
+                    </button>
+                  )}
+                </div>
+              )}
               <TemplatePicker value={template} onChange={chooseTemplate} />
               <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
               <label className="field-label">Background</label>

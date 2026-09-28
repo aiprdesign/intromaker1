@@ -5,6 +5,8 @@
  */
 import { headline } from "./fx";
 import { clamp, mixHex, range, rgba, rng, TAU } from "./math";
+import { CONCEPT_MAP, ROLE_ICONS, type ConceptRole } from "./concepts";
+import { drawLucide, iconFor as lucideFor } from "./icons";
 import { scratch } from "./scratch";
 import { renderShaderBg } from "./shaderbg";
 import { subFont, type HeadlineLayout } from "./text";
@@ -515,169 +517,31 @@ export function pill(
   return pw;
 }
 
-export type IconKind =
-  | "bolt"
-  | "chart"
-  | "shield"
-  | "users"
-  | "sparkle"
-  | "globe"
-  | "clock"
-  | "check"
-  | "chat"
-  | "cloud"
-  | "layers"
-  | "code";
+/** Legacy glyph names, now drawn with Lucide icons; any Lucide name also works. */
+export type IconKind = string;
+const LEGACY: Record<string, string> = {
+  bolt: "Zap",
+  chart: "ChartColumn",
+  shield: "ShieldCheck",
+  users: "Users",
+  sparkle: "Sparkles",
+  globe: "Globe",
+  clock: "Clock",
+  check: "Check",
+  chat: "MessageCircle",
+  cloud: "Cloud",
+  layers: "Layers",
+  code: "CodeXml",
+};
 
-/** Pick a glyph that matches a feature's wording. */
-export function iconFor(label: string, i: number): IconKind {
-  const l = label.toLowerCase();
-  if (/fast|speed|instant|quick|performance|second/.test(l)) return "bolt";
-  if (/secur|privacy|safe|complian|encrypt|trust/.test(l)) return "shield";
-  if (/team|collab|together|people|member|share/.test(l)) return "users";
-  if (/insight|analytic|report|data|metric|dashboard|forecast|revenue|growth/.test(l)) return "chart";
-  if (/ai\b|smart|automat|magic|intelligen|assist/.test(l)) return "sparkle";
-  if (/global|world|anywhere|language|region/.test(l)) return "globe";
-  if (/time|schedul|real-time|realtime|minute|hour/.test(l)) return "clock";
-  if (/chat|message|support|comment|feedback/.test(l)) return "chat";
-  if (/cloud|sync|backup|storage|deploy/.test(l)) return "cloud";
-  if (/integrat|connect|tool|app|plugin|workflow|pipeline/.test(l)) return "layers";
-  if (/api|code|developer|sdk|build/.test(l)) return "code";
-  return (["check", "sparkle", "bolt", "chart", "layers", "shield"] as IconKind[])[i % 6];
+/** Pick the icon for a feature's wording (falls back to the product concept's icon family). */
+export function iconFor(label: string, i: number, sc?: Pick<SkillContext, "concept">): IconKind {
+  return lucideFor(label, i, CONCEPT_MAP[sc?.concept ?? "general"]?.icons);
 }
 
-/** Simple line-art glyphs, drawn centred in a size×size box. */
-export function drawIcon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy: number, size: number, color: string) {
-  const s = size / 24;
-  ctx.save();
-  ctx.translate(cx - 12 * s, cy - 12 * s);
-  ctx.scale(s, s);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  switch (kind) {
-    case "bolt":
-      ctx.moveTo(13, 2);
-      ctx.lineTo(4, 14);
-      ctx.lineTo(12, 14);
-      ctx.lineTo(11, 22);
-      ctx.lineTo(20, 10);
-      ctx.lineTo(12, 10);
-      ctx.closePath();
-      ctx.stroke();
-      break;
-    case "chart":
-      ctx.moveTo(3, 21);
-      ctx.lineTo(21, 21);
-      ctx.moveTo(6, 17);
-      ctx.lineTo(6, 12);
-      ctx.moveTo(11, 17);
-      ctx.lineTo(11, 7);
-      ctx.moveTo(16, 17);
-      ctx.lineTo(16, 10);
-      ctx.moveTo(21, 17);
-      ctx.lineTo(21, 4);
-      ctx.stroke();
-      break;
-    case "shield":
-      ctx.moveTo(12, 2);
-      ctx.lineTo(20, 5);
-      ctx.lineTo(20, 11);
-      ctx.bezierCurveTo(20, 16, 16.5, 20, 12, 22);
-      ctx.bezierCurveTo(7.5, 20, 4, 16, 4, 11);
-      ctx.lineTo(4, 5);
-      ctx.closePath();
-      ctx.moveTo(8.5, 12);
-      ctx.lineTo(11, 14.5);
-      ctx.lineTo(15.5, 9.5);
-      ctx.stroke();
-      break;
-    case "users":
-      ctx.arc(9, 8, 3.5, 0, TAU);
-      ctx.moveTo(19.5, 9);
-      ctx.arc(17, 9, 2.5, 0, TAU);
-      ctx.moveTo(2, 20);
-      ctx.bezierCurveTo(2, 15, 16, 15, 16, 20);
-      ctx.moveTo(16.5, 14);
-      ctx.bezierCurveTo(19, 14, 22, 15.5, 22, 19);
-      ctx.stroke();
-      break;
-    case "sparkle":
-      ctx.moveTo(12, 2);
-      ctx.quadraticCurveTo(13, 11, 22, 12);
-      ctx.quadraticCurveTo(13, 13, 12, 22);
-      ctx.quadraticCurveTo(11, 13, 2, 12);
-      ctx.quadraticCurveTo(11, 11, 12, 2);
-      ctx.fill();
-      break;
-    case "globe":
-      ctx.arc(12, 12, 9.5, 0, TAU);
-      ctx.moveTo(2.5, 12);
-      ctx.lineTo(21.5, 12);
-      ctx.moveTo(12, 2.5);
-      ctx.bezierCurveTo(7, 7, 7, 17, 12, 21.5);
-      ctx.moveTo(12, 2.5);
-      ctx.bezierCurveTo(17, 7, 17, 17, 12, 21.5);
-      ctx.stroke();
-      break;
-    case "clock":
-      ctx.arc(12, 12, 9.5, 0, TAU);
-      ctx.moveTo(12, 6.5);
-      ctx.lineTo(12, 12);
-      ctx.lineTo(16, 14);
-      ctx.stroke();
-      break;
-    case "chat":
-      ctx.roundRect(3, 4, 18, 13, 4);
-      ctx.moveTo(8, 17);
-      ctx.lineTo(7, 21);
-      ctx.lineTo(12, 17);
-      ctx.stroke();
-      break;
-    case "cloud":
-      ctx.moveTo(7, 19);
-      ctx.bezierCurveTo(2, 19, 2, 12, 7, 12);
-      ctx.bezierCurveTo(7, 6, 16, 5, 17, 11);
-      ctx.bezierCurveTo(22, 11, 22, 19, 17, 19);
-      ctx.closePath();
-      ctx.stroke();
-      break;
-    case "layers":
-      ctx.moveTo(12, 3);
-      ctx.lineTo(21, 8);
-      ctx.lineTo(12, 13);
-      ctx.lineTo(3, 8);
-      ctx.closePath();
-      ctx.moveTo(3, 12.5);
-      ctx.lineTo(12, 17.5);
-      ctx.lineTo(21, 12.5);
-      ctx.moveTo(3, 17);
-      ctx.lineTo(12, 22);
-      ctx.lineTo(21, 17);
-      ctx.stroke();
-      break;
-    case "code":
-      ctx.moveTo(8, 7);
-      ctx.lineTo(3, 12);
-      ctx.lineTo(8, 17);
-      ctx.moveTo(16, 7);
-      ctx.lineTo(21, 12);
-      ctx.lineTo(16, 17);
-      ctx.moveTo(13.5, 4);
-      ctx.lineTo(10.5, 20);
-      ctx.stroke();
-      break;
-    default:
-      ctx.arc(12, 12, 9.5, 0, TAU);
-      ctx.moveTo(7.5, 12);
-      ctx.lineTo(10.5, 15);
-      ctx.lineTo(16.5, 9);
-      ctx.stroke();
-  }
-  ctx.restore();
+/** Draw an icon (Lucide) centred in a size×size box. */
+export function drawIcon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: number, cy: number, size: number, color: string, progress = 1) {
+  drawLucide(ctx, LEGACY[kind] ?? kind, cx, cy, size, color, { progress });
 }
 
 /**
@@ -794,14 +658,24 @@ export function blurInLayout(
 export function eyebrow(sc: SkillContext, text: string, y: number, k: number) {
   if (k <= 0 || !text) return;
   const { ctx, u, palette } = sc;
+  const icon = ROLE_ICONS[sc.scene.role as ConceptRole];
+  const size = 27 * u;
   ctx.save();
   ctx.globalAlpha = clamp(k);
-  pill(sc, text, sc.w / 2, y + (1 - k) * 10 * u, {
-    size: 27 * u,
+  // Pad the label on the left to make room for the chapter icon.
+  const label = icon ? `\u2002\u2002 ${text}` : text;
+  const cy = y + (1 - k) * 10 * u;
+  pill(sc, label, sc.w / 2, cy, {
+    size,
     fill: rgba(palette.primary, 0.12),
     border: rgba(palette.primary, 0.45),
     color: palette.text,
   });
+  if (icon) {
+    ctx.font = subFont(size, 600);
+    const tw = ctx.measureText(label).width;
+    drawLucide(ctx, icon, sc.w / 2 - tw / 2 + size * 0.55, cy, size * 0.95, palette.primary, { progress: k });
+  }
   ctx.restore();
 }
 
