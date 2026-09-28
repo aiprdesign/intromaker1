@@ -11,7 +11,8 @@
  */
 import { CONCEPT_MAP } from "../src/engine/concepts";
 import { iconsFor } from "../src/engine/icons";
-import { LENGTH_SECONDS, planFromPrompt, planFromSite, type Angle, type Length } from "../src/engine/planner";
+import { hasClaim } from "../src/engine/claims";
+import { LENGTH_SECONDS, planFromPrompt, planFromSite, safeSite, type Angle, type Length } from "../src/engine/planner";
 import { TEMPLATES } from "../src/engine/templates";
 import { speakable, wordBudget } from "../src/engine/voice";
 import type { SiteData, VideoPlan } from "../src/engine/types";
@@ -29,7 +30,7 @@ const IN_ACTION = new Set(["tour", "meet", "cards", "demo"]);
 const ROLE_OK = new Set(["promise"]);
 const PROOF = new Set(["quote", "logos", "cards", "stat"]);
 
-function score(plan: VideoPlan, requested: number, site: SiteData | null): { score: number; issues: Issue[] } {
+function score(plan: VideoPlan, requested: number, site: SiteData | null, safe = true): { score: number; issues: Issue[] } {
   let target = requested;
   const issues: Issue[] = [];
   const add = (metric: string, points: number, msg: string) => issues.push({ metric, points, msg });
@@ -134,6 +135,14 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null): { sco
   if (sc.some((s) => s.role === "quote" && s.vo)) add("voice", 1, "testimonial is talked over");
   if (sc[sc.length - 1]?.role === "cta" && !sc[sc.length - 1].vo) add("voice", 1, "CTA has no voice line");
 
+  // ── Claims: claim-safe films say what the product is and does, never how much better it is.
+  if (safe) {
+    for (const s of sc) {
+      const claim = [s.text, s.subtext, s.eyebrow, s.vo, ...(s.items ?? [])].find((x) => x && hasClaim(x));
+      if (claim) add("claims", 5, `${s.role} makes a claim: "${claim.replace(/\*/g, "").slice(0, 60)}"`);
+    }
+  }
+
   // ── CTA (5).
   const cta = sc.find((s) => s.role === "cta");
   if (cta && !cta.subtext) add("cta", 3, "CTA has no button label");
@@ -153,14 +162,18 @@ for (const { id, site } of SITES) {
     for (const angle of ANGLES)
       for (const [ti, template] of TPLS.entries()) {
         if (ti % 3 !== ANGLES.indexOf(angle)) continue; // spread templates across angles
-        const plan = planFromSite(site, { aspect: "16:9", length, template, angle, seed: 7 });
-        results.push({ name: `site:${id} ${length}/${angle}/${template}`, ...score(plan, LENGTH_SECONDS[length], site) });
+        // Claim-safe (the default) is judged on the material it may use; the site's-claims mode
+        // on the full site.
+        for (const safe of [true, false]) {
+          const plan = planFromSite(site, { aspect: "16:9", length, template, angle, seed: 7, safe });
+          results.push({ name: `site:${id} ${length}/${angle}/${template}${safe ? "" : " +claims"}`, ...score(plan, LENGTH_SECONDS[length], safe ? safeSite(site) : site, safe) });
+        }
       }
 }
 for (const prompt of PROMPTS)
   for (const length of LENGTHS)
     for (const template of ["midnight", "paper", "kinetic", "spatial"]) {
-      const plan = planFromPrompt({ prompt, aspect: "16:9", length, template, style: "saas", seed: 7 });
+      const plan = planFromPrompt({ prompt, aspect: "16:9", length, template, style: "saas", seed: 7, safe: true });
       results.push({ name: `prompt:"${prompt.slice(0, 32)}" ${length}/${template}`, ...score(plan, LENGTH_SECONDS[length], null) });
     }
 

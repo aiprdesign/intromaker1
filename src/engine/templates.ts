@@ -144,7 +144,7 @@ export const TEMPLATES: Template[] = [
     pace: 1,
     roles: {},
     revealNoLogo: "logo-reveal",
-    sample: sample("Build the future, *faster*."),
+    sample: sample("Build what's *next*."),
   },
   {
     id: "aurora",
@@ -270,7 +270,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.05,
     roles: {},
     revealNoLogo: "logo-reveal",
-    sample: sample("Work that feels *effortless*."),
+    sample: sample("Work that feels *calm*."),
   },
   {
     id: "enterprise",
@@ -432,7 +432,7 @@ export const TEMPLATES: Template[] = [
     pace: 0.95,
     roles: {},
     revealNoLogo: "logo-reveal",
-    sample: sample("Less, but *better*."),
+    sample: sample("Less, but *considered*."),
   },
   {
     id: "clay",

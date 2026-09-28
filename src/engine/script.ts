@@ -52,7 +52,7 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
     case "pain":
       return fit(
         items.length >= 2
-          ? [`${sentence(`No more ${list(items, 3)}`)} ${sentence(head)}`, `${sentence(`No more ${list(items, 2)}`)} ${sentence(head)}`, sentence(`No more ${list(items, 3)}`), sentence(`No more ${list(items, 2)}`), sentence(head)]
+          ? [`${sentence(`Less time on ${list(items, 3)}`)} ${sentence(head)}`, `${sentence(`Less time on ${list(items, 2)}`)} ${sentence(head)}`, sentence(`Less time on ${list(items, 3)}`), sentence(`Less time on ${list(items, 2)}`), sentence(head)]
           : [sentence(head)],
         budget,
       );

@@ -15,6 +15,8 @@ import {
   ANGLES,
   type Angle,
   planFromSite,
+  safePlan,
+  safeSite,
   readSite,
   sanitizePlan,
   type Length,
@@ -86,11 +88,11 @@ How to direct an epic, modern piece:
 
 TWO STYLES — set "style" and follow its rules:
 TRAILER: epic cinematic trailer. UPPERCASE 1-4 word cards, anton/grotesk font, spectacular skills, trailer score.
-SAAS: a world-class product-launch film in the style of Linear, Vercel, Stripe and Apple keynotes. Rules:
-- Font "inter". Copy in sentence case, 3-9 words, confident and concrete; wrap the key word in *asterisks* for the brand gradient ("Close deals at the speed of *thought*").
-- Narrative: hook (the promise, or pain-strike with 2-4 real pains → the better way) → brand (logo-reveal or particle-assemble) → product in action (ui-tour with 2 callout items or ui-cards over real media, and/or ONE interaction moment) → features (bento with 3-6 items, each "Short title — one-line benefit" using the site's own feature descriptions) → proof (testimonial ONLY with a real quote; logo-marquee ONLY with real customer logos; stats in ui-cards/number-ticker) → integrations if relevant → cta (subtext = the button label) last.
+SAAS: a polished product-launch film in the style of Linear, Vercel, Stripe and Apple keynotes. Rules:
+- Font "inter". Copy in sentence case, 3-9 words, confident and concrete; wrap the key word in *asterisks* for the brand gradient ("Your pipeline, *in one view*").
+- Narrative: hook (the promise, or pain-strike with 2-4 real pains → another way) → brand (logo-reveal or particle-assemble) → product in action (ui-tour with 2 callout items or ui-cards over real media, and/or ONE interaction moment) → features (bento with 3-6 items, each "Short title — one-line benefit" using the site's own feature descriptions) → proof (testimonial ONLY with a real quote; logo-marquee ONLY with real customer logos; stats in ui-cards/number-ticker) → integrations if relevant → cta (subtext = the button label) last.
 - Interaction moments — the best launch films SHOW the product doing something. Use at most one per film, matched to the product: command-k (keyboard-first dev/productivity tools; items = commands, the first is a real feature that runs), ai-prompt (AI products; items[0] = the prompt, subtext = the answer in the product's voice, items[1..3] = real capabilities), click-flow (automation; subtext = the button label, items = 3-5 tasks it completes), notify-stack (sales, e-commerce, security, messaging; items = 3-5 "Event — detail" notifications). chart-grow shows ONE real metric (subtext = the stat, e.g. "30,000+ businesses").
-- Prefer these skills: site-scroll, steps, icon-features, command-k, ai-prompt, click-flow, notify-stack, chart-grow, blur-reveal, word-swap ("Ship faster|smarter|together"), pain-strike, ui-tour, bento, ui-cards, integrations, testimonial, logo-marquee, cta, logo-reveal. Avoid neon/retro/glitch/shockwave/kinetic-slam.
+- Prefer these skills: site-scroll, steps, icon-features, command-k, ai-prompt, click-flow, notify-stack, chart-grow, blur-reveal, word-swap ("Your work, planned|built|shared"), pain-strike, ui-tour, bento, ui-cards, integrations, testimonial, logo-marquee, cta, logo-reveal. Avoid neon/retro/glitch/shockwave/kinetic-slam.
 - Transitions: dolly, whip, push, dissolve, leak, cut. bpm 112-126. Durations: hooks 3-3.5s, ui-tour 5.5-6.5s, bento 4.5-5s, others 3.5-4.5s.
 - Never invent customer names, quotes, logos or statistics.
 - Vary skills so no two consecutive scenes use the same one, and pick skills whose aesthetic fits the prompt's mood. Save the most spectacular skills (god-rays, shockwave, particle-assemble, glass-shatter, warp-tunnel) for the hook, title and outro.
@@ -98,6 +100,15 @@ SAAS: a world-class product-launch film in the style of Linear, Vercel, Stripe a
 - Choose the palette, font and bpm that match the mood: 128-145 bpm for hype/action/gaming, 110-125 for tech/launches, 85-100 for luxury/calm/documentary.
 - Hit the requested total length (sum of durations) within ±1.5 seconds.
 - Voice-over ("vo"): write the narrator's line for every scene as one flowing script, like a launch-film voice-over: warm, confident, second person, plain words. Each line must be speakable within its scene (about 2.5 words per second, minus half a second), may paraphrase but never add claims, and should complement rather than just read out the headline where there's room. Say the brand name on the reveal ("Meet Nimbus."). Leave vo empty on testimonial scenes so the quote reads.`;
+
+/** Added to the system prompt when claim-safe copy is on (the default). */
+const CLAIM_RULES = `CLAIM-SAFE COPY (required — overrides the rules above): every on-screen line and narrator line is generic and descriptive: what the product is and what it does, in plain words.
+- No superlatives or rankings: best, #1, leading, top, world's first, fastest, most powerful, award-winning, ultimate.
+- No absolutes or guarantees: 100%, guaranteed, never, always, everything, zero downtime, risk-free.
+- No speed or multiplier claims: in seconds, in minutes, instantly, 10x faster, 50% more.
+- No comparatives without a comparison: faster, better, smarter, easier.
+- No numbers used as claims (customer counts, percentages, ratings, uptime, revenue), no testimonials, no customer-logo walls, no metric or number scenes (testimonial, logo-marquee, chart-grow, number-ticker are not used).
+- Word-swap lines use neutral verbs ("Your work, planned|built|shared"). CTAs are simple actions ("Get started", "Try Acme").`;
 
 function hasCredentials() {
   return envClaudeAvailable();
@@ -187,6 +198,8 @@ type Body = Partial<PlanRequest> & {
   ai?: unknown;
   template?: string;
   angle?: unknown;
+  /** Claim-safe copy (default on). */
+  safe?: boolean;
   /**
    * Browser-run AI (a local model on the user's machine when this server is online):
    * "prompt" returns the director request; "finish" turns the model's JSON into a plan
@@ -204,19 +217,22 @@ function readBody(body: Body) {
   const length: Length = body.length === "short" || body.length === "long" ? body.length : "standard";
   const palette: PaletteId | "auto" = (PALETTE_IDS as readonly string[]).includes(body.palette as string) ? (body.palette as PaletteId) : "auto";
   const seed = Number(body.seed) || undefined;
-  const site = readSite(body.site);
+  const safe = body.safe !== false;
+  // Claim-safe: the director (built-in or AI) only ever sees the site's claim-free copy.
+  const rawSite = readSite(body.site);
+  const site = rawSite && safe ? safeSite(rawSite) : rawSite;
   const colors =
     body.colors && /^#[0-9a-f]{6}$/i.test(body.colors.primary) && /^#[0-9a-f]{6}$/i.test(body.colors.secondary) ? body.colors : undefined;
   const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
   const template = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
   const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
   const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
-  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template };
+  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template, safe };
   const concept = site
     ? detectConcept(`${site.name} ${site.tagline} ${site.description}`, [...site.headlines, ...site.features, ...site.steps, ...site.pains].join(" "))
     : detectConcept(prompt);
-  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle }) : planFromPrompt(request));
-  return { prompt, aspect, length, palette, seed, site, colors, style, template, angle, wantSaas, builtin, concept };
+  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle, safe }) : planFromPrompt(request));
+  return { prompt, aspect, length, palette, seed, site, colors, style, template, angle, wantSaas, builtin, concept, safe };
 }
 type Ctx = ReturnType<typeof readBody>;
 
@@ -231,12 +247,12 @@ async function directorRequest(c: Ctx) {
     (c.wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[c.template].name}": ${TEMPLATE_MAP[c.template].vibe} Write copy in this voice.` : "") +
     (c.wantSaas ? `\nINTERACTION MOMENT for this product: ${DEMOS[c.concept.id]?.skill ?? DEMOS.general.skill} (e.g. headline "${(DEMOS[c.concept.id] ?? DEMOS.general).title.replace(/\*/g, "")}"); fill it from the product's real features.` : "") +
     (c.wantSaas && c.concept.id !== "general"
-      ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat").join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${c.concept.cta[0].replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
+      ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat" && !(c.safe && ["quote", "logos", "metric"].includes(r))).join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${c.concept.cta[0].replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
       : "") +
     (c.palette !== "auto" ? ` Use the "${c.palette}" palette.` : "") +
     (c.angle ? `\nCREATIVE ANGLE "${ANGLES.find((a) => a.id === c.angle)!.name}": ${ANGLES.find((a) => a.id === c.angle)!.brief}` : "") +
     (c.seed ? ` Variation #${c.seed % 1000}: take a fresh creative angle.` : "");
-  const system = c.site ? SYSTEM + "\n" + SITE_RULES : SYSTEM;
+  const system = (c.site ? SYSTEM + "\n" + SITE_RULES : SYSTEM) + (c.safe ? "\n" + CLAIM_RULES : "");
   return { schema, images, text, system };
 }
 
@@ -266,7 +282,8 @@ function finishPlan(c: Ctx, raw: z.infer<typeof SitePlanSchema>) {
   // SaaS films get the chosen template's look, music, pacing and role skills.
   const styled = c.wantSaas ? applyTemplate({ ...directed, brand: directed.brand }, c.template, { palette: c.palette !== "auto" ? c.palette : undefined }) : directed;
   // Any scene the AI left without a narrator line gets one from the built-in script writer.
-  return writeVoiceover(styled);
+  const voiced = writeVoiceover(styled);
+  return c.safe ? safePlan(voiced) : voiced;
 }
 
 /** Validate model output against the storyboard schema (tolerating small deviations). */
@@ -285,7 +302,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const c = readBody(body);
-  const lintCtx = { site: c.site, targetSeconds: LENGTH_SECONDS[c.length] };
+  const lintCtx = { site: c.site, targetSeconds: LENGTH_SECONDS[c.length], safe: c.safe };
 
   // ── Browser-run AI: hand out the request, then finish what the model returned.
   if (body.phase === "prompt") {

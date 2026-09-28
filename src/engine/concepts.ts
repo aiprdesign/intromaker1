@@ -58,10 +58,10 @@ export const CONCEPTS: Concept[] = [
     orbit: ["GitBranch", "Database", "Cloud", "Server", "Webhook", "MessagesSquare", "Bug", "Container"],
     arc: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "integrations", "cards", "stat", "quote", "logos", "bento", "cta"],
     eyebrows: { how: "Get started", tour: "Developer experience", features: "Built for developers", integrations: "Works with your stack", cards: "Performance" },
-    featuresTitle: "Everything you need to *ship*",
-    cta: ["Start *building*", "Deploy in *minutes*", "Ship with *{name}*"],
+    featuresTitle: "Built for how you *ship*",
+    cta: ["Start *building*", "Try *{name}*", "Ship with *{name}*"],
     template: "midnight",
-    swap: "Ship faster|safer|together",
+    swap: "Your code, built|tested|shipped",
   },
   {
     id: "ai",
@@ -71,10 +71,10 @@ export const CONCEPTS: Concept[] = [
     orbit: ["FileText", "Mail", "MessagesSquare", "Database", "CalendarCheck", "Globe", "Image", "Code"],
     arc: ["hook", "pain", "reveal", "tour", "features", "how", "cards", "quote", "logos", "integrations", "bento", "meet", "cta"],
     eyebrows: { tour: "See it in action", features: "What it can do", how: "How it works", hook: "Introducing" },
-    featuresTitle: "Your AI can *do it all*",
+    featuresTitle: "AI that *works with you*",
     cta: ["Try it *free*", "Meet your *AI teammate*", "Start with *{name}*"],
     template: "aiglow",
-    swap: "Work smarter|faster|better",
+    swap: "Your work, drafted|summarised|automated",
   },
   {
     id: "fintech",
@@ -84,10 +84,10 @@ export const CONCEPTS: Concept[] = [
     orbit: ["Landmark", "CreditCard", "Receipt", "FileSpreadsheet", "Calculator", "Wallet", "Mail", "Database"],
     arc: ["pain", "hook", "reveal", "meet", "tour", "features", "cards", "stat", "quote", "logos", "how", "integrations", "bento", "cta"],
     eyebrows: { features: "Built for finance teams", cards: "Real results", tour: "Your money, one view" },
-    featuresTitle: "Finance on *autopilot*",
+    featuresTitle: "Finance, *organised*",
     cta: ["Open an *account*", "Get started *free*", "Take control with *{name}*"],
     template: "aurora",
-    swap: "Spend smarter|faster|safer",
+    swap: "Your spend, tracked|approved|reported",
   },
   {
     id: "security",
@@ -96,11 +96,11 @@ export const CONCEPTS: Concept[] = [
     icons: ["ShieldCheck", "LockKeyhole", "Fingerprint", "Radar", "BadgeCheck", "Activity"],
     orbit: ["Cloud", "Server", "Laptop", "Smartphone", "Fingerprint", "Mail", "Database", "Network"],
     arc: ["pain", "hook", "reveal", "tour", "features", "cards", "stat", "logos", "quote", "how", "integrations", "meet", "bento", "cta"],
-    eyebrows: { pain: "The threat", features: "Protection", logos: "Trusted by security teams", cards: "Detection" },
-    featuresTitle: "Protected on *every front*",
+    eyebrows: { pain: "The threat", features: "Protection", logos: "Security teams", cards: "Detection" },
+    featuresTitle: "Security, *by design*",
     cta: ["Book a *demo*", "Get *protected*", "Secure your team with *{name}*"],
     template: "hud",
-    swap: "Stay secure|compliant|ahead",
+    swap: "Your systems, monitored|reviewed|logged",
   },
   {
     id: "analytics",
@@ -109,11 +109,11 @@ export const CONCEPTS: Concept[] = [
     icons: ["ChartNoAxesCombined", "ChartPie", "Database", "TrendingUp", "Gauge", "Table"],
     orbit: ["Database", "FileSpreadsheet", "Cloud", "CreditCard", "Megaphone", "Users", "Webhook", "Mail"],
     arc: ["pain", "hook", "reveal", "tour", "cards", "features", "how", "integrations", "quote", "logos", "meet", "bento", "cta"],
-    eyebrows: { cards: "Insights", features: "Everything you need", integrations: "Connect every source" },
+    eyebrows: { cards: "Insights", features: "What's inside", integrations: "Connect your sources" },
     featuresTitle: "Answers, *not spreadsheets*",
     cta: ["See your *data*", "Start *free*", "Get insights with *{name}*"],
     template: "midnight",
-    swap: "Decide faster|smarter|better",
+    swap: "Your data, explored|measured|shared",
   },
   {
     id: "sales",
@@ -123,10 +123,10 @@ export const CONCEPTS: Concept[] = [
     orbit: ["Mail", "Phone", "CalendarCheck", "MessagesSquare", "Users", "Database", "FileText", "Video"],
     arc: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "cards", "quote", "logos", "integrations", "bento", "cta"],
     eyebrows: { features: "Built for revenue teams", cards: "Results", logos: "Trusted by sales teams" },
-    featuresTitle: "Close deals *faster*",
-    cta: ["Book a *demo*", "Close more with *{name}*", "Start *free*"],
+    featuresTitle: "Your pipeline, *organised*",
+    cta: ["Book a *demo*", "Sell with *{name}*", "Start *free*"],
     template: "enterprise",
-    swap: "Sell faster|smarter|together",
+    swap: "Your deals, tracked|organised|shared",
   },
   {
     id: "marketing",
@@ -135,11 +135,11 @@ export const CONCEPTS: Concept[] = [
     icons: ["Megaphone", "Mail", "Search", "Heart", "TrendingUp", "Target"],
     orbit: ["Mail", "Search", "Heart", "Image", "Video", "ChartPie", "ShoppingCart", "MessagesSquare"],
     arc: ["hook", "pain", "reveal", "tour", "features", "cards", "quote", "logos", "how", "integrations", "bento", "meet", "cta"],
-    eyebrows: { features: "Grow faster", cards: "Results" },
-    featuresTitle: "Marketing that *works*",
+    eyebrows: { features: "Features", cards: "Campaigns" },
+    featuresTitle: "Marketing, *organised*",
     cta: ["Grow your *audience*", "Start *free*", "Launch with *{name}*"],
     template: "pop",
-    swap: "Grow faster|louder|smarter",
+    swap: "Your campaigns, planned|launched|measured",
   },
   {
     id: "productivity",
@@ -148,11 +148,11 @@ export const CONCEPTS: Concept[] = [
     icons: ["Users", "SquareKanban", "ListChecks", "MessagesSquare", "CalendarCheck", "FileText"],
     orbit: ["MessagesSquare", "CalendarCheck", "FileText", "Mail", "Video", "Folder", "GitBranch", "PenTool"],
     arc: ["hook", "pain", "reveal", "meet", "tour", "features", "how", "integrations", "quote", "logos", "cards", "bento", "cta"],
-    eyebrows: { features: "Everything in one place", integrations: "Works with your tools" },
-    featuresTitle: "One place for *everything*",
-    cta: ["Get started *free*", "Try it with your *team*", "Work better with *{name}*"],
+    eyebrows: { features: "All in one place", integrations: "Works with your tools" },
+    featuresTitle: "Your work, *in one place*",
+    cta: ["Get started *free*", "Try it with your *team*", "Work with *{name}*"],
     template: "frosted",
-    swap: "Work faster|together|better",
+    swap: "Your work, planned|tracked|shared",
   },
   {
     id: "hr",
@@ -165,7 +165,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Hire and grow your *people*",
     cta: ["Book a *demo*", "Start *free*", "Build your team with *{name}*"],
     template: "clay",
-    swap: "Hire faster|better|happier",
+    swap: "Your hiring, organised|scheduled|tracked",
   },
   {
     id: "ecommerce",
@@ -175,10 +175,10 @@ export const CONCEPTS: Concept[] = [
     orbit: ["CreditCard", "Truck", "Mail", "Megaphone", "Boxes", "ChartPie", "Image", "Receipt"],
     arc: ["hook", "reveal", "tour", "features", "cards", "quote", "logos", "how", "integrations", "pain", "bento", "meet", "cta"],
     eyebrows: { features: "Sell more", cards: "Results" },
-    featuresTitle: "Everything to *sell more*",
+    featuresTitle: "Tools to *run your store*",
     cta: ["Start *selling*", "Open your *store*", "Grow with *{name}*"],
     template: "pop",
-    swap: "Sell more|faster|everywhere",
+    swap: "Your orders, listed|shipped|tracked",
   },
   {
     id: "health",
@@ -187,11 +187,11 @@ export const CONCEPTS: Concept[] = [
     icons: ["HeartPulse", "Stethoscope", "CalendarCheck", "ShieldCheck", "Users", "Pill"],
     orbit: ["CalendarCheck", "Video", "FileText", "ShieldCheck", "MessagesSquare", "CreditCard", "Pill", "Smartphone"],
     arc: ["pain", "hook", "reveal", "meet", "how", "features", "tour", "quote", "logos", "cards", "integrations", "bento", "cta"],
-    eyebrows: { features: "Better care", how: "How it works" },
+    eyebrows: { features: "Care tools", how: "How it works" },
     featuresTitle: "Care, *simplified*",
-    cta: ["Book a *demo*", "Get *started*", "Care better with *{name}*"],
+    cta: ["Book a *demo*", "Get *started*", "Care with *{name}*"],
     template: "paper",
-    swap: "Care faster|better|together",
+    swap: "Your care, scheduled|recorded|followed up",
   },
   {
     id: "education",
@@ -200,11 +200,11 @@ export const CONCEPTS: Concept[] = [
     icons: ["GraduationCap", "BookOpen", "Lightbulb", "Trophy", "Users", "Video"],
     orbit: ["Video", "BookOpen", "CalendarCheck", "MessagesSquare", "FileText", "Trophy", "Smartphone", "Mail"],
     arc: ["hook", "pain", "reveal", "tour", "features", "how", "quote", "logos", "cards", "integrations", "bento", "meet", "cta"],
-    eyebrows: { features: "Learn faster", how: "How it works" },
+    eyebrows: { features: "Learning tools", how: "How it works" },
     featuresTitle: "Learning that *sticks*",
     cta: ["Start *learning*", "Try it *free*", "Learn with *{name}*"],
     template: "frosted",
-    swap: "Learn faster|deeper|together",
+    swap: "Your courses, planned|published|tracked",
   },
   {
     id: "creative",
@@ -214,10 +214,10 @@ export const CONCEPTS: Concept[] = [
     orbit: ["Image", "Video", "PenTool", "Palette", "Folder", "MessagesSquare", "Cloud", "Shapes"],
     arc: ["hook", "reveal", "tour", "features", "cards", "quote", "logos", "how", "integrations", "pain", "bento", "meet", "cta"],
     eyebrows: { features: "Create anything", tour: "See it in action" },
-    featuresTitle: "Create *without limits*",
+    featuresTitle: "Made for *creators*",
     cta: ["Start *creating*", "Try it *free*", "Create with *{name}*"],
     template: "holo",
-    swap: "Create faster|bolder|together",
+    swap: "Your ideas, sketched|designed|shared",
   },
   {
     id: "communication",
@@ -230,7 +230,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Every conversation, *one inbox*",
     cta: ["Try it *free*", "Delight customers with *{name}*", "Get *started*"],
     template: "neon",
-    swap: "Reply faster|smarter|everywhere",
+    swap: "Your inbox, sorted|routed|answered",
   },
 ];
 
@@ -242,10 +242,10 @@ export const GENERAL: Concept = {
   orbit: ["Mail", "MessagesSquare", "CalendarCheck", "Database", "Cloud", "FileText", "CreditCard", "GitBranch"],
   arc: STORY,
   eyebrows: {},
-  featuresTitle: "Everything you *need*",
+  featuresTitle: "What's *inside*",
   cta: ["Try *{name}* today", "Get started with *{name}*", "Start building with *{name}*"],
   template: "midnight",
-  swap: "Work faster|smarter|together",
+  swap: "Your work, planned|built|shared",
 };
 
 export const CONCEPT_MAP: Record<string, Concept> = Object.fromEntries([...CONCEPTS, GENERAL].map((c) => [c.id, c]));
@@ -302,19 +302,19 @@ export interface DemoSpec {
   items: string[];
 }
 
-const PALETTE_CMDS = ["Search everything", "Invite a teammate", "Open settings"];
+const PALETTE_CMDS = ["Search your workspace", "Invite a teammate", "Open settings"];
 
 export const DEMOS: Record<string, DemoSpec> = {
-  devtools: { skill: "command-k", title: "Everything, one *keystroke* away", eyebrow: "Keyboard-first", items: ["View deploy logs", "Open preview URL", "Search docs"] },
-  productivity: { skill: "command-k", title: "Everything, one *keystroke* away", eyebrow: "Keyboard-first", items: PALETTE_CMDS },
+  devtools: { skill: "command-k", title: "Your tools, one *keystroke* away", eyebrow: "Keyboard-first", items: ["View deploy logs", "Open preview URL", "Search docs"] },
+  productivity: { skill: "command-k", title: "Your tools, one *keystroke* away", eyebrow: "Keyboard-first", items: PALETTE_CMDS },
   ai: { skill: "ai-prompt", title: "Just *ask*.", eyebrow: "AI built in", items: ["What can you do, {name}?"] },
   fintech: {
     skill: "click-flow", title: "Month-end, *handled*", eyebrow: "Automations", action: "Approve all",
-    items: ["Match every receipt", "Categorise spend", "Sync to accounting", "Notify finance"],
+    items: ["Match receipts", "Categorise spend", "Sync to accounting", "Notify finance"],
   },
   analytics: {
     skill: "click-flow", title: "Insights, *on demand*", eyebrow: "In action", action: "Generate report",
-    items: ["Pull the latest data", "Build every chart", "Spot the trends", "Share with the team"],
+    items: ["Pull the latest data", "Build the charts", "Spot the trends", "Share with the team"],
   },
   hr: {
     skill: "click-flow", title: "Hiring admin, *handled*", eyebrow: "Automations", action: "Send offers",
@@ -330,11 +330,11 @@ export const DEMOS: Record<string, DemoSpec> = {
   },
   creative: {
     skill: "click-flow", title: "From idea to *live*", eyebrow: "In action", action: "Publish",
-    items: ["Export every asset", "Optimise for web", "Share with the team", "Go live"],
+    items: ["Export the assets", "Optimise for web", "Share with the team", "Go live"],
   },
   general: {
     skill: "click-flow", title: "Busywork, *handled*", eyebrow: "In action", action: "Run",
-    items: ["Sync your data", "Update every record", "Notify the team", "Share the summary"],
+    items: ["Sync your data", "Update the records", "Notify the team", "Share the summary"],
   },
   sales: {
     skill: "notify-stack", title: "Your pipeline, *alive*", eyebrow: "Live",
@@ -345,15 +345,15 @@ export const DEMOS: Record<string, DemoSpec> = {
     items: ["Campaign live — Sent to your audience", "New subscribers — Your list just grew", "A/B test winner — Variant B picked", "Report ready — This week's results are in"],
   },
   ecommerce: {
-    skill: "notify-stack", title: "Your store, *on autopilot*", eyebrow: "Live",
-    items: ["New order — 2 items, ships today", "Payment received — Order confirmed", "Order shipped — Tracking sent to customer", "New review — ★★★★★ from a customer"],
+    skill: "notify-stack", title: "Your store, *live*", eyebrow: "Live",
+    items: ["New order — 2 items, ships today", "Payment received — Order confirmed", "Order shipped — Tracking sent to customer", "New review — From a customer"],
   },
   security: {
-    skill: "notify-stack", title: "Always *on watch*", eyebrow: "Live",
-    items: ["Threat blocked — Suspicious login stopped", "Device verified — Access granted", "Evidence collected — Control checked", "All clear — No open incidents"],
+    skill: "notify-stack", title: "Alerts, *in real time*", eyebrow: "Live",
+    items: ["Alert raised — Unusual login flagged", "Device verified — Access granted", "Evidence collected — Control checked", "Report ready — Weekly summary"],
   },
   communication: {
     skill: "notify-stack", title: "Every conversation, *one place*", eyebrow: "Live",
-    items: ["New message — The team replied", "You were mentioned — In #launch", "Call starting — Join in one click", "Thread resolved — Marked done"],
+    items: ["New message — The team replied", "You were mentioned — In #launch", "Call starting — The team is joining", "Thread resolved — Marked done"],
   },
 };

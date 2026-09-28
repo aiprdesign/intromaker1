@@ -1,4 +1,5 @@
 import type { SiteData } from "@/engine/types";
+import { hasClaim } from "@/engine/claims";
 
 /**
  * Storyboard QA for AI drafts: a deterministic checklist (story arc, copy length, pacing,
@@ -24,6 +25,8 @@ export interface Draft {
 export interface LintContext {
   site: SiteData | null;
   targetSeconds: number;
+  /** Claim-safe copy: flag superlatives, guarantees, speed claims and numbers-as-claims. */
+  safe?: boolean;
 }
 
 const HOOKS = new Set(["blur-reveal", "pain-strike", "word-swap", "cinematic-title", "type-cascade"]);
@@ -75,6 +78,11 @@ export function lintStoryboard(draft: Draft, ctx: LintContext): string[] {
     if (s.skill === "chart-grow" && !/\d/.test(s.subtext ?? "")) issues.push(`${n} needs subtext = one real stat with a number (e.g. "30,000+ businesses").`);
     if (s.skill === "cta" && !s.subtext?.trim()) issues.push(`${n} needs subtext = the button label${ctx.site?.cta ? ` ("${ctx.site.cta}")` : ""}.`);
     if (s.duration < 1.8 || s.duration > 8) issues.push(`${n} lasts ${s.duration}s; keep scenes between 2.5 and 6.5 seconds.`);
+    if (ctx.safe) {
+      const claims = [s.text, s.subtext, s.eyebrow, ...(s.items ?? []), (s as { vo?: string }).vo].filter((x): x is string => !!x && hasClaim(x));
+      if (claims.length) issues.push(`${n} makes a claim ("${claims[0].replace(/\*/g, "")}"); use generic, descriptive wording: no superlatives, guarantees, speed claims or numbers.`);
+      if (["testimonial", "logo-marquee", "chart-grow", "number-ticker"].includes(s.skill)) issues.push(`${n}: claim-safe films don't use ${s.skill}; drop the scene.`);
+    }
     if (!ctx.site) return;
     if (s.skill === "testimonial" && !ctx.site.testimonials.some((q) => norm(s.text).includes(norm(q.quote).slice(0, 40)))) {
       issues.push(`${n} quote is not from the site's TESTIMONIALS; use one verbatim or drop the scene.`);

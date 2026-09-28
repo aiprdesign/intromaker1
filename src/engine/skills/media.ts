@@ -429,7 +429,7 @@ export const mediaSkills: Skill[] = [
     name: "Logo Reveal",
     tagline: "Your logo bursts in with light rays, a shockwave and a glint, then the name.",
     bestFor: "The brand reveal and outro when a logo was imported. Headline = brand name.",
-    sample: { text: "ACME", subtext: "Build something great" },
+    sample: { text: "ACME", subtext: "Build something new" },
     render: logoReveal,
   },
   {
@@ -452,8 +452,8 @@ export const mediaSkills: Skill[] = [
     id: "screen-wall",
     name: "Screen Wall",
     tagline: "An endless 3D wall of your site's images scrolls behind a bold headline.",
-    bestFor: "Breadth moments: integrations, templates, 'everything in one place'. Needs several images.",
-    sample: { text: "ALL IN ONE PLACE", subtext: "Everything you need" },
+    bestFor: "Breadth moments: integrations, templates, 'all in one place'. Needs several images.",
+    sample: { text: "ALL IN ONE PLACE", subtext: "See it in action" },
     render: screenWall,
   },
 ];

@@ -61,6 +61,27 @@ export default function Studio() {
     schemeRef.current = sc;
     setPlan((p) => ({ ...p, scheme: sc }));
   };
+  // Claim-safe copy: generic wording with no superlatives, guarantees, speed claims or numbers.
+  // On by default; the site's own claims (stats, quotes, customer logos) only when switched off.
+  const [safe, setSafe] = useState(true);
+  const safeRef = useRef(safe);
+  safeRef.current = safe;
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.claims") === "site") setSafe(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseSafe = (on: boolean) => {
+    setSafe(on);
+    safeRef.current = on;
+    try {
+      localStorage.setItem("intromaker.claims", on ? "safe" : "site");
+    } catch {
+      /* ignore */
+    }
+  };
   // Glow on type and the highlight bloom. Off by default: crisp, halo-free text.
   const [glow, setGlow] = useState(false);
   useEffect(() => {
@@ -184,7 +205,8 @@ export default function Studio() {
     const template = templateRef.current;
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     const aiCfg = aiForRequest(loadAiSettings());
-    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiCfg, template, angle: opts.angle };
+    const safeCopy = safeRef.current;
+    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiCfg, template, angle: opts.angle, safe: safeCopy };
     // Local AI runs where the model is: from this browser when the server is online.
     if (isLocalProvider(aiCfg.provider) && !localViaServerRef.current) {
       try {
@@ -212,8 +234,8 @@ export default function Studio() {
     } catch {
       // Offline or API unavailable: the director also runs in the browser.
       const plan = s
-        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle })
-        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template });
+        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle, safe: safeCopy })
+        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template, safe: safeCopy });
       return { plan, engine: "builtin", engineLabel: "", label };
     }
   };
@@ -592,6 +614,23 @@ export default function Studio() {
               </button>
             ))}
           </div>
+
+          <label className="field-label">
+            Wording <span className="tpl-desc">{safe ? "Claim-safe" : "Site's claims"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={safe ? "active" : ""} onClick={() => chooseSafe(true)}>
+              Claim-safe (generic)
+            </button>
+            <button className={!safe ? "active" : ""} onClick={() => chooseSafe(false)}>
+              Use site&apos;s claims
+            </button>
+          </div>
+          <p className="hint">
+            {safe
+              ? "Generic, descriptive copy: no superlatives, guarantees, speed claims or numbers, and no testimonials or customer logos. Applies to the next generation."
+              : "Also uses the site's own stats, quotes and customer logos. You're responsible for checking any claims before publishing. Applies to the next generation."}
+          </p>
 
           <label className="field-label">
             Colours <span className="tpl-desc">{colourChoice === "template" ? "Template" : colourChoice === "brand" ? "Brand (auto)" : colourChoice === "logo" ? "Logo" : PALETTES[colourChoice].name}</span>

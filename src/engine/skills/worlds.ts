@@ -599,15 +599,15 @@ export const worldSkills: Skill[] = [
     name: "Orbital Core",
     tagline: "Tilted 3D orbits with satellites circle a glowing core title.",
     bestFor: "Tech platforms, AI, science, networks, ecosystems. 1–2 words.",
-    sample: { text: "CORE AI", subtext: "Everything connected" },
+    sample: { text: "CORE AI", subtext: "Connected by design" },
     render: orbitRings,
   },
   {
     id: "number-ticker",
     name: "Stat Counter",
     tagline: "A glowing counter races up to your number inside a progress dial.",
-    bestFor: "Stats and milestones. Text MUST contain a number, e.g. '10M+ USERS', '99.9% UPTIME'.",
-    sample: { text: "10M+ USERS", subtext: "And counting" },
+    bestFor: "Stats and milestones. Text MUST contain a number: a factual one ('3 STEPS', '2026'), or the site's own stat only when claims are allowed.",
+    sample: { text: "3 STEPS", subtext: "To get started" },
     render: numberTicker,
   },
   {

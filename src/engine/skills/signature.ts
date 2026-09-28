@@ -443,7 +443,7 @@ export const signatureSkills: Skill[] = [
     name: "Glass Shatter",
     tagline: "Glass shards fly in, lock into your title with a glint, then explode apart.",
     bestFor: "Action, sports, gaming, breaking news, bold statements. 1–3 words.",
-    sample: { text: "BREAKTHROUGH", subtext: "Limits are made to break" },
+    sample: { text: "BREAKTHROUGH", subtext: "A new chapter" },
     render: glassShatter,
   },
   {

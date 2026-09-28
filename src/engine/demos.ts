@@ -13,8 +13,8 @@ export const HERO_PLAN: VideoPlan = {
     { skill: "word-swap", text: "Make intros|trailers|launch films|promos", subtext: "Or paste your website URL", duration: 4, transition: "dolly" },
     {
       skill: "bento",
-      text: "Everything in *one studio*",
-      items: ["AI director", "33 motion skills", "Website import", "Beat-synced score", "Frame-perfect export", "Vertical & square"],
+      text: "Made in *one studio*",
+      items: ["AI director", "33 motion skills", "Website import", "Beat-synced score", "Video export", "Vertical & square"],
       duration: 5,
       transition: "whip",
     },
@@ -23,11 +23,11 @@ export const HERO_PLAN: VideoPlan = {
 };
 
 export const EXAMPLE_PROMPTS = [
-  'Launch video for "Pulse", an analytics app for product teams. Real-time dashboards, AI insights, team sharing, 5,000+ companies',
-  'Epic cyberpunk launch trailer for "NOVA AI", an AI copilot for developers. 10M+ users, ship faster, launching 2026',
-  'Luxury gold intro for a watch brand called "AURUM" — timeless craftsmanship, Swiss made',
-  "Hype gaming channel intro for SHADOWSTRIKE with toxic green energy, headshots and victory",
+  'Launch video for "Pulse", an analytics app for product teams. Dashboards, AI insights, team sharing',
+  'Cyberpunk launch trailer for "NOVA AI", an AI copilot for developers. Code suggestions, reviews, launching 2026',
+  'Gold intro for a watch brand called "AURUM" — craftsmanship, Swiss made',
+  "Gaming channel intro for SHADOWSTRIKE with toxic green energy, headshots and victory",
   "Retro 80s synthwave music festival teaser for NEON NIGHTS, live DJs all night",
-  'Space documentary opener "BEYOND ORBIT" about the first mission to Mars',
-  'Playful summer app launch for "SPLASH" — make friends, share moments, 500K downloads',
+  'Space documentary opener "BEYOND ORBIT" about a mission to Mars',
+  'Playful summer app launch for "SPLASH" — make friends, share moments',
 ];

@@ -174,7 +174,7 @@ function cursorPath(x0: number, y0: number, x1: number, y1: number, k: number) {
 
 function commandItems(scene: Scene) {
   const items = (scene.items ?? []).map(titleOf).filter(Boolean).slice(0, 5);
-  return items.length >= 2 ? items : ["Create new project", "Invite teammates", "Search everything", "Open settings"];
+  return items.length >= 2 ? items : ["Create new project", "Invite teammates", "Search your workspace", "Open settings"];
 }
 
 /** The typed query: the start of the target command's most distinctive word. */
@@ -767,7 +767,7 @@ function clickFlow(sc: SkillContext) {
     const cy = wy + wh + (portrait ? 70 : 48) * u;
     ctx.translate(cx, cy);
     ctx.scale(0.7 + 0.3 * k, 0.7 + 0.3 * k);
-    pill(sc, "✓  Done in one click", 0, 0, {
+    pill(sc, "✓  Done", 0, 0, {
       size: 22 * u * S,
       weight: 700,
       fill: rgba(palette.accent, palette.light ? 0.16 : 0.22),
@@ -782,7 +782,7 @@ function clickFlow(sc: SkillContext) {
 
 function notifyItems(scene: Scene) {
   const items = (scene.items ?? []).filter(Boolean).slice(0, 5);
-  return items.length >= 2 ? items : ["New signup — Someone just joined your workspace", "Report ready — Your weekly summary is in", "Goal reached — 100% of this month's target"];
+  return items.length >= 2 ? items : ["New signup — Someone just joined your workspace", "Report ready — Your weekly summary is in", "Task complete — Marked done by the team"];
 }
 
 function notifyTiming(scene: Scene, beat: number) {
@@ -1019,8 +1019,8 @@ export const interactionSkills: Skill[] = [
     id: "command-k",
     name: "Command Palette",
     tagline: "⌘K keycaps press, a command palette opens over a dimmed stage, a query types in, results filter live and Enter runs it.",
-    bestFor: "Keyboard-first and power-user products (dev tools, productivity). Headline = the promise ('Everything, one *keystroke* away'); items = 3–5 commands or features, the first is the one that runs.",
-    sample: { text: "Everything, one *keystroke* away", items: ["Deploy to production", "Create issue", "Invite teammate", "Search docs"] },
+    bestFor: "Keyboard-first and power-user products (dev tools, productivity). Headline = the promise ('Your tools, one *keystroke* away'); items = 3–5 commands or features, the first is the one that runs.",
+    sample: { text: "Your tools, one *keystroke* away", items: ["Deploy to production", "Create issue", "Invite teammate", "Search docs"] },
     itemsHint: "3–5 commands; the first one runs",
     render: commandK,
     sfx: (scene) => {
@@ -1060,7 +1060,7 @@ export const interactionSkills: Skill[] = [
     name: "One-Click Flow",
     tagline: "A cursor glides to the primary button behind a micro-zoom; one click and every task ticks off in a fast cascade.",
     bestFor: "Automation and 'it just works' moments. Headline = the outcome; subtext = the button label ('Run', 'Deploy', 'Approve all'); items = 3–5 tasks it completes (real features).",
-    sample: { text: "Busywork, *handled*", subtext: "Run", items: ["Match every receipt", "Categorise expenses", "Sync to accounting", "Notify finance"] },
+    sample: { text: "Busywork, *handled*", subtext: "Run", items: ["Match receipts", "Categorise expenses", "Sync to accounting", "Notify finance"] },
     itemsHint: "3–5 tasks it completes",
     render: clickFlow,
     sfx: (scene, beat) => {
@@ -1073,7 +1073,7 @@ export const interactionSkills: Skill[] = [
     name: "Notification Stack",
     tagline: "App notifications drop into an iOS-style stack, newest on top, each with an icon, title and detail.",
     bestFor: "Showing the product alive and working for you (sales, e-commerce, security, messaging). items = 3–5 notifications, each 'Title — detail'.",
-    sample: { text: "Your business, *on autopilot*", items: ["New order — 2 × Linen shirt, shipped today", "Payment received — Invoice #1042 paid", "Low stock — Reorder placed automatically", "5-star review — “Fastest checkout ever”"] },
+    sample: { text: "Your store, *in real time*", items: ["New order — 2 × Linen shirt, shipped today", "Payment received — Invoice #1042 paid", "Low stock — Reorder drafted", "New review — From a customer"] },
     itemsHint: "3–5 notifications, 'Title — detail'",
     render: notifyStack,
     sfx: (scene, beat) => notifyTiming(scene, beat).map((s) => at(s, "pop")),
@@ -1082,8 +1082,8 @@ export const interactionSkills: Skill[] = [
     id: "chart-grow",
     name: "Growth Chart",
     tagline: "A real number counts up beside an area chart that draws itself on, with a glowing head and a tooltip.",
-    bestFor: "One strong REAL metric ('30,000+ businesses', '$4B+ processed'). Headline = what it proves; subtext = the stat.",
-    sample: { text: "Growing with *our customers*", subtext: "30,000+ businesses" },
+    bestFor: "One REAL metric from the site, only when claims are allowed ('30,000+ businesses'). Headline = neutral ('Your numbers, *at a glance*'); subtext = the stat.",
+    sample: { text: "Your numbers, *at a glance*", subtext: "Monthly active projects" },
     render: chartGrow,
     sfx: () => {
       const T = chartTiming();

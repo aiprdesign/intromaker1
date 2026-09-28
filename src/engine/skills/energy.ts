@@ -398,7 +398,7 @@ export const energySkills: Skill[] = [
     name: "Particle Vortex",
     tagline: "Thousands of particles spiral in and crystallise into your logo-type.",
     bestFor: "Brand/title reveals, AI and tech products. Best with a 1–2 word brand name.",
-    sample: { text: "NOVA", subtext: "Intelligence, reimagined" },
+    sample: { text: "NOVA", subtext: "Meet the new assistant" },
     render: particleAssemble,
   },
   {

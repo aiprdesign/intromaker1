@@ -2,6 +2,7 @@ import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, DEMOS, detectConcept } from "./concepts";
 import { writeVoiceover } from "./script";
+import { isNumericClaim, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE } from "./templates";
 import {
   FONTS,
@@ -34,6 +35,8 @@ export interface PlanRequest {
   seed?: number;
   style?: StyleChoice;
   template?: string;
+  /** Claim-safe copy (default on): generic wording, no superlatives, guarantees or numbers. */
+  safe?: boolean;
 }
 
 interface Mood {
@@ -385,7 +388,15 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
 /** Prompt → intro, with a narrator line on every scene (used when voice-over is on). */
 export function planFromPrompt(req: PlanRequest): VideoPlan {
-  return writeVoiceover(planFromPromptRaw(req));
+  if (req.safe === false) return writeVoiceover(planFromPromptRaw(req));
+  // Claim-safe: the prompt's claims ("10M+ users", "the #1 copilot", "10x faster") are taken
+  // out before directing, so the film is built from what the product is rather than trimmed later.
+  const prompt = req.prompt
+    .split(/,(?!\d{3})|;|(?<=[.!?])\s+/)
+    .map((part) => (isNumericClaim(part) ? "" : safeCopy(part.trim())))
+    .filter((part) => part.replace(/[^a-z0-9]/gi, "").length > 1)
+    .join(", ");
+  return safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt })));
 }
 
 function planFromPromptRaw(req: PlanRequest): VideoPlan {
@@ -479,7 +490,7 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
     used += dur;
   }
   // Pad short prompts with brand-flavoured beats.
-  const fillers = ["BIGGER", "BOLDER", "NEXT LEVEL", "NO LIMITS", "BUILT DIFFERENT", "UNSTOPPABLE"];
+  const fillers = ["GET READY", "STAY TUNED", "A NEW CHAPTER", "LOOK CLOSER", "WATCH THIS SPACE", "COMING SOON"];
   while (used + BEAT <= target + 0.5 && fillers.length) {
     const skill = pickSkill(bodyPool, last);
     const text = fillers.splice(Math.floor(r() * fillers.length), 1)[0];
@@ -589,6 +600,8 @@ export interface SiteRequest {
   template?: string;
   /** Creative angle for the story: problem-led (default), product-first or proof-first. */
   angle?: Angle;
+  /** Claim-safe copy (default on): generic wording, no superlatives, guarantees or numbers. */
+  safe?: boolean;
 }
 
 export type Angle = "story" | "product" | "proof";
@@ -625,7 +638,96 @@ export function aiSelfIntro(text: string, name: string): { answer: string; first
 
 /** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
 export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
-  return writeVoiceover(req.style === "trailer" ? planFromSiteTrailer(site, req) : planFromSiteSaas(site, req));
+  const safe = req.safe !== false;
+  const input = safe ? safeSite(site) : site;
+  const plan = writeVoiceover(req.style === "trailer" ? planFromSiteTrailer(input, req) : planFromSiteSaas(input, req));
+  return safe ? safePlan(plan) : plan;
+}
+
+/**
+ * The site's copy, claim-safe: superlatives, guarantees and speed claims taken out of its
+ * wording, and anything that is a number-as-claim ("10,000+ teams", "99.9% uptime") left out,
+ * along with testimonials and customer-logo walls (endorsements). What remains is what the
+ * product is and does.
+ */
+export function safeSite(site: SiteData): SiteData {
+  const line = (x: string | null | undefined) => (x && !isNumericClaim(x) ? safeCopy(x) : "");
+  const words = (x: string) => x.replace(/\*/g, "").trim().split(/\s+/).filter(Boolean).length;
+  const headlines: string[] = [];
+  const features: string[] = [];
+  site.headlines.forEach((h, i) => {
+    const head = line(h);
+    if (words(head) < 2) return;
+    headlines.push(head);
+    features.push(line(site.features[i]));
+  });
+  const list = (xs: string[]) => xs.map(line).filter((x) => words(x) >= 1);
+  const sentences = (x: string) =>
+    x
+      .split(/(?<=[.!?])\s+/)
+      .map(line)
+      .filter((y) => words(y) >= 3)
+      .join(" ");
+  const tagline = line(site.tagline);
+  return {
+    ...site,
+    tagline: words(tagline) >= 2 ? tagline : headlines[0] ?? site.name,
+    description: sentences(site.description),
+    headlines,
+    features,
+    steps: list(site.steps),
+    pains: list(site.pains),
+    stats: [],
+    testimonials: [],
+    clientLogos: [],
+    cta: site.cta && !isNumericClaim(site.cta) ? safeCopy(site.cta) || "Get started" : site.cta && "Get started",
+  };
+}
+
+/** Roles whose whole point is a claim (a number, a quote, a customer wall): left out when claim-safe. */
+const CLAIM_ROLES = new Set(["quote", "logos", "metric", "stat"]);
+const CLAIM_SKILLS = new Set(["testimonial", "logo-marquee", "chart-grow", "number-ticker"]);
+
+/**
+ * A finished plan made claim-safe: every on-screen line and narrator line rewritten without
+ * superlatives, guarantees or speed claims; list items that are numbers-as-claims dropped; a
+ * headline that is one replaced with a neutral line; quote, customer-wall and metric scenes
+ * left out (the film is re-timed to keep its length).
+ */
+export function safePlan(plan: VideoPlan): VideoPlan {
+  const name = plan.brand?.name ?? plan.title;
+  const neutral = (role?: string) => (role === "hook" ? `Introducing *${name}*` : role === "cta" ? `Try *${name}*` : `See *${name}* in action`);
+  const fix = (x: string | undefined) => (x ? safeCopy(x) || undefined : x);
+  const before = plan.scenes.reduce((a, sc) => a + sc.duration, 0);
+  const kept = plan.scenes.filter((sc, i) => i === 0 || !(CLAIM_ROLES.has(sc.role ?? "") || CLAIM_SKILLS.has(sc.skill)));
+  const scenes = kept.map((sc) => {
+    // Word-swap alternatives are rewritten one by one; claims among them are dropped.
+    const text = sc.text.includes("|")
+      ? sc.text
+          .split("|")
+          .map((part, k) => (k === 0 ? safeCopy(part) : isNumericClaim(part) ? "" : safeCopy(part)))
+          .filter(Boolean)
+          .join("|")
+      : isNumericClaim(sc.text) && sc.role !== "reveal"
+        ? neutral(sc.role)
+        : safeCopy(sc.text) || neutral(sc.role);
+    const items = sc.items?.filter((it) => !isNumericClaim(it)).map((it) => safeCopy(it)).filter(Boolean);
+    return {
+      ...sc,
+      text,
+      subtext: sc.subtext && isNumericClaim(sc.subtext) && sc.role !== "cta" ? undefined : fix(sc.subtext),
+      eyebrow: fix(sc.eyebrow),
+      items: items?.length ? items : sc.items?.length ? undefined : sc.items,
+      vo: sc.vo && !isNumericClaim(sc.vo) ? fix(sc.vo) : sc.vo ? undefined : sc.vo,
+    };
+  });
+  // Keep the film's length: the time of any scene left out goes to the scenes around it.
+  const after = scenes.reduce((a, sc) => a + sc.duration, 0);
+  const k = after > 0 && before > after ? Math.min(1.35, before / after) : 1;
+  const beat = 60 / (plan.bpm || 120);
+  const out = { ...plan, scenes: k === 1 ? scenes : scenes.map((sc) => ({ ...sc, duration: Math.max(4, Math.round((sc.duration * k) / beat)) * beat })) };
+  // Narrator lines for any scene whose line was dropped.
+  return writeVoiceover(out);
 }
 
 /**
@@ -739,7 +841,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   } else if (painHook) {
     add(1, {
       role: "pain", skill: "pain-strike",
-      text: pick(["There's a *better* way.", "It doesn't have to be *this hard*.", "Time for a *better* way."]),
+      text: pick(["There's *another* way.", "It doesn't have to be *this hard*.", "Time for a *new* way."]),
       items: pains,
       eyebrow: "The old way",
       duration: beats(pains.length * 2 + 5),
@@ -812,7 +914,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (featureItems.length >= 5) {
     add(valuePriority, {
       role: "bento", skill: "bento",
-      text: `Everything in *${site.name}*`,
+      text: `Inside *${site.name}*`,
       items: featureItems.slice(0, 6),
       eyebrow: "All-in-one",
       duration: Math.max(4.4, beats(10)),
@@ -884,7 +986,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       role: "quote", skill: "testimonial",
       text: quote.quote,
       subtext: [quote.author, quote.role].filter(Boolean).join(" · "),
-      eyebrow: "Loved by teams",
+      eyebrow: "Customer story",
       duration: Math.max(4.6, beats(10)),
       transition: "leak",
       ...(quote.avatar ? { media: { src: assetUrl(quote.avatar), kind: "image" as const } } : {}),
@@ -893,7 +995,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (brand.clientLogos && brand.clientLogos.length >= 4) {
     add(proofPriority("logos", 6), {
       role: "logos", skill: "logo-marquee",
-      text: angle === "proof" && teamStat ? "In good *company*" : stat ? `Trusted by *${stat.toLowerCase()}*` : "Trusted by *leading teams*",
+      text: "Teams using *" + site.name + "*",
       eyebrow: "Customers",
       duration: beats(7),
       transition: "dolly",
@@ -1103,7 +1205,7 @@ function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
   if (wall) {
     scenes.push({
       skill: "screen-wall",
-      text: pick(["ALL IN ONE PLACE", "BUILT FOR SCALE", "EVERYTHING YOU NEED"] as const),
+      text: pick(["ALL IN ONE PLACE", "BUILT FOR TEAMS", "SEE IT IN ACTION"] as const),
       subtext: site.domain,
       duration: BEAT,
       transition: tr(["dolly", "whip", "zoom"]),
