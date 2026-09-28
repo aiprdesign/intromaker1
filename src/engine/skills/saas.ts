@@ -706,7 +706,7 @@ function bento(sc: SkillContext) {
 
 function iconFeatureItems(scene: Scene) {
   const items = (scene.items ?? []).filter(Boolean).slice(0, 6);
-  return items.length >= 2 ? items : ["Lightning fast", "Secure by default", "Built for teams", "Real-time insights"];
+  return items.length >= 2 ? items : ["Quick setup", "Access controls", "Built for teams", "Real-time insights"];
 }
 
 function iconFeaturesTiming(scene: Scene, beat: number) {
