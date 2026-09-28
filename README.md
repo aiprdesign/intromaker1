@@ -2,7 +2,7 @@
 
 IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-graphics video. You can use it for intros, trailers, launch promos and social reels.
 
-- **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, logo, screenshots, product videos and brand colours, then storyboards a launch film around them. The film follows a hook, logo, a product tour of the real UI, a features bento, proof (real testimonials and customer logos only), integrations, and a CTA with the site's own button label.
+- **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, header logo, screenshots, product videos and brand colours, then storyboards a launch film around them. The film follows a hook, logo, a product tour of the real UI, a features bento, proof (real testimonials and customer logos only), integrations, and a CTA with the site's own button label.
 - **SaaS launch-film mode**: modelled on today's best product videos. It uses sentence-case blur reveals with gradient accent words, rotating word swaps, a cursor-driven UI zoom tour with callouts, bento feature grids with live micro-animations, floating glass UI widgets, pain-to-solution strikes, an integration orbit, real testimonials, a customer-logo marquee and a CTA button that the cursor clicks. It has a grid, spotlight and beam backdrop, spring physics and glass cards with animated border beams, and is scored with an upbeat track plus UI sound effects synced to every click, pop and whoosh.
 - **Two styles**: *SaaS launch* (auto-selected for websites and product prompts) or *Epic trailer*.
 - **40 motion skills**: UI Assemble, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
@@ -50,6 +50,12 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - a one-click flow (micro-zoom, then a task cascade);
   - an iOS-style notification stack;
   - a growth chart for one real metric.
+- **The real logo, whatever it's made of**: the brand mark is found in the site header the way a person would find it (the home link or a logo-named element near the top-left), and taken in its best form:
+  - image logos (PNG, JPG, WebP, SVG, including lazy-loaded and `<picture>` sources) at their original quality;
+  - inline SVG logos serialised with their real colours;
+  - text/CSS logos (icon + name) as a 2× screenshot on true transparency.
+
+  Without a live browser, the HTML is read for the same clues, then structured-data logos, `og:logo` and large app icons (never a 16px favicon). On screen, only the neutral ink adapts to the style (black wordmark text goes white on dark styles, white text goes dark on light ones), so coloured marks keep their brand colours.
 - **Brand polish**: an anamorphic logo reveal, a corner brand bug through the body of the film, and an end card that holds on the logo, closing line, button and URL.
 - **Copy that reads like a designer wrote it**: the site's headlines are ranked for on-screen quality, the emphasis word is chosen by meaning ("*300+ tools*", "*whole team*"), bento cards carry the site's own one-line feature descriptions, and CTAs vary, including social proof ("Join *12,000+ teams*").
 - **Takes**: "3 more takes" directs alternative cuts (product-first, proof-first, a fresh story) in parallel. They appear as live previews, and you click one to use it.

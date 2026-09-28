@@ -23,6 +23,8 @@ export interface Capture {
   full: string | null;
   sections: string[];
   parts: SitePart[];
+  /** The header logo: an image URL from the page, or a saved SVG/PNG (/api/shot URL). */
+  logo: string | null;
 }
 
 async function launch(): Promise<Browser | null> {
@@ -59,10 +61,19 @@ function hostAllowed(url: string) {
   return hostVerdict.get(host)!;
 }
 
-async function save(id: string, data: Buffer) {
+export async function save(id: string, data: Buffer | string, ext: "jpg" | "png" | "svg" = "jpg") {
   await mkdir(SHOT_DIR, { recursive: true });
-  await writeFile(join(SHOT_DIR, `${id}.jpg`), data);
+  await writeFile(join(SHOT_DIR, `${id}.${ext}`), data);
   return `/api/shot?id=${id}`;
+}
+
+/** Remove script/handlers from site SVG markup before we store and serve it. */
+export function cleanSvg(svg: string) {
+  return svg
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*(["']).*?\1/gi, "")
+    .replace(/(href|xlink:href)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, "");
 }
 
 /**
@@ -118,6 +129,162 @@ async function captureParts(page: Page, key: string, maxY: number): Promise<Site
     if (shot) parts.push({ ...p, src: await save(`${key}-p${i}`, shot) });
   }
   return parts;
+}
+
+/**
+ * The brand mark from the site header, found the way a person would: the home link or a
+ * logo-named element near the top-left of the page. Then it's taken in the best form available:
+ * the original image file (PNG, JPG, WebP, SVG…), an inline SVG serialised with its computed
+ * colours, or, for text/CSS logos (icon + name), a 2× screenshot with the background removed.
+ */
+async function captureLogo(page: Page, key: string): Promise<string | null> {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const found = await page.evaluate(() => {
+    const visible = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return r.width >= 12 && r.height >= 10 && cs.visibility !== "hidden" && cs.display !== "none" && parseFloat(cs.opacity) > 0.1 ? r : null;
+    };
+    const isHome = (a: Element) => {
+      const href = a.getAttribute("href") ?? "";
+      try {
+        const u = new URL(href, location.href);
+        return u.host === location.host && /^\/?(index\.html?)?$/.test(u.pathname) && !u.hash;
+      } catch {
+        return false;
+      }
+    };
+    const hinted = (el: Element | null) =>
+      !!el && /logo|brand|wordmark|site-?title|navbar-brand|site-?name/i.test(`${el.id} ${el.getAttribute("class") ?? ""} ${el.getAttribute("alt") ?? ""} ${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("src") ?? ""} ${el.getAttribute("title") ?? ""}`);
+    type Cand = { el: Element; score: number };
+    const cands: Cand[] = [];
+    const consider = (el: Element, base: number) => {
+      const r = visible(el);
+      if (!r || r.top < -4 || r.top > 200 || r.width > 480 || r.height > 160) return;
+      if (el.closest("button") && !el.closest("a")) return; // menu / theme toggles
+      let score = base;
+      if (el.closest("header, nav, [role=banner]")) score += 3;
+      if (hinted(el) || hinted(el.parentElement)) score += 3;
+      const a = el.closest("a");
+      if (a && isHome(a)) score += 4;
+      if (r.left < window.innerWidth * 0.35) score += 2;
+      else if (Math.abs(r.left + r.width / 2 - window.innerWidth / 2) < 120) score += 1;
+      cands.push({ el, score: score - r.top / 120 });
+    };
+    for (const el of Array.from(document.querySelectorAll("a, img, svg, picture, [class*=logo], [id*=logo], [class*=brand]"))) {
+      const tag = el.tagName.toLowerCase();
+      if (tag === "a") {
+        if (isHome(el)) consider(el, 1);
+      } else if (tag === "svg") {
+        if (el.parentElement?.closest("svg")) continue;
+        consider(el, 1);
+      } else consider(el, tag === "img" || tag === "picture" ? 1 : 0);
+    }
+    cands.sort((a, b) => b.score - a.score);
+    const best = cands[0];
+    if (!best || best.score < 5) return null;
+    let el = best.el;
+    const text = (e: Element) => ((e as HTMLElement).innerText ?? "").trim();
+    // A container holding just one image or one SVG: use the graphic itself (text drawn inside
+    // an SVG wordmark is part of the graphic, not a separate text logo).
+    if (!["img", "svg"].includes(el.tagName.toLowerCase())) {
+      const imgs = el.querySelectorAll("img");
+      const svgs = Array.from(el.querySelectorAll("svg")).filter((s) => !s.parentElement?.closest("svg"));
+      const svgText = svgs.map((s) => (s.textContent ?? "").trim()).join("");
+      const ownText = text(el).replace(/\s+/g, "").replace(svgText.replace(/\s+/g, ""), "");
+      if (ownText.length <= 1 && imgs.length + svgs.length === 1) el = imgs[0] ?? svgs[0];
+    }
+    const r = el.getBoundingClientRect();
+    const box = { x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height };
+    if (el.tagName.toLowerCase() === "img") {
+      const img = el as HTMLImageElement;
+      if (img.naturalWidth >= 16 && img.currentSrc && !img.currentSrc.startsWith("blob:")) return { mode: "img" as const, src: img.currentSrc, box };
+      return { mode: "shot" as const, box };
+    }
+    if (el.tagName.toLowerCase() === "svg") {
+      // Inline SVG: resolve <use> references and bake computed colours, so it renders on its own.
+      const src = el as SVGSVGElement;
+      const clone = src.cloneNode(true) as SVGSVGElement;
+      for (const use of Array.from(clone.querySelectorAll("use"))) {
+        const ref = (use.getAttribute("href") ?? use.getAttribute("xlink:href") ?? "").trim();
+        const target = ref.startsWith("#") ? document.getElementById(ref.slice(1)) : null;
+        if (!target) continue;
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        for (const child of Array.from(target.childNodes)) g.appendChild(child.cloneNode(true));
+        use.replaceWith(g);
+      }
+      const orig = [src, ...Array.from(src.querySelectorAll("*"))];
+      const copy = [clone, ...Array.from(clone.querySelectorAll("*"))];
+      orig.forEach((o, i) => {
+        const c = copy[i];
+        if (!c || !(o instanceof SVGElement)) return;
+        const cs = getComputedStyle(o);
+        for (const prop of ["fill", "stroke", "stroke-width", "opacity", "fill-opacity", "stop-color"]) {
+          const v = cs.getPropertyValue(prop);
+          if (v && v !== "normal") c.setAttribute(prop, v);
+        }
+      });
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      clone.setAttribute("width", String(Math.round(r.width)));
+      clone.setAttribute("height", String(Math.round(r.height)));
+      if (!clone.getAttribute("viewBox")) clone.setAttribute("viewBox", `0 0 ${Math.round(r.width)} ${Math.round(r.height)}`);
+      return { mode: "svg" as const, svg: new XMLSerializer().serializeToString(clone), box };
+    }
+    return { mode: "shot" as const, box };
+  });
+  if (!found) return null;
+  if (found.mode === "img") return found.src;
+  if (found.mode === "svg" && found.svg.length < 400_000) return save(`${key}-logo`, cleanSvg(found.svg), "svg");
+  // Text / CSS logo: a 2× screenshot on real transparency (the page, header and wrappers behind
+  // the logo are made see-through for the shot), with colour-keying as a fallback.
+  await page.evaluate((b) => {
+    const style = document.createElement("style");
+    style.textContent = "html, body { background: transparent !important; }";
+    document.head.appendChild(style);
+    const hit = document.elementFromPoint(b.x + b.w / 2 - window.scrollX, b.y + b.h / 2 - window.scrollY);
+    for (let n: Element | null = hit?.closest("a, [class*=logo], [class*=brand]")?.parentElement ?? null; n && n !== document.documentElement; n = n.parentElement) {
+      (n as HTMLElement).style.setProperty("background", "transparent", "important");
+      (n as HTMLElement).style.setProperty("backdrop-filter", "none", "important");
+    }
+  }, found.box);
+  const pad = 4;
+  const shot = await page
+    .screenshot({ type: "png", scale: "device", omitBackground: true, fullPage: true, clip: { x: Math.max(0, found.box.x - pad), y: Math.max(0, found.box.y - pad), width: found.box.w + pad * 2, height: found.box.h + pad * 2 } })
+    .catch(() => null);
+  if (!shot) return null;
+  const keyed = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const g = c.getContext("2d")!;
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height);
+    const px = d.data;
+    const at = (x: number, y: number) => (y * c.width + x) * 4;
+    const corners = [at(0, 0), at(c.width - 1, 0), at(0, c.height - 1), at(c.width - 1, c.height - 1)];
+    if (corners.every((i) => px[i + 3] < 8)) return c.toDataURL("image/png").split(",")[1]; // already transparent
+    const bg = [0, 1, 2].map((k) => corners.reduce((a, i) => a + px[i + k], 0) / 4);
+    const uniform = corners.every((i) => Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) < 30);
+    if (uniform) {
+      for (let i = 0; i < px.length; i += 4) {
+        const dist = Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]);
+        // Soft edge: clear on the background colour, fading in over a small band…
+        const a = Math.min(1, Math.max(0, (dist - 18) / 70));
+        px[i + 3] = Math.round(px[i + 3] * a);
+        // …and the edge pixels' own colour recovered (the page background removed from the
+        // anti-aliasing), so there's no dark or light fringe on a new background.
+        if (a > 0 && a < 1) {
+          for (let k = 0; k < 3; k++) px[i + k] = Math.max(0, Math.min(255, Math.round((px[i + k] - bg[k] * (1 - a)) / a)));
+        }
+      }
+      g.putImageData(d, 0, 0);
+    }
+    return c.toDataURL("image/png").split(",")[1];
+  }, shot.toString("base64"));
+  return save(`${key}-logo`, Buffer.from(keyed, "base64"), "png");
 }
 
 export async function captureSite(url: string): Promise<Capture | null> {
@@ -192,7 +359,9 @@ export async function captureSite(url: string): Promise<Capture | null> {
     }
     const parts = await captureParts(page, key, Math.min(pageHeight, 7200));
     const html = await page.content();
-    return { html, finalUrl: page.url(), hero, full, sections, parts };
+    // Last: the logo capture may clear page backgrounds for a transparent screenshot.
+    const logo = await captureLogo(page, key).catch(() => null);
+    return { html, finalUrl: page.url(), hero, full, sections, parts, logo };
   } catch (e) {
     console.warn("[capture] live capture failed, using static fetch:", (e as Error).message);
     return null;

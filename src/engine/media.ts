@@ -147,36 +147,60 @@ export async function syncVideos(plan: VideoPlan, sceneIndex: number, local: num
 
 /* ───────── Logo analysis ───────── */
 
-const darkCache = new Map<string, boolean>();
+const adaptCache = new Map<string, HTMLCanvasElement | HTMLImageElement>();
 
-/** True if the logo is mostly dark ink (made for light backgrounds) and should be inverted. */
-export function isDarkLogo(img: HTMLImageElement) {
-  const hit = darkCache.get(img.src);
-  if (hit !== undefined) return hit;
-  let dark = false;
+/**
+ * The logo, made legible on the stage without touching its brand colours: only the neutral ink
+ * is adapted (near-black wordmark text turns white on dark styles, near-white text turns dark
+ * on light styles), so a coloured mark next to a wordmark keeps its colours. Logos that need
+ * nothing are returned as they are.
+ */
+export function stageLogo(img: HTMLImageElement, lightStage: boolean): HTMLCanvasElement | HTMLImageElement {
+  if (!img.naturalWidth) return img;
+  const key = `${img.src}|${lightStage ? "l" : "d"}`;
+  const hit = adaptCache.get(key);
+  if (hit) return hit;
+  let out: HTMLCanvasElement | HTMLImageElement = img;
   try {
+    const scale = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight));
     const c = document.createElement("canvas");
-    c.width = c.height = 48;
+    c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    c.height = Math.max(1, Math.round(img.naturalHeight * scale));
     const g = c.getContext("2d", { willReadFrequently: true })!;
-    g.drawImage(img, 0, 0, 48, 48);
-    const d = g.getImageData(0, 0, 48, 48).data;
-    let lum = 0;
-    let n = 0;
+    g.drawImage(img, 0, 0, c.width, c.height);
+    const d = g.getImageData(0, 0, c.width, c.height);
+    const px = d.data;
     let opaque = 0;
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i + 3] > 128) {
-        opaque++;
-        lum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
-        n++;
-      }
+    let ink = 0;
+    const isInk = (i: number) => {
+      const mx = Math.max(px[i], px[i + 1], px[i + 2]);
+      const mn = Math.min(px[i], px[i + 1], px[i + 2]);
+      const sat = mx ? (mx - mn) / mx : 0;
+      const lum = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
+      return sat < 0.22 && (lightStage ? lum > 0.78 : lum < 0.28);
+    };
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 40) continue;
+      opaque++;
+      if (isInk(i)) ink++;
     }
-    // Opaque square logos (e.g. app icons) are shown as-is.
-    dark = n > 0 && opaque < 48 * 48 * 0.9 && lum / n < 0.35;
+    // Opaque rectangles (app icons, photos) are left alone; so is a logo with hardly any ink.
+    if (opaque > 0 && opaque < (px.length / 4) * 0.92 && ink / opaque > 0.06) {
+      const to = lightStage ? [17, 17, 24] : [255, 255, 255];
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i + 3] < 8 || !isInk(i)) continue;
+        px[i] = to[0];
+        px[i + 1] = to[1];
+        px[i + 2] = to[2];
+      }
+      g.putImageData(d, 0, 0);
+      out = c;
+    }
   } catch {
-    dark = false;
+    out = img;
   }
-  darkCache.set(img.src, dark);
-  return dark;
+  adaptCache.set(key, out);
+  return out;
 }
 
 /* ───────── Brand colours ───────── */

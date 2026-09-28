@@ -1,6 +1,7 @@
 import { parse, type HTMLElement } from "node-html-parser";
 import type { SiteData } from "@/engine/types";
-import { captureSite } from "./capture";
+import { createHash } from "node:crypto";
+import { captureSite, cleanSvg, save } from "./capture";
 import { safeFetch, UrlError } from "./netguard";
 
 const MAX_HTML = 3_000_000;
@@ -37,6 +38,106 @@ function fromSrcset(srcset: string | undefined) {
     if (url && (!best || w > best.w)) best = { url, w };
   }
   return best?.url ?? null;
+}
+
+const isHomeHref = (href: string | undefined, base: URL) => {
+  if (!href) return false;
+  try {
+    const u = new URL(href, base);
+    return u.host === base.host && /^\/?(index\.html?)?$/.test(u.pathname) && !u.hash;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The header logo from the page's HTML (when no live browser render is available), found the
+ * way a person would: the home link or a logo-named image/SVG in the header, then the site's
+ * structured-data logo, og:logo, and finally large app icons. Lazy-loaded (data-src),
+ * <picture> sources and inline SVG logos are all understood. Returns an absolute URL, or a
+ * saved SVG (/api/shot) for inline SVG logos.
+ */
+async function findLogo(root: HTMLElement, rawHtml: string, base: URL, siteName: string): Promise<string | null> {
+  const hint = /logo|brand|wordmark|site-?title|navbar-brand|site-?name/i;
+  const wall = /customer|client|trusted|partner|logo-?(wall|cloud|grid|strip|marquee|list)|brands|companies|testimonial|footer/i;
+  const attrsOf = (el: HTMLElement | null) => (el ? `${el.getAttribute("class") ?? ""} ${el.getAttribute("id") ?? ""} ${el.getAttribute("aria-label") ?? ""}` : "");
+  const context = (el: HTMLElement) => {
+    let score = 0;
+    let home = false;
+    let header = false;
+    for (let n: HTMLElement | null = el, d = 0; n && d < 8; n = n.parentNode as HTMLElement | null, d++) {
+      const tag = n.tagName?.toLowerCase();
+      if (tag === "a" && isHomeHref(n.getAttribute("href"), base)) home = true;
+      if (tag === "header" || tag === "nav" || n.getAttribute?.("role") === "banner") header = true;
+      if (d > 0 && wall.test(attrsOf(n))) return -99;
+      if (d <= 2 && hint.test(attrsOf(n))) score += 3;
+    }
+    return score + (home ? 4 : 0) + (header ? 3 : 0);
+  };
+  type Cand = { score: number; src?: string; svg?: HTMLElement };
+  const cands: Cand[] = [];
+  const name = siteName.toLowerCase();
+  for (const img of root.querySelectorAll("img")) {
+    const src =
+      img.getAttribute("src") && !img.getAttribute("src")!.startsWith("data:")
+        ? img.getAttribute("src")
+        : img.getAttribute("data-src") ?? img.getAttribute("data-lazy-src") ?? fromSrcset(img.getAttribute("srcset") ?? img.getAttribute("data-srcset"));
+    const pictureSrc = img.parentNode && (img.parentNode as HTMLElement).tagName?.toLowerCase() === "picture" ? fromSrcset((img.parentNode as HTMLElement).querySelector("source")?.getAttribute("srcset")) : null;
+    const url = absolute(src ?? pictureSrc, base);
+    if (!url || (Number(img.getAttribute("width")) > 0 && Number(img.getAttribute("width")) <= 2)) continue;
+    const alt = (img.getAttribute("alt") ?? "").toLowerCase();
+    let score = context(img);
+    if (hint.test(`${attrsOf(img)} ${img.getAttribute("alt") ?? ""} ${img.getAttribute("src") ?? ""}`)) score += 3;
+    if (name && alt && (alt === name || alt.startsWith(`${name} `) || alt.includes(`${name} logo`))) score += 2;
+    cands.push({ score, src: url });
+  }
+  for (const svg of root.querySelectorAll("svg")) {
+    if ((svg.parentNode as HTMLElement | null)?.closest?.("svg")) continue;
+    let score = context(svg) + (hint.test(attrsOf(svg)) ? 3 : 0);
+    if (svg.querySelector("title") && name && svg.querySelector("title")!.text.toLowerCase().includes(name)) score += 2;
+    if (svg.toString().length < 80) score = -99;
+    cands.push({ score, svg });
+  }
+  cands.sort((a, b) => b.score - a.score);
+  const best = cands[0];
+  if (best && best.score >= 5) {
+    if (best.src) return best.src;
+    if (best.svg) {
+      let markup = cleanSvg(best.svg.toString());
+      // currentColor inherits from the page; outside it that would render black. Use the nearest
+      // inline colour when the HTML states one.
+      if (/currentColor/i.test(markup)) {
+        let color: string | null = null;
+        for (let n: HTMLElement | null = best.svg, d = 0; n && d < 6 && !color; n = n.parentNode as HTMLElement | null, d++) {
+          color = (n.getAttribute?.("style") ?? "").match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)?.[1]?.trim() ?? null;
+        }
+        if (color && /^[#a-z0-9(),.\s%-]+$/i.test(color)) markup = markup.replace(/currentColor/gi, color);
+      }
+      if (!/xmlns=/.test(markup)) markup = markup.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+      if (markup.length < 400_000) {
+        const key = createHash("sha1").update(base.toString() + Date.now()).digest("hex").slice(0, 16);
+        return save(`${key}-logo`, markup, "svg");
+      }
+    }
+  }
+  // Structured data (schema.org Organization) and og:logo.
+  const ld = rawHtml.match(/"logo"\s*:\s*(?:"([^"]+)"|\{[^}]*?"url"\s*:\s*"([^"]+)")/);
+  const fromLd = absolute(ld?.[1] ?? ld?.[2], base);
+  if (fromLd) return fromLd;
+  const og = absolute(meta(root, "og:logo") ?? root.querySelector('[itemprop="logo"]')?.getAttribute("content") ?? root.querySelector('img[itemprop="logo"]')?.getAttribute("src"), base);
+  if (og) return og;
+  // App icons, only when large enough to read as a logo (a 16px favicon isn't one).
+  const icons = root
+    .querySelectorAll('link[rel~="apple-touch-icon"], link[rel~="icon"], link[rel="shortcut icon"], link[rel="mask-icon"]')
+    .map((l) => {
+      const href = l.getAttribute("href") ?? "";
+      const rel = l.getAttribute("rel") ?? "";
+      const size = /\.svg(\?|$)/i.test(href) ? 512 : /apple-touch/.test(rel) ? 180 : parseInt(l.getAttribute("sizes")?.split("x")[0] ?? "0", 10) || 16;
+      return { href: absolute(href, base), size };
+    })
+    .filter((i) => i.href && i.size >= 64)
+    .sort((a, b) => b.size - a.size);
+  return icons[0]?.href ?? null;
 }
 
 function meta(root: HTMLElement, ...keys: string[]) {
@@ -156,26 +257,8 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
     }
   }
 
-  // Logo: explicit <img> logos first, then high-res icons.
-  let logo: string | null = null;
-  for (const img of root.querySelectorAll("header img, nav img, a img, img")) {
-    const attrs = `${img.getAttribute("class") ?? ""} ${img.getAttribute("id") ?? ""} ${img.getAttribute("alt") ?? ""} ${img.getAttribute("src") ?? ""}`;
-    if (/logo/i.test(attrs)) {
-      logo = absolute(img.getAttribute("src") ?? fromSrcset(img.getAttribute("srcset")), pageBase);
-      if (logo) break;
-    }
-  }
-  if (!logo) {
-    const icons = root
-      .querySelectorAll('link[rel~="apple-touch-icon"], link[rel~="icon"], link[rel="shortcut icon"]')
-      .map((l) => ({
-        href: absolute(l.getAttribute("href"), pageBase),
-        size: parseInt(l.getAttribute("sizes")?.split("x")[0] ?? "0", 10) || (l.getAttribute("href")?.endsWith(".svg") ? 512 : 16),
-      }))
-      .filter((i) => i.href)
-      .sort((a, b) => b.size - a.size);
-    logo = icons[0]?.href ?? meta(root, "og:logo");
-  }
+  // Logo: the live capture's header mark when there is one; else read it from the HTML.
+  const logo: string | null = live?.logo ?? (await findLogo(root, html, pageBase, name));
 
   // Images: social cards first, then large content images.
   const images: string[] = [];

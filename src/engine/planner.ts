@@ -561,7 +561,7 @@ export function readSite(raw: unknown): SiteData | null {
       };
     })(),
     cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
-    logo: http(r.logo) ? (r.logo as string) : null,
+    logo: http(r.logo) || isShot(r.logo) ? (r.logo as string) : null,
     images: (Array.isArray(r.images) ? r.images : []).filter(http).slice(0, 14) as string[],
     videos: (Array.isArray(r.videos) ? r.videos : []).filter(http).slice(0, 4) as string[],
     themeColor: typeof r.themeColor === "string" && /^#[0-9a-f]{3,8}$/i.test(r.themeColor) ? r.themeColor : null,
@@ -1133,7 +1133,7 @@ export function beatSync(plan: VideoPlan): VideoPlan {
 }
 
 /** Only same-origin proxied assets may be referenced by a plan. */
-const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d|p\d{1,2})$/.test(s);
+const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d|p\d{1,2}|logo)$/.test(s);
 const PART_KINDS = new Set(["media", "panel", "card", "button"]);
 function sanitizeParts(v: unknown): SitePart[] {
   if (!Array.isArray(v)) return [];

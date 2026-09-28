@@ -2,7 +2,7 @@ import { revealHit } from "../arrange";
 import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
 import { saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
-import { getImage, getMedia, isDarkLogo, mediaSize, type Drawable } from "../media";
+import { getImage, getMedia, stageLogo, mediaSize, type Drawable } from "../media";
 import { scratch } from "../scratch";
 import { subFont } from "../text";
 import type { Skill, SkillContext } from "../types";
@@ -147,9 +147,7 @@ function logoReveal(sc: SkillContext) {
     // Render the mark (inverted to white if it's dark ink) with a glint sweeping across it.
     const pad = 4;
     const buf = scratch("logo", Math.ceil(lw) + pad * 2, Math.ceil(lh) + pad * 2);
-    if (!palette.light && isDarkLogo(logo)) buf.ctx.filter = "brightness(0) invert(1)";
-    buf.ctx.drawImage(logo, pad, pad, lw, lh);
-    buf.ctx.filter = "none";
+    buf.ctx.drawImage(stageLogo(logo, !!palette.light), pad, pad, lw, lh);
     const gx = lerp(-lw * 0.6, lw * 1.6, range(t, hit + 0.3, hit + 1.2));
     const glint = buf.ctx.createLinearGradient(gx - lw * 0.25, 0, gx + lw * 0.25, lh);
     glint.addColorStop(0, "rgba(255,255,255,0)");
