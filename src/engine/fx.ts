@@ -167,6 +167,7 @@ export function flash(sc: SkillContext, amount: number, color = "#ffffff") {
 
 /** Glow helper: sets canvas shadow for bloom-y strokes/fills. */
 export function glow(ctx: CanvasRenderingContext2D, color: string, blur: number) {
+  if (crisp) return noGlow(ctx);
   ctx.shadowColor = color;
   ctx.shadowBlur = blur;
   ctx.shadowOffsetX = 0;

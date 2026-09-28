@@ -5,7 +5,7 @@ import { captionAt } from "./voice";
 import { PALETTES } from "./palettes";
 import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
-import { getImage, stageLogo } from "./media";
+import { drawLogo, getImage } from "./media";
 import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
@@ -520,7 +520,7 @@ function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, 
   if (logo?.naturalWidth) {
     const lh = (wordmark ? 30 : 38) * u;
     const lw = (logo.naturalWidth / logo.naturalHeight) * lh;
-    ctx.drawImage(stageLogo(logo, !!palette.light), x, y - lh / 2, lw, lh);
+    drawLogo(ctx, logo, !!palette.light, x, y - lh / 2, lw, lh);
     lx = x + lw + 12 * u;
   }
   if (!wordmark && brand.name) {

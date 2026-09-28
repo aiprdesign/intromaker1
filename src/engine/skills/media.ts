@@ -2,7 +2,7 @@ import { revealHit } from "../arrange";
 import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
 import { saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
-import { getImage, getMedia, stageLogo, mediaSize, type Drawable } from "../media";
+import { drawLogo, logoMaxWidth, getImage, getMedia, mediaSize, type Drawable } from "../media";
 import { scratch } from "../scratch";
 import { subFont } from "../text";
 import type { Skill, SkillContext } from "../types";
@@ -142,12 +142,18 @@ function logoReveal(sc: SkillContext) {
   if (logo && logo.naturalWidth) {
     const box = short * (h > w ? 0.34 : 0.3) * (wordmark ? 1.25 : 1);
     const ar = logo.naturalWidth / logo.naturalHeight;
-    const lw = ar >= 1 ? Math.min(box * 1.9, box * ar) : box * ar;
+    const lw = Math.min(ar >= 1 ? Math.min(box * 1.9, box * ar) : box * ar, logoMaxWidth(ctx, logo));
     const lh = lw / ar;
     // Render the mark (inverted to white if it's dark ink) with a glint sweeping across it.
     const pad = 4;
-    const buf = scratch("logo", Math.ceil(lw) + pad * 2, Math.ceil(lh) + pad * 2);
-    buf.ctx.drawImage(stageLogo(logo, !!palette.light), pad, pad, lw, lh);
+    const s = Math.max(0, k) * (1 + ex * 0.4);
+    // The buffer matches the logo's on-screen size (zoom and camera included), so it's never
+    // enlarged after drawing.
+    const m = ctx.getTransform();
+    const res = Math.min(2.5, Math.max(1, Math.hypot(m.a, m.b) * Math.max(1, s)));
+    const buf = scratch("logo", Math.ceil((lw + pad * 2) * res), Math.ceil((lh + pad * 2) * res));
+    buf.ctx.setTransform(res, 0, 0, res, 0, 0);
+    drawLogo(buf.ctx, logo, !!palette.light, pad, pad, lw, lh);
     const gx = lerp(-lw * 0.6, lw * 1.6, range(t, hit + 0.3, hit + 1.2));
     const glint = buf.ctx.createLinearGradient(gx - lw * 0.25, 0, gx + lw * 0.25, lh);
     glint.addColorStop(0, "rgba(255,255,255,0)");
@@ -155,18 +161,19 @@ function logoReveal(sc: SkillContext) {
     glint.addColorStop(1, "rgba(255,255,255,0)");
     buf.ctx.globalCompositeOperation = "source-atop";
     buf.ctx.fillStyle = glint;
-    buf.ctx.fillRect(0, 0, buf.canvas.width, buf.canvas.height);
+    buf.ctx.fillRect(0, 0, lw + pad * 2, lh + pad * 2);
     buf.ctx.globalCompositeOperation = "source-over";
+    buf.ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.save();
     ctx.globalAlpha = clamp(k * 1.5) * (1 - ex);
     ctx.translate(cx, logoY);
-    const s = Math.max(0, k) * (1 + ex * 0.4);
     ctx.scale(s, s);
     const blur = (1 - clamp(k)) * 16 * u;
     if (blur > 0.5) ctx.filter = `blur(${blur.toFixed(1)}px)`;
     glow(ctx, rgba(palette.primary, 0.9), 40 * u);
-    ctx.drawImage(buf.canvas, -lw / 2 - pad, -lh / 2 - pad);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(buf.canvas, 0, 0, Math.ceil((lw + pad * 2) * res), Math.ceil((lh + pad * 2) * res), -lw / 2 - pad, -lh / 2 - pad, Math.ceil((lw + pad * 2) * res) / res, Math.ceil((lh + pad * 2) * res) / res);
     ctx.restore();
     nameY = (wordmark ? logoY : cy) + lh / 2 + short * 0.12;
   }

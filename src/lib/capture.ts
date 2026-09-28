@@ -137,6 +137,25 @@ async function captureParts(page: Page, key: string, maxY: number): Promise<Site
  * the original image file (PNG, JPG, WebP, SVG…), an inline SVG serialised with its computed
  * colours, or, for text/CSS logos (icon + name), a 2× screenshot with the background removed.
  */
+/** The SVG version of a raster logo, when the site serves one beside it. */
+async function svgTwin(page: Page, src: string): Promise<string | null> {
+  let url: URL;
+  try {
+    url = new URL(src);
+  } catch {
+    return null;
+  }
+  if (!/\.(png|jpe?g|gif|webp|avif)$/i.test(url.pathname)) return null;
+  url.pathname = url.pathname.replace(/\.(png|jpe?g|gif|webp|avif)$/i, ".svg");
+  url.search = "";
+  if (!(await hostAllowed(url.href))) return null;
+  const res = await page.request.get(url.href, { timeout: 5000, maxRedirects: 0 }).catch(() => null);
+  if (!res || !res.ok()) return null;
+  const body = (await res.text().catch(() => "")).trim();
+  if (!/svg/i.test(res.headers()["content-type"] ?? "") || !/^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i.test(body) || body.length > 400_000) return null;
+  return cleanSvg(body);
+}
+
 async function captureLogo(page: Page, key: string): Promise<string | null> {
   await page.evaluate(() => window.scrollTo(0, 0));
   const found = await page.evaluate(() => {
@@ -198,7 +217,27 @@ async function captureLogo(page: Page, key: string): Promise<string | null> {
     const box = { x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height };
     if (el.tagName.toLowerCase() === "img") {
       const img = el as HTMLImageElement;
-      if (img.naturalWidth >= 16 && img.currentSrc && !img.currentSrc.startsWith("blob:")) return { mode: "img" as const, src: img.currentSrc, box };
+      // Every file the page offers for this logo: <picture> sources and srcset entries. An SVG
+      // among them wins; otherwise the largest raster.
+      const offered: { url: string; w: number }[] = [];
+      const addSet = (set: string | null, type?: string | null) => {
+        for (const part of (set ?? "").split(",")) {
+          const [u, size] = part.trim().split(/\s+/);
+          if (!u) continue;
+          try {
+            const url = new URL(u, location.href).href;
+            const w = /svg/i.test(type ?? "") || /\.svg(\?|#|$)/i.test(url) ? Infinity : size ? parseFloat(size) * (size.endsWith("x") ? img.getBoundingClientRect().width : 1) : img.naturalWidth;
+            offered.push({ url, w });
+          } catch {
+            /* bad URL */
+          }
+        }
+      };
+      if (img.parentElement?.tagName.toLowerCase() === "picture") for (const s of Array.from(img.parentElement.querySelectorAll("source"))) addSet(s.getAttribute("srcset"), s.getAttribute("type"));
+      addSet(img.getAttribute("srcset"));
+      if (img.currentSrc && !img.currentSrc.startsWith("blob:")) offered.push({ url: img.currentSrc, w: /\.svg(\?|#|$)/i.test(img.currentSrc) || /^data:image\/svg/i.test(img.currentSrc) ? Infinity : img.naturalWidth });
+      offered.sort((a, b) => b.w - a.w);
+      if (img.naturalWidth >= 16 && offered.length) return { mode: "img" as const, src: offered[0].url, vector: offered[0].w === Infinity, box };
       return { mode: "shot" as const, box };
     }
     if (el.tagName.toLowerCase() === "svg") {
@@ -233,7 +272,13 @@ async function captureLogo(page: Page, key: string): Promise<string | null> {
     return { mode: "shot" as const, box };
   });
   if (!found) return null;
-  if (found.mode === "img") return found.src;
+  if (found.mode === "img") {
+    if (found.vector) return found.src;
+    // A raster logo often has an SVG twin at the same path (logo.png → logo.svg): use it if so.
+    const twin = await svgTwin(page, found.src);
+    if (twin) return save(`${key}-logo`, twin, "svg");
+    return found.src;
+  }
   if (found.mode === "svg" && found.svg.length < 400_000) return save(`${key}-logo`, cleanSvg(found.svg), "svg");
   // Text / CSS logo: a 2× screenshot on real transparency (the page, header and wrappers behind
   // the logo are made see-through for the shot), with colour-keying as a fallback.
@@ -248,9 +293,24 @@ async function captureLogo(page: Page, key: string): Promise<string | null> {
     }
   }, found.box);
   const pad = 4;
-  const shot = await page
-    .screenshot({ type: "png", scale: "device", omitBackground: true, fullPage: true, clip: { x: Math.max(0, found.box.x - pad), y: Math.max(0, found.box.y - pad), width: found.box.w + pad * 2, height: found.box.h + pad * 2 } })
-    .catch(() => null);
+  // Shot at 4× (Chromium re-renders the text and CSS at that density),
+  // so the logo stays sharp when the film shows it large. Playwright's own screenshot is the
+  // fallback.
+  const clip = { x: Math.max(0, found.box.x - pad), y: Math.max(0, found.box.y - pad), width: found.box.w + pad * 2, height: found.box.h + pad * 2 };
+  let shot: Buffer | null = null;
+  const cdp = await page.context().newCDPSession(page).catch(() => null);
+  if (cdp) {
+    try {
+      await cdp.send("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
+      const res = (await cdp.send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 4 }, captureBeyondViewport: true, fromSurface: true })) as { data: string };
+      shot = Buffer.from(res.data, "base64");
+    } catch {
+      shot = null;
+    }
+    await cdp.send("Emulation.setDefaultBackgroundColorOverride", {}).catch(() => {});
+    await cdp.detach().catch(() => {});
+  }
+  shot ??= await page.screenshot({ type: "png", scale: "device", omitBackground: true, fullPage: true, clip }).catch(() => null);
   if (!shot) return null;
   const keyed = await page.evaluate(async (b64) => {
     const img = new Image();

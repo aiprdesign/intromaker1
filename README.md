@@ -24,7 +24,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
   The narration goes through a voice chain (rumble filter, presence lift, compression), and the music ducks under every line. Scenes stretch to the next beat when a line needs more time. Captions sit on a frosted pill that reads over any layout, with the spoken word lit in the accent colour. Voice and captions are included in every export.
 - **Beat-synced direction**: scene lengths snap to whole beats, so every cut lands on the kick. The picture and the score share one arrangement: the camera punches on the kicks the music actually plays, holds still in the breakdown and hits harder on each drop. Component entrances land on the eighth-note grid.
-- **Cinematic finishing**: two-scale highlight bloom, a colour grade, light leaks, lens bokeh, extruded 3D type, vignette and film grain.
+- **Cinematic finishing**: two-scale highlight bloom, a colour grade, light leaks, lens bokeh, extruded 3D type, vignette and film grain. Text glow is off by default for crisp type; switch *Glow* on in the studio for halos and highlight bloom.
 - **Export presets**: YouTube 1080p60, Reels/TikTok/Shorts 9:16, LinkedIn/Instagram 1:1 and web 720p. The same storyboard re-lays itself out for each format, so nothing is cropped. There's also a one-click PNG thumbnail of the end card. Output is MP4 where the browser supports it (WebM otherwise) with the soundtrack mixed in, rendered entirely in the browser.
 
 ### What makes the SaaS films look pro
@@ -51,11 +51,19 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - an iOS-style notification stack;
   - a growth chart for one real metric.
 - **The real logo, whatever it's made of**: the brand mark is found in the site header the way a person would find it (the home link or a logo-named element near the top-left), and taken in its best form:
-  - image logos (PNG, JPG, WebP, SVG, including lazy-loaded and `<picture>` sources) at their original quality;
-  - inline SVG logos serialised with their real colours;
-  - text/CSS logos (icon + name) as a 2× screenshot on true transparency.
+  - SVG first: inline SVG logos serialised with their real colours, an SVG offered in `<picture>` or `srcset`, or an SVG twin served beside a raster logo (`logo.png` → `logo.svg`);
+  - otherwise the largest raster the page offers (PNG, WebP, JPG; GIF only as a last resort);
+  - text/CSS logos (icon + name) as a 4× screenshot on true transparency.
 
-  Without a live browser, the HTML is read for the same clues, then structured-data logos, `og:logo` and large app icons (never a 16px favicon). On screen, only the neutral ink adapts to the style (black wordmark text goes white on dark styles, white text goes dark on light ones), so coloured marks keep their brand colours.
+  Without a live browser, the HTML is read for the same clues (SVG preferred, largest `srcset` entry), then structured-data logos, `og:logo` and large app icons (never a 16px favicon).
+
+  On screen, SVG logos are rendered fresh at every size, so edges are always sharp. Raster logos are cleaned once:
+  - a plain white box is keyed out, including the holes in letters, with colour-to-alpha edges and no grey outline;
+  - GIF's hard 1-bit edges are smoothed;
+  - small files are upscaled with high-quality filtering and never shown more than 2.5× their own pixels;
+  - small copies (the corner brand bug) are scaled down in steps, so they aren't aliased.
+
+  Only the neutral ink adapts to the style (black wordmark text goes white on dark styles, white text goes dark on light ones), so coloured marks keep their brand colours.
 - **Brand polish**: an anamorphic logo reveal, a corner brand bug through the body of the film, and an end card that holds on the logo, closing line, button and URL.
 - **Copy that reads like a designer wrote it**: the site's headlines are ranked for on-screen quality, the emphasis word is chosen by meaning ("*300+ tools*", "*whole team*"), bento cards carry the site's own one-line feature descriptions, and CTAs vary, including social proof ("Join *12,000+ teams*").
 - **Takes**: "3 more takes" directs alternative cuts (product-first, proof-first, a fresh story) in parallel. They appear as live previews, and you click one to use it.

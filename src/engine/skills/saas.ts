@@ -7,7 +7,7 @@
  */
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
-import { findHotspots, getImage, getMedia, stageLogo, mediaSize, segmentShot } from "../media";
+import { drawLogo, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, segmentShot } from "../media";
 import {
   blurInLayout,
   borderBeam,
@@ -92,11 +92,11 @@ function drawLogoMark(sc: SkillContext, src: string | undefined, cx: number, cy:
   if (!img || !img.naturalWidth) return false;
   const { ctx } = sc;
   const ar = img.naturalWidth / img.naturalHeight;
-  const lw = ar >= 1 ? Math.min(box * 2.2, box * ar) : box * ar;
+  const lw = Math.min(ar >= 1 ? Math.min(box * 2.2, box * ar) : box * ar, logoMaxWidth(ctx, img));
   const lh = lw / ar;
   ctx.save();
   ctx.globalAlpha *= alpha;
-  ctx.drawImage(stageLogo(img, !!sc.palette.light), cx - lw / 2, cy - lh / 2, lw, lh);
+  drawLogo(ctx, img, !!sc.palette.light, cx - lw / 2, cy - lh / 2, lw, lh);
   ctx.restore();
   return true;
 }
@@ -1217,7 +1217,7 @@ function marquee(sc: SkillContext) {
         row.forEach((img, i) => {
           if (x + widths[i] > -50 && x < w + 50) {
             ctx.save();
-            ctx.drawImage(stageLogo(img, !!palette.light), x, ry - (widths[i] / (img.naturalWidth / img.naturalHeight)) / 2, widths[i], widths[i] / (img.naturalWidth / img.naturalHeight));
+            drawLogo(ctx, img, !!palette.light, x, ry - (widths[i] / (img.naturalWidth / img.naturalHeight)) / 2, widths[i], widths[i] / (img.naturalWidth / img.naturalHeight));
             ctx.restore();
           }
           x += widths[i] + gap;

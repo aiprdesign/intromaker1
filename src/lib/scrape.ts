@@ -82,13 +82,22 @@ async function findLogo(root: HTMLElement, rawHtml: string, base: URL, siteName:
       img.getAttribute("src") && !img.getAttribute("src")!.startsWith("data:")
         ? img.getAttribute("src")
         : img.getAttribute("data-src") ?? img.getAttribute("data-lazy-src") ?? fromSrcset(img.getAttribute("srcset") ?? img.getAttribute("data-srcset"));
-    const pictureSrc = img.parentNode && (img.parentNode as HTMLElement).tagName?.toLowerCase() === "picture" ? fromSrcset((img.parentNode as HTMLElement).querySelector("source")?.getAttribute("srcset")) : null;
-    const url = absolute(src ?? pictureSrc, base);
+    const picture = img.parentNode && (img.parentNode as HTMLElement).tagName?.toLowerCase() === "picture" ? (img.parentNode as HTMLElement) : null;
+    const pictureSrc = picture ? fromSrcset(picture.querySelector("source")?.getAttribute("srcset")) : null;
+    // Best file for the logo: an SVG when one is offered, else the largest srcset entry.
+    const sources = picture?.querySelectorAll("source") ?? [];
+    const svgSource = sources.map((s) => fromSrcset(s.getAttribute("srcset"))).find((u, i) => u && (/svg/i.test(sources[i].getAttribute("type") ?? "") || /\.svg(\?|#|$)/i.test(u)));
+    const largest = fromSrcset(img.getAttribute("srcset") ?? img.getAttribute("data-srcset"));
+    const vectorSrc = src && /\.svg(\?|#|$)/i.test(src) ? src : null;
+    const url = absolute(svgSource ?? vectorSrc ?? largest ?? src ?? pictureSrc, base);
     if (!url || (Number(img.getAttribute("width")) > 0 && Number(img.getAttribute("width")) <= 2)) continue;
     const alt = (img.getAttribute("alt") ?? "").toLowerCase();
     let score = context(img);
     if (hint.test(`${attrsOf(img)} ${img.getAttribute("alt") ?? ""} ${img.getAttribute("src") ?? ""}`)) score += 3;
     if (name && alt && (alt === name || alt.startsWith(`${name} `) || alt.includes(`${name} logo`))) score += 2;
+    // Vector logos stay sharp at any size; GIFs have hard 1-bit edges.
+    if (/\.svg(\?|#|$)/i.test(url)) score += 1;
+    else if (/\.gif(\?|#|$)/i.test(url)) score -= 1;
     cands.push({ score, src: url });
   }
   for (const svg of root.querySelectorAll("svg")) {

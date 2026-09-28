@@ -30,10 +30,15 @@ function loadImage(src: string) {
   const p = new Promise<void>((resolve) => {
     const img = new Image();
     img.decoding = "async";
+    // Captured logos: learn whether the file is SVG before first use, so it's drawn as vector
+    // from the first frame.
+    const kind = /-logo$/.test(src) ? probeVector(src) : Promise.resolve();
     img.onload = () => {
-      images.set(src, img);
-      resolve();
-      notifyReady();
+      void kind.then(() => {
+        images.set(src, img);
+        resolve();
+        notifyReady();
+      });
     };
     img.onerror = () => resolve();
     img.src = src;
@@ -147,60 +152,350 @@ export async function syncVideos(plan: VideoPlan, sceneIndex: number, local: num
 
 /* ───────── Logo analysis ───────── */
 
-const adaptCache = new Map<string, HTMLCanvasElement | HTMLImageElement>();
+/** Logos whose file is vector (SVG): drawn fresh at every size, so edges are always sharp. */
+const vectorLogos = new Set<string>();
+const looksVector = (src: string) => /^data:image\/svg/i.test(src) || /\.svg(\?|#|$)/i.test(decodeURIComponent(src.replace(/^\/api\/asset\?url=/, "")));
+const probes = new Map<string, Promise<void>>();
+const absolute = (src: string) => (typeof location !== "undefined" ? new URL(src, location.href).href : src);
+function probeVector(raw: string): Promise<void> {
+  const src = absolute(raw);
+  const known = probes.get(src);
+  if (known) return known;
+  let p: Promise<void> = Promise.resolve();
+  if (looksVector(raw)) vectorLogos.add(src);
+  else if (/-logo$/.test(src) && typeof fetch !== "undefined") {
+    // Captured logos (/api/shot?id=…-logo) are SVG or PNG; the server says which.
+    p = fetch(src, { method: "HEAD" })
+      .then((r) => {
+        if (!/svg/i.test(r.headers.get("content-type") ?? "")) return;
+        vectorLogos.add(src);
+        for (const k of Array.from(levelCache.keys())) if (k.startsWith(`${src}|`)) levelCache.delete(k);
+        notifyReady();
+      })
+      .catch(() => {});
+  }
+  probes.set(src, p);
+  return p;
+}
+
+const levelCache = new Map<string, HTMLCanvasElement | HTMLImageElement>();
+const baseCache = new Map<string, HTMLCanvasElement | null>();
 
 /**
- * The logo, made legible on the stage without touching its brand colours: only the neutral ink
- * is adapted (near-black wordmark text turns white on dark styles, near-white text turns dark
- * on light styles), so a coloured mark next to a wordmark keeps its colours. Logos that need
- * nothing are returned as they are.
+ * Draw a logo at its best: SVGs are rasterised at the size they're shown; PNG, JPG and GIF logos
+ * are cleaned once (a plain white box keyed out, GIF's hard 1-bit edges smoothed, small files
+ * upscaled with high-quality filtering), then scaled down in steps so small copies (the brand bug)
+ * stay smooth instead of aliased. Neutral ink adapts to the stage (see adaptInk).
  */
-export function stageLogo(img: HTMLImageElement, lightStage: boolean): HTMLCanvasElement | HTMLImageElement {
-  if (!img.naturalWidth) return img;
-  const key = `${img.src}|${lightStage ? "l" : "d"}`;
-  const hit = adaptCache.get(key);
+export function drawLogo(ctx: CanvasRenderingContext2D, img: HTMLImageElement, lightStage: boolean, x: number, y: number, w: number, h: number) {
+  const m = ctx.getTransform();
+  const px = Math.max(w, h) * Math.max(1e-3, Math.hypot(m.a, m.b));
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(logoAt(img, lightStage, px), x, y, w, h);
+  ctx.restore();
+}
+
+/** The logo prepared for drawing about `px` pixels on its long side (power-of-two buckets). */
+export function logoAt(img: HTMLImageElement, lightStage: boolean, px = 1024): HTMLCanvasElement | HTMLImageElement {
+  if (!img.naturalWidth || typeof document === "undefined") return img;
+  void probeVector(img.src);
+  const bucket = Math.min(2048, Math.max(32, 2 ** Math.ceil(Math.log2(Math.max(1, px)))));
+  const key = `${img.src}|${lightStage ? "l" : "d"}|${bucket}`;
+  const hit = levelCache.get(key);
   if (hit) return hit;
   let out: HTMLCanvasElement | HTMLImageElement = img;
   try {
-    const scale = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(img.naturalWidth * scale));
-    c.height = Math.max(1, Math.round(img.naturalHeight * scale));
-    const g = c.getContext("2d", { willReadFrequently: true })!;
-    g.drawImage(img, 0, 0, c.width, c.height);
-    const d = g.getImageData(0, 0, c.width, c.height);
-    const px = d.data;
-    let opaque = 0;
-    let ink = 0;
-    const isInk = (i: number) => {
-      const mx = Math.max(px[i], px[i + 1], px[i + 2]);
-      const mn = Math.min(px[i], px[i + 1], px[i + 2]);
-      const sat = mx ? (mx - mn) / mx : 0;
-      const lum = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
-      return sat < 0.22 && (lightStage ? lum > 0.78 : lum < 0.28);
-    };
-    for (let i = 0; i < px.length; i += 4) {
-      if (px[i + 3] < 40) continue;
-      opaque++;
-      if (isInk(i)) ink++;
-    }
-    // Opaque rectangles (app icons, photos) are left alone; so is a logo with hardly any ink.
-    if (opaque > 0 && opaque < (px.length / 4) * 0.92 && ink / opaque > 0.06) {
-      const to = lightStage ? [17, 17, 24] : [255, 255, 255];
-      for (let i = 0; i < px.length; i += 4) {
-        if (px[i + 3] < 8 || !isInk(i)) continue;
-        px[i] = to[0];
-        px[i + 1] = to[1];
-        px[i + 2] = to[2];
-      }
-      g.putImageData(d, 0, 0);
+    const long = Math.max(img.naturalWidth, img.naturalHeight);
+    if (vectorLogos.has(img.src)) {
+      // Vector: render straight at the bucket size.
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round((img.naturalWidth / long) * bucket));
+      c.height = Math.max(1, Math.round((img.naturalHeight / long) * bucket));
+      const g = c.getContext("2d", { willReadFrequently: true })!;
+      g.drawImage(img, 0, 0, c.width, c.height);
+      adaptInk(g, c.width, c.height, lightStage);
       out = c;
+    } else {
+      const bkey = `${img.src}|${lightStage ? "l" : "d"}`;
+      if (!baseCache.has(bkey)) baseCache.set(bkey, prepareRaster(img, lightStage));
+      const base = baseCache.get(bkey);
+      out = base ? stepDown(base, bucket) : img;
     }
   } catch {
     out = img;
   }
-  adaptCache.set(key, out);
+  levelCache.set(key, out);
   return out;
+}
+
+/**
+ * Largest on-screen width (in canvas pixels) a logo can be shown at without looking enlarged:
+ * unlimited for SVG, 2.5× the file's own pixels for PNG / JPG / GIF (clean and a little smaller
+ * beats big and blocky).
+ */
+export function logoMaxWidth(ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
+  if (vectorLogos.has(img.src)) return Infinity;
+  const m = ctx.getTransform();
+  return (img.naturalWidth * 2.5) / Math.max(1e-3, Math.hypot(m.a, m.b));
+}
+
+/** Back-compat: the logo prepared at a generous size. */
+export function stageLogo(img: HTMLImageElement, lightStage: boolean) {
+  return logoAt(img, lightStage, 1024);
+}
+
+/** Halve with smoothing until close, then a final high-quality step: no aliasing on small copies. */
+function stepDown(src: HTMLCanvasElement, bucket: number): HTMLCanvasElement {
+  let cur = src;
+  const target = (c: HTMLCanvasElement) => Math.max(c.width, c.height);
+  while (target(cur) > bucket * 2) {
+    const n = document.createElement("canvas");
+    n.width = Math.max(1, Math.round(cur.width / 2));
+    n.height = Math.max(1, Math.round(cur.height / 2));
+    const g = n.getContext("2d")!;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(cur, 0, 0, n.width, n.height);
+    cur = n;
+  }
+  if (target(cur) <= bucket) return cur;
+  const k = bucket / target(cur);
+  const n = document.createElement("canvas");
+  n.width = Math.max(1, Math.round(cur.width * k));
+  n.height = Math.max(1, Math.round(cur.height * k));
+  const g = n.getContext("2d")!;
+  g.imageSmoothingQuality = "high";
+  g.drawImage(cur, 0, 0, n.width, n.height);
+  return n;
+}
+
+/** Clean a raster logo once, at a working size of at least ~1200px on its long side. */
+function prepareRaster(img: HTMLImageElement, lightStage: boolean): HTMLCanvasElement | null {
+  const long = Math.max(img.naturalWidth, img.naturalHeight);
+  const fit = Math.min(1, 2048 / long);
+  const w0 = Math.max(1, Math.round(img.naturalWidth * fit));
+  const h0 = Math.max(1, Math.round(img.naturalHeight * fit));
+  const c0 = document.createElement("canvas");
+  c0.width = w0;
+  c0.height = h0;
+  const g0 = c0.getContext("2d", { willReadFrequently: true })!;
+  g0.drawImage(img, 0, 0, w0, h0);
+  const d0 = g0.getImageData(0, 0, w0, h0);
+  const px = d0.data;
+  const n = w0 * h0;
+
+  // A logo saved on a plain white box (common for JPG logos): key the box out with a soft edge.
+  const at = (x: number, y: number) => (y * w0 + x) * 4;
+  const corners = [at(0, 0), at(w0 - 1, 0), at(0, h0 - 1), at(w0 - 1, h0 - 1)];
+  const whiteBox = corners.every((i) => px[i + 3] > 250 && px[i] > 238 && px[i + 1] > 238 && px[i + 2] > 238);
+  if (whiteBox) keyWhite(px, w0, h0);
+
+  // Hard 1-bit transparency (GIF, some PNG-8): every pixel fully on or off.
+  let clear = 0;
+  let partial = 0;
+  for (let i = 3; i < px.length; i += 4) {
+    if (px[i] === 0) clear++;
+    else if (px[i] < 255) partial++;
+  }
+  const hardEdges = !whiteBox && clear > n * 0.03 && partial < n * 0.004;
+  // Transparent pixels often hold junk colour (black, or the GIF's matte): pull the neighbouring
+  // opaque colour into them so smoothing never drags in a fringe.
+  bleed(px, w0, h0, 3);
+  g0.putImageData(d0, 0, 0);
+
+  // Upscale small logos with high-quality filtering so the film never enlarges raw pixels.
+  const f = Math.min(4, Math.max(1, Math.ceil(1200 / Math.max(w0, h0))));
+  let c = c0;
+  if (f > 1) {
+    c = document.createElement("canvas");
+    c.width = w0 * f;
+    c.height = h0 * f;
+    const g = c.getContext("2d")!;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(c0, 0, 0, c.width, c.height);
+  }
+  const g = c.getContext("2d", { willReadFrequently: true })!;
+  if (hardEdges) {
+    // Smooth the staircase: blur the alpha a little, then re-sharpen it with a soft threshold,
+    // which traces a clean anti-aliased curve through the steps.
+    const d = g.getImageData(0, 0, c.width, c.height);
+    smoothAlpha(d.data, c.width, c.height, Math.max(1, Math.round(f * 0.75)));
+    g.putImageData(d, 0, 0);
+  }
+  adaptInk(g, c.width, c.height, lightStage);
+  return c;
+}
+
+/**
+ * Remove the white box a logo was saved on. Background is the white connected to the border,
+ * plus enclosed white surrounded by neutral ink (the holes in "o", "e", "a"); enclosed white
+ * surrounded by colour (a dot in a coloured mark) is part of the logo and stays. Pixels on and
+ * next to the background get colour-to-alpha, so anti-aliased edges fade out cleanly instead of
+ * leaving a grey outline.
+ */
+function keyWhite(px: Uint8ClampedArray, w: number, h: number) {
+  const n = w * h;
+  const light = (p: number) => 765 - px[p * 4] - px[p * 4 + 1] - px[p * 4 + 2] <= 88;
+  const bg = new Uint8Array(n);
+  const fill = (seeds: number[], mark: Uint8Array, value: number) => {
+    const out: number[] = [];
+    const stack = seeds;
+    while (stack.length) {
+      const p = stack.pop()!;
+      if (mark[p] || !light(p)) continue;
+      mark[p] = value;
+      out.push(p);
+      const x = p % w;
+      if (x > 0) stack.push(p - 1);
+      if (x < w - 1) stack.push(p + 1);
+      if (p >= w) stack.push(p - w);
+      if (p < n - w) stack.push(p + w);
+    }
+    return out;
+  };
+  const border: number[] = [];
+  for (let x = 0; x < w; x++) border.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) border.push(y * w, y * w + w - 1);
+  fill(border, bg, 1);
+  // Enclosed light regions: background when their rim is neutral ink.
+  const seen = new Uint8Array(n);
+  for (let p = 0; p < n; p++) {
+    if (bg[p] || seen[p] || !light(p)) continue;
+    const region = fill([p], seen, 1);
+    let rim = 0;
+    let coloured = 0;
+    for (const q of region) {
+      const x = q % w;
+      for (const r of [x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1, q - w, q + w]) {
+        if (r < 0 || r >= n || light(r)) continue;
+        const i = r * 4;
+        const mx = Math.max(px[i], px[i + 1], px[i + 2]);
+        const mn = Math.min(px[i], px[i + 1], px[i + 2]);
+        rim++;
+        if (mx - mn > 40) coloured++;
+      }
+    }
+    if (rim && coloured / rim < 0.5) for (const q of region) bg[q] = 1;
+  }
+  // Edge band: background plus two pixels around it.
+  let band = bg;
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Uint8Array(band);
+    for (let p = 0; p < n; p++) {
+      if (band[p]) continue;
+      const x = p % w;
+      if ((x > 0 && band[p - 1]) || (x < w - 1 && band[p + 1]) || (p >= w && band[p - w]) || (p < n - w && band[p + w])) next[p] = 1;
+    }
+    band = next;
+  }
+  for (let p = 0; p < n; p++) {
+    if (!band[p]) continue;
+    const i = p * 4;
+    // Colour-to-alpha against white.
+    const a = Math.max(255 - px[i], 255 - px[i + 1], 255 - px[i + 2]) / 255;
+    // Tiny residue on the white (JPEG noise) is cleared outright.
+    const alpha = bg[p] ? Math.max(0, (a - 0.07) / 0.93) : a;
+    if (alpha <= 0) {
+      px[i + 3] = 0;
+      continue;
+    }
+    for (let k = 0; k < 3; k++) px[i + k] = Math.max(0, Math.min(255, Math.round((px[i + k] - 255 * (1 - a)) / a)));
+    px[i + 3] = Math.round(px[i + 3] * alpha);
+  }
+}
+
+function bleed(px: Uint8ClampedArray, w: number, h: number, passes: number) {
+  for (let p = 0; p < passes; p++) {
+    const src = new Uint8ClampedArray(px);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (src[i + 3] > 0) continue;
+        let r = 0, gg = 0, b = 0, k = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx, yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+            const j = (yy * w + xx) * 4;
+            if (src[j + 3] === 0) continue;
+            r += src[j];
+            gg += src[j + 1];
+            b += src[j + 2];
+            k++;
+          }
+        }
+        if (k) {
+          px[i] = r / k;
+          px[i + 1] = gg / k;
+          px[i + 2] = b / k;
+        }
+      }
+    }
+  }
+}
+
+function smoothAlpha(px: Uint8ClampedArray, w: number, h: number, r: number) {
+  const a = new Float32Array(w * h);
+  for (let i = 0; i < a.length; i++) a[i] = px[i * 4 + 3] / 255;
+  // Separable box blur.
+  const tmp = new Float32Array(a.length);
+  for (let y = 0; y < h; y++) {
+    let sum = 0;
+    for (let x = -r; x <= r; x++) sum += a[y * w + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[y * w + x] = sum / (2 * r + 1);
+      sum += a[y * w + Math.min(w - 1, x + r + 1)] - a[y * w + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let y = -r; y <= r; y++) sum += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      const v = sum / (2 * r + 1);
+      // Soft threshold around the edge.
+      const t = Math.min(1, Math.max(0, (v - 0.3) / 0.4));
+      px[(y * w + x) * 4 + 3] = Math.round(t * t * (3 - 2 * t) * 255);
+      sum += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+}
+
+/**
+ * The logo made legible on the stage without touching its brand colours: only the neutral ink
+ * is adapted (near-black wordmark text turns white on dark styles, near-white text turns dark
+ * on light styles), so a coloured mark next to a wordmark keeps its colours. Opaque rectangles
+ * (app icons, photos) and logos with hardly any ink are left alone.
+ */
+function adaptInk(g: CanvasRenderingContext2D, w: number, h: number, lightStage: boolean) {
+  const d = g.getImageData(0, 0, w, h);
+  const px = d.data;
+  let opaque = 0;
+  let ink = 0;
+  const inkness = (i: number) => {
+    const mx = Math.max(px[i], px[i + 1], px[i + 2]);
+    const mn = Math.min(px[i], px[i + 1], px[i + 2]);
+    const sat = mx ? (mx - mn) / mx : 0;
+    const lum = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
+    // Neutral: low saturation, or so little chroma it only looks tinted (JPEG noise on black).
+    if (sat >= 0.22 && mx - mn > 30) return 0;
+    // Soft band instead of a hard cut, so anti-aliased edges recolour smoothly.
+    return lightStage ? Math.min(1, Math.max(0, (lum - 0.72) / 0.12)) : Math.min(1, Math.max(0, (0.34 - lum) / 0.12));
+  };
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 40) continue;
+    opaque++;
+    if (inkness(i) > 0.5) ink++;
+  }
+  if (!(opaque > 0 && opaque < (px.length / 4) * 0.92 && ink / opaque > 0.06)) return;
+  const to = lightStage ? [17, 17, 24] : [255, 255, 255];
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 4) continue;
+    const k = inkness(i);
+    if (k <= 0) continue;
+    for (let c = 0; c < 3; c++) px[i + c] = Math.round(px[i + c] + (to[c] - px[i + c]) * k);
+  }
+  g.putImageData(d, 0, 0);
 }
 
 /* ───────── Brand colours ───────── */
