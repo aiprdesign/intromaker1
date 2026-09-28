@@ -27,7 +27,8 @@ export interface LintContext {
 }
 
 const HOOKS = new Set(["blur-reveal", "pain-strike", "word-swap", "cinematic-title", "type-cascade"]);
-const NEEDS_ITEMS: Record<string, number> = { "ui-tour": 2, bento: 3, "pain-strike": 2, steps: 2, "word-swap": 2 };
+const NEEDS_ITEMS: Record<string, number> = { "ui-tour": 2, bento: 3, "pain-strike": 2, steps: 2, "word-swap": 2, "command-k": 3, "click-flow": 3, "notify-stack": 3, "ai-prompt": 1 };
+const DEMO_SKILLS = new Set(["command-k", "ai-prompt", "click-flow", "notify-stack"]);
 
 const words = (s: string) => s.replace(/\*/g, "").split(/\s+/).filter(Boolean).length;
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -58,6 +59,7 @@ export function lintStoryboard(draft: Draft, ctx: LintContext): string[] {
   if (saas) {
     if (!HOOKS.has(scenes[0].skill)) issues.push(`Open with a hook (blur-reveal with the promise, or pain-strike with real pains), not ${scenes[0].skill}.`);
     if (scenes[scenes.length - 1].skill !== "cta") issues.push("End on a cta scene whose subtext is the button label.");
+    if (scenes.filter((s) => DEMO_SKILLS.has(s.skill)).length > 1) issues.push("Use at most one interaction moment (command-k, ai-prompt, click-flow or notify-stack) per film.");
     const withEyebrow = scenes.filter((s) => s.eyebrow?.trim()).length;
     if (scenes.length >= 4 && withEyebrow < scenes.length / 2) issues.push("Give most scenes an eyebrow chapter label so the film reads as one story.");
   }
@@ -70,6 +72,7 @@ export function lintStoryboard(draft: Draft, ctx: LintContext): string[] {
     }
     const need = NEEDS_ITEMS[s.skill];
     if (need && (s.items?.filter(Boolean).length ?? 0) < need) issues.push(`${n} needs at least ${need} items.`);
+    if (s.skill === "chart-grow" && !/\d/.test(s.subtext ?? "")) issues.push(`${n} needs subtext = one real stat with a number (e.g. "30,000+ businesses").`);
     if (s.skill === "cta" && !s.subtext?.trim()) issues.push(`${n} needs subtext = the button label${ctx.site?.cta ? ` ("${ctx.site.cta}")` : ""}.`);
     if (s.duration < 1.8 || s.duration > 8) issues.push(`${n} lasts ${s.duration}s; keep scenes between 2.5 and 6.5 seconds.`);
     if (!ctx.site) return;

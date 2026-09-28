@@ -35,6 +35,11 @@ export const SKILL_IDS = [
   "site-scroll",
   "steps",
   "icon-features",
+  "command-k",
+  "ai-prompt",
+  "click-flow",
+  "notify-stack",
+  "chart-grow",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -257,7 +262,7 @@ export interface SkillContext {
   concept?: string;
 }
 
-export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike";
+export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike" | "key" | "success";
 
 /** A sound-effect cue at a scene-local time (seconds). */
 export interface SfxCue {

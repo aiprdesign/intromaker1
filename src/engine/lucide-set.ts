@@ -204,6 +204,10 @@ import {
   CircleX,
   TriangleAlert,
   Frown,
+  ArrowUp,
+  Command,
+  Keyboard,
+  BellRing,
 } from "lucide";
 
 export type IconNode = [tag: string, attrs: Record<string, string | number | undefined>][];
@@ -413,4 +417,8 @@ export const LUCIDE = {
   CircleX,
   TriangleAlert,
   Frown,
+  ArrowUp,
+  Command,
+  Keyboard,
+  BellRing,
 } as unknown as Record<string, IconNode>;

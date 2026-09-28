@@ -22,7 +22,9 @@ const STOP = new Set("a an the of to in on at by for with and or but your our my
 const words = (s: string) => s.replace(/\*/g, "").split(/\s+/).filter(Boolean);
 const norm = (s: string) => s.toLowerCase().replace(/\*/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 const PRODUCT = new Set(["meet", "tour", "cards"]);
-const VALUE = new Set(["features", "how", "bento"]);
+// A demo beat (command palette, AI answer, one-click flow, live notifications) shows value too.
+const VALUE = new Set(["features", "how", "bento", "demo"]);
+const IN_ACTION = new Set(["tour", "meet", "cards", "demo"]);
 const ROLE_OK = new Set(["promise"]);
 const PROOF = new Set(["quote", "logos", "cards", "stat"]);
 
@@ -43,6 +45,13 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null): { sco
   const proofAvailable = !!site && (site.testimonials.length > 0 || site.clientLogos.length > 0 || site.stats.length > 0);
   if (target >= 20 && proofAvailable && !roles.some((r) => PROOF.has(r))) add("arc", 4, "site has proof but the film shows none");
   if (roles[roles.length - 1] !== "cta") add("arc", 8, "does not end on the CTA");
+  // Best-in-class launch films show the product *doing* something, not only talking about it.
+  if (target >= 20 && !roles.some((r) => IN_ACTION.has(r))) add("arc", 3, "no product-in-action moment (tour, demo, live UI)");
+  // Interaction moments need their inputs: a command to run, a prompt to send, tasks to tick off.
+  for (const s of sc.filter((x) => x.role === "demo")) {
+    if ((s.items ?? []).length < (s.skill === "ai-prompt" ? 1 : 3)) add("arc", 2, `${s.skill} demo has too few items`);
+    if (s.skill === "ai-prompt" && !s.subtext && (s.items ?? []).length < 2) add("copy", 2, "AI answer has no content");
+  }
 
   // ── Richness: long films use the material the site offers.
   if (site && requested >= 30) {

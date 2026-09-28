@@ -23,6 +23,8 @@ export type Role =
   | "integrations"
   | "features"
   | "promise"
+  | "demo"
+  | "metric"
   | "cta";
 
 export type TemplateCategory = "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
@@ -68,8 +70,13 @@ export const DEFAULT_ROLE_SKILL: Record<Role, SkillId> = {
   integrations: "integrations",
   features: "icon-features",
   promise: "word-swap",
+  demo: "click-flow",
+  metric: "chart-grow",
   cta: "cta",
 };
+
+/** Interaction moments: the director picks one per film to suit the product, and templates keep it. */
+export const DEMO_SKILLS = new Set<SkillId>(["command-k", "ai-prompt", "click-flow", "notify-stack"]);
 
 /** Base length of each role in beats (and a floor in seconds). */
 function roleLength(scene: Scene, role: Role): [number, number] {
@@ -102,6 +109,10 @@ function roleLength(scene: Scene, role: Role): [number, number] {
       return [8, 3.8];
     case "features":
       return [(scene.items?.length ?? 4) * 1.5 + 6, 4.6];
+    case "demo":
+      return scene.skill === "ai-prompt" ? [12, 5.6] : scene.skill === "notify-stack" ? [(scene.items?.length ?? 4) * 1.2 + 5, 4.4] : [10, 4.8];
+    case "metric":
+      return [8, 4];
     case "cta":
       return [8, 3.6];
   }
@@ -570,6 +581,11 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "logo-marquee": "logos",
   "number-ticker": "stat",
   integrations: "integrations",
+  "command-k": "demo",
+  "ai-prompt": "demo",
+  "click-flow": "demo",
+  "notify-stack": "demo",
+  "chart-grow": "metric",
   cta: "cta",
 };
 
@@ -594,6 +610,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (!role) return scene;
     let skill = tpl.roles[role] ?? DEFAULT_ROLE_SKILL[role];
     if (role === "reveal" && !plan.brand?.logo) skill = tpl.revealNoLogo;
+    if (role === "demo" && DEMO_SKILLS.has(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
@@ -642,8 +659,9 @@ export function fitLength(plan: VideoPlan, target: number): VideoPlan {
   return {
     ...plan,
     scenes: plan.scenes.map((s) => {
-      const floor = { cta: 3, reveal: 2.4, hook: 2.6, features: 3.4, tour: 4.2, how: 3.6, quote: 3.8 }[s.role ?? ""] ?? 3;
-      return { ...s, duration: Math.max(Math.ceil(floor / beat), Math.round((s.duration * k) / beat)) * beat };
+      const floor = { cta: 3, reveal: 2.4, hook: 2.6, features: 3.4, tour: 4.2, how: 3.6, quote: 3.8, demo: 4.2, metric: 3.4 }[s.role ?? ""] ?? 3;
+      // Past ~8s a single shot drags, however much time there is to fill.
+      return { ...s, duration: Math.min(Math.floor(8.4 / beat), Math.max(Math.ceil(floor / beat), Math.round((s.duration * k) / beat))) * beat };
     }),
   };
 }

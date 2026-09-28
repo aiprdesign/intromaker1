@@ -23,7 +23,7 @@ import {
 } from "@/engine/planner";
 import { SKILLS } from "@/engine/skills";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
-import { detectConcept } from "@/engine/concepts";
+import { DEMOS, detectConcept } from "@/engine/concepts";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData } from "@/engine/types";
 
 export const runtime = "nodejs";
@@ -84,8 +84,9 @@ TWO STYLES — set "style" and follow its rules:
 TRAILER: epic cinematic trailer. UPPERCASE 1-4 word cards, anton/grotesk font, spectacular skills, trailer score.
 SAAS: a world-class product-launch film in the style of Linear, Vercel, Stripe and Apple keynotes. Rules:
 - Font "inter". Copy in sentence case, 3-9 words, confident and concrete; wrap the key word in *asterisks* for the brand gradient ("Close deals at the speed of *thought*").
-- Narrative: hook (the promise, or pain-strike with 2-4 real pains → the better way) → brand (logo-reveal or particle-assemble) → product (ui-tour with 2 callout items, or ui-cards) → features (bento with 3-6 items, each "Short title — one-line benefit" using the site's own feature descriptions) → proof (testimonial ONLY with a real quote; logo-marquee ONLY with real customer logos; stats in ui-cards/number-ticker) → integrations if relevant → cta (subtext = the button label) last.
-- Prefer these skills: site-scroll, steps, icon-features, blur-reveal, word-swap ("Ship faster|smarter|together"), pain-strike, ui-tour, bento, ui-cards, integrations, testimonial, logo-marquee, cta, logo-reveal. Avoid neon/retro/glitch/shockwave/kinetic-slam.
+- Narrative: hook (the promise, or pain-strike with 2-4 real pains → the better way) → brand (logo-reveal or particle-assemble) → product in action (ui-tour with 2 callout items or ui-cards over real media, and/or ONE interaction moment) → features (bento with 3-6 items, each "Short title — one-line benefit" using the site's own feature descriptions) → proof (testimonial ONLY with a real quote; logo-marquee ONLY with real customer logos; stats in ui-cards/number-ticker) → integrations if relevant → cta (subtext = the button label) last.
+- Interaction moments — the best launch films SHOW the product doing something. Use at most one per film, matched to the product: command-k (keyboard-first dev/productivity tools; items = commands, the first is a real feature that runs), ai-prompt (AI products; items[0] = the prompt, subtext = the answer in the product's voice, items[1..3] = real capabilities), click-flow (automation; subtext = the button label, items = 3-5 tasks it completes), notify-stack (sales, e-commerce, security, messaging; items = 3-5 "Event — detail" notifications). chart-grow shows ONE real metric (subtext = the stat, e.g. "30,000+ businesses").
+- Prefer these skills: site-scroll, steps, icon-features, command-k, ai-prompt, click-flow, notify-stack, chart-grow, blur-reveal, word-swap ("Ship faster|smarter|together"), pain-strike, ui-tour, bento, ui-cards, integrations, testimonial, logo-marquee, cta, logo-reveal. Avoid neon/retro/glitch/shockwave/kinetic-slam.
 - Transitions: dolly, whip, push, dissolve, leak, cut. bpm 112-126. Durations: hooks 3-3.5s, ui-tour 5.5-6.5s, bento 4.5-5s, others 3.5-4.5s.
 - Never invent customer names, quotes, logos or statistics.
 - Vary skills so no two consecutive scenes use the same one, and pick skills whose aesthetic fits the prompt's mood. Save the most spectacular skills (god-rays, shockwave, particle-assemble, glass-shatter, warp-tunnel) for the hook, title and outro.
@@ -150,7 +151,8 @@ This storyboard is a product intro for the website below, built from its own bra
   1 Hook ("The old way": pain-strike with the real pains → "There's a *better* way", or blur-reveal with the promise)
   2 Reveal (logo-reveal, subtext = the promise) 3 Meet (site-scroll on the FULL-PAGE screenshot, eyebrow "Meet <Name>")
   4 How it works (steps with the real steps) 5 Features (ui-tour on the best product image/video with 2 callouts; bento)
-  6 Proof ("Loved by teams" testimonial, "Customers" logo-marquee, "Results" ui-cards with real stats) 7 Integrations 8 CTA.
+  5b Product in action: one interaction moment (command-k / ai-prompt / click-flow / notify-stack) that suits the product
+  6 Proof ("Loved by teams" testimonial, "Customers" logo-marquee, "Results" ui-cards or chart-grow with a real stat) 7 Integrations 8 CTA.
   Skip beats the site has no material for. Keep copy consistent: one voice, one promise, recurring brand name.`;
 
 /** Screenshots the AI should look at: the hero plus a few page sections (vision input). */
@@ -220,6 +222,7 @@ async function directorRequest(c: Ctx) {
     (c.prompt ? `Prompt: ${c.prompt}\n\n` : "") +
     `Style: ${c.wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${c.aspect}. Target total length: ${LENGTH_SECONDS[c.length]} seconds.` +
     (c.wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[c.template].name}": ${TEMPLATE_MAP[c.template].vibe} Write copy in this voice.` : "") +
+    (c.wantSaas ? `\nINTERACTION MOMENT for this product: ${DEMOS[c.concept.id]?.skill ?? DEMOS.general.skill} (e.g. headline "${(DEMOS[c.concept.id] ?? DEMOS.general).title.replace(/\*/g, "")}"); fill it from the product's real features.` : "") +
     (c.wantSaas && c.concept.id !== "general"
       ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat").join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${c.concept.cta[0].replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
       : "") +

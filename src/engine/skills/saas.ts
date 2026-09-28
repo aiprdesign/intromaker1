@@ -67,7 +67,7 @@ function stagger(sc: SkillContext) {
 }
 
 /** Top-of-frame headline with an optional chapter eyebrow ("How it works") above it. */
-function topHeadline(sc: SkillContext) {
+export function topHeadline(sc: SkillContext) {
   const { w, h, t, d, u, scene } = sc;
   const portrait = h > w;
   const hasEb = !!scene.eyebrow;

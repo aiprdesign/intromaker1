@@ -623,16 +623,21 @@ export function blurInLayout(
         ctx.fillStyle = g;
       } else ctx.fillStyle = palette.text;
       ctx.textAlign = "left";
+      // Glyphs are placed by prefix width so kerning is kept: summing single-glyph widths
+      // runs long and pushes the word into its neighbour.
       let cx = x;
-      for (const ch of clean) {
+      let complete = true;
+      for (let ci = 0; ci < clean.length; ci++) {
+        cx = x + (ci ? ctx.measureText(clean.slice(0, ci)).width : 0) + layout.tracking * ci;
         if (gi >= visible) {
           cursor ??= { x: cx, y };
+          complete = false;
           break;
         }
-        ctx.fillText(ch, cx, y);
-        cx += ctx.measureText(ch).width + layout.tracking;
+        ctx.fillText(clean[ci], cx, y);
         gi++;
       }
+      if (complete) cx = x + widths[i];
       if (typing && gi >= visible) cursor ??= { x: cx, y };
       ctx.restore();
       gi++;

@@ -684,6 +684,52 @@ export class Soundtrack {
         });
         break;
       }
+      case "key": {
+        // Soft mechanical keystroke: a short filtered tick plus a low thock.
+        const n = this.noiseSource();
+        const bp = c.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.Q.value = 1.4;
+        bp.frequency.value = 3200;
+        const ng = c.createGain();
+        ng.gain.setValueAtTime(0.0001, t);
+        ng.gain.exponentialRampToValueAtTime(0.12, t + 0.002);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+        n.connect(bp).connect(ng).connect(this.out);
+        n.start(t, Math.random());
+        n.stop(t + 0.04);
+        const o = this.track(c.createOscillator());
+        o.type = "sine";
+        o.frequency.setValueAtTime(190, t);
+        o.frequency.exponentialRampToValueAtTime(120, t + 0.04);
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.09, t + 0.003);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+        o.connect(g).connect(this.out);
+        o.start(t);
+        o.stop(t + 0.07);
+        break;
+      }
+      case "success": {
+        // Two-note rising chime (a fifth), the universal "done" sound.
+        [79, 86].forEach((note, i) => {
+          const tt = t + i * 0.09;
+          const o = this.track(c.createOscillator());
+          o.type = "triangle";
+          o.frequency.value = hz(note);
+          const g = c.createGain();
+          g.gain.setValueAtTime(0.0001, tt);
+          g.gain.exponentialRampToValueAtTime(0.1, tt + 0.008);
+          g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.5);
+          o.connect(g);
+          g.connect(this.out);
+          g.connect(this.reverbSend);
+          o.start(tt);
+          o.stop(tt + 0.55);
+        });
+        break;
+      }
       case "strike": {
         const n = this.noiseSource();
         const bp = c.createBiquadFilter();

@@ -1,6 +1,6 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
-import { CONCEPT_MAP, detectConcept } from "./concepts";
+import { CONCEPT_MAP, CONCEPTS, DEMOS, detectConcept } from "./concepts";
 import { applyTemplate, DEFAULT_TEMPLATE } from "./templates";
 import {
   FONTS,
@@ -288,8 +288,10 @@ function stats(prompt: string): string[] {
 /** Product/SaaS prompts get the modern launch-film treatment unless they ask for a trailer. */
 export function isSaasPrompt(prompt: string) {
   const l = prompt.toLowerCase();
+  // Any recognisable product category (an AI assistant, a CRM, a payments tool…) is a SaaS film too.
   return (
-    /\b(saas|app|platform|software|startup|product|dashboard|b2b|api|crm|tool|workspace|launch video|explainer|demo)\b/.test(l) &&
+    (/\b(saas|app|platform|software|startup|product|dashboard|b2b|api|crm|tool|workspace|launch video|explainer|demo|system|teams|assistant|automation|analytics)\b/.test(l) ||
+      Math.max(...CONCEPTS.map((c) => (l.match(c.keywords) ?? []).length)) >= 2) &&
     !/\b(epic|trailer|cinematic|game|gaming|movie|film|hype|festival|documentary)\b/.test(l)
   );
 }
@@ -592,6 +594,26 @@ const ANGLE_ORDER: Record<Angle, string[]> = {
   proof: ["hook", "pain", "reveal", "quote", "logos", "meet", "tour", "features", "how", "bento", "cards", "integrations", "cta"],
 };
 
+/**
+ * Turn the product's description into its own first-person answer for the AI-prompt demo:
+ * "Scribe drafts emails in your voice" → "I draft emails in your voice";
+ * "Meet Harbor, the AI assistant that…" → "I'm the AI assistant that…".
+ */
+export function aiSelfIntro(text: string, name: string): { answer: string; firstPerson: boolean } {
+  const clean = text.replace(/\*/g, "").trim();
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let rest = clean.replace(new RegExp(`^(meet|introducing|say hello to)\\s+${esc}[,:]?\\s*`, "i"), "");
+  if (rest !== clean && /^(the|an?|your)\s/i.test(rest)) return { answer: `I'm ${rest.charAt(0).toLowerCase()}${rest.slice(1)}`.replace(/([^.!?])$/, "$1."), firstPerson: true };
+  const m = rest.match(new RegExp(`^${esc}\\s+(is|has|helps|makes|lets|gives|turns|brings|drafts|writes|keeps|puts|finds|runs|builds|automates|stops|sends|takes|does|answers|summari[sz]es|handles|manages|tracks|creates|connects|[a-z]+s)\\b\\s*`, "i"));
+  if (m) {
+    const verb = m[1].toLowerCase();
+    rest = rest.slice(m[0].length);
+    const first = verb === "is" ? "I'm" : verb === "has" ? "I have" : verb === "does" ? "I do" : `I ${verb.replace(/(ch|sh|x|ss|z)es$/, "$1").replace(/ies$/, "y").replace(/s$/, "")}`;
+    return { answer: `${first} ${rest}`.trim().replace(/([^.!?])$/, "$1."), firstPerson: true };
+  }
+  return { answer: clean, firstPerson: false };
+}
+
 /** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
 export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
   return req.style === "trailer" ? planFromSiteTrailer(site, req) : planFromSiteSaas(site, req);
@@ -736,7 +758,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // 4. How it works.
   if (site.steps && site.steps.length >= 2) {
-    add(5, {
+    add(target >= 30 ? 3 : 5, {
       role: "how", skill: "steps",
       text: `Get started in *${site.steps.length} steps*`,
       items: site.steps.slice(0, 4),
@@ -770,7 +792,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Key features as icon tiles (the classic SaaS feature row); a bento when there are many.
   // One value beat, always: icon tiles for up to four features, a bento for a richer set.
   // (In a product-first teaser the tour already carries the features.)
-  const valuePriority = target < 20 && ((angle === "product" && tourMedia) || (angle === "proof" && (quote || teamStat))) ? 5 : 2;
+  const valuePriority = target < 20 && ((angle === "product" && tourMedia) || (angle === "proof" && quote)) ? 5 : 2;
   if (featureItems.length >= 5) {
     add(valuePriority, {
       role: "bento", skill: "bento",
@@ -790,6 +812,36 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       transition: "dolly",
     });
   }
+  // 5b. The signature interaction moment: the product *doing* something (a command palette,
+  // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
+  // Products that lead with AI get the AI moment whatever their category.
+  const aiLed = concept.id !== "ai" && [site.tagline, ...site.headlines.slice(0, 4)].some((x) => /\b(ai|assistant|copilot|gpt)\b/i.test(x ?? ""));
+  const demo = aiLed ? DEMOS.ai : DEMOS[concept.id] ?? DEMOS.general;
+  const shownTitles = new Set([...featureItems.slice(0, featureItems.length >= 5 ? 6 : 4), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
+  const spareFeatures = shortFeatures.filter((f) => !shownTitles.has(norm(f)));
+  let demoScene: Scene | null = null;
+  if (demo.skill === "command-k") {
+    // The command that runs is a real feature; the rest are the palette's everyday commands.
+    // (A feature already shown elsewhere in the film isn't repeated: the palette's own commands run instead.)
+    const lead = spareFeatures[0];
+    demoScene = { role: "demo", skill: "command-k", text: demo.title, items: lead ? [lead, ...demo.items].slice(0, 4) : demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
+  } else if (demo.skill === "ai-prompt") {
+    // Ask the product what it does; it answers in its own words (the site's copy, first person).
+    const said = aiSelfIntro(sentenceCopy(site.description, 16) || descClause || tagline, site.name);
+    demoScene = {
+      role: "demo", skill: "ai-prompt", text: demo.title,
+      subtext: said.answer,
+      items: [(said.firstPerson ? demo.items[0] : "Tell me about {name}").replace(/\{name\}/g, site.name), ...spareFeatures.slice(0, 3)],
+      eyebrow: demo.eyebrow, duration: beats(12), transition: "whip",
+    };
+  } else if (demo.skill === "click-flow") {
+    demoScene = { role: "demo", skill: "click-flow", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
+  } else {
+    demoScene = { role: "demo", skill: "notify-stack", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(demo.items.length * 1.2 + 5), transition: "whip" };
+  }
+  // A product-first or media-less film leans on it; teasers keep it only when it is the product.
+  add(target < 20 ? (angle === "product" && !tourMedia ? 3 : 6) : !tourMedia ? 2 : 3, demoScene);
+
   // 6. Proof — only real quotes, logos and numbers.
   // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
   // between the reveal and the product that needs no media and makes no claims.
@@ -837,6 +889,19 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       media: cardsMedia,
     });
   }
+  // One real adoption number, counted up over a chart that draws itself on.
+  const countStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer|merchant|brand|processed|deploy|member|people|org/i.test(st) && !/%/.test(st));
+  const metricStat = countStat && !(proofHook && countStat === teamStat) ? countStat : undefined;
+  if (metricStat) {
+    add(target >= 30 ? 4 : proofKind === "cards" && target >= 20 ? 3 : 7, {
+      role: "metric", skill: "chart-grow",
+      text: `${site.name}, *by the numbers*`,
+      subtext: metricStat,
+      eyebrow: "By the numbers",
+      duration: beats(8),
+      transition: "dolly",
+    });
+  }
   // 7. Ecosystem.
   if (integrationLine) {
     add(8, {
@@ -870,6 +935,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const rank: string[] = angle === "story" ? concept.arc : ANGLE_ORDER[angle];
   // Beats an arc doesn't list (the positioning line) sit right after the reveal.
   const rankOf = (role?: string) => {
+    if (role === "demo") return rank.indexOf("tour") - 0.5;
+    if (role === "metric") return rank.indexOf("cards") - 0.25;
     const i = rank.indexOf(role ?? "");
     return i >= 0 ? i : rank.indexOf("reveal") + 0.5;
   };
@@ -881,7 +948,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (scenes[0]) scenes[0] = { ...scenes[0], transition: "cut" };
   // Closing line: social proof when the film hasn't used it yet, else a varied call to action.
   const cta = scenes[scenes.length - 1];
-  const usedStat = scenes.some((sc) => sc.role === "logos") || (angle === "proof" && !!teamStat);
+  const usedStat = scenes.some((sc) => sc.role === "logos" || (sc.role === "metric" && sc.subtext === teamStat)) || (angle === "proof" && !!teamStat);
   // Chapter labels in the category's own voice.
   for (const sc of scenes) {
     const eb = concept.eyebrows[sc.role as keyof typeof concept.eyebrows];
@@ -900,7 +967,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
   const total = styled.scenes.reduce((a, sc) => a + sc.duration, 0);
-  if (total < target * 0.85) {
+  if (total < target * 0.9) {
     const cut = Math.round(total);
     styled.target = cut;
     styled.notes = [

@@ -20,6 +20,8 @@ export type ConceptRole =
   | "logos"
   | "integrations"
   | "promise"
+  | "demo"
+  | "metric"
   | "cta";
 
 export interface Concept {
@@ -278,4 +280,80 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
   logos: "Building2",
   integrations: "Plug",
   promise: "Zap",
+  demo: "MousePointerClick",
+  metric: "TrendingUp",
+};
+
+/**
+ * The signature interaction moment for each category, as the best launch films in it stage
+ * one: Linear/Raycast open a command palette, AI products stream an answer, automation tools
+ * finish a whole checklist in one click, and commerce/sales/security tools show the product
+ * alive with a stack of notifications. The copy is generic UI of the category (commands,
+ * tasks, events), never a claim about the product; the first command / the prompt's answer
+ * is filled from the product's real features by the director.
+ */
+export interface DemoSpec {
+  skill: "command-k" | "ai-prompt" | "click-flow" | "notify-stack";
+  title: string;
+  eyebrow: string;
+  /** click-flow: the button label. */
+  action?: string;
+  /** command-k: supporting commands; click-flow: tasks; notify-stack: "Event — detail"; ai-prompt: [prompt]. */
+  items: string[];
+}
+
+const PALETTE_CMDS = ["Search everything", "Invite a teammate", "Open settings"];
+
+export const DEMOS: Record<string, DemoSpec> = {
+  devtools: { skill: "command-k", title: "Everything, one *keystroke* away", eyebrow: "Keyboard-first", items: ["View deploy logs", "Open preview URL", "Search docs"] },
+  productivity: { skill: "command-k", title: "Everything, one *keystroke* away", eyebrow: "Keyboard-first", items: PALETTE_CMDS },
+  ai: { skill: "ai-prompt", title: "Just *ask*.", eyebrow: "AI built in", items: ["What can you do, {name}?"] },
+  fintech: {
+    skill: "click-flow", title: "Month-end, *handled*", eyebrow: "Automations", action: "Approve all",
+    items: ["Match every receipt", "Categorise spend", "Sync to accounting", "Notify finance"],
+  },
+  analytics: {
+    skill: "click-flow", title: "Insights, *on demand*", eyebrow: "In action", action: "Generate report",
+    items: ["Pull the latest data", "Build every chart", "Spot the trends", "Share with the team"],
+  },
+  hr: {
+    skill: "click-flow", title: "Hiring admin, *handled*", eyebrow: "Automations", action: "Send offers",
+    items: ["Collect approvals", "Generate offer letters", "Send for e-signature", "Schedule onboarding"],
+  },
+  health: {
+    skill: "click-flow", title: "Less admin, *more care*", eyebrow: "In action", action: "Confirm",
+    items: ["Check availability", "Book the appointment", "Send reminders", "Update the record"],
+  },
+  education: {
+    skill: "click-flow", title: "Your course, *live*", eyebrow: "In action", action: "Publish",
+    items: ["Upload lessons", "Build the quizzes", "Invite students", "Track progress"],
+  },
+  creative: {
+    skill: "click-flow", title: "From idea to *live*", eyebrow: "In action", action: "Publish",
+    items: ["Export every asset", "Optimise for web", "Share with the team", "Go live"],
+  },
+  general: {
+    skill: "click-flow", title: "Busywork, *handled*", eyebrow: "In action", action: "Run",
+    items: ["Sync your data", "Update every record", "Notify the team", "Share the summary"],
+  },
+  sales: {
+    skill: "notify-stack", title: "Your pipeline, *alive*", eyebrow: "Live",
+    items: ["Meeting booked — Discovery call, Thursday 10:00", "Lead assigned — Routed to the right rep", "Follow-up sent — Sequence step 2 of 4", "Deal won — Moved to closed-won"],
+  },
+  marketing: {
+    skill: "notify-stack", title: "Campaigns that *keep running*", eyebrow: "Live",
+    items: ["Campaign live — Sent to your audience", "New subscribers — Your list just grew", "A/B test winner — Variant B picked", "Report ready — This week's results are in"],
+  },
+  ecommerce: {
+    skill: "notify-stack", title: "Your store, *on autopilot*", eyebrow: "Live",
+    items: ["New order — 2 items, ships today", "Payment received — Order confirmed", "Order shipped — Tracking sent to customer", "New review — ★★★★★ from a customer"],
+  },
+  security: {
+    skill: "notify-stack", title: "Always *on watch*", eyebrow: "Live",
+    items: ["Threat blocked — Suspicious login stopped", "Device verified — Access granted", "Evidence collected — Control checked", "All clear — No open incidents"],
+  },
+  communication: {
+    skill: "notify-stack", title: "Every conversation, *one place*", eyebrow: "Live",
+    items: ["New message — The team replied", "You were mentioned — In #launch", "Call starting — Join in one click", "Thread resolved — Marked done"],
+  },
 };

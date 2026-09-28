@@ -20,8 +20,12 @@ const ROLE_NAMES: Partial<Record<string, string>> = {
   logos: "Customers",
   integrations: "Integrations",
   promise: "Promise",
+  metric: "Numbers",
   cta: "Call to action",
 };
+
+/** Interaction moments are named after what the viewer sees. */
+const DEMO_ICONS: Record<string, string> = { "command-k": "Command", "ai-prompt": "Sparkles", "click-flow": "MousePointerClick", "notify-stack": "BellRing" };
 
 /** The film's story arc at a glance: one chip per beat; click to jump to its editor. */
 export default function ArcStrip({ plan, onPick }: { plan: VideoPlan; onPick: (i: number) => void }) {
@@ -30,8 +34,8 @@ export default function ArcStrip({ plan, onPick }: { plan: VideoPlan; onPick: (i
     <div className="arc-strip" aria-label="Story arc">
       {plan.scenes.map((s, i) => {
         const role = s.role ?? "";
-        const name = ROLE_NAMES[role] ?? SKILL_MAP[s.skill]?.name ?? s.skill;
-        const icon = ROLE_ICONS[role as ConceptRole] ?? (role === "reveal" ? "Sparkles" : role === "cta" ? "MousePointerClick" : "Clapperboard");
+        const name = (role === "demo" ? SKILL_MAP[s.skill]?.name : ROLE_NAMES[role]) ?? SKILL_MAP[s.skill]?.name ?? s.skill;
+        const icon = (role === "demo" ? DEMO_ICONS[s.skill] : undefined) ?? ROLE_ICONS[role as ConceptRole] ?? (role === "reveal" ? "Sparkles" : role === "cta" ? "MousePointerClick" : "Clapperboard");
         return (
           <button key={i} className="arc-chip" onClick={() => onPick(i)} title={`${name}: ${s.text.replace(/\*/g, "")}`} style={{ flexGrow: s.duration / total }}>
             <Icon name={icon} size={13} />
