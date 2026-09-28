@@ -17,6 +17,7 @@ import {
   eyebrow,
   glassCard,
   iconFor,
+  iconsFor,
   pill,
   saasBackground,
   saasFont,
@@ -581,7 +582,7 @@ function bento(sc: SkillContext) {
     ctx.roundRect(x + 22 * u, y + 22 * u, it, it, 14 * u);
     ctx.fill();
     const [title, desc] = items[i].split(/\s+[—–]\s+/);
-    drawIcon(ctx, iconFor(title, i, sc), x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.56, "#fff", ease.outCubic(range(lt, 0.15, 0.9)));
+    drawIcon(ctx, iconsFor(items.map((x) => x.split(/\s+[—–]\s+/)[0]), sc)[i], x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.56, "#fff", ease.outCubic(range(lt, 0.15, 0.9)));
     // Label, with the feature's one-line description under it in roomy cells.
     const fs = portrait ? Math.min(46 * u, bw / 14) : Math.min(30 * u, bw / 11);
     const wrap = (text: string, font: string) => {
@@ -697,7 +698,7 @@ function iconFeatures(sc: SkillContext) {
     ctx.shadowBlur = 24 * u;
     ctx.fill();
     ctx.shadowBlur = 0;
-    drawIcon(ctx, iconFor(title, i, sc), tx, ty, ts * 0.56, palette.light ? "#ffffff" : palette.bg0, ease.outCubic(range(lt, 0.15, 1)));
+    drawIcon(ctx, iconsFor(items.map((x) => x.split(/\s+[—–]\s+/)[0]), sc)[i], tx, ty, ts * 0.56, palette.light ? "#ffffff" : palette.bg0, ease.outCubic(range(lt, 0.15, 1)));
     // Title (wrapped to two lines, shrinking if needed) + optional description.
     const wrapLines = (text: string, font: string, maxW: number) => {
       ctx.font = font;
@@ -1442,7 +1443,7 @@ function steps(sc: SkillContext) {
     // Step icon at the card's leading edge; text makes room for it.
     const is = Math.min(ch * 0.42, 40 * u * S);
     const ix = cx + 20 * u + is / 2;
-    drawIcon(ctx, iconFor(label, i, sc), ix, cy + ch / 2, is, palette.primary, lt > 0 ? ease.outCubic(range(lt, 0.05, 0.7)) : 0.35);
+    drawIcon(ctx, iconsFor(labels, sc)[i], ix, cy + ch / 2, is, palette.primary, lt > 0 ? ease.outCubic(range(lt, 0.05, 0.7)) : 0.35);
     const tx0 = cx + 20 * u + is + 14 * u;
     ctx.textAlign = "left";
     lines.slice(0, 2).forEach((l, li, arr) => ctx.fillText(l, tx0, cy + ch / 2 + (li - (arr.length - 1) / 2) * lh));

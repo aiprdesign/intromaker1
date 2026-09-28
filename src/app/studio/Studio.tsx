@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
+import ArcStrip from "@/components/ArcStrip";
 import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
 import BackgroundPicker, { applyBackground, type BgChoice } from "@/components/BackgroundPicker";
@@ -108,6 +109,7 @@ export default function Studio() {
     });
   };
   const [importing, setImporting] = useState(false);
+  const [importStage, setImportStage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const booted = useRef(false);
 
@@ -191,7 +193,7 @@ export default function Studio() {
       const take = await direct(opts);
       show(take);
       setTakes([{ ...take, label: "Take 1" }]);
-      if (take.note) setNote(take.note);
+      if (take.note || take.plan.notes?.length) setNote([take.note, ...(take.plan.notes ?? [])].filter(Boolean).join(" "));
     } finally {
       setLoading(false);
     }
@@ -217,6 +219,11 @@ export default function Studio() {
     const url = (raw ?? siteUrl).trim();
     if (!url) return;
     setImporting(true);
+    // Narrate what's happening while the site is captured and read.
+    const stages = ["Opening the site in a real browser…", "Capturing screenshots…", "Reading copy, features and proof…"];
+    let si = 0;
+    setImportStage(stages[0]);
+    const timer = setInterval(() => setImportStage(stages[Math.min(++si, stages.length - 1)]), 2500);
     setImportError(null);
     try {
       const res = await fetch("/api/scrape", {
@@ -230,16 +237,21 @@ export default function Studio() {
       setSite(s);
       setSiteUrl(s.url);
       const colorSources = [s.logo, ...s.images.slice(0, 2)].filter(Boolean).map((u) => assetUrl(u as string));
+      clearInterval(timer);
+      setImportStage("Detecting brand colours…");
       const colors = (await extractBrandColors(colorSources, s.themeColor)) ?? undefined;
       setBrandColors(colors);
       // A full story arc needs room: websites default to the long cut.
       const len = length === "standard" ? "long" : length;
       setLength(len);
+      setImportStage(`Directing your ${s.name} film…`);
       await generate({ site: s, colors: useBrandColors ? colors : undefined, length: len });
     } catch (e) {
+      clearInterval(timer);
       setImportError((e as Error).message);
     } finally {
       setImporting(false);
+      setImportStage(null);
     }
   };
 
@@ -370,6 +382,11 @@ export default function Studio() {
               {importing ? "Importing…" : "Import"}
             </button>
           </form>
+          {importStage && (
+            <p className="hint import-stage">
+              <span className="spinner sm" /> {importStage}
+            </p>
+          )}
           {importError && <p className="hint warn">{importError}</p>}
           {site && (
             <div className="site-card">
@@ -573,6 +590,10 @@ export default function Studio() {
             <Player plan={plan} resetKey={version} />
           </div>
 
+          {plan.style === "saas" && (
+            <ArcStrip plan={plan} onPick={(i) => document.getElementById(`scene-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} />
+          )}
+
           <div className="takes">
             <div className="takes-head">
               <h2>Takes</h2>
@@ -620,7 +641,7 @@ export default function Studio() {
           </div>
           <div className="storyboard">
             {plan.scenes.map((s, i) => (
-              <div className="scene-card" key={i}>
+              <div className="scene-card" key={i} id={`scene-${i}`}>
                 {plan.style === "saas" && (
                   <input
                     className="input eyebrow-input"

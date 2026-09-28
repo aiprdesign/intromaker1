@@ -6,7 +6,7 @@
 import { headline } from "./fx";
 import { clamp, mixHex, range, rgba, rng, TAU } from "./math";
 import { CONCEPT_MAP, ROLE_ICONS, type ConceptRole } from "./concepts";
-import { drawLucide, iconFor as lucideFor } from "./icons";
+import { drawLucide, iconFor as lucideFor, iconsFor as lucideIconsFor } from "./icons";
 import { scratch } from "./scratch";
 import { renderShaderBg } from "./shaderbg";
 import { subFont, type HeadlineLayout } from "./text";
@@ -537,6 +537,11 @@ const LEGACY: Record<string, string> = {
 /** Pick the icon for a feature's wording (falls back to the product concept's icon family). */
 export function iconFor(label: string, i: number, sc?: Pick<SkillContext, "concept">): IconKind {
   return lucideFor(label, i, CONCEPT_MAP[sc?.concept ?? "general"]?.icons);
+}
+
+/** Distinct icons for labels shown together in one scene. */
+export function iconsFor(labels: string[], sc?: Pick<SkillContext, "concept">): IconKind[] {
+  return lucideIconsFor(labels, CONCEPT_MAP[sc?.concept ?? "general"]?.icons);
 }
 
 /** Draw an icon (Lucide) centred in a size×size box. */

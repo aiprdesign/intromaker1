@@ -22,6 +22,7 @@ export type Role =
   | "stat"
   | "integrations"
   | "features"
+  | "promise"
   | "cta";
 
 export type TemplateCategory = "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
@@ -66,6 +67,7 @@ export const DEFAULT_ROLE_SKILL: Record<Role, SkillId> = {
   stat: "number-ticker",
   integrations: "integrations",
   features: "icon-features",
+  promise: "word-swap",
   cta: "cta",
 };
 
@@ -95,6 +97,8 @@ function roleLength(scene: Scene, role: Role): [number, number] {
     case "stat":
       return [6, 2.8];
     case "integrations":
+      return [8, 3.8];
+    case "promise":
       return [8, 3.8];
     case "features":
       return [(scene.items?.length ?? 4) * 1.5 + 6, 4.6];
@@ -128,7 +132,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dolly", "whip", "push", "dissolve"],
     pace: 1,
     roles: {},
-    revealNoLogo: "particle-assemble",
+    revealNoLogo: "logo-reveal",
     sample: sample("Build the future, *faster*."),
   },
   {
@@ -146,7 +150,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["leak", "dissolve", "dolly"],
     pace: 1.1,
     roles: { integrations: "integrations" },
-    revealNoLogo: "liquid-gradient",
+    revealNoLogo: "logo-reveal",
     sample: sample("Money that moves at *internet speed*."),
   },
   {
@@ -164,7 +168,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dissolve", "push", "cut"],
     pace: 1.15,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Simple. Powerful. *Yours*."),
   },
   {
@@ -182,7 +186,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["cut", "shutter", "push"],
     pace: 0.9,
     roles: {},
-    revealNoLogo: "type-cascade",
+    revealNoLogo: "logo-reveal",
     sample: sample("Ship it. *Scale it.*"),
   },
   {
@@ -218,7 +222,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dissolve", "leak", "dolly"],
     pace: 1.2,
     roles: {},
-    revealNoLogo: "god-rays",
+    revealNoLogo: "logo-reveal",
     sample: sample("The next era of *work* begins."),
   },
   {
@@ -236,7 +240,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["glitch", "whip", "dolly"],
     pace: 0.95,
     roles: {},
-    revealNoLogo: "glitch-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Security that thinks *ahead*."),
   },
   {
@@ -254,7 +258,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dissolve", "push", "dolly"],
     pace: 1.05,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Work that feels *effortless*."),
   },
   {
@@ -272,7 +276,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["push", "dissolve", "cut"],
     pace: 1.05,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Revenue, *finally in sync*."),
   },
   {
@@ -290,7 +294,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["cut", "glitch", "shutter"],
     pace: 0.95,
     roles: {},
-    revealNoLogo: "glitch-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("npm install *speed*"),
   },
   {
@@ -308,7 +312,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["cut", "whip", "zoom"],
     pace: 0.8,
     roles: {},
-    revealNoLogo: "kinetic-slam",
+    revealNoLogo: "logo-reveal",
     sample: sample("Design. Ship. *Repeat.*"),
   },
   {
@@ -344,7 +348,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dissolve", "leak", "push"],
     pace: 1.15,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Crafted for the *curious*."),
   },
   {
@@ -362,7 +366,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dolly", "dissolve", "leak"],
     pace: 1,
     roles: {},
-    revealNoLogo: "particle-assemble",
+    revealNoLogo: "logo-reveal",
     sample: sample("Your new *AI teammate*."),
   },
   {
@@ -380,7 +384,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dolly", "push", "dissolve"],
     pace: 1.05,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Work in a *new dimension*."),
   },
   {
@@ -398,7 +402,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["glitch", "shutter", "cut"],
     pace: 0.95,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Threat detected. *Neutralised.*"),
   },
   {
@@ -416,7 +420,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["cut", "push"],
     pace: 0.95,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Less, but *better*."),
   },
   {
@@ -434,7 +438,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["push", "zoom", "dissolve"],
     pace: 0.95,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Software that feels *squishy*."),
   },
   {
@@ -452,7 +456,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dolly", "whip", "dissolve"],
     pace: 1,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Polished to *perfection*."),
   },
   {
@@ -470,7 +474,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dissolve", "dolly", "leak"],
     pace: 1.05,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("The future, *in full colour*."),
   },
   {
@@ -488,7 +492,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["cut", "glitch", "shutter"],
     pace: 0.95,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("thinking in *pixels*."),
   },
   {
@@ -506,7 +510,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["whip", "zoom", "dolly"],
     pace: 0.95,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Drive into *tomorrow*."),
   },
   {
@@ -524,7 +528,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dissolve", "dolly", "leak"],
     pace: 1.1,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Built for *infinite scale*."),
   },
   {
@@ -542,7 +546,7 @@ export const TEMPLATES: Template[] = [
     transitions: ["dissolve", "leak"],
     pace: 1.15,
     roles: {},
-    revealNoLogo: "blur-reveal",
+    revealNoLogo: "logo-reveal",
     sample: sample("Quietly *exceptional*."),
   },
 ];
@@ -561,6 +565,7 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   bento: "bento",
   "ui-cards": "cards",
   "icon-features": "features",
+  "word-swap": "promise",
   testimonial: "quote",
   "logo-marquee": "logos",
   "number-ticker": "stat",
@@ -609,7 +614,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   }, 0);
   const styled = scenes.reduce((a, sc) => a + sc.duration, 0);
   const fit = styled > 0 ? clamp(styled, neutral * 0.88, neutral * 1.1) / styled : 1;
-  return {
+  const styledPlan: VideoPlan = {
     ...plan,
     template: tpl.id,
     palette: opts.palette ?? tpl.palette,
@@ -620,5 +625,25 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     flavor: tpl.flavor,
     look: tpl.look,
     scenes: scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round((s.duration * fit) / beat)) * beat })),
+  };
+  return plan.target ? fitLength(styledPlan, plan.target) : styledPlan;
+}
+
+/**
+ * Stretch or compress scene lengths so the film lands on the requested length (within what
+ * keeps each beat readable), snapping every scene to whole beats of the template's tempo.
+ */
+export function fitLength(plan: VideoPlan, target: number): VideoPlan {
+  const beat = 60 / plan.bpm;
+  const total = plan.scenes.reduce((a, s) => a + s.duration, 0);
+  if (!total) return plan;
+  const k = Math.min(1.35, Math.max(0.72, target / total));
+  if (Math.abs(k - 1) < 0.04) return plan;
+  return {
+    ...plan,
+    scenes: plan.scenes.map((s) => {
+      const floor = { cta: 3, reveal: 2.4, hook: 2.6, features: 3.4, tour: 4.2, how: 3.6, quote: 3.8 }[s.role ?? ""] ?? 3;
+      return { ...s, duration: Math.max(Math.ceil(floor / beat), Math.round((s.duration * k) / beat)) * beat };
+    }),
   };
 }

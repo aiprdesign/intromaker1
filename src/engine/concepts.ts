@@ -19,6 +19,7 @@ export type ConceptRole =
   | "quote"
   | "logos"
   | "integrations"
+  | "promise"
   | "cta";
 
 export interface Concept {
@@ -40,6 +41,8 @@ export interface Concept {
   cta: string[];
   /** Style template that suits the category best. */
   template: string;
+  /** Positioning line for the word-swap beat ("Ship faster|safer|together"). */
+  swap: string;
 }
 
 const STORY: ConceptRole[] = ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"];
@@ -53,9 +56,10 @@ export const CONCEPTS: Concept[] = [
     orbit: ["GitBranch", "Database", "Cloud", "Server", "Webhook", "MessagesSquare", "Bug", "Container"],
     arc: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "integrations", "cards", "stat", "quote", "logos", "bento", "cta"],
     eyebrows: { how: "Get started", tour: "Developer experience", features: "Built for developers", integrations: "Works with your stack", cards: "Performance" },
-    featuresTitle: "Built for *developers*",
+    featuresTitle: "Everything you need to *ship*",
     cta: ["Start *building*", "Deploy in *minutes*", "Ship with *{name}*"],
     template: "midnight",
+    swap: "Ship faster|safer|together",
   },
   {
     id: "ai",
@@ -68,6 +72,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Your AI can *do it all*",
     cta: ["Try it *free*", "Meet your *AI teammate*", "Start with *{name}*"],
     template: "aiglow",
+    swap: "Work smarter|faster|better",
   },
   {
     id: "fintech",
@@ -80,6 +85,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Finance on *autopilot*",
     cta: ["Open an *account*", "Get started *free*", "Take control with *{name}*"],
     template: "aurora",
+    swap: "Spend smarter|faster|safer",
   },
   {
     id: "security",
@@ -92,6 +98,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Protected on *every front*",
     cta: ["Book a *demo*", "Get *protected*", "Secure your team with *{name}*"],
     template: "hud",
+    swap: "Stay secure|compliant|ahead",
   },
   {
     id: "analytics",
@@ -104,6 +111,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Answers, *not spreadsheets*",
     cta: ["See your *data*", "Start *free*", "Get insights with *{name}*"],
     template: "midnight",
+    swap: "Decide faster|smarter|better",
   },
   {
     id: "sales",
@@ -116,6 +124,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Close deals *faster*",
     cta: ["Book a *demo*", "Close more with *{name}*", "Start *free*"],
     template: "enterprise",
+    swap: "Sell faster|smarter|together",
   },
   {
     id: "marketing",
@@ -128,6 +137,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Marketing that *works*",
     cta: ["Grow your *audience*", "Start *free*", "Launch with *{name}*"],
     template: "pop",
+    swap: "Grow faster|louder|smarter",
   },
   {
     id: "productivity",
@@ -140,6 +150,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "One place for *everything*",
     cta: ["Get started *free*", "Try it with your *team*", "Work better with *{name}*"],
     template: "frosted",
+    swap: "Work faster|together|better",
   },
   {
     id: "hr",
@@ -152,6 +163,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Hire and grow your *people*",
     cta: ["Book a *demo*", "Start *free*", "Build your team with *{name}*"],
     template: "clay",
+    swap: "Hire faster|better|happier",
   },
   {
     id: "ecommerce",
@@ -164,6 +176,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Everything to *sell more*",
     cta: ["Start *selling*", "Open your *store*", "Grow with *{name}*"],
     template: "pop",
+    swap: "Sell more|faster|everywhere",
   },
   {
     id: "health",
@@ -176,6 +189,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Care, *simplified*",
     cta: ["Book a *demo*", "Get *started*", "Care better with *{name}*"],
     template: "paper",
+    swap: "Care faster|better|together",
   },
   {
     id: "education",
@@ -188,6 +202,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Learning that *sticks*",
     cta: ["Start *learning*", "Try it *free*", "Learn with *{name}*"],
     template: "frosted",
+    swap: "Learn faster|deeper|together",
   },
   {
     id: "creative",
@@ -200,6 +215,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Create *without limits*",
     cta: ["Start *creating*", "Try it *free*", "Create with *{name}*"],
     template: "holo",
+    swap: "Create faster|bolder|together",
   },
   {
     id: "communication",
@@ -212,6 +228,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Every conversation, *one inbox*",
     cta: ["Try it *free*", "Delight customers with *{name}*", "Get *started*"],
     template: "neon",
+    swap: "Reply faster|smarter|everywhere",
   },
 ];
 
@@ -226,6 +243,7 @@ export const GENERAL: Concept = {
   featuresTitle: "Everything you *need*",
   cta: ["Try *{name}* today", "Get started with *{name}*", "Start building with *{name}*"],
   template: "midnight",
+  swap: "Work faster|smarter|together",
 };
 
 export const CONCEPT_MAP: Record<string, Concept> = Object.fromEntries([...CONCEPTS, GENERAL].map((c) => [c.id, c]));
@@ -259,4 +277,5 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
   quote: "Star",
   logos: "Building2",
   integrations: "Plug",
+  promise: "Zap",
 };

@@ -170,6 +170,10 @@ export interface VideoPlan {
   look?: Look;
   /** Score style; defaults to follow `style`. */
   music?: "saas" | "trailer";
+  /** Requested film length in seconds; templates fit scene lengths to it. */
+  target?: number;
+  /** Director's notes for the user (e.g. "only enough material for a 20s cut"). */
+  notes?: string[];
   /** Product concept (devtools, ai, fintech…): picks icon families and story vocabulary. */
   concept?: string;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */

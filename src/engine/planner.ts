@@ -224,6 +224,9 @@ function extractBrand(prompt: string): string | null {
   if (quoted) return quoted[1].trim();
   const named = prompt.match(/\b(?:called|named|for|brand|channel|company|startup|product)\s+([A-Z][\w.&-]*(?:\s+[A-Z0-9][\w.&-]*){0,2})/);
   if (named) return named[1].trim();
+  // "Sentinel stops threats…" / "Shopwave helps brands…": a capitalised name opening a sentence.
+  const opener = prompt.match(/^\s*(?:meet\s+|introducing\s+)?([A-Z][a-z][\w.&-]{1,24})\s+(?:is|are|helps|lets|makes|stops|keeps|turns|gives|brings|writes|runs|puts|connects|automates|finds|builds|ships)\b/);
+  if (opener) return opener[1].trim();
   // "Ledgerly: business banking…" / "Nimbus is a developer platform…" / "Meet Nimbus, …"
   const lead = prompt.match(/^\s*(?:meet\s+|introducing\s+)?([A-Z][\w.&-]{1,24}(?:\s+[A-Z][\w.&-]{1,24})?)\s*(?::|—|–|-\s|,|\s+(?:is|are|helps|lets|makes)\b)/i);
   if (lead && !/^(an?|the|my|our|this|make|create|build|launch)$/i.test(lead[1])) return lead[1].trim();
@@ -298,67 +301,81 @@ function naturalCase(phrase: string, source: string) {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+/**
+ * Read a SaaS prompt like a copywriter: the product name, its one-line pitch and the feature
+ * list. "Nimbus is a developer platform with instant rollbacks, preview URLs and edge
+ * functions" → pitch "The developer platform", features [Instant rollbacks, Preview URLs,
+ * Edge functions]; verb clauses ("writes your emails and summarises your meetings") become
+ * features too.
+ */
+export function parseSaasPrompt(prompt: string) {
+  const brand = extractBrand(prompt);
+  let body = prompt.replace(/["“”‘’]/g, "").trim();
+  body = body.replace(/^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer)\s+)?(?:video|film|teaser|trailer|intro|promo)\s+(?:for|about|of)\s+/i, "");
+  body = body.replace(/^(?:meet|introducing)\s+/i, "");
+  if (brand) body = body.split(brand).join(" ").replace(/^\s*[,:—–-]?\s*(?:is|are)?\s*/i, "").trim();
+  // Real stats have magnitude ("10,000+ teams", "99.9% uptime"), not "SOC 2" or "3 steps".
+  const numbers = stats(prompt).filter((n) => /\d{2,}|\d[kmbx%]|\+/i.test(n.split(" ")[0]));
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  // Pitch: the leading noun phrase, up to the first list or clause marker.
+  const pitchRaw = body.split(/\s(?:with|that|which|who|featuring|including)\s|:|;|\.|,\s(?=\w+\s)/i)[0].trim();
+  const pitchWords = pitchRaw.split(/\s+/).filter(Boolean);
+  const pitch =
+    pitchWords.length >= 2 && pitchWords.length <= 10 ? cap(pitchRaw.replace(/^(an?|the)\s+/i, "The ")) : shortenCopy(cap(pitchRaw), 9);
+  // Features: list items and verb clauses after the pitch.
+  let rest = body.slice(pitchRaw.length);
+  // A bare pitch ("the AI assistant") reads better with its first verb clause:
+  // "The AI assistant that writes your emails".
+  let pitchOut = pitch;
+  const clause = rest.match(/^\s+(that|which|who)\s+([^,;.]+?)(?=\s+and\s|[,;.]|$)/i);
+  // Only when at least two other features remain for the feature row.
+  const clauseCount = rest.split(/,|\sand\s|;/).filter((c) => c.trim()).length;
+  if (clause && clauseCount >= 3 && pitchWords.length <= 4 && pitchWords.length + 1 + clause[2].split(/\s+/).length <= 9) {
+    pitchOut = `${pitch} ${clause[1].toLowerCase()} ${clause[2].trim()}`;
+    rest = rest.slice(clause[0].length);
+  }
+  const features = rest
+    .split(/(?<!\d),|,(?!\d)|[;:]|\.(?!\d)|\sand\s|\s&\s|\s(?:with|that|which|who|featuring|including|plus)\s/i)
+    .map((c) => c.trim().replace(/^(?:and|with|that|which|also|plus|to|it)\s+/i, "").replace(/\s+(?:for|to)\s+(?:teams?|startups?|you|everyone|businesses)\b.*$/i, ""))
+    .filter((c) => c && !/^[$€£]?\d[\d,.]*[kmb%x]?\+?(\s|$)/i.test(c) && !/^[\d\s.,%+$€£kmb]+$/i.test(c))
+    .map((c) => cap(c.split(/\s+/).length > 6 ? shortenCopy(c, 6) : c))
+    .filter((c) => c && c.split(/\s+/).length <= 6 && !/^(the|a|an|you|it|them|teams?)$/i.test(c));
+  return { brand, pitch: pitchOut, features: [...new Set(features)], numbers };
+}
+
 function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const prompt = req.prompt.trim();
   const seed = (req.seed ?? hashString(prompt)) >>> 0;
-  const r = rng(seed);
-  const pick = <T,>(arr: readonly T[]) => arr[Math.floor(r() * arr.length)];
-  const bpm = pick([116, 120, 124] as const);
-  const beat = 60 / bpm;
-  const brand = extractBrand(prompt) ?? "Your product";
-  const numbers = stats(prompt);
-  const body = phrases(prompt, brand)
-    .filter((p) => !numbers.some((n) => n.includes(p)))
-    .map((p) => naturalCase(p, prompt))
-    .filter((p) => p.split(" ").length <= 6 && !/^(meet|introducing|launch|video|intro|trailer|teaser|the|a|an)$/i.test(p.trim()));
-  // The clause right after the brand is usually its one-line pitch: "an analytics app for product teams".
-  const pitch = prompt
-    .slice(prompt.indexOf(brand) + brand.length)
-    .replace(/^["'”’\s,:—–-]+/, "")
-    .split(/[.;!?\n]|,\s/)[0]
-    .trim()
-    .replace(/^(is\s+)?(an?|the)\s+/i, "The ");
-  const pitchOk = pitch.split(/\s+/).length >= 3 && pitch.split(/\s+/).length <= 10;
-  const tagline = pitchOk ? pitch : body[0] ?? `Meet ${brand}`;
-  const features = body.filter((b) => !tagline.toLowerCase().includes(b.toLowerCase()));
-  const target = LENGTH_SECONDS[req.length];
-  const concept = detectConcept(prompt);
-  const scenes: Scene[] = [
-    { role: "hook", skill: "blur-reveal", text: tagline, items: [`Introducing ${brand}`], duration: 7 * beat, transition: "cut" },
-    { role: "reveal", skill: "particle-assemble", text: brand, duration: 6 * beat, transition: "dolly" },
-  ];
-  if (features.length >= 5) {
-    scenes.push({ role: "bento", skill: "bento", text: `Everything in *${brand}*`, items: features.slice(0, 6), duration: Math.max(4.4, 10 * beat), transition: "whip" });
-  } else if (features.length >= 2) {
-    scenes.push({
-      role: "features", skill: "icon-features",
-      text: concept.featuresTitle,
-      items: features.slice(0, 4),
-      eyebrow: concept.eyebrows.features ?? "Features",
-      duration: Math.max(4.6, (features.length * 1.5 + 6) * beat),
-      transition: "whip",
-    });
-  } else if (features.length) {
-    scenes.push({ skill: "blur-reveal", text: features.join(". "), duration: 7 * beat, transition: "whip" });
-  }
-  if (numbers.length) {
-    scenes.push({
-      role: "cards", skill: "ui-cards",
-      text: `See ${brand} *in action*`,
-      items: [features[0] ?? brand, naturalCase(numbers[0], prompt), features[1] ?? "", features[2] ?? ""],
-      duration: Math.max(4.2, 9 * beat),
-      transition: "dolly",
-    });
-  }
-  const used = scenes.reduce((a, s) => a + s.duration, 0);
-  if (used + 8 * beat < target && features.length >= 2) {
-    scenes.push({ skill: "word-swap", text: `Built for ${features.slice(0, 3).map((f) => f.toLowerCase()).join("|")}`, duration: 8 * beat, transition: "whip" });
-  }
-  scenes.push({ role: "cta", skill: "cta", text: pick(concept.cta).replace(/\{name\}/g, brand), subtext: "Get started", duration: Math.max(3.6, 8 * beat), transition: "dolly" });
-  const plan = sanitizePlan({ title: brand, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, style: "saas", concept: concept.id });
-  return applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
-    palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
-  });
+  const parsed = parseSaasPrompt(prompt);
+  const brand = parsed.brand ?? "Your product";
+  const numbers = parsed.numbers;
+  const tagline = parsed.pitch || `Meet ${brand}`;
+  const features = parsed.features.filter((f) => norm(f) !== norm(tagline));
+  // A prompt becomes a minimal site profile, so prompt films get the same concept-aware arc,
+  // feature icons, chapters, pacing and CTA voice as website films.
+  const site: SiteData = {
+    url: "",
+    domain: "",
+    name: brand,
+    tagline,
+    description: prompt,
+    headlines: features.slice(0, 6),
+    features: [],
+    stats: numbers.map((n) => naturalCase(n, prompt)),
+    testimonials: [],
+    clientLogos: [],
+    steps: [],
+    pains: [],
+    font: null,
+    shots: { hero: null, full: null, sections: [] },
+    cta: null,
+    logo: null,
+    images: [],
+    videos: [],
+    themeColor: null,
+  };
+  const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas" });
+  return { ...plan, title: brand };
 }
 
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
@@ -580,6 +597,25 @@ export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
   return req.style === "trailer" ? planFromSiteTrailer(site, req) : planFromSiteSaas(site, req);
 }
 
+/**
+ * Shorten a long headline to its core clause ("Plan every project with flexible boards…" →
+ * "Plan every project"), never ending on a filler word. Returns "" if nothing usable.
+ */
+function shortenCopy(text: string, maxWords: number) {
+  const clean = text.replace(/[.!?]+$/, "").trim();
+  const words = clean.split(/\s+/);
+  if (words.length <= maxWords) return clean;
+  const clause = clean.split(/\s(?:with|that|so|and|to|for|by|while|without|—|–)\s|,\s/)[0].trim();
+  const cw = clause.split(/\s+/);
+  if (cw.length >= 2 && cw.length <= maxWords) return clause;
+  const cut = words.slice(0, maxWords);
+  while (cut.length > 2 && /^(a|an|the|of|to|in|on|at|by|for|with|and|or|your|our|their|every|all)$/i.test(cut[cut.length - 1])) cut.pop();
+  return cut.length >= 2 ? cut.join(" ") : "";
+}
+
+/** Loose comparison key for copy. */
+const norm = (t: string) => t.toLowerCase().replace(/\*/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
 /** Sentence-case copy: trim, drop trailing period for headlines, keep the site's own casing. */
 function sentenceCopy(text: string, maxWords: number) {
   const first = text.split(/(?<=[.!?])\s|\s[—–|]\s/)[0].trim();
@@ -626,17 +662,17 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const video: Media | undefined = brand.videos[0] ? { src: brand.videos[0], kind: "video" } : undefined;
   const shots = site.shots ?? { hero: null, full: null, sections: [] };
 
-  const tagline = sentenceCopy(site.tagline, 10) || sentenceCopy(site.description, 12) || `Meet ${site.name}`;
+  const tagline = sentenceCopy(site.tagline, 10) || shortenCopy(site.tagline, 9) || sentenceCopy(site.description, 12) || shortenCopy(site.description, 9) || `Meet ${site.name}`;
   // Best headlines first; each keeps its feature description from the page.
   const ranked = site.headlines
     .map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title), i }))
     .sort((a, b) => b.score - a.score || a.i - b.i);
-  const shortFeatures = ranked.map((f) => sentenceCopy(f.title, 6)).filter((h) => h && h !== tagline);
-  const longFeatures = ranked.map((f) => sentenceCopy(f.title, 9)).filter((h) => h && h !== tagline);
+  const shortFeatures = ranked.map((f) => sentenceCopy(f.title, 6) || shortenCopy(f.title, 6)).filter((h) => h && h !== tagline);
+  const longFeatures = ranked.map((f) => sentenceCopy(f.title, 9) || shortenCopy(f.title, 9)).filter((h) => h && h !== tagline);
   // Bento cards: "Title — one-line description" when the page has one.
   const bentoItems = ranked
     .map((f) => {
-      const title = sentenceCopy(f.title, 6);
+      const title = sentenceCopy(f.title, 6) || shortenCopy(f.title, 6);
       if (!title || title === tagline) return "";
       const desc = sentenceCopy(f.desc, 10).replace(/\.$/, "");
       return desc && desc.toLowerCase() !== title.toLowerCase() ? `${title} — ${desc}` : title;
@@ -660,7 +696,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
   // 1. Hook: the problem, the promise, or the proof.
   // Open on the problem only in categories whose films do (e-commerce / creative lead with the promise).
-  const painHook = angle === "story" && pains.length >= 2 && concept.arc.indexOf("pain") < concept.arc.indexOf("reveal");
+  const painHook = angle === "story" && target >= 20 && pains.length >= 2 && concept.arc.indexOf("pain") < concept.arc.indexOf("reveal");
   const proofHook = angle === "proof" && !!teamStat;
   // The tagline is used once: in the hook, or (if the hook is pains/proof) under the logo.
   const taglineFree = painHook || proofHook;
@@ -689,7 +725,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   });
   // 3. Meet: the real website.
   if (shots.full) {
-    add(3, {
+    add(!(video ?? images[0] ?? shots.sections[0] ?? shots.hero) && target >= 20 ? 2 : 3, {
       role: "meet", skill: "site-scroll",
       text: taglineFree ? tagline : descClause || `Say hello to *${site.name}*`,
       eyebrow: `Meet ${site.name}`,
@@ -711,11 +747,20 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // 5. Features: cursor tour on the product, then a bento.
   const tourMedia = video ?? images[0] ?? img(shots.sections[0]) ?? img(shots.hero);
+  // Each beat gets its own copy: the tour's headline and callouts are not reused by the
+  // feature tiles or result cards (repetition reads as filler).
+  const tourHead = longFeatures[0] ?? `See *${site.name}* in action`;
+  // With only a handful of features, the tour keeps its headline and leaves the rest to the tiles.
+  const otherTitles = shortFeatures.filter((f) => norm(f) !== norm(tourHead));
+  const tourCallouts = otherTitles.length >= 4 ? otherTitles.slice(0, 2) : otherTitles.length === 3 ? otherTitles.slice(2) : [];
+  const usedByTour = new Set(tourMedia ? [tourHead, ...tourCallouts].map(norm) : []);
+  const freshItems = bentoItems.filter((it) => !usedByTour.has(norm(it.split(/\s+[—–]\s+/)[0])));
+  const featureItems = freshItems.length >= 2 ? freshItems : bentoItems.filter((it) => norm(it.split(/\s+[—–]\s+/)[0]) !== norm(tourHead));
   if (tourMedia) {
-    add(angle === "product" ? 1 : 4, {
+    add(angle === "product" ? 1 : target >= 20 ? 2 : 4, {
       role: "tour", skill: "ui-tour",
-      text: longFeatures[0] ?? `See ${site.name} in action`,
-      items: shortFeatures.slice(1, 3),
+      text: tourHead,
+      items: tourCallouts,
       eyebrow: "Features",
       duration: Math.max(5.6, beats(12)),
       transition: "whip",
@@ -723,29 +768,44 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     });
   }
   // Key features as icon tiles (the classic SaaS feature row); a bento when there are many.
-  if (bentoItems.length >= 2) {
-    add(4, {
-      role: "features", skill: "icon-features",
-      text: concept.featuresTitle,
-      items: bentoItems.slice(0, 4),
-      eyebrow: "Features",
-      duration: Math.max(4.6, beats(Math.min(4, bentoItems.length) * 1.5 + 6)),
-      transition: "dolly",
-    });
-  }
-  if (shortFeatures.length >= 5) {
-    add(6, {
+  // One value beat, always: icon tiles for up to four features, a bento for a richer set.
+  // (In a product-first teaser the tour already carries the features.)
+  const valuePriority = target < 20 && ((angle === "product" && tourMedia) || (angle === "proof" && (quote || teamStat))) ? 5 : 2;
+  if (featureItems.length >= 5) {
+    add(valuePriority, {
       role: "bento", skill: "bento",
       text: `Everything in *${site.name}*`,
-      items: bentoItems.slice(0, 6),
+      items: featureItems.slice(0, 6),
       eyebrow: "All-in-one",
       duration: Math.max(4.4, beats(10)),
       transition: "dolly",
     });
+  } else if (featureItems.length >= 2) {
+    add(valuePriority, {
+      role: "features", skill: "icon-features",
+      text: concept.featuresTitle,
+      items: featureItems.slice(0, 4),
+      eyebrow: "Features",
+      duration: Math.max(4.6, beats(Math.min(4, featureItems.length) * 1.5 + 6)),
+      transition: "dolly",
+    });
   }
   // 6. Proof — only real quotes, logos and numbers.
+  // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
+  // between the reveal and the product that needs no media and makes no claims.
+  add(target >= 20 && !tourMedia && !shots.full ? 3 : 6, {
+    role: "promise", skill: "word-swap",
+    text: concept.swap,
+    subtext: sentenceCopy(site.description, 12) || undefined,
+    eyebrow: `Why ${site.name}`,
+    duration: beats(8),
+    transition: "whip",
+  });
+  // The strongest proof we have (a real quote, else customer logos, else numbers) is kept.
+  const proofKind = quote ? "quote" : brand.clientLogos && brand.clientLogos.length >= 4 ? "logos" : site.stats.length ? "cards" : null;
+  const proofPriority = (kind: string, normal: number) => (proofKind === kind && target >= 20 ? 2 : normal);
   if (quote) {
-    add(angle === "proof" ? 1 : 5, {
+    add(angle === "proof" ? 1 : proofPriority("quote", 5), {
       role: "quote", skill: "testimonial",
       text: quote.quote,
       subtext: [quote.author, quote.role].filter(Boolean).join(" · "),
@@ -756,7 +816,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     });
   }
   if (brand.clientLogos && brand.clientLogos.length >= 4) {
-    add(6, {
+    add(proofPriority("logos", 6), {
       role: "logos", skill: "logo-marquee",
       text: angle === "proof" && teamStat ? "In good *company*" : stat ? `Trusted by *${stat.toLowerCase()}*` : "Trusted by *leading teams*",
       eyebrow: "Customers",
@@ -765,11 +825,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     });
   }
   const cardsMedia = img(shots.sections[1]) ?? images[1] ?? img(shots.hero) ?? images[0];
-  if (site.stats.length && cardsMedia) {
-    add(7, {
+  if (site.stats.length) {
+    const spare = longFeatures.find((f) => !usedByTour.has(norm(f)) && !featureItems.some((it) => norm(it.split(/\s+[—–]\s+/)[0]) === norm(f)));
+    add(proofPriority("cards", 7), {
       role: "cards", skill: "ui-cards",
-      text: longFeatures[1] ?? `${site.name}, *in action*`,
-      items: [shortFeatures[0] ?? site.name, site.stats[0], shortFeatures[1] ?? "", shortFeatures[2] ?? ""],
+      text: spare ?? `${site.name} *in numbers*`,
+      items: [`${site.name} update: all systems go`, site.stats[0], "This week", "Your team"],
       eyebrow: "Results",
       duration: Math.max(4.2, beats(9)),
       transition: "whip",
@@ -780,7 +841,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (integrationLine) {
     add(8, {
       role: "integrations", skill: "integrations",
-      text: sentenceCopy(integrationLine, 9) || integrationLine,
+      text: sentenceCopy(integrationLine, 9) || "Works with *your stack*",
       eyebrow: "Integrations",
       duration: beats(8),
       transition: "whip",
@@ -800,15 +861,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const chosen = new Set<number>();
   let used = 0;
   for (const c of [...order].sort((a, b) => a.priority - b.priority || a.i - b.i)) {
-    if (c.priority <= 1 || used + c.scene.duration <= target + 1.5) {
+    // Scenes are fitted to the target afterwards (down to ~75%), so the budget can run a little over.
+    if (c.priority <= 2 || used + c.scene.duration <= target * 1.12 + 1.5) {
       chosen.add(c.i);
       used += c.scene.duration;
     }
   }
   const rank: string[] = angle === "story" ? concept.arc : ANGLE_ORDER[angle];
+  // Beats an arc doesn't list (the positioning line) sit right after the reveal.
+  const rankOf = (role?: string) => {
+    const i = rank.indexOf(role ?? "");
+    return i >= 0 ? i : rank.indexOf("reveal") + 0.5;
+  };
   const scenes = order
     .filter((c) => chosen.has(c.i))
-    .sort((a, b) => rank.indexOf(a.scene.role ?? "") - rank.indexOf(b.scene.role ?? "") || a.i - b.i)
+    .sort((a, b) => rankOf(a.scene.role) - rankOf(b.scene.role) || a.i - b.i)
     .map((c) => c.scene);
   // Transitions follow the new order: the opener cuts in.
   if (scenes[0]) scenes[0] = { ...scenes[0], transition: "cut" };
@@ -826,11 +893,26 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     cta.text = teamStat && !usedStat ? `Join *${teamStat.toLowerCase()}*` : pick(lines);
   }
 
-  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id });
-  return applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
+  // Thin material (a one-line prompt, a sparse page) makes a tight shorter cut rather than
+  // padding with invented beats, and the director says what would unlock the full length.
+  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target });
+  const styled = applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
+  const total = styled.scenes.reduce((a, sc) => a + sc.duration, 0);
+  if (total < target * 0.85) {
+    const cut = Math.round(total);
+    styled.target = cut;
+    styled.notes = [
+      `There's enough material for a tight ${cut}s film rather than ${target}s, so nothing is padded or invented. ` +
+        (site.url
+          ? "Sites with more feature headlines, steps or testimonials make longer films."
+          : "List a few features in your prompt (e.g. “with X, Y and Z”) or import the website for the full cut."),
+    ];
+  }
+  return styled;
 }
+
 
 function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
   const text = [site.name, site.tagline, site.description, ...site.headlines].join(" ").toLowerCase();
@@ -1013,6 +1095,8 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     flavor: ["tech", "soft", "pop", "minimal", "neon"].includes(raw.flavor as string) ? raw.flavor : undefined,
     scheme: raw.scheme === "vibrant" || raw.scheme === "60-30-10" ? raw.scheme : undefined,
     concept: typeof raw.concept === "string" && CONCEPT_MAP[raw.concept] ? raw.concept : undefined,
+    target: Number(raw.target) > 0 ? Math.min(120, Math.max(6, Number(raw.target))) : undefined,
+    notes: Array.isArray(raw.notes) ? raw.notes.filter((n): n is string => typeof n === "string").slice(0, 3).map((n) => n.slice(0, 300)) : undefined,
     look:
       raw.look && typeof raw.look === "object"
         ? {

@@ -193,6 +193,23 @@ export function iconFor(label: string, i: number, family: string[] = DEFAULT_FAM
   return family[i % family.length] ?? "Sparkles";
 }
 
+/** Icons for a set of labels shown together: best match each, never the same icon twice. */
+export function iconsFor(labels: string[], family: string[] = DEFAULT_FAMILY): string[] {
+  const used = new Set<string>();
+  return labels.map((label, i) => {
+    const l = label.toLowerCase();
+    for (const [re, icon] of KEYWORDS) {
+      if (re.test(l) && !used.has(icon)) {
+        used.add(icon);
+        return icon;
+      }
+    }
+    const f = family.find((x) => !used.has(x)) ?? DEFAULT_FAMILY.find((x) => !used.has(x)) ?? family[i % family.length];
+    used.add(f);
+    return f;
+  });
+}
+
 export const DEFAULT_FAMILY = ["Sparkles", "Zap", "ChartNoAxesCombined", "Layers", "ShieldCheck", "Users"];
 
 /** Icons for pains being struck through. */

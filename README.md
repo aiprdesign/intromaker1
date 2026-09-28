@@ -37,6 +37,10 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **High-end GPU backgrounds**: animated mesh gradients, grainy gradients, silk flow, smoke rings, a neural glow and light rays, rendered frame-exactly on the GPU with the open-source [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0). They're tinted from the palette and kept deep enough for text to stay readable. Every style has a signature background, and the studio's *Background* picker can put any gradient behind any style. Preview and export match exactly.
 - **Every format**: all SaaS scenes are laid out for 16:9, 9:16 and 1:1.
 
+## Quality: Kaizen scorecard
+
+`npm run kaizen` generates 672 storyboards and scores each out of 100. The corpus covers 8 websites (sales, developer tool, AI, fintech, security, e-commerce, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc, length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+
 ## Run it
 
 ```bash
