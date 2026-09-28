@@ -981,8 +981,11 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
             text: ["blur", "mask", "pop", "glow", "type"].includes(raw.look.text as string) ? raw.look.text : undefined,
             backdrop: ["grid", "dots", "blobs", "scanlines", "plain"].includes(raw.look.backdrop as string) ? raw.look.backdrop : undefined,
             card: ["glass", "frost", "flat", "brutal"].includes(raw.look.card as string) ? raw.look.card : undefined,
+            shader: ["mesh", "grain", "warp", "smoke", "neuro", "rays"].includes(raw.look.shader as string) ? raw.look.shader : undefined,
+            shaderStrength: raw.look.shaderStrength !== undefined ? Math.min(1, Math.max(0, Number(raw.look.shaderStrength) || 0)) : undefined,
+            shaderSpeed: raw.look.shaderSpeed !== undefined ? Math.min(3, Math.max(0, Number(raw.look.shaderSpeed) || 0)) : undefined,
+            bokeh: raw.look.bokeh === true ? true : raw.look.bokeh === false ? false : undefined,
             textScale: raw.look.textScale !== undefined ? Math.min(1.6, Math.max(0.7, Number(raw.look.textScale) || 1)) : undefined,
-            bokeh: raw.look.bokeh === false ? false : undefined,
             grain: raw.look.grain !== undefined ? Math.min(2, Math.max(0, Number(raw.look.grain) || 0)) : undefined,
             vignette: raw.look.vignette !== undefined ? Math.min(1.6, Math.max(0, Number(raw.look.vignette) || 0)) : undefined,
           }

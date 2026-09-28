@@ -81,7 +81,7 @@ function logoReveal(sc: SkillContext) {
     ctx.fillRect(0, 0, w, h);
   }
   // Rotating light burst behind the mark.
-  const burst = clamp(range(t, hit - 0.3, hit + 0.2)) * (1 - ex) * (saas ? 0.18 : 1);
+  const burst = saas ? 0 : clamp(range(t, hit - 0.3, hit + 0.2)) * (1 - ex);
   // SaaS: an anamorphic light streak blooms horizontally through the mark on the hit.
   if (saas) {
     const sk = range(t, hit - 0.15, hit + 1.4);

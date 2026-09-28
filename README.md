@@ -23,6 +23,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Copy that reads like a designer wrote it**: the site's headlines are ranked for on-screen quality, the emphasis word is chosen by meaning ("*300+ tools*", "*whole team*"), bento cards carry the site's own one-line feature descriptions, and CTAs vary, including social proof ("Join *12,000+ teams*").
 - **Takes**: "3 more takes" directs alternative cuts (product-first, proof-first, a fresh story) in parallel. They appear as live previews, and you click one to use it.
 - **AI self-review**: the AI's draft is checked against a storyboard checklist covering arc, copy length, pacing, and invented quotes, logos or numbers. *Best* mode always critiques and revises its draft. *Balanced* revises only when the checklist fails. Anything invented that remains is removed.
+- **High-end GPU backgrounds**: animated mesh gradients, grainy gradients, silk flow, smoke rings, a neural glow and light rays, rendered frame-exactly on the GPU with the open-source [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0). They're tinted from the palette and kept deep enough for text to stay readable. Every style has a signature background, and the studio's *Background* picker can put any gradient behind any style. Preview and export match exactly.
 - **Every format**: all SaaS scenes are laid out for 16:9, 9:16 and 1:1.
 
 ## Run it
@@ -54,6 +55,7 @@ src/engine/
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass
   planner.ts      built-in director + plan sanitising + share-link encoding
   audio.ts        procedural trailer score arranged to the storyboard (WebAudio)
+  shaderbg.ts     WebGL2 runner for Paper Shaders gradients (frame-exact, shared context)
   templates.ts    style templates (look, motion, music, pacing, role → skill)
   export.ts       WebCodecs offline export, export presets, PNG thumbnail
 src/app/api/generate/route.ts   Claude AI Director (structured output), falls back to planner.ts
@@ -90,3 +92,8 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 
 - The pricing tiers on the landing page are marketing UI only. Auth and billing are not wired up.
 - Export renders every frame offline with WebCodecs (Chrome, Edge, Safari 17+), so videos come out smooth and exactly the right length on any machine. Other browsers fall back to real-time recording.
+
+## Third-party
+
+- [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0) by Paper Design. `src/engine/shaderbg.ts` includes their vertex shader source.
+- Fonts via Fontsource: Inter, Space Grotesk, Anton, Instrument Serif and JetBrains Mono (SIL Open Font License).

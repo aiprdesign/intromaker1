@@ -6,6 +6,7 @@ import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiS
 import { Logo } from "@/components/Nav";
 import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
+import BackgroundPicker, { applyBackground, type BgChoice } from "@/components/BackgroundPicker";
 import TemplatePicker from "@/components/TemplatePicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import Player from "@/components/Player";
@@ -41,6 +42,15 @@ export default function Studio() {
   const templateRef = useRef(template);
   templateRef.current = template;
   const [takes, setTakes] = useState<Take[]>([]);
+  const [bg, setBg] = useState<BgChoice>("template");
+  const bgRef = useRef(bg);
+  bgRef.current = bg;
+  const chooseBackground = (b: BgChoice) => {
+    setBg(b);
+    bgRef.current = b;
+    // "Template default" restores the template's own look; others override just the stage.
+    setPlan((p) => (b === "template" && p.style === "saas" && p.template ? applyTemplate(p, p.template, { palette: p.palette }) : applyBackground(p, b)));
+  };
   const [takesLoading, setTakesLoading] = useState(false);
   useEffect(() => {
     try {
@@ -62,7 +72,7 @@ export default function Studio() {
       /* ignore */
     }
     // A palette the user picked survives template switches; otherwise the template's colours apply.
-    setPlan((p) => (p.style === "saas" ? applyTemplate(p, id, { palette: palette !== "auto" ? palette : undefined }) : p));
+    setPlan((p) => (p.style === "saas" ? applyBackground(applyTemplate(p, id, { palette: palette !== "auto" ? palette : undefined }), bgRef.current) : p));
     setVersion((v) => v + 1);
   };
   useEffect(() => setAi(loadAiSettings()), []);
@@ -133,7 +143,7 @@ export default function Studio() {
   };
 
   const show = (take: Take) => {
-    setPlan(take.plan);
+    setPlan(applyBackground(take.plan, bgRef.current));
     setVersion((v) => v + 1);
     setEngine(take.engine);
     setEngineLabel(take.engineLabel);
@@ -440,6 +450,9 @@ export default function Studio() {
               </label>
               <TemplatePicker value={template} onChange={chooseTemplate} />
               <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
+              <label className="field-label">Background</label>
+              <BackgroundPicker value={bg} onChange={chooseBackground} palette={plan.style === "saas" ? plan.palette : TEMPLATE_MAP[template].palette} look={plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look} />
+              <p className="hint">GPU gradient stages rendered with the open-source Paper Shaders (Apache-2.0).</p>
             </>
           )}
 

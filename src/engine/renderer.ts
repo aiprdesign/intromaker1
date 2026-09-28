@@ -96,6 +96,7 @@ function drawScene(
     brand: plan.brand,
     style: plan.style,
     look: plan.look,
+    globalT,
   };
   resetCtx(target);
   target.save();
@@ -493,7 +494,7 @@ function post(
   }
   // Out-of-focus foreground bokeh for depth.
   const r = rng(seed * 3 + 17);
-  for (let i = 0; i < (look?.bokeh === false ? 0 : 7); i++) {
+  for (let i = 0; i < (look ? (look.bokeh === true ? 7 : 0) : 7); i++) {
     const bx = (r() * 1.2 - 0.1 + globalT * (0.01 + r() * 0.02)) % 1.2;
     const by = r();
     const br = (60 + r() * 140) * u;

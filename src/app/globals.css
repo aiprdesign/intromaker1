@@ -1359,3 +1359,46 @@ button.brand-colors.on {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ───────── Background picker ───────── */
+
+.bg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.bg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 3px 3px 5px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.bg-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-2);
+}
+.bg-card.active {
+  border-color: var(--cyan);
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15);
+}
+.bg-card canvas {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 7px;
+  display: block;
+  background: #000;
+}
+.bg-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 0 2px;
+  line-height: 1.2;
+}

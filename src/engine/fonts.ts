@@ -1,3 +1,4 @@
+import { ensureShaderAssets } from "./shaderbg";
 let ready: Promise<void> | null = null;
 
 const brandFonts = new Map<string, Promise<boolean>>();
@@ -48,6 +49,7 @@ export function ensureFonts() {
     document.fonts.load('400 100px "Instrument Serif"'),
     document.fonts.load('800 100px "JetBrains Mono"'),
     document.fonts.load('500 40px "JetBrains Mono"'),
+    ensureShaderAssets(),
   ])
     .then(() => undefined)
     .catch(() => undefined);

@@ -5,6 +5,8 @@
  */
 import { headline } from "./fx";
 import { clamp, mixHex, range, rgba, rng, TAU } from "./math";
+import { scratch } from "./scratch";
+import { renderShaderBg } from "./shaderbg";
 import { subFont, type HeadlineLayout } from "./text";
 import type { FontId, SkillContext } from "./types";
 
@@ -38,8 +40,21 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   ctx.fillStyle = palette.bg0;
   ctx.fillRect(0, 0, w, h);
 
+  // Premium GPU gradient stage (mesh / grain / warp / smoke / neuro / rays), when the look has one.
+  // The camera overscans slightly, so paint a little beyond the frame.
+  const shaderKind = look?.shader ?? (look?.backdrop === "blobs" ? "mesh" : undefined);
+  const shaded = shaderKind ? renderShaderBg(shaderKind, palette, w, h, sc.globalT ?? t, seed, look?.shaderSpeed ?? 0.6) : null;
+  if (shaded) {
+    ctx.save();
+    ctx.globalAlpha = look?.shaderStrength ?? 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(shaded, -w * 0.03, -h * 0.03, w * 1.06, h * 1.06);
+    ctx.restore();
+  }
+
   // Aurora: soft moving colour fields bleeding from the top edge.
-  const aur = (opts.aurora ?? 1) * (look?.aurora ?? 1) * (light ? 0.7 : 1);
+  const aur = (opts.aurora ?? 1) * (look?.aurora ?? 1) * (light ? 0.7 : 1) * (shaded ? 0.35 : 1);
   ctx.save();
   ctx.globalCompositeOperation = glowOp;
   const fields: [number, string, number][] = [
@@ -57,7 +72,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   ctx.restore();
 
   const backdrop = look?.backdrop ?? "grid";
-  if (backdrop === "blobs") {
+  if (backdrop === "blobs" && !shaded) {
     // Big soft colour blobs drifting across the whole frame (glassmorphism / AI-glow stages).
     ctx.save();
     ctx.globalCompositeOperation = glowOp;
@@ -85,11 +100,13 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
       ctx.fill();
     }
     ctx.restore();
-    const fade = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.3, w / 2, h * 0.45, Math.max(w, h) * 0.7);
-    fade.addColorStop(0, rgba(palette.bg0, 0));
-    fade.addColorStop(1, rgba(palette.bg0, 0.85));
-    ctx.fillStyle = fade;
-    ctx.fillRect(0, 0, w, h);
+    if (!shaded) {
+      const fade = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.3, w / 2, h * 0.45, Math.max(w, h) * 0.7);
+      fade.addColorStop(0, rgba(palette.bg0, 0));
+      fade.addColorStop(1, rgba(palette.bg0, 0.85));
+      ctx.fillStyle = fade;
+      ctx.fillRect(0, 0, w, h);
+    }
   } else if (backdrop === "scanlines") {
     // CRT terminal: phosphor glow, scanlines and a slow rolling bright band.
     ctx.save();
@@ -113,29 +130,33 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   }
 
   if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
+    // Over a shader stage the grid lives on its own layer, masked to fade at the edges;
+    // on a flat stage it is drawn directly and faded with the base colour.
+    const layer = shaded ? scratch("saas-grid", w, h) : null;
+    const gc = layer ? layer.ctx : ctx;
     const step = 72 * u;
     const ox = (w / 2) % step;
     const oy = (h / 2) % step;
-    ctx.save();
-    ctx.strokeStyle = rgba(palette.text, 0.055);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
+    gc.save();
+    gc.strokeStyle = rgba(palette.text, 0.055);
+    gc.lineWidth = 1;
+    gc.beginPath();
     for (let x = ox; x < w; x += step) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
+      gc.moveTo(x, 0);
+      gc.lineTo(x, h);
     }
     for (let y = oy; y < h; y += step) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
+      gc.moveTo(0, y);
+      gc.lineTo(w, y);
     }
-    ctx.stroke();
-    ctx.fillStyle = rgba(palette.text, 0.12);
-    for (let x = ox; x < w; x += step) for (let y = oy; y < h; y += step) ctx.fillRect(x - 1, y - 1, 2, 2);
+    gc.stroke();
+    gc.fillStyle = rgba(palette.text, 0.12);
+    for (let x = ox; x < w; x += step) for (let y = oy; y < h; y += step) gc.fillRect(x - 1, y - 1, 2, 2);
 
     // Travelling beams along grid lines.
     const r = rng(seed + 404);
     const beams = Math.round((opts.beams ?? 4) * (look ? look.beams : 1));
-    ctx.globalCompositeOperation = glowOp;
+    gc.globalCompositeOperation = glowOp;
     for (let i = 0; i < beams; i++) {
       const vertical = r() > 0.5;
       const lineIdx = Math.floor(r() * (vertical ? w / step : h / step));
@@ -147,28 +168,40 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
       const c = i % 2 ? palette.primary : palette.secondary;
       if (vertical) {
         const x = ox + lineIdx * step;
-        const g = ctx.createLinearGradient(0, pos - len, 0, pos);
+        const g = gc.createLinearGradient(0, pos - len, 0, pos);
         g.addColorStop(0, rgba(c, 0));
         g.addColorStop(1, rgba(c, 0.9));
-        ctx.fillStyle = g;
-        ctx.fillRect(x - 1, pos - len, 2, len);
+        gc.fillStyle = g;
+        gc.fillRect(x - 1, pos - len, 2, len);
       } else {
         const y = oy + lineIdx * step;
-        const g = ctx.createLinearGradient(pos - len, 0, pos, 0);
+        const g = gc.createLinearGradient(pos - len, 0, pos, 0);
         g.addColorStop(0, rgba(c, 0));
         g.addColorStop(1, rgba(c, 0.9));
-        ctx.fillStyle = g;
-        ctx.fillRect(pos - len, y - 1, len, 2);
+        gc.fillStyle = g;
+        gc.fillRect(pos - len, y - 1, len, 2);
       }
     }
-    ctx.restore();
+    gc.restore();
 
-    // Fade the grid out towards the edges.
-    const fade = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.2, w / 2, h * 0.45, Math.max(w, h) * 0.65);
-    fade.addColorStop(0, rgba(palette.bg0, 0));
-    fade.addColorStop(1, rgba(palette.bg0, 0.92));
-    ctx.fillStyle = fade;
-    ctx.fillRect(0, 0, w, h);
+    if (layer) {
+      gc.save();
+      gc.globalCompositeOperation = "destination-in";
+      const mask = gc.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.15, w / 2, h * 0.45, Math.max(w, h) * 0.6);
+      mask.addColorStop(0, "rgba(0,0,0,0.75)");
+      mask.addColorStop(1, "rgba(0,0,0,0)");
+      gc.fillStyle = mask;
+      gc.fillRect(0, 0, w, h);
+      gc.restore();
+      ctx.drawImage(layer.canvas, 0, 0);
+    } else {
+      // Fade the grid out towards the edges.
+      const fade = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.2, w / 2, h * 0.45, Math.max(w, h) * 0.65);
+      fade.addColorStop(0, rgba(palette.bg0, 0));
+      fade.addColorStop(1, rgba(palette.bg0, 0.92));
+      ctx.fillStyle = fade;
+      ctx.fillRect(0, 0, w, h);
+    }
   }
 
   // Spotlight cone from above.

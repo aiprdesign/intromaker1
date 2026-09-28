@@ -186,7 +186,7 @@ export interface Look {
   aurora: number;
   /** Headline animation: blur-in, crisp mask slide, bouncy pop, or slow glowing reveal. */
   text?: "blur" | "mask" | "pop" | "glow" | "type";
-  /** Foreground lens bokeh. */
+  /** Foreground lens bokeh (off for SaaS looks unless true). */
   bokeh?: boolean;
   /** Film grain strength multiplier. */
   grain?: number;
@@ -198,6 +198,12 @@ export interface Look {
   card?: "glass" | "frost" | "flat" | "brutal";
   /** Headline size multiplier (kinetic-type styles go big). */
   textScale?: number;
+  /** GPU shader gradient behind everything (Paper Shaders): mesh, grain, warp, smoke, neuro, rays. */
+  shader?: "mesh" | "grain" | "warp" | "smoke" | "neuro" | "rays";
+  /** Shader opacity over the base colour (0–1). */
+  shaderStrength?: number;
+  /** Shader animation speed multiplier. */
+  shaderSpeed?: number;
 }
 
 export interface SkillContext {
@@ -221,6 +227,8 @@ export interface SkillContext {
   brand?: Brand;
   style?: "saas" | "trailer";
   look?: Look;
+  /** Time in the whole film (seconds): lets backgrounds flow continuously across cuts. */
+  globalT?: number;
 }
 
 export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike";
