@@ -42,6 +42,14 @@ export default function Studio() {
   const templateRef = useRef(template);
   templateRef.current = template;
   const [takes, setTakes] = useState<Take[]>([]);
+  const [scheme, setScheme] = useState<NonNullable<VideoPlan["scheme"]>>("60-30-10");
+  const schemeRef = useRef(scheme);
+  schemeRef.current = scheme;
+  const chooseScheme = (sc: NonNullable<VideoPlan["scheme"]>) => {
+    setScheme(sc);
+    schemeRef.current = sc;
+    setPlan((p) => ({ ...p, scheme: sc }));
+  };
   const [bg, setBg] = useState<BgChoice>("template");
   const bgRef = useRef(bg);
   bgRef.current = bg;
@@ -143,7 +151,7 @@ export default function Studio() {
   };
 
   const show = (take: Take) => {
-    setPlan(applyBackground(take.plan, bgRef.current));
+    setPlan({ ...applyBackground(take.plan, bgRef.current), scheme: schemeRef.current });
     setVersion((v) => v + 1);
     setEngine(take.engine);
     setEngineLabel(take.engineLabel);
@@ -468,6 +476,23 @@ export default function Studio() {
           <label className="field-label">
             Colours <span className="tpl-desc">{colourChoice === "template" ? "Template" : colourChoice === "brand" ? "Brand" : PALETTES[colourChoice].name}</span>
           </label>
+          <div className="seg-control">
+            {(
+              [
+                ["60-30-10", "60 · 30 · 10 balance"],
+                ["vibrant", "Vibrant"],
+              ] as [NonNullable<VideoPlan["scheme"]>, string][]
+            ).map(([id, label]) => (
+              <button key={id} className={scheme === id ? "active" : ""} onClick={() => chooseScheme(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            {scheme === "60-30-10"
+              ? "Designer's 60-30-10 rule: 60% dominant background, 30% supporting colour for cards and gradients, 10% accent for highlights and buttons."
+              : "Every palette colour at full strength: louder, more colourful."}
+          </p>
           <PaletteChooser
             value={colourChoice}
             onChange={chooseColours}

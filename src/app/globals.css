@@ -1333,23 +1333,13 @@ button.brand-colors.on {
 }
 .pal-stripes {
   display: flex;
-  gap: 4px;
-  align-items: flex-end;
-  height: 30px;
-  padding: 6px;
+  height: 26px;
   border-radius: 7px;
+  overflow: hidden;
   border: 1px solid rgba(128, 128, 128, 0.25);
 }
 .pal-stripes span {
-  flex: 1;
   height: 100%;
-  border-radius: 4px;
-}
-.pal-stripes span:nth-child(2) {
-  height: 70%;
-}
-.pal-stripes span:nth-child(3) {
-  height: 45%;
 }
 .pal-name {
   font-size: 11px;

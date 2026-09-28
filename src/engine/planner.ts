@@ -972,6 +972,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     template: typeof raw.template === "string" && /^[a-z]{2,20}$/.test(raw.template) ? raw.template : undefined,
     music: raw.music === "saas" || raw.music === "trailer" ? raw.music : undefined,
     flavor: ["tech", "soft", "pop", "minimal", "neon"].includes(raw.flavor as string) ? raw.flavor : undefined,
+    scheme: raw.scheme === "vibrant" || raw.scheme === "60-30-10" ? raw.scheme : undefined,
     look:
       raw.look && typeof raw.look === "object"
         ? {

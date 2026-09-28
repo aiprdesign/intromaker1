@@ -162,6 +162,8 @@ export interface VideoPlan {
   look?: Look;
   /** Score style; defaults to follow `style`. */
   music?: "saas" | "trailer";
+  /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */
+  scheme?: "60-30-10" | "vibrant";
   /** Flavour of the SaaS score. */
   flavor?: "tech" | "soft" | "pop" | "minimal" | "neon";
 }
@@ -177,6 +179,8 @@ export interface Palette {
   text: string;
   /** Light-background theme: glows become solid, borders darken, logos stay as-is. */
   light?: boolean;
+  /** 60-30-10 rule: the supporting 30% colour (surfaces, gradient fields). Set when the rule is applied. */
+  support?: string;
 }
 
 /** Background treatment for SaaS scenes, set by the style template. */

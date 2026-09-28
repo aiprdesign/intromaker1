@@ -62,6 +62,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   brand?: VideoPlan["brand"];
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
+  scheme?: VideoPlan["scheme"];
 };
 
 /** Draw a scene's content (camera + skill), without transitions or post, into `target`. */
@@ -79,7 +80,7 @@ function drawScene(
   d = scene.duration,
   transitionIn = true,
 ) {
-  const palette = brandPalette(plan.palette, plan.brand);
+  const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   const sc: SkillContext = {
     ctx: target,
     w,
@@ -121,7 +122,7 @@ export function renderScene(
   globalT = t,
   context: { prev?: { scene: Scene; index: number }; extendSelf?: boolean } = {},
 ) {
-  const palette = brandPalette(plan.palette, plan.brand);
+  const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
   const d = context.extendSelf ? scene.duration + OVERLAP_EXTEND : scene.duration;
   const overlapping = !!context.prev && t < TRANSITION_LEN && OVERLAP.has(scene.transition);
@@ -144,18 +145,56 @@ export function renderScene(
   post(ctx, w, h, t, sc.seed, palette, opts, globalT, plan.look);
 }
 
+/** SaaS films follow the 60-30-10 colour rule unless the plan asks for "vibrant". */
+export function schemeOf(plan: { style?: VideoPlan["style"]; scheme?: VideoPlan["scheme"] }) {
+  return plan.style === "saas" && plan.scheme !== "vibrant" ? ("60-30-10" as const) : ("vibrant" as const);
+}
+
+/**
+ * The 60-30-10 rule used by designers: 60% dominant (the stage, bg0), 30% supporting colour
+ * (cards, panels, gradient fields) and 10% accent (highlight words, buttons, cursor, beams).
+ * Accents collapse to one hue (secondary becomes a tint of the accent) so nothing competes,
+ * and surfaces take a muted tone of the palette's secondary colour.
+ */
+function saturation(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
+export function ruleOf(p: Palette): Palette {
+  // The accent is the palette's most vivid colour (e.g. Mono's red, not its white).
+  const swap = saturation(p.secondary) > saturation(p.primary) + 0.35;
+  const accent = swap ? p.secondary : p.primary;
+  const support = mixHex(p.bg0, swap ? p.primary : p.secondary, p.light ? 0.24 : 0.36);
+  return {
+    ...p,
+    support,
+    primary: accent,
+    secondary: mixHex(accent, p.light ? "#000000" : "#ffffff", p.light ? 0.22 : 0.3),
+    accent: mixHex(accent, support, 0.4),
+    bg1: mixHex(p.bg0, support, p.light ? 0.35 : 0.55),
+  };
+}
+
 /** Base palette with the brand's colours swapped in (backgrounds keep the base's darkness). */
-export function brandPalette(id: VideoPlan["palette"], brand?: VideoPlan["brand"]): Palette {
+export function brandPalette(id: VideoPlan["palette"], brand?: VideoPlan["brand"], scheme: VideoPlan["scheme"] = "vibrant"): Palette {
   const base = PALETTES[id];
   const c = brand?.colors;
-  if (!c) return base;
-  return {
-    ...base,
-    primary: c.primary,
-    secondary: c.secondary,
-    accent: mixHex(c.primary, c.secondary, 0.5),
-    bg1: mixHex(base.bg0, c.primary, 0.22),
-  };
+  const p = c
+    ? {
+        ...base,
+        primary: c.primary,
+        secondary: c.secondary,
+        accent: mixHex(c.primary, c.secondary, 0.5),
+        bg1: mixHex(base.bg0, c.primary, 0.22),
+      }
+    : base;
+  return scheme === "60-30-10" ? ruleOf(p) : p;
 }
 
 /** Render the whole plan at absolute time `time`. */
@@ -205,7 +244,7 @@ function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, 
   if (start < 0) return;
   const a = ease.inOutCubic(range(time, start + 0.35, start + 0.95)) * (1 - ease.inCubic(range(time, end - 0.45, end - 0.05)));
   if (a <= 0) return;
-  const palette = brandPalette(plan.palette, brand);
+  const palette = brandPalette(plan.palette, brand, schemeOf(plan));
   const u = Math.min(w, h) / 1080;
   const x = 52 * u;
   const y = 54 * u;

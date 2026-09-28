@@ -284,8 +284,17 @@ const rgba = (hex: string, a = 1) => {
 /** Colour sets tuned so text stays legible: deep on dark stages, airy on light ones. */
 function colours(kind: ShaderBg, p: Palette) {
   const light = !!p.light;
-  const k = light ? 0.42 : 0.62;
   const tone = (c: string, amt: number) => mixHex(p.bg0, c, amt);
+  if (p.support) {
+    // 60-30-10: colour spots in proportion: 6 dominant tones, 3 supporting, 1 accent.
+    const D = [p.bg0, tone(p.support, 0.25), p.bg0, tone(p.support, 0.12), p.bg0, tone(p.support, 0.35)];
+    const S = [p.support, tone(p.support, 0.7), mixHex(p.support, p.text, light ? 0.06 : 0.1)];
+    const A = [tone(p.primary, light ? 0.55 : 0.8)];
+    if (kind === "mesh" || kind === "warp") return [...D.slice(0, 3), S[0], D[3], S[1], D[4], A[0], D[5], S[2]];
+    // Ring / ray / grain shapes paint on a dominant back colour: supporting colour + a touch of accent.
+    return [S[0], S[1], A[0]];
+  }
+  const k = light ? 0.42 : 0.62;
   const set = [tone(p.primary, k), tone(p.secondary, k * 0.9), tone(p.accent, k * 0.75), light ? p.bg1 : tone(p.bg1, 0.9)];
   if (kind === "mesh") return [p.bg0, ...set];
   return set;
@@ -315,8 +324,8 @@ function uniformsFor(kind: ShaderBg, p: Palette, seed: number): Record<string, U
         ...base,
         u_fit: 0,
         u_scale: 1.2,
-        u_colors: [rgba(p.bg0), ...cols.slice(0, 3)],
-        u_colorsCount: 4,
+        u_colors: p.support ? cols : [rgba(p.bg0), ...cols.slice(0, 3)],
+        u_colorsCount: p.support ? cols.length : 4,
         u_proportion: 0.42,
         u_softness: 1,
         u_shape: WarpPatterns.edge,
@@ -343,8 +352,8 @@ function uniformsFor(kind: ShaderBg, p: Palette, seed: number): Record<string, U
         ...base,
         u_fit: 0,
         u_scale: 1.4,
-        u_colorFront: rgba(mixHex(p.bg0, p.primary, 0.8)),
-        u_colorMid: rgba(mixHex(p.bg0, p.secondary, 0.45)),
+        u_colorFront: rgba(mixHex(p.bg0, p.primary, p.support ? 0.48 : 0.8)),
+        u_colorMid: rgba(p.support ?? mixHex(p.bg0, p.secondary, 0.45)),
         u_colorBack: back,
         u_brightness: 0.05,
         u_contrast: 0.3,
@@ -354,7 +363,7 @@ function uniformsFor(kind: ShaderBg, p: Palette, seed: number): Record<string, U
         ...base,
         u_offsetY: -0.55,
         u_colorBack: back,
-        u_colorBloom: rgba(mixHex(p.bg0, p.primary, 0.5)),
+        u_colorBloom: rgba(p.support ? mixHex(p.bg0, p.support, 0.8) : mixHex(p.bg0, p.primary, 0.5)),
         u_colors: cols.slice(0, 3),
         u_colorsCount: 3,
         u_spotty: 0.3,

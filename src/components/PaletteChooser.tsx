@@ -5,12 +5,13 @@ import { PALETTE_IDS, type Brand, type Palette, type PaletteId } from "@/engine/
 
 export type ColourChoice = "template" | "brand" | PaletteId;
 
-function Stripes({ bg, a, b, c }: { bg: string; a: string; b: string; c?: string }) {
+/** Colour bar in 60 / 30 / 10 proportions: dominant background, supporting colour, accent. */
+function Stripes({ bg, a, b }: { bg: string; a: string; b: string; c?: string }) {
   return (
-    <span className="pal-stripes" style={{ background: bg }}>
-      <span style={{ background: a }} />
-      <span style={{ background: b }} />
-      {c && <span style={{ background: c }} />}
+    <span className="pal-stripes">
+      <span style={{ background: bg, flex: 6 }} />
+      <span style={{ background: b, flex: 3 }} />
+      <span style={{ background: a, flex: 1 }} />
     </span>
   );
 }
