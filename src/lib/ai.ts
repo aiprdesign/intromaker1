@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod/v4";
 import { assertPublicUrl } from "./netguard";
-import { PRESET_MAP, type ProviderPreset } from "./providers";
+import { PRESET_MAP, PROVIDER_PRESETS, type ProviderPreset } from "./providers";
 
 /**
  * Bring-your-own-key AI director. Claude runs through the Anthropic SDK with structured output;
@@ -132,8 +132,36 @@ async function callClaude<T extends z.ZodType>(cfg: AiConfig, call: DirectorCall
   }
 }
 
+/**
+ * Can this server reach the user's local model servers (localhost)? True when it runs on the
+ * user's own machine (dev mode or INTROMAKER_ALLOW_PRIVATE_URLS=1). An online deployment can't,
+ * so local AI then runs from the user's browser instead.
+ */
+export function serverReachesLocal() {
+  if (process.env.INTROMAKER_HOSTED === "1") return false;
+  return process.env.NODE_ENV !== "production" || process.env.INTROMAKER_ALLOW_PRIVATE_URLS === "1";
+}
+
+/** Probe the known local model servers (Ollama, LM Studio, llama.cpp, Jan, vLLM…) for models. */
+export async function scanLocal() {
+  const found: { id: string; name: string; baseUrl: string; models: string[] }[] = [];
+  await Promise.all(
+    PROVIDER_PRESETS.filter((p) => p.group === "Local" && p.baseUrl).map(async (p) => {
+      try {
+        const res = await fetch(`${p.baseUrl}/models`, { signal: AbortSignal.timeout(1500) });
+        if (!res.ok) return;
+        const data = (await res.json()) as { data?: { id: string }[] };
+        found.push({ id: p.id, name: p.name, baseUrl: p.baseUrl!, models: (data.data ?? []).map((m) => m.id).filter(Boolean).slice(0, 50) });
+      } catch {
+        /* not running */
+      }
+    }),
+  );
+  return found;
+}
+
 async function checkBaseUrl(base: string) {
-  const allowLocal = process.env.NODE_ENV !== "production" || process.env.INTROMAKER_ALLOW_PRIVATE_URLS === "1";
+  const allowLocal = serverReachesLocal();
   const url = new URL(base);
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new AiError("Base URL must be http(s).");
   // Local model servers (Ollama, LM Studio) are fine on your own machine; not on a public deployment.

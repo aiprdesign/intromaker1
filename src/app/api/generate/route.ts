@@ -2,7 +2,7 @@ import { z } from "zod/v4";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { assetUrl } from "@/engine/assets";
-import { AiError, describe, envClaudeAvailable, readAiConfig, runDirector, type AiConfig } from "@/lib/ai";
+import { AiError, describe, envClaudeAvailable, readAiConfig, runDirector, serverReachesLocal, type AiConfig } from "@/lib/ai";
 import { SHOT_DIR } from "@/lib/capture";
 import { lintStoryboard, repairStoryboard, reviewBrief } from "@/lib/review";
 import { PALETTES } from "@/engine/palettes";
@@ -97,7 +97,12 @@ function hasCredentials() {
 }
 
 export async function GET() {
-  return Response.json({ ai: hasCredentials(), model: hasCredentials() ? process.env.INTROMAKER_MODEL || "claude-opus-5" : null });
+  return Response.json({
+    ai: hasCredentials(),
+    model: hasCredentials() ? process.env.INTROMAKER_MODEL || "claude-opus-5" : null,
+    // Local AI goes through this server only when it runs on the user's machine.
+    localViaServer: serverReachesLocal(),
+  });
 }
 
 function siteAssets(site: SiteData): { media: Media; label: string }[] {
@@ -165,33 +170,132 @@ async function siteImages(site: SiteData) {
   return out;
 }
 
+type Body = Partial<PlanRequest> & {
+  site?: unknown;
+  colors?: Brand["colors"];
+  style?: StyleChoice;
+  ai?: unknown;
+  template?: string;
+  angle?: unknown;
+  /**
+   * Browser-run AI (a local model on the user's machine when this server is online):
+   * "prompt" returns the director request; "finish" turns the model's JSON into a plan
+   * (asking for one revision first when the self-review wants it).
+   */
+  phase?: "prompt" | "finish";
+  draft?: unknown;
+  revised?: unknown;
+  engineLabel?: string;
+};
+
+function readBody(body: Body) {
+  const prompt = String(body.prompt ?? "").slice(0, 1000);
+  const aspect: Aspect = body.aspect === "9:16" || body.aspect === "1:1" ? body.aspect : "16:9";
+  const length: Length = body.length === "short" || body.length === "long" ? body.length : "standard";
+  const palette: PaletteId | "auto" = (PALETTE_IDS as readonly string[]).includes(body.palette as string) ? (body.palette as PaletteId) : "auto";
+  const seed = Number(body.seed) || undefined;
+  const site = readSite(body.site);
+  const colors =
+    body.colors && /^#[0-9a-f]{6}$/i.test(body.colors.primary) && /^#[0-9a-f]{6}$/i.test(body.colors.secondary) ? body.colors : undefined;
+  const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
+  const template = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
+  const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
+  const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
+  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template };
+  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle }) : planFromPrompt(request));
+  return { prompt, aspect, length, palette, seed, site, colors, style, template, angle, wantSaas, builtin };
+}
+type Ctx = ReturnType<typeof readBody>;
+
+/** Everything the AI director is sent: system prompt, brief, screenshots and output schema. */
+async function directorRequest(c: Ctx) {
+  const schema = c.site ? SitePlanSchema : PlanSchema;
+  const images = c.site ? await siteImages(c.site) : [];
+  const text =
+    (c.site ? `${images.length ? "The attached images are screenshots of the website — use them to understand the product, its look and which assets best show it. Screenshot order matches ASSETS: hero first, then sections.\n\n" : ""}${siteBrief(c.site)}\n\n` : "") +
+    (c.prompt ? `Prompt: ${c.prompt}\n\n` : "") +
+    `Style: ${c.wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${c.aspect}. Target total length: ${LENGTH_SECONDS[c.length]} seconds.` +
+    (c.wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[c.template].name}": ${TEMPLATE_MAP[c.template].vibe} Write copy in this voice.` : "") +
+    (c.palette !== "auto" ? ` Use the "${c.palette}" palette.` : "") +
+    (c.angle ? `\nCREATIVE ANGLE "${ANGLES.find((a) => a.id === c.angle)!.name}": ${ANGLES.find((a) => a.id === c.angle)!.brief}` : "") +
+    (c.seed ? ` Variation #${c.seed % 1000}: take a fresh creative angle.` : "");
+  const system = c.site ? SYSTEM + "\n" + SITE_RULES : SYSTEM;
+  return { schema, images, text, system };
+}
+
+/** Turn a (checked, repaired) AI storyboard into a renderable plan in the chosen style. */
+function finishPlan(c: Ctx, raw: z.infer<typeof SitePlanSchema>) {
+  const out = repairStoryboard(raw, { site: c.site, targetSeconds: LENGTH_SECONDS[c.length] });
+  const brand = c.site ? brandFromSite(c.site, c.colors) : undefined;
+  const assets: Media[] = c.site ? siteAssets(c.site).map((a) => a.media) : [];
+  const directed = beatSync(
+    sanitizePlan({
+      ...out,
+      aspect: c.aspect,
+      palette: c.palette !== "auto" ? c.palette : out.palette,
+      seed: c.seed ?? Math.floor(Math.random() * 1e9),
+      brand,
+      style: out.style,
+      scenes: out.scenes.map((s) => {
+        const idx = "media" in s ? (s.media as number) : -1;
+        // Testimonials get the real author's avatar when the quote matches the site's.
+        const q = c.site?.testimonials.find((x) => s.skill === "testimonial" && x.avatar && s.text.includes(x.quote.slice(0, 40)));
+        const media = q?.avatar ? { src: assetUrl(q.avatar), kind: "image" as const } : assets[idx];
+        return { ...s, subtext: s.subtext || undefined, items: s.items?.length ? s.items : undefined, eyebrow: s.eyebrow || undefined, media };
+      }),
+    }),
+  );
+  // SaaS films get the chosen template's look, music, pacing and role skills.
+  return c.wantSaas ? applyTemplate({ ...directed, brand: directed.brand }, c.template, { palette: c.palette !== "auto" ? c.palette : undefined }) : directed;
+}
+
+/** Validate model output against the storyboard schema (tolerating small deviations). */
+function readDraft(schema: z.ZodType, raw: unknown): z.infer<typeof SitePlanSchema> | null {
+  const parsed = schema.safeParse(raw);
+  if (parsed.success) return parsed.data as z.infer<typeof SitePlanSchema>;
+  const o = raw as { scenes?: unknown };
+  return o && typeof o === "object" && Array.isArray(o.scenes) && o.scenes.length ? (raw as z.infer<typeof SitePlanSchema>) : null;
+}
+
 export async function POST(req: Request) {
-  let body: Partial<PlanRequest> & { site?: unknown; colors?: Brand["colors"]; style?: StyleChoice; ai?: unknown; template?: string; angle?: unknown };
+  let body: Body;
   try {
     body = await req.json();
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const prompt = String(body.prompt ?? "").slice(0, 1000);
-  const aspect: Aspect = body.aspect === "9:16" || body.aspect === "1:1" ? body.aspect : "16:9";
-  const length: Length = body.length === "short" || body.length === "long" ? body.length : "standard";
-  const palette = (PALETTE_IDS as readonly string[]).includes(body.palette as string)
-    ? (body.palette as PaletteId)
-    : "auto";
-  const seed = Number(body.seed) || undefined;
-  const site = readSite(body.site);
-  const colors =
-    body.colors && /^#[0-9a-f]{6}$/i.test(body.colors.primary) && /^#[0-9a-f]{6}$/i.test(body.colors.secondary)
-      ? body.colors
-      : undefined;
-  const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
-  const template = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
-  const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
-  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template };
-  const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
+  const c = readBody(body);
+  const lintCtx = { site: c.site, targetSeconds: LENGTH_SECONDS[c.length] };
 
-  const builtin = () =>
-    site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle }) : planFromPrompt(request);
+  // ── Browser-run AI: hand out the request, then finish what the model returned.
+  if (body.phase === "prompt") {
+    const r = await directorRequest(c);
+    return Response.json({ system: r.system, text: r.text, images: r.images, schema: z.toJSONSchema(r.schema) });
+  }
+  if (body.phase === "finish") {
+    const { schema, text } = await directorRequest(c);
+    const cfg = readAiConfig(body.ai);
+    const label = (cfg ? describe(cfg) : "Local AI").slice(0, 80);
+    const draft = readDraft(schema, body.draft);
+    if (!draft) return Response.json({ plan: c.builtin(), engine: "builtin", note: "The local model's reply wasn't a storyboard; used built-in director." });
+    const issues = lintStoryboard(draft, lintCtx);
+    const mode = cfg?.mode ?? "balanced";
+    const revised = body.revised ? readDraft(schema, body.revised) : null;
+    if (!body.revised && (mode === "best" || (mode === "balanced" && issues.length))) {
+      return Response.json({ review: text + "\n" + reviewBrief(draft, issues) });
+    }
+    let out = draft;
+    let reviewed = "";
+    if (revised) {
+      const left = lintStoryboard(revised, lintCtx).length;
+      if (left <= issues.length) {
+        out = revised;
+        const fixed = issues.length - left;
+        reviewed = fixed > 0 ? ` · self-reviewed, fixed ${fixed} issue${fixed > 1 ? "s" : ""}` : " · self-reviewed";
+      }
+    }
+    return Response.json({ plan: finishPlan(c, out), engine: "ai", engineLabel: `${label}${reviewed}` });
+  }
 
   // Which AI runs the director: the user's own key/provider, else a server Claude key, else built-in.
   const userAi = readAiConfig(body.ai);
@@ -201,29 +305,18 @@ export async function POST(req: Request) {
       : !userAi && hasCredentials()
         ? { provider: "anthropic", mode: "balanced", images: true }
         : null;
-  if (!ai || (!prompt.trim() && !site)) {
-    return Response.json({ plan: builtin(), engine: "builtin" });
+  if (!ai || (!c.prompt.trim() && !c.site)) {
+    return Response.json({ plan: c.builtin(), engine: "builtin" });
   }
 
   try {
-    const schema = site ? SitePlanSchema : PlanSchema;
-    const images = site ? await siteImages(site) : [];
-    const text =
-      (site ? `${images.length ? "The attached images are screenshots of the website — use them to understand the product, its look and which assets best show it. Screenshot order matches ASSETS: hero first, then sections.\n\n" : ""}${siteBrief(site)}\n\n` : "") +
-      (prompt ? `Prompt: ${prompt}\n\n` : "") +
-      `Style: ${wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${aspect}. Target total length: ${LENGTH_SECONDS[length]} seconds.` +
-      (wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[template].name}": ${TEMPLATE_MAP[template].vibe} Write copy in this voice.` : "") +
-      (palette !== "auto" ? ` Use the "${palette}" palette.` : "") +
-      (angle ? `\nCREATIVE ANGLE "${ANGLES.find((a) => a.id === angle)!.name}": ${ANGLES.find((a) => a.id === angle)!.brief}` : "") +
-      (seed ? ` Variation #${seed % 1000}: take a fresh creative angle.` : "");
-    const system = site ? SYSTEM + "\n" + SITE_RULES : SYSTEM;
+    const { schema, images, text, system } = await directorRequest(c);
     const result = await runDirector(ai, { system, text, images, schema });
     if (result === "refusal") {
-      return Response.json({ plan: builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
+      return Response.json({ plan: c.builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
     }
     // Self-review: Best mode always critiques and revises its draft; Balanced revises only
     // when the checklist finds real problems; Fast ships the first draft.
-    const lintCtx = { site, targetSeconds: LENGTH_SECONDS[length] };
     let out = result as z.infer<typeof SitePlanSchema>;
     const issues = lintStoryboard(out, lintCtx);
     const mode = ai.mode ?? "balanced";
@@ -243,34 +336,10 @@ export async function POST(req: Request) {
         console.error("[generate] review pass failed, keeping draft:", err instanceof AiError ? err.message : (err as Error).name);
       }
     }
-    out = repairStoryboard(out, lintCtx);
-    const brand = site ? brandFromSite(site, colors) : undefined;
-    const assets: Media[] = site ? siteAssets(site).map((a) => a.media) : [];
-    const directed = beatSync(
-      sanitizePlan({
-        ...out,
-        aspect,
-        palette: palette !== "auto" ? palette : out.palette,
-        seed: seed ?? Math.floor(Math.random() * 1e9),
-        brand,
-        style: out.style,
-        scenes: out.scenes.map((s) => {
-          const idx = "media" in s ? (s.media as number) : -1;
-          // Testimonials get the real author's avatar when the quote matches the site's.
-          const q = site?.testimonials.find((x) => s.skill === "testimonial" && x.avatar && s.text.includes(x.quote.slice(0, 40)));
-          const media = q?.avatar ? { src: assetUrl(q.avatar), kind: "image" as const } : assets[idx];
-          return { ...s, subtext: s.subtext || undefined, items: s.items?.length ? s.items : undefined, eyebrow: s.eyebrow || undefined, media };
-        }),
-      }),
-    );
-    // SaaS films get the chosen template's look, music, pacing and role skills.
-    const plan = wantSaas
-      ? applyTemplate({ ...directed, brand: directed.brand }, template, { palette: palette !== "auto" ? palette : undefined })
-      : directed;
-    return Response.json({ plan, engine: "ai", engineLabel: describe(ai) + reviewed });
+    return Response.json({ plan: finishPlan(c, out), engine: "ai", engineLabel: describe(ai) + reviewed });
   } catch (err) {
     const message = err instanceof AiError ? err.message : (err as Error).name === "TimeoutError" ? "AI request timed out" : "AI director unavailable";
     console.error("[generate] falling back to built-in director:", message);
-    return Response.json({ plan: builtin(), engine: "builtin", note: `AI director error (${message}); used built-in director.` });
+    return Response.json({ plan: c.builtin(), engine: "builtin", note: `AI director error (${message}); used built-in director.` });
   }
 }

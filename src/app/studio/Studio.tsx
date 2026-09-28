@@ -7,6 +7,8 @@ import { Logo } from "@/components/Nav";
 import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
 import BackgroundPicker, { applyBackground, type BgChoice } from "@/components/BackgroundPicker";
+import { runBrowserDirector } from "@/lib/localai";
+import { isLocalProvider } from "@/lib/providers";
 import TemplatePicker from "@/components/TemplatePicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import Player from "@/components/Player";
@@ -29,6 +31,10 @@ export default function Studio() {
   const [plan, setPlan] = useState<VideoPlan>(HERO_PLAN);
   const [engine, setEngine] = useState<Engine>("manual");
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  /** Whether the server can reach this computer's local AI (else local models run from the browser). */
+  const [localViaServer, setLocalViaServer] = useState(true);
+  const localViaServerRef = useRef(true);
+  localViaServerRef.current = localViaServer;
   const [loading, setLoading] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -107,7 +113,10 @@ export default function Studio() {
   useEffect(() => {
     fetch("/api/generate")
       .then((r) => r.json())
-      .then((d) => setAiAvailable(Boolean(d.ai)))
+      .then((d) => {
+        setAiAvailable(Boolean(d.ai));
+        setLocalViaServer(d.localViaServer !== false);
+      })
       .catch(() => setAiAvailable(false));
   }, []);
 
@@ -132,11 +141,28 @@ export default function Studio() {
     const len = opts.length ?? length;
     const template = templateRef.current;
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
+    const aiCfg = aiForRequest(loadAiSettings());
+    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiCfg, template, angle: opts.angle };
+    // Local AI runs where the model is: from this browser when the server is online.
+    if (isLocalProvider(aiCfg.provider) && !localViaServerRef.current) {
+      try {
+        const data = await runBrowserDirector(body, aiCfg);
+        return { plan: sanitizePlan(data.plan as VideoPlan), engine: data.engine as Engine, engineLabel: data.engineLabel ?? "", note: data.note, label };
+      } catch (e) {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, ai: { provider: "builtin" } }),
+        }).catch(() => null);
+        const data = res?.ok ? await res.json() : null;
+        if (data) return { plan: sanitizePlan(data.plan), engine: "builtin", engineLabel: "", note: `Local AI: ${(e as Error).message} Used the built-in director.`, label };
+      }
+    }
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiForRequest(loadAiSettings()), template, angle: opts.angle }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -320,7 +346,7 @@ export default function Studio() {
         </button>
       </header>
 
-      {aiOpen && <AiSettings value={ai} onChange={setAi} onClose={() => setAiOpen(false)} serverClaude={!!aiAvailable} />}
+      {aiOpen && <AiSettings value={ai} onChange={setAi} onClose={() => setAiOpen(false)} serverClaude={!!aiAvailable} localViaServer={localViaServer} />}
       <div className="studio-body">
         <aside className="panel">
           <h2>From a website</h2>

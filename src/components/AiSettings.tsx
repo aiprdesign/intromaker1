@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { browserListModels, browserScan, browserTest, type LocalServer } from "@/lib/localai";
 import { detectProvider, PRESET_MAP, PROVIDER_GROUPS, PROVIDER_PRESETS } from "@/lib/providers";
 
 /** "builtin" or a provider id from src/lib/providers.ts. */
@@ -69,11 +70,14 @@ export default function AiSettings({
   onChange,
   onClose,
   serverClaude,
+  localViaServer = true,
 }: {
   value: AiSettingsValue;
   onChange: (v: AiSettingsValue) => void;
   onClose: () => void;
   serverClaude: boolean;
+  /** False when IntroMaker is hosted online: local models are then called from this browser. */
+  localViaServer?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   const [showKey, setShowKey] = useState(false);
@@ -83,6 +87,29 @@ export default function AiSettings({
   const [models, setModels] = useState<{ state: "idle" | "loading" | "ok" | "fail"; list: string[]; msg?: string }>({ state: "idle", list: [] });
   const [test, setTest] = useState<{ state: "idle" | "running" | "ok" | "fail"; msg?: string }>({ state: "idle" });
   const p = PRESET_MAP[draft.provider];
+  const isLocal = p?.group === "Local";
+  const inBrowser = isLocal && !localViaServer;
+  const [scan, setScan] = useState<{ state: "idle" | "scanning" | "done"; found: LocalServer[] }>({ state: "idle", found: [] });
+  /** Look for Ollama, LM Studio, llama.cpp, Jan, vLLM… on this computer. */
+  const runScan = async () => {
+    setScan({ state: "scanning", found: [] });
+    let found: LocalServer[] = [];
+    try {
+      const r = await fetch("/api/ai-scan").then((x) => x.json());
+      found = r.available ? r.found : await browserScan();
+    } catch {
+      found = await browserScan();
+    }
+    setScan({ state: "done", found });
+  };
+  useEffect(() => {
+    void runScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const pickLocal = (f: LocalServer) => {
+    setDraft({ ...switchTo(draft, f.id), model: f.models[0] ?? "", baseUrl: "" });
+    setModels({ state: "ok", list: f.models, msg: `${f.models.length} models found on ${f.name.replace(" (local)", "")}` });
+  };
   useEffect(() => setTest({ state: "idle" }), [draft.provider, draft.apiKey, draft.model, draft.baseUrl]);
   useEffect(() => {
     setModels({ state: "idle", list: [] });
@@ -122,6 +149,15 @@ export default function AiSettings({
 
   const loadModels = async () => {
     setModels({ state: "loading", list: [] });
+    if (inBrowser) {
+      try {
+        const list = await browserListModels(draft);
+        setModels({ state: "ok", list, msg: `${list.length} models available` });
+      } catch (e) {
+        setModels({ state: "fail", list: [], msg: (e as Error).message });
+      }
+      return;
+    }
     try {
       const data = await post("/api/ai-models");
       if (data.error) setModels({ state: "fail", list: [], msg: data.error });
@@ -133,6 +169,15 @@ export default function AiSettings({
 
   const runTest = async () => {
     setTest({ state: "running" });
+    if (inBrowser) {
+      try {
+        await browserTest(draft);
+        setTest({ state: "ok", msg: `Connected from this browser: ${p?.name} · ${draft.model || p?.models[0]}` });
+      } catch (e) {
+        setTest({ state: "fail", msg: (e as Error).message });
+      }
+      return;
+    }
     try {
       const data = await post("/api/ai-test");
       setTest(data.ok ? { state: "ok", msg: `Connected: ${data.label}` } : { state: "fail", msg: data.error });
@@ -158,6 +203,31 @@ export default function AiSettings({
           built in. Keys are stored only in this browser and sent only to your own IntroMaker server.
         </p>
 
+        <div className="quick-setup">
+          <div className="quick-head">
+            <strong>Local AI on this computer</strong>
+            <button className="btn btn-ghost sm" onClick={runScan} disabled={scan.state === "scanning"}>
+              {scan.state === "scanning" ? "Scanning…" : "Scan again"}
+            </button>
+          </div>
+          {scan.state === "done" && scan.found.length === 0 && (
+            <p className="hint">
+              None found. Install <a className="key-link" href="https://ollama.com/download" target="_blank" rel="noreferrer">Ollama ↗</a> or{" "}
+              <a className="key-link" href="https://lmstudio.ai" target="_blank" rel="noreferrer">LM Studio ↗</a> for free, private AI, or paste any
+              cloud API key below.
+            </p>
+          )}
+          {scan.found.length > 0 && (
+            <div className="model-chips">
+              {scan.found.map((f) => (
+                <button key={f.id} className={`chip ${draft.provider === f.id ? "active" : ""}`} onClick={() => pickLocal(f)}>
+                  ● {f.name.replace(" (local)", "")} · {f.models.length} model{f.models.length === 1 ? "" : "s"} · Use
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="provider-toolbar">
           <label className="field-label">Provider</label>
           <input className="input sm" value={query} placeholder="Search providers…" onChange={(e) => setQuery(e.target.value)} aria-label="Search providers" />
@@ -179,7 +249,7 @@ export default function AiSettings({
                 <div className="provider-grid">
                   {items.map((x) => (
                     <button key={x.id} className={`provider ${draft.provider === x.id ? "active" : ""}`} onClick={() => setDraft(switchTo(draft, x.id))}>
-                      {x.name}
+                      {x.name.replace(/ \(local\)$/, "")}
                     </button>
                   ))}
                 </div>
@@ -210,6 +280,13 @@ export default function AiSettings({
 
         {p && (
           <>
+            <p className="runs-on">
+              {isLocal
+                ? inBrowser
+                  ? "Runs on your computer: this browser talks to the local model directly (IntroMaker is online)."
+                  : "Runs on your computer: the local IntroMaker server calls the model on localhost."
+                : "Runs in the cloud, through the IntroMaker server (your key is never sent anywhere else)."}
+            </p>
             {detected && <p className="hint ok">Recognised a {detected} key.</p>}
             {p.note && <p className="hint">{p.note}</p>}
             {showBase && (

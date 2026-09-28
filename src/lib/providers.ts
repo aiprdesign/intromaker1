@@ -5,7 +5,7 @@
  */
 
 export type Protocol = "anthropic" | "openai" | "gemini";
-export type ProviderGroup = "Popular" | "Fast inference" | "Open models" | "Regional" | "Local" | "Other";
+export type ProviderGroup = "Popular" | "Fast inference" | "Open models" | "Gateways" | "Regional" | "Local" | "Other";
 
 export interface ProviderPreset {
   id: string;
@@ -255,6 +255,154 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     models: ["glm-4.5", "glm-4.5-air"],
     vision: false,
   },
+  {
+    id: "cohere",
+    name: "Cohere",
+    group: "Popular",
+    protocol: "openai",
+    baseUrl: "https://api.cohere.ai/compatibility/v1",
+    keyHint: "API key",
+    keyUrl: "https://dashboard.cohere.com/api-keys",
+    models: ["command-a-03-2025", "command-r-plus"],
+    vision: false,
+  },
+  {
+    id: "novita",
+    name: "Novita AI",
+    group: "Open models",
+    protocol: "openai",
+    baseUrl: "https://api.novita.ai/v3/openai",
+    keyHint: "API key",
+    keyUrl: "https://novita.ai/settings/key-management",
+    models: ["meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-v3"],
+    vision: false,
+  },
+  {
+    id: "hyperbolic",
+    name: "Hyperbolic",
+    group: "Open models",
+    protocol: "openai",
+    baseUrl: "https://api.hyperbolic.xyz/v1",
+    keyHint: "API key",
+    keyUrl: "https://app.hyperbolic.xyz/settings",
+    models: ["meta-llama/Llama-3.3-70B-Instruct", "deepseek-ai/DeepSeek-V3"],
+    vision: false,
+  },
+  {
+    id: "nebius",
+    name: "Nebius AI Studio",
+    group: "Open models",
+    protocol: "openai",
+    baseUrl: "https://api.studio.nebius.com/v1",
+    keyHint: "API key",
+    keyUrl: "https://studio.nebius.com",
+    models: ["meta-llama/Llama-3.3-70B-Instruct", "Qwen/Qwen2.5-72B-Instruct"],
+    vision: false,
+  },
+  {
+    id: "featherless",
+    name: "Featherless",
+    group: "Open models",
+    protocol: "openai",
+    baseUrl: "https://api.featherless.ai/v1",
+    keyHint: "API key",
+    keyUrl: "https://featherless.ai/account/api-keys",
+    models: ["meta-llama/Llama-3.3-70B-Instruct"],
+    vision: false,
+  },
+  {
+    id: "venice",
+    name: "Venice AI",
+    group: "Open models",
+    protocol: "openai",
+    baseUrl: "https://api.venice.ai/api/v1",
+    keyHint: "API key",
+    keyUrl: "https://venice.ai/settings/api",
+    models: ["llama-3.3-70b", "qwen3-235b"],
+    vision: false,
+  },
+  {
+    id: "github",
+    name: "GitHub Models",
+    group: "Gateways",
+    protocol: "openai",
+    baseUrl: "https://models.github.ai/inference",
+    keyHint: "ghp_… / github_pat_…",
+    keyUrl: "https://github.com/settings/tokens",
+    keyPrefix: /^(ghp_|github_pat_)/,
+    models: ["openai/gpt-4.1", "openai/gpt-4.1-mini", "meta/Llama-3.3-70B-Instruct"],
+    vision: true,
+    note: "Free tier with a GitHub token (models:read permission).",
+  },
+  {
+    id: "vercel",
+    name: "Vercel AI Gateway",
+    group: "Gateways",
+    protocol: "openai",
+    baseUrl: "https://ai-gateway.vercel.sh/v1",
+    keyHint: "API key",
+    keyUrl: "https://vercel.com/dashboard/ai-gateway",
+    models: ["anthropic/claude-sonnet-5", "openai/gpt-4.1", "google/gemini-2.5-flash"],
+    vision: true,
+  },
+  {
+    id: "cloudflare",
+    name: "Cloudflare Workers AI",
+    group: "Gateways",
+    protocol: "openai",
+    needsBaseUrl: true,
+    baseUrlHint: "https://api.cloudflare.com/client/v4/accounts/ACCOUNT_ID/ai/v1",
+    keyHint: "API token",
+    keyUrl: "https://dash.cloudflare.com/profile/api-tokens",
+    models: ["@cf/meta/llama-3.3-70b-instruct-fp8-fast"],
+    vision: false,
+    note: "Replace ACCOUNT_ID in the URL with your Cloudflare account ID.",
+  },
+  {
+    id: "scaleway",
+    name: "Scaleway",
+    group: "Regional",
+    protocol: "openai",
+    baseUrl: "https://api.scaleway.ai/v1",
+    keyHint: "Secret key",
+    keyUrl: "https://console.scaleway.com/iam/api-keys",
+    models: ["llama-3.3-70b-instruct", "mistral-small-3.1-24b-instruct-2503"],
+    vision: false,
+  },
+  {
+    id: "siliconflow",
+    name: "SiliconFlow",
+    group: "Regional",
+    protocol: "openai",
+    baseUrl: "https://api.siliconflow.com/v1",
+    keyHint: "sk-…",
+    keyUrl: "https://cloud.siliconflow.com/account/ak",
+    models: ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct"],
+    vision: false,
+  },
+  {
+    id: "minimax",
+    name: "MiniMax",
+    group: "Regional",
+    protocol: "openai",
+    baseUrl: "https://api.minimax.io/v1",
+    keyHint: "API key",
+    keyUrl: "https://www.minimax.io/platform",
+    models: ["MiniMax-M1", "MiniMax-Text-01"],
+    vision: false,
+  },
+  {
+    id: "volcengine",
+    name: "Volcengine Ark (Doubao)",
+    group: "Regional",
+    protocol: "openai",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    keyHint: "API key",
+    keyUrl: "https://console.volcengine.com/ark",
+    models: ["doubao-seed-1-6-250615"],
+    vision: false,
+    note: "Model = your endpoint ID or model name.",
+  },
   // ── Local (runs on your machine, no key)
   {
     id: "ollama",
@@ -281,6 +429,83 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     models: ["local-model"],
     vision: false,
     note: "Start LM Studio's local server, then Load models.",
+  },
+  {
+    id: "llamacpp",
+    name: "llama.cpp server (local)",
+    group: "Local",
+    protocol: "openai",
+    baseUrl: "http://localhost:8080/v1",
+    keyOptional: true,
+    keyHint: "not needed",
+    keyUrl: "https://github.com/ggml-org/llama.cpp",
+    models: ["local-model"],
+    vision: false,
+    note: "Run `llama-server -m model.gguf --port 8080`.",
+  },
+  {
+    id: "jan",
+    name: "Jan (local)",
+    group: "Local",
+    protocol: "openai",
+    baseUrl: "http://localhost:1337/v1",
+    keyOptional: true,
+    keyHint: "not needed",
+    keyUrl: "https://jan.ai",
+    models: ["llama3.2-3b-instruct"],
+    vision: false,
+    note: "Enable Jan's Local API Server in Settings.",
+  },
+  {
+    id: "vllm",
+    name: "vLLM (local)",
+    group: "Local",
+    protocol: "openai",
+    baseUrl: "http://localhost:8000/v1",
+    keyOptional: true,
+    keyHint: "not needed",
+    keyUrl: "https://docs.vllm.ai",
+    models: ["Qwen/Qwen2.5-7B-Instruct"],
+    vision: false,
+    note: "Run `vllm serve <model>`.",
+  },
+  {
+    id: "textgen",
+    name: "text-generation-webui (local)",
+    group: "Local",
+    protocol: "openai",
+    baseUrl: "http://localhost:5000/v1",
+    keyOptional: true,
+    keyHint: "not needed",
+    keyUrl: "https://github.com/oobabooga/text-generation-webui",
+    models: ["local-model"],
+    vision: false,
+    note: "Start it with the --api flag.",
+  },
+  {
+    id: "koboldcpp",
+    name: "KoboldCpp (local)",
+    group: "Local",
+    protocol: "openai",
+    baseUrl: "http://localhost:5001/v1",
+    keyOptional: true,
+    keyHint: "not needed",
+    keyUrl: "https://github.com/LostRuins/koboldcpp",
+    models: ["koboldcpp"],
+    vision: false,
+  },
+  {
+    id: "gpt4all",
+    name: "GPT4All (local)",
+    group: "Local",
+    protocol: "openai",
+    baseUrl: "http://localhost:4891/v1",
+    keyOptional: true,
+    keyHint: "not needed",
+    keyUrl: "https://www.nomic.ai/gpt4all",
+    models: ["Llama 3.2 3B Instruct"],
+    vision: false,
+    note: "Enable the Local API Server in GPT4All settings.",
   },
   // ── Other
   {
@@ -313,7 +538,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
 ];
 
 export const PRESET_MAP: Record<string, ProviderPreset> = Object.fromEntries(PROVIDER_PRESETS.map((p) => [p.id, p]));
-export const PROVIDER_GROUPS: ProviderGroup[] = ["Popular", "Fast inference", "Open models", "Regional", "Local", "Other"];
+export const PROVIDER_GROUPS: ProviderGroup[] = ["Local", "Popular", "Fast inference", "Open models", "Gateways", "Regional", "Other"];
 
 /** Guess the provider from a pasted API key (most specific prefixes first). */
 export function detectProvider(key: string): ProviderPreset | null {
@@ -321,4 +546,12 @@ export function detectProvider(key: string): ProviderPreset | null {
   if (!k) return null;
   const ordered = [...PROVIDER_PRESETS].filter((p) => p.keyPrefix).sort((a, b) => (a.id === "openai" ? 1 : b.id === "openai" ? -1 : 0));
   return ordered.find((p) => p.keyPrefix!.test(k)) ?? null;
+}
+
+/** Local model servers run on the user's own machine. */
+export const isLocalProvider = (id: string) => PRESET_MAP[id]?.group === "Local";
+
+/** True when the page itself is served from this machine (so the server can reach localhost). */
+export function isLocalHost(hostname: string) {
+  return /^(localhost|127\.\d+\.\d+\.\d+|\[?::1\]?|0\.0\.0\.0)$/.test(hostname) || hostname.endsWith(".local");
 }

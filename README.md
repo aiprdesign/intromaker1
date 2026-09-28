@@ -69,6 +69,7 @@ src/engine/
 src/app/api/generate/route.ts   Claude AI Director (structured output), falls back to planner.ts
 src/lib/providers.ts            provider registry (endpoint, auth, key prefix, suggested models, vision)
 src/lib/ai.ts                   AI director over 3 protocols (Anthropic SDK, OpenAI-compatible, Gemini) + model listing
+src/lib/localai.ts              browser-side local AI (scan, test, director) for online deployments
 src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/scrape.ts               website extraction (name, copy, features, stats, CTA, testimonials, customer logos, logo, images, videos, theme colour)
 src/lib/netguard.ts             SSRF guard: only public http(s) hosts, re-checked on every redirect
@@ -85,15 +86,20 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 ## Notes
 
 - **Live website capture** uses the Chrome or Edge already installed on your computer to take screenshots (hero, full page, sections) and render JavaScript-heavy sites. If neither is installed it falls back to a plain HTML fetch. Set `INTROMAKER_BROWSER` to a browser executable to use a specific one.
-- **Bring any AI**: in the studio's ⚙ settings, pick one of 24 built-in providers, or just paste a key and the provider is recognised from its prefix. Then pick or type a model, and it works; endpoints and auth are preconfigured. The providers are:
-  - **Popular**: Anthropic Claude, OpenAI, Google Gemini, OpenRouter, xAI Grok, Mistral, DeepSeek.
-  - **Fast inference**: Groq, Cerebras, SambaNova.
-  - **Open models**: Together, Fireworks, DeepInfra, Hugging Face, NVIDIA NIM, Perplexity.
-  - **Regional**: Alibaba Qwen, Moonshot Kimi, Z.ai GLM.
-  - **Local**: Ollama, LM Studio.
-  - **Other**: Azure OpenAI, and any OpenAI-compatible API.
-
-  *Load models* lists the models your key can use, and each provider remembers its own key. Screenshots go only to vision models. Keys stay in your browser. To add a provider, add an entry in `src/lib/providers.ts`.
+- **Bring any AI, with almost no setup**: open ⚙ in the studio.
+  - **Local AI is found automatically**: Ollama, LM Studio, llama.cpp, Jan, vLLM, text-generation-webui, KoboldCpp and GPT4All. Click *Use* and it's ready.
+  - **Cloud AI**: paste a key and the provider is recognised from its prefix. 42 presets have endpoints, auth and suggested models filled in:
+    - **Popular**: Claude, OpenAI, Gemini, OpenRouter, xAI, Mistral, DeepSeek, Cohere.
+    - **Fast inference**: Groq, Cerebras, SambaNova.
+    - **Open models**: Together, Fireworks, DeepInfra, Hugging Face, NVIDIA NIM, Perplexity, Novita, Hyperbolic, Nebius, Featherless, Venice.
+    - **Gateways**: GitHub Models, Vercel AI Gateway, Cloudflare Workers AI.
+    - **Regional**: Qwen, Kimi, GLM, Scaleway, SiliconFlow, MiniMax, Volcengine.
+    - **Other**: Azure OpenAI, and any OpenAI-compatible URL.
+  - *Load models* lists what your key can use, and each provider remembers its own key.
+- **Where the AI runs**:
+  - **Cloud AI** always goes through the IntroMaker server, so keys never reach third-party pages and there are no CORS limits.
+  - **Local AI** runs where the model is. When IntroMaker runs on your machine, its server calls localhost. When IntroMaker is hosted online (set `INTROMAKER_HOSTED=1`), the server can't reach your computer, so the browser calls your local model directly. The server still builds the prompt, runs the quality checklist and styles the result. If the browser is blocked, the settings explain how to allow it (for example `OLLAMA_ORIGINS` or LM Studio's *Enable CORS*).
+  - To add a provider, add an entry in `src/lib/providers.ts`.
 - **AI that reads the site**: with a key (or `ANTHROPIC_API_KEY` on the server), Claude receives the extracted copy, features, steps, pains, stats, testimonials and asset list, plus the site's screenshots as images, and writes the storyboard. Without a key, the built-in director uses the same story arc.
 
 - Website import fetches pages server-side and blocks private and internal addresses. For local testing against `localhost` sites, set `INTROMAKER_ALLOW_PRIVATE_URLS=1`.
