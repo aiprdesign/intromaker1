@@ -23,6 +23,8 @@ const RULES: Rule[] = [
   [new RegExp(`\\b(the|a|our)\\s+(?:world'?s\\s+)?(?:\\*)?(?:${SUPERLATIVE})(?:\\*)?\\s+(way|place|tool|platform|app)\\s+to\\b`, "gi"), (_m, _a, noun) => `a new ${noun} to`],
   [new RegExp(`\\bthe\\s+world'?s\\s+(?:first|largest|biggest|${SUPERLATIVE})\\s+`, "gi"), "the "],
   [/\bworld'?s\s+(?:first|largest|biggest)\s+/gi, ""],
+  // "The most powerful X ever built": the boast goes, and so does its tail.
+  [/\s+(?:ever\s+(?:built|made|created|designed)|of all time|on the market|in the world)\b/gi, ""],
   [new RegExp(`(?:\\*)?(?<![\\w#])(?:${SUPERLATIVE})(?:\\*)?(?=[\\s,.!?—–-]|$)\\s*`, "gi"), ""],
   // Comparatives with nothing to compare against ("Ship faster", "a better way to").
   [/\b(?:a|the)\s+(?:\*)?(?:better|faster|smarter|easier|simpler|quicker)(?:\*)?\s+(way|place|tool|platform|app)\s+to\b/gi, (_m, noun: string) => `a new ${noun} to`],
@@ -30,7 +32,7 @@ const RULES: Rule[] = [
   // Absolutes and guarantees.
   [/\b100\s?%\s*/g, ""],
   [/\b(?:guaranteed|guarantees?|risk[- ]free|foolproof|bulletproof|forever)\b\s*/gi, ""],
-  [/\bnever\s+miss\s+(?:a|an|another)\s+([a-z]+?)(?:s)?(?:\s+again)?\b/gi, (_m, w: string) => `keep track of ${w}s`],
+  [/\bnever\s+miss\s+(?:a|an|another)\s+([a-z]+(?:-[a-z]+)*)(?:\s+again)?\b/gi, (_m, w: string) => `keep track of ${/s$/i.test(w) ? w : `${w}s`}`],
   [/\bnever\s+miss\b/gi, "keep track of"],
   [/\bnever\s+lose\b/gi, "keep"],
   [/\bnever\s+worry\s+about\b/gi, "worry less about"],

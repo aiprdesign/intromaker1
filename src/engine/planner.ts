@@ -3,7 +3,7 @@ import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, DEMOS, detectConcept } from "./concepts";
 import { writeVoiceover } from "./script";
 import { isNumericClaim, safeCopy } from "./claims";
-import { applyTemplate, DEFAULT_TEMPLATE } from "./templates";
+import { applyTemplate, DEFAULT_TEMPLATE, fitLength } from "./templates";
 import {
   FONTS,
   PALETTE_IDS,
@@ -610,6 +610,8 @@ export const ANGLES: { id: Angle; name: string; brief: string }[] = [
   { id: "product", name: "Product-first", brief: "Open on the promise and get to the product in action within seconds; demo-heavy." },
   { id: "proof", name: "Proof-first", brief: "Lead with social proof (customers, real numbers, a real quote), then show why." },
 ];
+/** Proof-first with no proof: open on the positioning line, then the product doing its job. */
+const VALUE_ORDER = ["hook", "reveal", "demo", "features", "bento", "meet", "tour", "how", "cards", "integrations", "cta"];
 const ANGLE_ORDER: Record<Angle, string[]> = {
   story: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
   product: ["hook", "pain", "reveal", "tour", "features", "meet", "bento", "how", "cards", "quote", "logos", "integrations", "cta"],
@@ -640,8 +642,35 @@ export function aiSelfIntro(text: string, name: string): { answer: string; first
 export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
   const safe = req.safe !== false;
   const input = safe ? safeSite(site) : site;
-  const plan = writeVoiceover(req.style === "trailer" ? planFromSiteTrailer(input, req) : planFromSiteSaas(input, req));
+  const plan = writeVoiceover(req.style === "trailer" ? planFromSiteTrailer(input, req) : trimToTarget(planFromSiteSaas(input, req)));
   return safe ? safePlan(plan) : plan;
+}
+
+/** Beats that can go when a film runs long, least essential first. */
+const DROPPABLE = ["integrations", "promise", "cards", "how", "bento", "features", "meet"];
+
+/**
+ * A film that can't reach its length because every beat is already at its shortest readable
+ * duration (slow templates, many beats) loses its least essential beat instead of overrunning.
+ * The film keeps at least one value beat and five scenes.
+ */
+function trimToTarget(plan: VideoPlan): VideoPlan {
+  const target = plan.target;
+  if (!target) return plan;
+  let scenes = plan.scenes;
+  const total = () => scenes.reduce((a, sc) => a + sc.duration, 0);
+  const hasValue = (xs: Scene[]) => xs.some((sc) => ["features", "bento", "demo", "how"].includes(sc.role ?? ""));
+  while (total() > target * 1.1 && scenes.length > 5) {
+    const i = DROPPABLE.map((r) => scenes.findIndex((sc) => sc.role === r)).find((k) => k >= 0 && hasValue(scenes.filter((_, j) => j !== k)));
+    if (i === undefined) break;
+    scenes = scenes.filter((_, j) => j !== i);
+    // The cut that now joins two scenes mustn't repeat the one before it.
+    if (scenes[i] && scenes[i - 1] && scenes[i].transition === scenes[i - 1].transition && scenes[i].transition !== "cut") {
+      const alt = (["whip", "dolly", "push", "dissolve"] as Transition[]).find((tr) => tr !== scenes[i - 1].transition && tr !== scenes[i + 1]?.transition)!;
+      scenes = scenes.map((sc, j) => (j === i ? { ...sc, transition: alt } : sc));
+    }
+  }
+  return scenes === plan.scenes ? plan : fitLength({ ...plan, scenes }, target);
 }
 
 /**
@@ -653,14 +682,19 @@ export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
 export function safeSite(site: SiteData): SiteData {
   const line = (x: string | null | undefined) => (x && !isNumericClaim(x) ? safeCopy(x) : "");
   const words = (x: string) => x.replace(/\*/g, "").trim().split(/\s+/).filter(Boolean).length;
-  const headlines: string[] = [];
-  const features: string[] = [];
+  // Lines the site wrote without claims lead; rewritten ones follow (a boast with its claim taken
+  // out reads thinner), minus a leftover article ("The most powerful lead scoring" → "Lead scoring").
+  const pairs: { head: string; desc: string; rewritten: boolean }[] = [];
   site.headlines.forEach((h, i) => {
-    const head = line(h);
+    let head = line(h);
+    const rewritten = head !== h.trim();
+    if (rewritten && words(head) <= 4) head = head.replace(/^(the|a|an|our)\s+/i, "").replace(/^[a-z]/, (c) => c.toUpperCase());
     if (words(head) < 2) return;
-    headlines.push(head);
-    features.push(line(site.features[i]));
+    pairs.push({ head, desc: line(site.features[i]), rewritten });
   });
+  pairs.sort((a, b) => Number(a.rewritten) - Number(b.rewritten));
+  const headlines = pairs.map((p) => p.head);
+  const features = pairs.map((p) => p.desc);
   const list = (xs: string[]) => xs.map(line).filter((x) => words(x) >= 1);
   const sentences = (x: string) =>
     x
@@ -669,7 +703,7 @@ export function safeSite(site: SiteData): SiteData {
       .filter((y) => words(y) >= 3)
       .join(" ");
   const tagline = line(site.tagline);
-  return {
+  const out = {
     ...site,
     tagline: words(tagline) >= 2 ? tagline : headlines[0] ?? site.name,
     description: sentences(site.description),
@@ -682,7 +716,12 @@ export function safeSite(site: SiteData): SiteData {
     clientLogos: [],
     cta: site.cta && !isNumericClaim(site.cta) ? safeCopy(site.cta) || "Get started" : site.cta && "Get started",
   };
+  REWRITTEN.set(out, new Set(pairs.filter((p) => p.rewritten).map((p) => p.head)));
+  return out;
 }
+
+/** Headlines safeSite had to rewrite: ranked a little lower, so the site's own clean lines lead. */
+const REWRITTEN = new WeakMap<SiteData, Set<string>>();
 
 /** Roles whose whole point is a claim (a number, a quote, a customer wall): left out when claim-safe. */
 const CLAIM_ROLES = new Set(["quote", "logos", "metric", "stat"]);
@@ -797,7 +836,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
 
   const tagline = sentenceCopy(site.tagline, 10) || shortenCopy(site.tagline, 9) || sentenceCopy(site.description, 12) || shortenCopy(site.description, 9) || `Meet ${site.name}`;
   // Best headlines first; each keeps its feature description from the page.
-  const allHeads = site.headlines.map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title), i }));
+  const rewritten = REWRITTEN.get(site);
+  const allHeads = site.headlines.map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title) - (rewritten?.has(title) ? 1.2 : 0), i }));
   // When the page's features come with descriptions (feature cards), headings without one are
   // section titles ("Start understanding your users today"), not features.
   const described = allHeads.filter((f) => f.desc.trim().split(/\s+/).length >= 4);
@@ -833,9 +873,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Open on the problem only in categories whose films do (e-commerce / creative lead with the promise).
   const painHook = angle === "story" && target >= 20 && pains.length >= 2 && concept.arc.indexOf("pain") < concept.arc.indexOf("reveal");
   const proofHook = angle === "proof" && !!teamStat;
-  // The tagline is used once: in the hook, or (if the hook is pains/proof) under the logo.
-  const taglineFree = painHook || proofHook;
+  // Proof-first with no proof to show (claim-safe, or a site without any) becomes value-first:
+  // it opens on the positioning line and leads with the product doing its job.
+  const hasProof = !!teamStat || site.testimonials.length > 0 || (brand.clientLogos?.length ?? 0) >= 4 || site.stats.length > 0;
+  const valueFirst = angle === "proof" && !hasProof;
   const descClause = sentenceCopy(site.description.split(/\s(?:so|because|that|which|to help)\s|\s[—–]\s/)[0], 10);
+  // Product-first opens on what the product does (its description) and keeps the tagline for the logo.
+  // (Without a description, a feature line the tour doesn't use.)
+  const usable = (x: string | undefined): x is string => !!x && norm(x) !== norm(tagline) && x.split(" ").length >= 3;
+  const productLine = [descClause, longFeatures[1], longFeatures[2], longFeatures[3]].find(usable) ?? "";
+  const productHook = angle === "product" && !painHook ? productLine : "";
+  // Value-first opens on what the product does for you: a feature benefit the tour doesn't use.
+  // (Never the line product-first opens on, so the two takes differ.)
+  const valueHook = valueFirst ? [longFeatures[2], longFeatures[3], longFeatures[1], descClause].find((x) => usable(x) && norm(x) !== norm(productLine)) ?? "" : "";
+  // The tagline is used once: in the hook, or (if the hook is pains/proof/value) under the logo.
+  const taglineFree = painHook || proofHook || !!valueHook || !!productHook;
   if (proofHook) {
     add(1, { role: "hook", skill: "blur-reveal", text: `Trusted by *${teamStat.toLowerCase()}*`, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
   } else if (painHook) {
@@ -847,8 +899,10 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: beats(pains.length * 2 + 5),
       transition: "cut",
     });
+  } else if (valueFirst && valueHook) {
+    add(1, { role: "hook", skill: "blur-reveal", text: valueHook, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
   } else {
-    add(1, { role: "hook", skill: "blur-reveal", text: tagline, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
+    add(1, { role: "hook", skill: "blur-reveal", text: productHook || tagline, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
   }
   // 2. Reveal.
   add(1, {
@@ -863,7 +917,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     const assemble = !!shots.hero;
     add(!(video ?? images[0] ?? shots.sections[0] ?? shots.hero) && target >= 20 ? 2 : assemble && target >= 20 ? 2 : 3, {
       role: "meet", skill: assemble ? "ui-assemble" : "site-scroll",
-      text: taglineFree ? tagline : descClause || `Say hello to *${site.name}*`,
+      text: taglineFree && !(valueHook && descClause && norm(valueHook) !== norm(descClause)) ? tagline : descClause || `Say hello to *${site.name}*`,
       eyebrow: `Meet ${site.name}`,
       duration: Math.max(5, beats(10)),
       transition: "whip",
@@ -965,12 +1019,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // A product-first or media-less film leans on it; teasers keep it only when it is the product.
   // (When the film already shows the real product — a tour or the assembled page — it's optional.)
   const productShown = !!tourMedia || !!shots.hero;
-  add(target < 20 ? (angle === "product" && !productShown ? 3 : 6) : !productShown ? 2 : target >= 30 ? 3 : 4, demoScene);
+  add(valueFirst && target >= 20 ? 2 : target < 20 ? (angle === "product" && !productShown ? 3 : 6) : !productShown ? 2 : target >= 30 ? 3 : 4, demoScene);
 
   // 6. Proof — only real quotes, logos and numbers.
   // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
   // between the reveal and the product that needs no media and makes no claims.
-  add(target >= 20 && !tourMedia && !shots.full ? 3 : 6, {
+  add(target >= 20 && !tourMedia && !shots.full && !valueFirst ? 3 : 6, {
     role: "promise", skill: "word-swap",
     text: concept.swap,
     subtext: sentenceCopy(site.description, 12) || undefined,
@@ -1057,11 +1111,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       used += c.scene.duration;
     }
   }
-  const rank: string[] = angle === "story" ? concept.arc : ANGLE_ORDER[angle];
+  const rank: string[] = angle === "story" ? concept.arc : valueFirst ? VALUE_ORDER : ANGLE_ORDER[angle];
   const scenes0 = candidates.map((c) => c.scene);
   // Beats an arc doesn't list (the positioning line) sit right after the reveal.
   const rankOf = (role?: string) => {
-    if (role === "demo") return rank.indexOf("tour") - 0.5;
+    if (role === "demo") return valueFirst ? rank.indexOf("demo") : rank.indexOf("tour") - 0.5;
     // The product assembled from its own components is the first thing after the reveal.
     if (role === "meet" && scenes0.some((c) => c.role === "meet" && c.skill === "ui-assemble")) return rank.indexOf("reveal") + 0.3;
     if (role === "metric") return rank.indexOf("cards") - 0.25;
@@ -1072,6 +1126,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     .filter((c) => chosen.has(c.i))
     .sort((a, b) => rankOf(a.scene.role) - rankOf(b.scene.role) || a.i - b.i)
     .map((c) => c.scene);
+  // Product-first is a cold open: the first product beat plays before the logo.
+  if (angle === "product") {
+    const r = scenes.findIndex((sc) => sc.role === "reveal");
+    const first = scenes.findIndex((sc) => sc.role === "meet" || sc.role === "tour");
+    if (r > 0 && first > r) scenes.splice(r, 0, scenes.splice(first, 1)[0]);
+  }
   // Transitions follow the new order: the opener cuts in.
   if (scenes[0]) scenes[0] = { ...scenes[0], transition: "cut" };
   // Closing line: social proof when the film hasn't used it yet, else a varied call to action.

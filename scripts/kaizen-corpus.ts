@@ -155,6 +155,40 @@ export const SITES: { id: string; site: SiteData }[] = [
       cta: "Get started for free",
     }),
   },
+  {
+    // Marketing copy that is almost all claims: what's left in claim-safe mode must still carry a film.
+    id: "rocketly (hype copy)",
+    site: base({
+      ...media,
+      url: "https://rocketly.io",
+      domain: "rocketly.io",
+      name: "Rocketly",
+      tagline: "The world's #1 AI sales platform",
+      description: "Rocketly is the fastest way to find, engage and close your best leads. Our award-winning AI works 24/7 so you never miss a deal again.",
+      headlines: [
+        "10x your pipeline in minutes",
+        "The most powerful lead scoring ever built",
+        "Never miss a follow-up again",
+        "Everything you need to close more deals",
+        "Automatic email sequences",
+        "Trusted by 50,000+ sales teams",
+      ],
+      features: [
+        "Our AI finds your best leads instantly.",
+        "Industry-leading accuracy scores every lead in real time.",
+        "Rocketly reminds your reps when a deal goes quiet.",
+        "Sequences, dialer, pipeline and reports in one place.",
+        "Write once and Rocketly sends personalised follow-ups on schedule.",
+        "",
+      ],
+      stats: ["50,000+ teams", "3x more meetings", "98% satisfaction"],
+      testimonials: [q("Rocketly is hands down the best sales tool we've ever used.", "Sam Ortiz", "VP Sales, Brightline")],
+      clientLogos: logos,
+      steps: ["Connect your CRM", "Import your leads", "Launch your first sequence"],
+      pains: ["Cold leads", "Manual follow-ups", "Messy spreadsheets"],
+      cta: "Start your free trial",
+    }),
+  },
 ];
 
 export const PROMPTS: string[] = [

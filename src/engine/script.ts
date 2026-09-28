@@ -33,11 +33,17 @@ const count = (s: string) => speakable(s).split(/\s+/).filter(Boolean).length;
 /** Trim a line to the scene's word budget, dropping list items first, then whole clauses. */
 function fit(candidates: string[], budget: number) {
   for (const c of candidates) if (c && count(c) <= budget) return c;
+  // One word over is fine (a recorded line stretches its scene to the next beat); chopping the
+  // last word of a sentence is not.
+  for (const c of candidates) if (c && count(c) <= budget + 1) return c;
   const last = candidates.filter(Boolean).pop() ?? "";
   const words = last.split(" ").slice(0, budget);
   // Numbers read longer than they look ("10,000+" → "more than 10,000").
   while (words.length > 2 && count(words.join(" ")) > budget) words.pop();
-  while (words.length > 2 && /^(and|or|the|a|an|to|of|for|with|your)$/i.test(words[words.length - 1])) words.pop();
+  // Cut at a clause boundary rather than mid-phrase ("The tools you need to close" → "The tools you need").
+  const boundary = words.reduce((at, w, k) => (k >= 3 && /^(to|that|so|which|with|for|and|while|when)$/i.test(w) ? k : at), -1);
+  if (boundary > 0 && boundary < words.length - 1) words.length = boundary;
+  while (words.length > 2 && /^(and|or|the|a|an|to|of|for|with|your|more|less|than|so|that|in|on|at|by)$/i.test(words[words.length - 1])) words.pop();
   return words.length ? `${words.join(" ").replace(/[,;:]$/, "")}.` : "";
 }
 
@@ -57,7 +63,8 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
         budget,
       );
     case "hook":
-      return fit([sentence(head)], budget);
+      // A word-swap opener is said as its alternatives ("Your data, explored. Measured. Shared.").
+      return fit([head.includes("|") ? head.split("|").map((w) => sentence(w.trim())).join(" ") : sentence(head)], budget);
     case "reveal":
       // The reveal's subtext is sometimes just the web address: that's shown, not said.
       return fit([s.subtext && /\s/.test(s.subtext.trim()) ? `Meet ${name}. ${sentence(s.subtext)}` : "", `Meet ${name}.`], budget);
@@ -84,7 +91,23 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
     case "cta": {
       const domain = plan.brand?.domain && !/localhost/.test(plan.brand.domain) ? plan.brand.domain : "";
       const button = clean(s.subtext);
-      return fit([button && domain ? `${sentence(head)} ${button.replace(/[.!]+$/, "")} at ${domain}.` : "", button ? `${sentence(head)} ${sentence(button)}` : "", sentence(head)], budget);
+      // The close always names the product (by its web address, or its name).
+      const says = (x: string) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(x);
+      const named = says(`${head} ${button}`);
+      const bare = button.replace(/[.!]+$/, "");
+      return fit(
+        [
+          button && domain ? `${sentence(head)} ${bare} at ${domain}.` : "",
+          button && !named ? `${sentence(head)} ${bare} with ${name}.` : "",
+          button && named ? `${sentence(head)} ${sentence(button)}` : "",
+          domain ? `${sentence(head)} ${domain}.` : "",
+          says(head) ? sentence(head) : "",
+          button && says(button) ? sentence(button) : "",
+          `${sentence(head)} ${name}.`,
+          `Try ${name}.`,
+        ],
+        budget,
+      );
     }
     default:
       // Trailer films and scenes without a role: the card's own words.

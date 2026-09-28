@@ -86,7 +86,26 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ## Quality: Kaizen scorecard
 
-`npm run kaizen` generates 744 storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+`npm run kaizen` generates the storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+
+The corpus now has 10 websites, including a hype-heavy site whose copy is almost all claims, and scores 1,586 storyboards. That covers both wording modes, vertical 9:16 cuts and take variety. When the scorecard saturated, its bar was raised with what a viewer notices:
+- **specificity**: headlines in the product's own words, not boilerplate;
+- **rewrite damage**: fragments, dangling endings and broken plurals left by claim-safe rewriting;
+- **brand**: the logo revealed when there is one, and the brand named in the closing line;
+- **real product**: captured UI and imagery on screen;
+- **beat sync**;
+- **9:16 headline width**;
+- **take variety**: "3 more takes" must give genuinely different films;
+- **claims**: none in claim-safe mode.
+
+On the raised bar, perfect films were 550 of 1,586. One cycle of fixes took that to **1,436**:
+- product-first takes open cold on the product, with the logo after it;
+- proof-first without proof becomes a value-first cut led by the product demo;
+- each take opens on a different line;
+- the closing narrator line always names the product;
+- rewritten boasts rank below the site's clean lines;
+- shortened voice lines are cut at clause boundaries;
+- overlong films drop their least essential beat.
 
 ## Run it
 

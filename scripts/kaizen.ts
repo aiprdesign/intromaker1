@@ -143,6 +143,9 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
     }
   }
 
+  // ── Experience: what a viewer notices, beyond the checklist.
+  experience(plan, site, requested, add);
+
   // ── CTA (5).
   const cta = sc.find((s) => s.role === "cta");
   if (cta && !cta.subtext) add("cta", 3, "CTA has no button label");
@@ -150,6 +153,67 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
 
   const lost = issues.reduce((a, i) => a + i.points, 0);
   return { score: Math.max(0, 100 - lost), issues };
+}
+
+/** Content words (4+ letters) of a line, for "is this the product's own copy?" checks. */
+const content = (x: string) => new Set(norm(x).split(" ").filter((w) => w.length >= 4 && !GENERIC_WORDS.has(w)));
+const GENERIC_WORDS = new Set("your with from that this what team teams work into more make built tools need inside action introducing using".split(" "));
+const DANGLING = /\b(close|closes|get|make|help|helps|lets|so|that|which|to|for|with|and|or|the|a|an|your|by|of|on|at|in|more|less|than)[.!?]?$/i;
+
+function experience(plan: VideoPlan, site: SiteData | null, requested: number, add: (metric: string, points: number, msg: string) => void) {
+  const sc = plan.scenes;
+  const name = plan.brand?.name ?? plan.title;
+  // Specificity: headlines should be the product's own story, not boilerplate any product could use.
+  if (site) {
+    const own = content([site.tagline, site.description, ...site.headlines, ...site.features, ...site.steps, ...site.pains, ...site.stats].join(" "));
+    const judged = sc.filter((s) => ["hook", "meet", "tour", "features", "bento", "cards", "integrations"].includes(s.role ?? ""));
+    // A scene is the product's own when its headline or (for feature grids) its items are.
+    const ownWords = (x: string) => [...content(x)].some((w) => own.has(w)) || (x.match(/\d[\d,.]*/g) ?? []).some((n) => site.stats.some((st) => st.includes(n)));
+    const generic = judged.filter((s) => !ownWords(s.text) && !(["features", "bento"].includes(s.role ?? "") && (s.items ?? []).some(ownWords)));
+    const hook = sc.find((s) => s.role === "hook" || s.role === "pain");
+    if (hook?.role === "hook" && generic.includes(hook) && [...own].length > 8) add("specific", 3, `hook is boilerplate: "${hook.text}"`);
+    if (judged.length >= 3 && generic.length / judged.length > 0.5) add("specific", 3, `${generic.length}/${judged.length} headlines are boilerplate`);
+  }
+  // Rewrite damage: fragments a viewer would read as broken copy.
+  const lines: [string, string][] = [];
+  for (const s of sc) {
+    // Customer quotes are verbatim; they aren't ours to judge.
+    if (s.role === "quote") continue;
+    if (s.role !== "reveal") lines.push([`${s.role} headline`, s.text.split("|")[0]]);
+    for (const it of s.items ?? []) lines.push([`${s.role} item`, it.split(/\s+[—–]\s+/)[0]]);
+    for (const sent of (s.vo ?? "").split(/(?<=[.!?])\s+/)) if (sent) lines.push([`${s.role} voice`, sent]);
+  }
+  let damage = 0;
+  for (const [where, raw] of lines) {
+    const x = raw.replace(/\*/g, "").trim();
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+\.?$/i.test(x)) continue; // a web address, said as written
+    if (/\d+\+? more$/i.test(x)) continue; // "Gmail, Slack and 50 more" is complete
+    const bad = /\bever (?:built|made)\b|\b[a-z]+s-(?:up|in|on|out)s?\b/i.test(x) ? "reads as a broken rewrite" : DANGLING.test(x) && x.split(" ").length > 1 ? "ends mid-thought" : /^[a-z]/.test(x) && !/^(iOS|e[A-Z]|macOS)/.test(x) ? "starts lowercase" : /\b(\w+) \1\b/i.test(x) ? "repeats a word" : "";
+    if (bad && damage++ < 3) add("damage", 2, `${where} ${bad}: "${x.slice(0, 60)}"`);
+  }
+  // Brand: the real logo is revealed when there is one; the close names the brand.
+  if (plan.brand?.logo && !sc.some((s) => s.skill === "logo-reveal")) add("brand", 3, "site has a logo but the film never reveals it");
+  const last = sc[sc.length - 1];
+  if (last?.role === "cta" && last.vo && !last.vo.includes(name) && !(plan.brand?.domain && last.vo.includes(plan.brand.domain))) add("brand", 1, "CTA line doesn't name the brand");
+  // The real product: captured UI and imagery should be on screen.
+  if (site && requested >= 20) {
+    const parts = site.shots.parts?.length ?? 0;
+    if (parts >= 3 && !sc.some((s) => s.skill === "ui-assemble")) add("product", 3, `${parts} UI components captured but no UI Assemble`);
+    const hasVisuals = !!(site.shots.hero || site.shots.full || site.images.length || site.videos.length);
+    const shown = sc.filter((s) => s.media || ["ui-assemble", "site-scroll"].includes(s.skill)).length;
+    if (hasVisuals && shown === 0) add("product", 4, "site has product visuals but none are shown");
+  }
+  // Beat sync: every cut on the beat grid.
+  const beat = 60 / (plan.bpm || 120);
+  const off = sc.filter((s) => Math.abs(s.duration / beat - Math.round(s.duration / beat)) > 0.04).length;
+  if (off) add("sync", Math.min(3, off), `${off} scene${off > 1 ? "s" : ""} cut off the beat`);
+  // Vertical: headlines that won't fit a phone frame.
+  if (plan.aspect === "9:16") {
+    for (const s of sc) {
+      const longest = Math.max(...s.text.replace(/\*/g, "").split(/[\s|]+/).map((w) => w.length));
+      if (s.role !== "quote" && (longest > 14 || s.text.replace(/\*/g, "").length > 56)) add("portrait", 2, `${s.role} headline too wide for 9:16: "${s.text.slice(0, 40)}"`);
+    }
+  }
 }
 
 const LENGTHS: Length[] = ["short", "standard", "long"];
@@ -169,6 +233,22 @@ for (const { id, site } of SITES) {
           results.push({ name: `site:${id} ${length}/${angle}/${template}${safe ? "" : " +claims"}`, ...score(plan, LENGTH_SECONDS[length], safe ? safeSite(site) : site, safe) });
         }
       }
+}
+// Vertical cuts and take variety ("3 more takes" should give genuinely different films).
+for (const { id, site } of SITES) {
+  for (const template of ["midnight", "paper", "kinetic"]) {
+    const plan = planFromSite(site, { aspect: "9:16", length: "standard", template, angle: "story", seed: 7 });
+    results.push({ name: `site:${id} 9:16/${template}`, ...score(plan, LENGTH_SECONDS.standard, safeSite(site)) });
+  }
+  for (const length of ["standard", "long"] as Length[]) {
+    const takes = ANGLES.map((angle) => planFromSite(site, { aspect: "16:9", length, template: "midnight", angle, seed: 7 }));
+    const arcs = takes.map((p) => p.scenes.map((s) => s.role).join(">"));
+    const issues: Issue[] = [];
+    const same = arcs.length - new Set(arcs).size;
+    if (same) issues.push({ metric: "takes", points: 3 * same, msg: `${same + 1} of 3 takes have the same arc` });
+    if (new Set(takes.map((p) => norm(p.scenes[0].text))).size === 1) issues.push({ metric: "takes", points: 2, msg: "all takes open on the same line" });
+    results.push({ name: `takes:${id} ${length}`, score: Math.max(0, 100 - issues.reduce((a, i) => a + i.points, 0)), issues });
+  }
 }
 for (const prompt of PROMPTS)
   for (const length of LENGTHS)
