@@ -2,16 +2,18 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod/v4";
 import { assertPublicUrl } from "./netguard";
+import { PRESET_MAP, type ProviderPreset } from "./providers";
 
 /**
  * Bring-your-own-key AI director. Claude runs through the Anthropic SDK with structured output;
- * OpenAI, OpenRouter and any OpenAI-compatible endpoint (Groq, DeepSeek, Mistral, Together,
- * Ollama, LM Studio…) use /chat/completions JSON mode; Gemini uses generateContent JSON mode.
+ * every OpenAI-compatible provider in the registry (OpenAI, OpenRouter, xAI, Mistral, DeepSeek,
+ * Groq, Together, Ollama, Azure… see providers.ts) uses /chat/completions JSON mode; Gemini uses
+ * generateContent JSON mode.
  * Keys come from the user's browser per request (or the server env for Claude) and are never logged.
  */
 
-export const PROVIDERS = ["builtin", "anthropic", "openai", "gemini", "openrouter", "custom"] as const;
-export type Provider = (typeof PROVIDERS)[number];
+/** "builtin" (no AI) or a provider id from the registry in providers.ts. */
+export type Provider = string;
 export type Mode = "fast" | "balanced" | "best";
 
 export interface AiConfig {
@@ -24,13 +26,18 @@ export interface AiConfig {
   images?: boolean;
 }
 
-export const DEFAULT_MODELS: Record<Exclude<Provider, "builtin">, string> = {
-  anthropic: "claude-opus-5",
-  openai: "gpt-4.1",
-  gemini: "gemini-2.5-flash",
-  openrouter: "anthropic/claude-sonnet-5",
-  custom: "llama3.1",
-};
+function presetOf(cfg: AiConfig): ProviderPreset {
+  const p = PRESET_MAP[cfg.provider];
+  if (!p) throw new AiError("No AI provider selected.");
+  return p;
+}
+
+/** The model to use: the user's choice, else the provider's first suggestion. */
+export function modelOf(cfg: AiConfig) {
+  if (cfg.model) return cfg.model;
+  if (cfg.provider === "anthropic" && process.env.INTROMAKER_MODEL) return process.env.INTROMAKER_MODEL;
+  return PRESET_MAP[cfg.provider]?.models[0] ?? "";
+}
 
 export class AiError extends Error {}
 
@@ -45,7 +52,7 @@ export interface DirectorCall<T extends z.ZodType> {
 export function readAiConfig(raw: unknown): AiConfig | null {
   const r = raw as Record<string, unknown> | null;
   if (!r || typeof r !== "object") return null;
-  const provider = (PROVIDERS as readonly string[]).includes(r.provider as string) ? (r.provider as Provider) : null;
+  const provider = r.provider === "builtin" || PRESET_MAP[r.provider as string] ? (r.provider as Provider) : null;
   if (!provider) return null;
   const str = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
   return {
@@ -66,7 +73,7 @@ export function envClaudeAvailable() {
 function redact(msg: string, key?: string) {
   let out = msg.slice(0, 300);
   if (key && key.length > 6) out = out.split(key).join("•••");
-  return out.replace(/\b(sk|gsk|AIza|xai|or)-?[A-Za-z0-9_\-]{8,}/g, "•••");
+  return out.replace(/\b(sk|gsk|AIza|xai|or|hf|pplx|nvapi|csk|fw)[-_]?[A-Za-z0-9_\-]{8,}/g, "•••");
 }
 
 function extractJson(text: string): unknown {
@@ -93,7 +100,7 @@ async function callClaude<T extends z.ZodType>(cfg: AiConfig, call: DirectorCall
   const key = cfg.apiKey;
   if (!key && !envClaudeAvailable()) throw new AiError("Add an Anthropic API key in AI settings.");
   const client = new Anthropic(key ? { apiKey: key } : {});
-  const model = cfg.model || process.env.INTROMAKER_MODEL || DEFAULT_MODELS.anthropic;
+  const model = modelOf(cfg);
   // Model families differ: Haiku 4.5 has no adaptive thinking/effort; server-side fallbacks
   // apply to the models with safety classifiers (Opus 5 / Fable).
   const adaptive = !/haiku/i.test(model);
@@ -135,17 +142,28 @@ async function checkBaseUrl(base: string) {
   });
 }
 
+/** Resolve an OpenAI-compatible endpoint: base URL (validated when user-supplied) and auth headers. */
+async function openAiEndpoint(cfg: AiConfig) {
+  const preset = presetOf(cfg);
+  const custom = (cfg.baseUrl ?? "").replace(/\/+$/, "");
+  const base = preset.needsBaseUrl || (custom && custom !== preset.baseUrl) ? custom : (preset.baseUrl ?? "");
+  if (!base) throw new AiError(`Add the base URL for ${preset.name}.`);
+  // Anything not a built-in public endpoint (custom URLs, local servers) is checked first.
+  if (base !== preset.baseUrl || preset.group === "Local") await checkBaseUrl(base);
+  if (!cfg.apiKey && !preset.keyOptional) throw new AiError(`Add your ${preset.name} API key in AI settings.`);
+  const headers: Record<string, string> = {};
+  if (cfg.apiKey) {
+    if (preset.authHeader === "api-key") headers["api-key"] = cfg.apiKey;
+    else headers.Authorization = `Bearer ${cfg.apiKey}`;
+  }
+  if (preset.id === "openrouter") Object.assign(headers, { "HTTP-Referer": "https://intromaker.local", "X-Title": "IntroMaker" });
+  return { preset, base, headers };
+}
+
 async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: DirectorCall<T>): Promise<z.infer<T>> {
-  const base =
-    cfg.provider === "openai"
-      ? "https://api.openai.com/v1"
-      : cfg.provider === "openrouter"
-        ? "https://openrouter.ai/api/v1"
-        : (cfg.baseUrl ?? "").replace(/\/+$/, "");
-  if (!base) throw new AiError("Add the base URL of your OpenAI-compatible endpoint.");
-  if (cfg.provider === "custom") await checkBaseUrl(base);
-  if (!cfg.apiKey && cfg.provider !== "custom") throw new AiError("Add your API key in AI settings.");
-  const model = cfg.model || DEFAULT_MODELS[cfg.provider as "openai" | "openrouter" | "custom"];
+  const { preset, base, headers } = await openAiEndpoint(cfg);
+  const model = modelOf(cfg);
+  if (!model) throw new AiError(`Enter a model name for ${preset.name}.`);
   const schemaText = JSON.stringify(z.toJSONSchema(call.schema));
   const instruction = `\n\nRespond with ONLY a JSON object (no prose, no markdown) that matches this JSON Schema:\n${schemaText}`;
 
@@ -156,11 +174,7 @@ async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: Di
     ];
     return fetch(`${base}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(cfg.apiKey ? { Authorization: `Bearer ${cfg.apiKey}` } : {}),
-        ...(cfg.provider === "openrouter" ? { "HTTP-Referer": "https://intromaker.local", "X-Title": "IntroMaker" } : {}),
-      },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
         model,
         messages: [
@@ -173,7 +187,8 @@ async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: Di
     });
   };
 
-  let images = cfg.images !== false && call.images.length > 0;
+  // Send screenshots only to vision models (a custom model name may be; the 400 retry covers it).
+  let images = cfg.images !== false && call.images.length > 0 && (preset.vision || (!!cfg.model && !preset.models.includes(cfg.model)));
   let jsonMode = true;
   let res = await attempt(images, jsonMode);
   // Older/local models may not support images or JSON mode: degrade gracefully.
@@ -195,7 +210,7 @@ async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: Di
 
 async function callGemini<T extends z.ZodType>(cfg: AiConfig, call: DirectorCall<T>): Promise<z.infer<T>> {
   if (!cfg.apiKey) throw new AiError("Add your Google AI Studio API key in AI settings.");
-  const model = cfg.model || DEFAULT_MODELS.gemini;
+  const model = modelOf(cfg);
   const schemaText = JSON.stringify(z.toJSONSchema(call.schema));
   const attempt = (withImages: boolean) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
@@ -238,36 +253,69 @@ export async function runDirector<T extends z.ZodType>(cfg: AiConfig, call: Dire
   } catch (e) {
     if (e instanceof AiError) throw e;
     if ((e as Error).name === "TimeoutError") throw new AiError("The AI took too long to answer.");
-    if (e instanceof TypeError) throw new AiError(`Couldn't reach ${cfg.provider === "custom" ? cfg.baseUrl : cfg.provider} — check the URL and your connection.`);
+    if (e instanceof TypeError) {
+      const p = PRESET_MAP[cfg.provider];
+      const where = cfg.baseUrl || p?.baseUrl || p?.name || cfg.provider;
+      throw new AiError(`Couldn't reach ${where}${p?.group === "Local" ? ` — is ${p.name.replace(" (local)", "")} running?` : " — check the URL and your connection."}`);
+    }
     if (e instanceof SyntaxError) throw new AiError("The model returned malformed JSON.");
     throw e;
   }
 }
 
 function dispatch<T extends z.ZodType>(cfg: AiConfig, call: DirectorCall<T>): Promise<z.infer<T> | "refusal"> {
-  switch (cfg.provider) {
+  switch (presetOf(cfg).protocol) {
     case "anthropic":
       return callClaude(cfg, call);
     case "gemini":
       return callGemini(cfg, call);
-    case "openai":
-    case "openrouter":
-    case "custom":
-      return callOpenAiCompatible(cfg, call);
     default:
-      throw new AiError("No AI provider selected.");
+      return callOpenAiCompatible(cfg, call);
+  }
+}
+
+/** Models the key can use, straight from the provider (for the settings model picker). */
+export async function listModels(cfg: AiConfig): Promise<string[]> {
+  const preset = presetOf(cfg);
+  try {
+    let ids: string[] = [];
+    if (preset.protocol === "anthropic") {
+      if (!cfg.apiKey && !envClaudeAvailable()) throw new AiError("Add an Anthropic API key first.");
+      const client = new Anthropic(cfg.apiKey ? { apiKey: cfg.apiKey } : {});
+      for await (const m of client.models.list({ limit: 100 })) ids.push(m.id);
+    } else if (preset.protocol === "gemini") {
+      if (!cfg.apiKey) throw new AiError("Add your Google AI Studio API key first.");
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+        headers: { "x-goog-api-key": cfg.apiKey },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (res.status === 400 || res.status === 401 || res.status === 403) throw new AiError("Google rejected the API key.");
+      if (!res.ok) throw new AiError(`Gemini error ${res.status}.`);
+      const data = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+      ids = (data.models ?? [])
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => m.name.replace(/^models\//, ""));
+    } else {
+      const { base, headers } = await openAiEndpoint(cfg);
+      const res = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(20_000) });
+      if (res.status === 401 || res.status === 403) throw new AiError("The provider rejected the API key.");
+      if (!res.ok) throw new AiError(`${preset.name} doesn't list models (${res.status}); type the model name instead.`);
+      const data = (await res.json()) as { data?: { id: string }[]; models?: { id?: string; name?: string }[] };
+      ids = (data.data ?? data.models ?? []).map((m) => ("id" in m && m.id) || (m as { name?: string }).name || "").filter(Boolean);
+    }
+    return [...new Set(ids)].sort().slice(0, 400);
+  } catch (e) {
+    if (e instanceof AiError) throw e;
+    if (e instanceof Anthropic.AuthenticationError) throw new AiError("Anthropic rejected the API key (401).");
+    if ((e as Error).name === "TimeoutError") throw new AiError("The provider took too long to answer.");
+    if (e instanceof TypeError) throw new AiError(`Couldn't reach ${preset.name}${preset.group === "Local" ? " — is it running?" : "."}`);
+    throw new AiError(`Couldn't list models: ${redact((e as Error).message ?? "", cfg.apiKey)}`);
   }
 }
 
 export function describe(cfg: AiConfig) {
-  const names: Record<Provider, string> = {
-    builtin: "Built-in director",
-    anthropic: "Claude",
-    openai: "OpenAI",
-    gemini: "Gemini",
-    openrouter: "OpenRouter",
-    custom: "Custom model",
-  };
-  const model = cfg.provider === "builtin" ? "" : cfg.model || (cfg.provider === "anthropic" ? process.env.INTROMAKER_MODEL : "") || DEFAULT_MODELS[cfg.provider];
-  return model ? `${names[cfg.provider]} · ${model}` : names[cfg.provider];
+  if (cfg.provider === "builtin") return "Built-in director";
+  const name = PRESET_MAP[cfg.provider]?.name.replace(/ \(local\)$/, "") ?? "AI";
+  const model = modelOf(cfg);
+  return model ? `${name} · ${model}` : name;
 }

@@ -56,7 +56,8 @@ src/engine/
   templates.ts    style templates (look, motion, music, pacing, role → skill)
   export.ts       WebCodecs offline export, export presets, PNG thumbnail
 src/app/api/generate/route.ts   Claude AI Director (structured output), falls back to planner.ts
-src/lib/ai.ts                   multi-provider AI (Claude, OpenAI, Gemini, OpenRouter, custom)
+src/lib/providers.ts            provider registry (endpoint, auth, key prefix, suggested models, vision)
+src/lib/ai.ts                   AI director over 3 protocols (Anthropic SDK, OpenAI-compatible, Gemini) + model listing
 src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/scrape.ts               website extraction (name, copy, features, stats, CTA, testimonials, customer logos, logo, images, videos, theme colour)
 src/lib/netguard.ts             SSRF guard: only public http(s) hosts, re-checked on every redirect
@@ -73,7 +74,15 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 ## Notes
 
 - **Live website capture** uses the Chrome or Edge already installed on your computer to take screenshots (hero, full page, sections) and render JavaScript-heavy sites. If neither is installed it falls back to a plain HTML fetch. Set `INTROMAKER_BROWSER` to a browser executable to use a specific one.
-- **Bring any AI**: in the studio's ⚙ settings, pick Anthropic Claude, OpenAI, Google Gemini, OpenRouter or any OpenAI-compatible endpoint (Ollama, Groq and others), paste a key, choose a model and a Fast/Balanced/Best mode. The key stays in your browser.
+- **Bring any AI**: in the studio's ⚙ settings, pick one of 24 built-in providers, or just paste a key and the provider is recognised from its prefix. Then pick or type a model, and it works; endpoints and auth are preconfigured. The providers are:
+  - **Popular**: Anthropic Claude, OpenAI, Google Gemini, OpenRouter, xAI Grok, Mistral, DeepSeek.
+  - **Fast inference**: Groq, Cerebras, SambaNova.
+  - **Open models**: Together, Fireworks, DeepInfra, Hugging Face, NVIDIA NIM, Perplexity.
+  - **Regional**: Alibaba Qwen, Moonshot Kimi, Z.ai GLM.
+  - **Local**: Ollama, LM Studio.
+  - **Other**: Azure OpenAI, and any OpenAI-compatible API.
+
+  *Load models* lists the models your key can use, and each provider remembers its own key. Screenshots go only to vision models. Keys stay in your browser. To add a provider, add an entry in `src/lib/providers.ts`.
 - **AI that reads the site**: with a key (or `ANTHROPIC_API_KEY` on the server), Claude receives the extracted copy, features, steps, pains, stats, testimonials and asset list, plus the site's screenshots as images, and writes the storyboard. Without a key, the built-in director uses the same story arc.
 
 - Website import fetches pages server-side and blocks private and internal addresses. For local testing against `localhost` sites, set `INTROMAKER_ALLOW_PRIVATE_URLS=1`.

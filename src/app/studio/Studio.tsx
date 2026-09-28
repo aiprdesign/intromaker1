@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import AiSettings, { aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
+import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import LoopCanvas from "@/components/LoopCanvas";
 import TemplatePicker from "@/components/TemplatePicker";
@@ -105,7 +105,7 @@ export default function Studio() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: loadAiSettings(), template, angle: opts.angle }),
+        body: JSON.stringify({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiForRequest(loadAiSettings()), template, angle: opts.angle }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
