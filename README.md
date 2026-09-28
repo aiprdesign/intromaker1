@@ -15,7 +15,14 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ### What makes the SaaS films look pro
 
-- **14 style templates**, modelled on the most popular SaaS intro looks: Midnight Grid (dev-tool dark), Aurora Gradient (Stripe-style), Minimal Light (keynote), Mono Pro, Bold Pop, Cinematic Keynote, Neon Tech, Frosted Glass (glassmorphism), Enterprise Clean (B2B blue), Dev Terminal (CRT and typewriter), Kinetic Type (huge words on the beat), Neo-Brutalist (hard shadows), Editorial Serif (cream and serif) and AI Glow. Each has its own palette, typeface, backdrop (grid, dots, blobs, scanlines or plain), card style (glass, frosted, flat or brutalist), text motion (blur, mask, pop, glow or typewriter), transitions, music and pacing. Switching restyles the film instantly.
+- **24 style templates**, modelled on the most popular SaaS intro looks and grouped in the picker:
+  - **Modern**: Midnight Grid, Aurora Gradient, Mono Pro, AI Glow.
+  - **3D & Sci-Fi**: 3D Spatial (content on an orbiting 3D plane over glowing 3D panels), Sci-Fi HUD (brackets, timecode, readouts, scan lines), Synthwave 3D (neon grid floor to the horizon), Deep Space (parallax starfield and nebula), Holographic, Liquid Chrome, Neon Tech, Dev Terminal.
+  - **Clean & Light**: Minimal Light, Swiss Clean (hairline layout frame), Enterprise Clean, Frosted Glass.
+  - **Bold & Playful**: Bold Pop, Kinetic Type, Neo-Brutalist, Clay 3D (puffy claymorphism cards and gooey metaballs), Retro Dither.
+  - **Premium**: Cinematic Keynote, Editorial Serif, Luxe Noir.
+
+  Each style has its own palette, typeface, GPU background, card style (glass, frosted, flat, brutalist or clay), text motion (blur, mask, pop, glow or typewriter), optional 3D stage and HUD or frame overlay, transitions, music and pacing. Switching restyles the film instantly.
 - **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 20 dark and light palettes. A palette you pick survives template switches.
 - **Edited like a real film**: whip pans, dolly zoom-throughs, pushes, dissolves and light leaks show the outgoing and incoming shots at the same time, and every cut lands on the beat.
 - **A product tour that clicks real UI**: the screenshot (or first video frame) is analysed for its busiest interface regions, and the camera zooms and the cursor clicks there.

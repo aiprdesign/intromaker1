@@ -8,6 +8,14 @@
  * (one shared context) and returns a canvas the 2D pipeline composites like any image.
  */
 import {
+  colorPanelsFragmentShader,
+  ditheringFragmentShader,
+  DitheringShapes,
+  DitheringTypes,
+  metaballsFragmentShader,
+  swirlFragmentShader,
+  voronoiFragmentShader,
+  wavesFragmentShader,
   getShaderColorFromString,
   getShaderNoiseTexture,
   godRaysFragmentShader,
@@ -22,8 +30,8 @@ import {
 import { mixHex } from "./math";
 import type { Palette } from "./types";
 
-export type ShaderBg = "mesh" | "grain" | "warp" | "smoke" | "neuro" | "rays";
-export const SHADER_BGS: ShaderBg[] = ["mesh", "grain", "warp", "smoke", "neuro", "rays"];
+export type ShaderBg = "mesh" | "grain" | "warp" | "smoke" | "neuro" | "rays" | "panels" | "metaballs" | "swirl" | "voronoi" | "dither" | "waves";
+export const SHADER_BGS: ShaderBg[] = ["mesh", "grain", "warp", "smoke", "neuro", "rays", "panels", "metaballs", "swirl", "voronoi", "dither", "waves"];
 
 /** Paper Shaders' shared vertex shader (Apache-2.0, Paper Design); not exported by the package. */
 const VERTEX = `#version 300 es
@@ -185,8 +193,27 @@ const FRAGMENTS: Record<ShaderBg, string> = {
   smoke: smokeRingFragmentShader,
   neuro: neuroNoiseFragmentShader,
   rays: godRaysFragmentShader,
+  panels: colorPanelsFragmentShader,
+  metaballs: metaballsFragmentShader,
+  swirl: swirlFragmentShader,
+  voronoi: voronoiFragmentShader,
+  dither: ditheringFragmentShader,
+  waves: wavesFragmentShader,
 };
-const NEEDS_NOISE: Record<ShaderBg, boolean> = { mesh: false, grain: true, warp: true, smoke: true, neuro: false, rays: true };
+const NEEDS_NOISE: Record<ShaderBg, boolean> = {
+  mesh: false,
+  grain: true,
+  warp: true,
+  smoke: true,
+  neuro: false,
+  rays: true,
+  panels: false,
+  metaballs: true,
+  swirl: false,
+  voronoi: true,
+  dither: false,
+  waves: false,
+};
 
 type Uniform = number | number[] | number[][];
 
@@ -358,6 +385,80 @@ function uniformsFor(kind: ShaderBg, p: Palette, seed: number): Record<string, U
         u_brightness: 0.05,
         u_contrast: 0.3,
       };
+    case "panels":
+      // Glowing translucent 3D panels rotating around an axis.
+      return {
+        ...base,
+        u_scale: 1.1,
+        u_colorBack: back,
+        u_colors: cols.slice(0, 3),
+        u_colorsCount: 3,
+        u_angle1: 0.3,
+        u_angle2: -0.2,
+        u_length: 1.1,
+        u_edges: 1,
+        u_blur: 0.25,
+        u_fadeIn: 0.9,
+        u_fadeOut: 0.35,
+        u_density: 2.6,
+        u_gradient: 0.6,
+      };
+    case "metaballs":
+      return { ...base, u_scale: 1.3, u_colorBack: back, u_colors: cols.slice(0, 3), u_colorsCount: 3, u_count: 8, u_size: 0.8 };
+    case "swirl":
+      return {
+        ...base,
+        u_scale: 1.2,
+        u_colorBack: back,
+        u_colors: cols.slice(0, 3),
+        u_colorsCount: 3,
+        u_bandCount: 4,
+        u_twist: 0.25,
+        u_center: 0.3,
+        u_proportion: 0.5,
+        u_softness: 1,
+        u_noiseFrequency: 0.4,
+        u_noise: 0.2,
+      };
+    case "voronoi":
+      return {
+        ...base,
+        u_fit: 0,
+        u_scale: 0.7,
+        u_colors: cols.slice(0, 3),
+        u_colorsCount: 3,
+        u_stepsPerColor: 2,
+        u_colorGap: back,
+        u_colorGlow: rgba(mixHex(p.bg0, p.primary, 0.7)),
+        u_distortion: 0.4,
+        u_gap: 0.035,
+        u_glow: 0.6,
+      };
+    case "dither":
+      return {
+        ...base,
+        u_fit: 0,
+        u_colorBack: back,
+        u_colorFront: rgba(p.support ?? mixHex(p.bg0, p.primary, 0.5)),
+        u_shape: DitheringShapes.warp,
+        u_type: DitheringTypes["4x4"],
+        u_pxSize: 3,
+      };
+    case "waves":
+      return {
+        ...base,
+        u_fit: 0,
+        u_scale: 1.1,
+        u_rotation: 12,
+        u_colorFront: rgba(mixHex(p.bg0, p.support ?? p.primary, 0.8)),
+        u_colorBack: back,
+        u_shape: 2.4,
+        u_frequency: 0.35,
+        u_amplitude: 0.35,
+        u_spacing: 2.2,
+        u_proportion: 0.05,
+        u_softness: 0.8,
+      };
     case "rays":
       return {
         ...base,
@@ -389,7 +490,7 @@ export function renderShaderBg(kind: ShaderBg, palette: Palette, w: number, h: n
     return null;
   }
   // Smooth fields upscale invisibly; grainy / fine-line shaders keep more resolution.
-  const scale = Math.min(1, (kind === "grain" || kind === "neuro" ? 900 : 640) / Math.max(w, h));
+  const scale = Math.min(1, (kind === "grain" || kind === "neuro" || kind === "dither" || kind === "waves" || kind === "voronoi" ? 900 : 640) / Math.max(w, h));
   const rw = Math.max(2, Math.round(w * scale));
   const rh = Math.max(2, Math.round(h * scale));
   if (glCanvas.width !== rw || glCanvas.height !== rh) {

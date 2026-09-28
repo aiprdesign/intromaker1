@@ -59,6 +59,13 @@ export const PALETTE_IDS = [
   "cream",
   "violet",
   "volt",
+  "spatial",
+  "hud",
+  "swiss",
+  "clay",
+  "chrome",
+  "holo",
+  "dither",
 ] as const;
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
@@ -197,17 +204,21 @@ export interface Look {
   /** Vignette strength multiplier. */
   vignette?: number;
   /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, or plain. */
-  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain";
+  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars";
   /** UI card treatment: frosted glass (default), frosted-light, flat, or neo-brutalist. */
-  card?: "glass" | "frost" | "flat" | "brutal";
+  card?: "glass" | "frost" | "flat" | "brutal" | "clay";
   /** Headline size multiplier (kinetic-type styles go big). */
   textScale?: number;
   /** GPU shader gradient behind everything (Paper Shaders): mesh, grain, warp, smoke, neuro, rays. */
-  shader?: "mesh" | "grain" | "warp" | "smoke" | "neuro" | "rays";
+  shader?: "mesh" | "grain" | "warp" | "smoke" | "neuro" | "rays" | "panels" | "metaballs" | "swirl" | "voronoi" | "dither" | "waves";
   /** Shader opacity over the base colour (0–1). */
   shaderStrength?: number;
   /** Shader animation speed multiplier. */
   shaderSpeed?: number;
+  /** 3D stage: scene content floats on a tilted plane (degrees) that slowly orbits. */
+  depth?: number;
+  /** Frame overlay drawn over the film: sci-fi HUD or a Swiss-style layout frame. */
+  overlay?: "hud" | "frame";
 }
 
 export interface SkillContext {
@@ -233,6 +244,8 @@ export interface SkillContext {
   look?: Look;
   /** Time in the whole film (seconds): lets backgrounds flow continuously across cuts. */
   globalT?: number;
+  /** Set while rendering a 3D-stage content layer: the stage (background) is drawn separately. */
+  noStage?: boolean;
 }
 
 export type SfxKind = "whoosh" | "click" | "pop" | "swoosh" | "tick" | "shimmer" | "strike";

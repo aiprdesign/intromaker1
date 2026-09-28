@@ -32,6 +32,7 @@ export function sentence(sc: SkillContext, opts: Parameters<typeof headline>[1] 
  * a faded grid with dots, and bright beams that travel along the grid lines.
  */
 export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?: number; aurora?: number } = {}) {
+  if (sc.noStage) return;
   const { ctx, w, h, t, u, palette, seed } = sc;
   const look = sc.look;
   const light = !!palette.light;
@@ -127,6 +128,79 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
     ctx.fillStyle = "rgba(0,0,0,0.28)";
     const gap = Math.max(3, 4 * u);
     for (let y = 0; y < h; y += gap) ctx.fillRect(0, y, w, gap * 0.45);
+  }
+
+  if (backdrop === "horizon") {
+    // Synthwave 3D floor: perspective grid rushing towards the viewer, glowing horizon line.
+    const hy = h * 0.6;
+    ctx.save();
+    const sky = ctx.createLinearGradient(0, hy - h * 0.35, 0, hy);
+    sky.addColorStop(0, rgba(palette.primary, 0));
+    sky.addColorStop(1, rgba(palette.primary, 0.28));
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, hy - h * 0.35, w, h * 0.35);
+    const floor = ctx.createLinearGradient(0, hy, 0, h);
+    floor.addColorStop(0, rgba(palette.bg1, 0.9));
+    floor.addColorStop(1, rgba(palette.bg0, 1));
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, hy, w, h - hy);
+    ctx.beginPath();
+    ctx.rect(0, hy, w, h - hy);
+    ctx.clip();
+    ctx.strokeStyle = palette.primary;
+    ctx.shadowColor = palette.primary;
+    ctx.shadowBlur = 10 * u;
+    const f = h * 0.4;
+    const phase = ((sc.globalT ?? t) * 0.9) % 1;
+    for (let i = 0; i < 26; i++) {
+      const z = i + 1 - phase;
+      const y = hy + f / z;
+      if (y > h + 4) continue;
+      ctx.globalAlpha = Math.min(1, 1.6 / z) * 0.85;
+      ctx.lineWidth = Math.max(1, 2.4 * u / Math.sqrt(z));
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 1.6 * u;
+    for (let i = -18; i <= 18; i++) {
+      ctx.beginPath();
+      ctx.moveTo(w / 2 + i * w * 0.012, hy);
+      ctx.lineTo(w / 2 + i * w * 0.16, h);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Horizon glow.
+    const hg = ctx.createLinearGradient(0, hy - 30 * u, 0, hy + 30 * u);
+    hg.addColorStop(0, rgba(palette.secondary, 0));
+    hg.addColorStop(0.5, rgba(palette.secondary, 0.75));
+    hg.addColorStop(1, rgba(palette.secondary, 0));
+    ctx.save();
+    ctx.globalCompositeOperation = glowOp;
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, hy - 30 * u, w, 60 * u);
+    ctx.restore();
+  } else if (backdrop === "stars") {
+    // Parallax starfield: three depth layers drifting, gently twinkling.
+    const r = rng(seed + 77);
+    const T = sc.globalT ?? t;
+    ctx.save();
+    ctx.globalCompositeOperation = glowOp;
+    for (let layer = 0; layer < 3; layer++) {
+      const n = [140, 70, 26][layer];
+      const speed = [4, 10, 22][layer] * u;
+      const size = [0.9, 1.4, 2.2][layer] * u;
+      for (let i = 0; i < n; i++) {
+        const x = (((r() * w - T * speed) % w) + w) % w;
+        const y = r() * h;
+        const tw = 0.55 + 0.45 * Math.sin(T * (1 + r() * 2) + i);
+        ctx.fillStyle = rgba(i % 7 === 0 ? palette.secondary : palette.text, (0.35 + layer * 0.25) * tw);
+        ctx.fillRect(x, y, size, size);
+      }
+    }
+    ctx.restore();
   }
 
   if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
@@ -233,7 +307,33 @@ export function glassCard(
     ctx.save();
     ctx.globalAlpha *= a;
     const light = !!palette.light;
-    if (kind === "brutal") {
+    if (kind === "clay") {
+      // Claymorphism: soft pastel slab, extruded underside, puffy inner highlight.
+      const rr = Math.max(r, 26 * u);
+      const face = opts.tint ? mixHex(palette.bg1, opts.tint, 0.2) : palette.bg1;
+      ctx.shadowColor = rgba(palette.support ?? palette.primary, light ? 0.35 : 0.5);
+      ctx.shadowBlur = 44 * u;
+      ctx.shadowOffsetY = 24 * u;
+      ctx.beginPath();
+      ctx.roundRect(x, y + 10 * u, cw, ch, rr);
+      ctx.fillStyle = mixHex(face, "#000000", light ? 0.12 : 0.35);
+      ctx.fill();
+      ctx.shadowColor = "transparent";
+      ctx.beginPath();
+      ctx.roundRect(x, y, cw, ch, rr);
+      ctx.fillStyle = face;
+      ctx.fill();
+      const hl = ctx.createLinearGradient(x, y, x, y + ch * 0.6);
+      hl.addColorStop(0, "rgba(255,255,255,0.55)");
+      hl.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = hl;
+      ctx.beginPath();
+      ctx.roundRect(x + 6 * u, y + 5 * u, cw - 12 * u, ch * 0.5, rr * 0.8);
+      ctx.fill();
+      ctx.restore();
+    } else if (kind === "brutal") {
       // Neo-brutalist: solid fill, thick ink border, hard offset shadow.
       const rr = Math.min(r, 12 * u);
       ctx.fillStyle = palette.text;

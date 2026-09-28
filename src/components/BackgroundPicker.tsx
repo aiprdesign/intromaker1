@@ -13,6 +13,12 @@ export const BG_OPTIONS: { id: BgChoice; name: string }[] = [
   { id: "smoke", name: "Smoke ring" },
   { id: "neuro", name: "Neural glow" },
   { id: "rays", name: "Light rays" },
+  { id: "panels", name: "3D light panels" },
+  { id: "metaballs", name: "3D metaballs" },
+  { id: "swirl", name: "Chrome swirl" },
+  { id: "voronoi", name: "Sci-fi cells" },
+  { id: "waves", name: "Line waves" },
+  { id: "dither", name: "Retro dither" },
   { id: "none", name: "Clean (no gradient)" },
 ];
 

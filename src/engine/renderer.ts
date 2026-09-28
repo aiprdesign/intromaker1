@@ -5,6 +5,7 @@ import { scratch } from "./scratch";
 import { getImage, isDarkLogo } from "./media";
 import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
+import { saasBackground } from "./saasfx";
 import type { Aspect, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
 export const TRANSITION_LEN = 0.45;
@@ -100,6 +101,21 @@ function drawScene(
     globalT,
   };
   resetCtx(target);
+  const depth = plan.style === "saas" ? plan.look?.depth ?? 0 : 0;
+  if (depth > 0) {
+    // 3D stage: flat shader background, content projected onto a tilted, orbiting plane.
+    saasBackground(sc);
+    const layer = scratch("depth-content", w, h);
+    const csc: SkillContext = { ...sc, ctx: layer.ctx, noStage: true };
+    layer.ctx.save();
+    if (opts.camera !== false) applyCamera(csc, globalT);
+    if (transitionIn) applyTransitionIn(csc);
+    SKILL_MAP[scene.skill].render(csc);
+    layer.ctx.restore();
+    projectPlane(target, layer.canvas, w, h, depth, globalT);
+    resetCtx(target);
+    return sc;
+  }
   target.save();
   if (opts.camera !== false) applyCamera(sc, globalT);
   if (transitionIn) applyTransitionIn(sc);
@@ -107,6 +123,38 @@ function drawScene(
   target.restore();
   resetCtx(target);
   return sc;
+}
+
+/**
+ * Draw `src` as a plane tilted back by ~`depth` degrees (true perspective, via thin horizontal
+ * strips), with a slow orbit: the tilt breathes and the plane yaws gently from side to side.
+ */
+function projectPlane(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, w: number, h: number, depth: number, t: number) {
+  const ax = ((depth * (0.8 + 0.2 * Math.sin(t * 0.33))) * Math.PI) / 180;
+  const yaw = ((depth * 0.35 * Math.sin(t * 0.21)) * Math.PI) / 180;
+  const f = h * 2.4;
+  const strip = Math.max(2, Math.round(h / 300));
+  const project = (y: number) => {
+    const yc = y - h / 2;
+    const z = -yc * Math.sin(ax);
+    const k = f / (f + z);
+    return { y: h / 2 + yc * Math.cos(ax) * k, k };
+  };
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.transform(Math.cos(yaw), Math.sin(yaw) * 0.18, 0, 1, 0, 0);
+  const zoom = 1.02;
+  ctx.scale(zoom, zoom);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.imageSmoothingEnabled = true;
+  for (let y = 0; y < h; y += strip) {
+    const a = project(y);
+    const b = project(Math.min(h, y + strip));
+    const k = (a.k + b.k) / 2;
+    const dw = w * k;
+    ctx.drawImage(src, 0, y, w, Math.min(strip, h - y), w / 2 - dw / 2, a.y, dw, Math.max(0.5, b.y - a.y) + 0.6);
+  }
+  ctx.restore();
 }
 
 /** Render a single scene at local time t (used directly by the skill showcase). */
@@ -217,7 +265,89 @@ export function renderFrame(
     prev: at.index > 0 ? { scene: plan.scenes[at.index - 1], index: at.index - 1 } : undefined,
     extendSelf: !!next && OVERLAP.has(next.transition),
   });
-  brandBug(ctx, plan, time, w, h);
+  if (plan.style === "saas" && plan.look?.overlay) filmOverlay(ctx, plan, time, w, h, at.index);
+  else brandBug(ctx, plan, time, w, h);
+}
+
+/** Frame-level overlays: a sci-fi HUD or a Swiss-style layout frame (they carry the brand name). */
+function filmOverlay(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, w: number, h: number, index: number) {
+  const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  const u = Math.min(w, h) / 1080;
+  const name = plan.brand?.name ?? plan.title;
+  const total = totalDuration(plan);
+  const fade = Math.min(1, time / 0.6) * Math.min(1, (total - time) / 0.3 + 0.35);
+  resetCtx(ctx);
+  ctx.save();
+  ctx.globalAlpha = fade;
+  if (plan.look?.overlay === "hud") {
+    const c = palette.primary;
+    const m = 42 * u;
+    const L = 46 * u;
+    ctx.strokeStyle = rgba(c, 0.85);
+    ctx.lineWidth = 2.5 * u;
+    ctx.shadowColor = c;
+    ctx.shadowBlur = 10 * u;
+    for (const [x, y, sx, sy] of [[m, m, 1, 1], [w - m, m, -1, 1], [m, h - m, 1, -1], [w - m, h - m, -1, -1]]) {
+      ctx.beginPath();
+      ctx.moveTo(x, y + sy * L);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + sx * L, y);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    // Ruler ticks down the left edge.
+    ctx.strokeStyle = rgba(c, 0.35);
+    ctx.lineWidth = 1.2 * u;
+    for (let i = 0; i < 24; i++) {
+      const y = h * 0.2 + (i * h * 0.6) / 23;
+      ctx.beginPath();
+      ctx.moveTo(m, y);
+      ctx.lineTo(m + (i % 4 === 0 ? 16 : 8) * u, y);
+      ctx.stroke();
+    }
+    // Slow scan line.
+    const sy = ((time * 0.18) % 1) * h;
+    const g = ctx.createLinearGradient(0, sy - 60 * u, 0, sy);
+    g.addColorStop(0, rgba(c, 0));
+    g.addColorStop(1, rgba(c, 0.1));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, sy - 60 * u, w, 60 * u);
+    ctx.fillStyle = rgba(c, 0.35);
+    ctx.fillRect(0, sy, w, Math.max(1, u));
+    // Readouts.
+    ctx.font = `500 ${Math.round(17 * u)}px "JetBrains Mono", monospace`;
+    ctx.fillStyle = rgba(c, 0.9);
+    ctx.textBaseline = "middle";
+    const tc = `T+${String(Math.floor(time / 60)).padStart(2, "0")}:${(time % 60).toFixed(2).padStart(5, "0")}`;
+    ctx.textAlign = "left";
+    ctx.fillText(`SYS // ${name.toUpperCase()}`, m + L + 14 * u, m + 2 * u);
+    ctx.fillText(`SEQ ${String(index + 1).padStart(2, "0")}/${String(plan.scenes.length).padStart(2, "0")}`, m + L + 14 * u, h - m);
+    ctx.textAlign = "right";
+    ctx.fillText(tc, w - m - L - 14 * u, m + 2 * u);
+    const lat = (37.7749 + Math.sin(time * 0.7) * 0.01).toFixed(4);
+    const lon = (122.4194 + Math.cos(time * 0.6) * 0.01).toFixed(4);
+    ctx.fillText(`${lat}N  ${lon}W`, w - m - L - 14 * u, h - m);
+    // Blinking status square.
+    if (Math.floor(time * 2) % 2 === 0) ctx.fillRect(w - m - L - 14 * u - 250 * u, m - 6 * u, 12 * u, 12 * u);
+  } else {
+    // Swiss layout frame: hairline inset border and corner labels.
+    const m = 36 * u;
+    ctx.strokeStyle = rgba(palette.text, 0.22);
+    ctx.lineWidth = Math.max(1, 1.4 * u);
+    ctx.strokeRect(m, m, w - m * 2, h - m * 2);
+    ctx.font = subFont(17 * u, 600);
+    ctx.fillStyle = rgba(palette.text, 0.75);
+    ctx.textBaseline = "middle";
+    const scene = plan.scenes[index];
+    ctx.textAlign = "left";
+    ctx.fillText(name, m + 18 * u, m + 26 * u);
+    ctx.fillText((scene?.eyebrow ?? "").toUpperCase(), m + 18 * u, h - m - 26 * u);
+    ctx.textAlign = "right";
+    ctx.fillText(`Nº ${String(index + 1).padStart(2, "0")} / ${String(plan.scenes.length).padStart(2, "0")}`, w - m - 18 * u, m + 26 * u);
+    ctx.fillStyle = palette.primary;
+    ctx.fillRect(w - m - 18 * u - 14 * u, h - m - 33 * u, 14 * u, 14 * u);
+  }
+  ctx.restore();
 }
 
 const BUG_SKIP = new Set(["hook", "pain", "reveal", "cta"]);
