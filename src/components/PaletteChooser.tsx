@@ -3,7 +3,8 @@
 import { PALETTES } from "@/engine/palettes";
 import { PALETTE_IDS, type Brand, type Palette, type PaletteId } from "@/engine/types";
 
-export type ColourChoice = "template" | "brand" | PaletteId;
+/** "brand": colours detected across the site (auto); "logo": colours from the logo alone. */
+export type ColourChoice = "template" | "brand" | "logo" | PaletteId;
 
 /** Colour bar in 60 / 30 / 10 proportions: dominant background, supporting colour, accent. */
 function Stripes({ bg, a, b }: { bg: string; a: string; b: string; c?: string }) {
@@ -26,12 +27,17 @@ export default function PaletteChooser({
   templatePalette,
   templateName,
   brandColors,
+  logoColors,
+  hasLogo,
 }: {
   value: ColourChoice;
   onChange: (c: ColourChoice) => void;
   templatePalette: PaletteId;
   templateName?: string;
   brandColors?: Brand["colors"];
+  logoColors?: Brand["colors"];
+  /** A logo was imported (so a missing logo palette means it's black & white). */
+  hasLogo?: boolean;
 }) {
   const tp = PALETTES[templatePalette];
   const card = (id: ColourChoice, name: string, p: Pick<Palette, "bg0" | "primary" | "secondary" | "accent">, hint?: string) => (
@@ -49,10 +55,23 @@ export default function PaletteChooser({
         {brandColors &&
           card(
             "brand",
-            "Brand colours",
+            "Brand colours (auto)",
             { bg0: tp.bg0, primary: brandColors.primary, secondary: brandColors.secondary, accent: brandColors.primary },
-            "Colours detected from the website's logo and images",
+            "Detected automatically from the website: its theme colour, logo and images",
           )}
+        {logoColors &&
+          card(
+            "logo",
+            "Logo colours",
+            { bg0: tp.bg0, primary: logoColors.primary, secondary: logoColors.secondary, accent: logoColors.primary },
+            "Taken from the logo alone (a one-colour logo gets a matching analogous second colour)",
+          )}
+        {!logoColors && hasLogo && (
+          <button className="pal-card" disabled title="The logo is black, white or grey, so it has no brand colours to use">
+            <Stripes bg={tp.bg0} a="#9ca3af" b="#4b5563" />
+            <span className="pal-name">Logo colours (mono logo)</span>
+          </button>
+        )}
       </div>
       <div className="pal-group">Dark</div>
       <div className="pal-grid">{dark.map((id) => card(id, PALETTES[id].name, PALETTES[id]))}</div>

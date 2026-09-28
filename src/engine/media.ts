@@ -237,7 +237,7 @@ function hslToHex(h: number, s: number, l: number) {
  * to glow on a dark background.
  */
 export async function extractBrandColors(srcs: string[], themeColor?: string | null) {
-  const buckets = new Map<number, { w: number; s: number; l: number; h: number }>();
+  const buckets: Buckets = new Map();
   const add = (h: number, s: number, l: number, weight: number) => {
     if (s < 0.3 || l < 0.18 || l > 0.85) return;
     const key = Math.round(h / 20) % 18;
@@ -273,15 +273,62 @@ export async function extractBrandColors(srcs: string[], themeColor?: string | n
       /* ignore undecodable images */
     }
   }
+  return colorsFrom(buckets);
+}
+
+type Buckets = Map<number, { w: number; s: number; l: number; h: number }>;
+
+/**
+ * Colours from the logo alone: its dominant brand hue and a second hue that's actually in the
+ * logo, or, for a single-colour logo, a harmonious analogous partner (colour theory: ±30° on the
+ * wheel reads as one family). Returns null for a black / white / grey logo.
+ */
+export async function extractLogoColors(src: string | undefined) {
+  if (!src) return null;
+  await loadImage(src);
+  const img = images.get(src);
+  if (!img?.naturalWidth) return null;
+  const buckets: Buckets = new Map();
+  try {
+    const n = 64;
+    const c = document.createElement("canvas");
+    c.width = c.height = n;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0, n, n);
+    const d = g.getImageData(0, 0, n, n).data;
+    for (let p = 0; p < d.length; p += 4) {
+      if (d[p + 3] < 128) continue;
+      const [h, sat, l] = rgbToHsl(d[p], d[p + 1], d[p + 2]);
+      if (sat < 0.25 || l < 0.12 || l > 0.9) continue;
+      const key = Math.round(h / 20) % 18;
+      const bk = buckets.get(key) ?? { w: 0, s: 0, l: 0, h: 0 };
+      const wt = 0.5 + sat;
+      bk.w += wt;
+      bk.s += sat * wt;
+      bk.l += l * wt;
+      bk.h += h * wt;
+      buckets.set(key, bk);
+    }
+  } catch {
+    return null;
+  }
+  // A few stray coloured pixels (anti-aliasing) don't make a colour logo.
+  const total = [...buckets.values()].reduce((a, b) => a + b.w, 0);
+  if (total < 40) return null;
+  return colorsFrom(buckets, 30);
+}
+
+/** Two stage-ready colours from hue buckets: the strongest hue and a distinct second one. */
+function colorsFrom(buckets: Buckets, analogous = 45) {
   const ranked = [...buckets.values()].sort((a, b) => b.w - a.w);
   if (!ranked.length) return null;
   const top = ranked[0];
   const h1 = top.h / top.w;
   const second = ranked.find((b) => {
     const dh = Math.abs(b.h / b.w - h1);
-    return Math.min(dh, 360 - dh) > 35;
+    return Math.min(dh, 360 - dh) > 35 && b.w > top.w * 0.08;
   });
-  const h2 = second ? second.h / second.w : (h1 + 45) % 360;
+  const h2 = second ? second.h / second.w : (h1 + analogous) % 360;
   // Normalise for a dark stage: saturated and bright enough to glow.
   const s1 = Math.max(0.7, top.s / top.w);
   return {

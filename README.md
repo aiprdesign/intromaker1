@@ -37,7 +37,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - **Premium**: Cinematic Keynote, Editorial Serif, Luxe Noir.
 
   Each style has its own palette, typeface, GPU background, card style (glass, frosted, flat, brutalist or clay), text motion (blur, mask, pop, glow or typewriter), optional 3D stage and HUD or frame overlay, transitions, music and pacing. Switching restyles the film instantly.
-- **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 20 dark and light palettes. A palette you pick survives template switches.
+- **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 20 dark and light palettes. A palette you pick survives template switches. After a website import, two buttons sit side by side on the site card: *Auto brand colours* (read from the whole page, the default) and *Logo colours* (read from the header logo alone; a one-colour logo gets a close analogous partner hue). A black-and-white logo has no colours to offer, so that option is greyed out.
 - **Edited like a real film**: whip pans, dolly zoom-throughs, pushes, dissolves and light leaks show the outgoing and incoming shots at the same time, and every cut lands on the beat.
 - **Real UI, animated piece by piece — not flat screenshots**:
   - When a site is imported, the real browser also cuts out the page's UI components (product shots, app panels, KPI cards, charts, feature cards, buttons) with their exact positions. On other screenshots, image segmentation finds the blocks instead.

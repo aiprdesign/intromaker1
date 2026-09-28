@@ -19,7 +19,7 @@ import { writeVoiceover } from "@/engine/script";
 import { DEFAULT_VOICE, speakable, wordBudget } from "@/engine/voice";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
-import { assetUrl, extractBrandColors } from "@/engine/media";
+import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
 import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { SKILL_MAP, SKILLS } from "@/engine/skills";
 import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
@@ -107,17 +107,23 @@ export default function Studio() {
   const [siteUrl, setSiteUrl] = useState("");
   const [site, setSite] = useState<SiteData | null>(null);
   const [brandColors, setBrandColors] = useState<Brand["colors"]>(undefined);
-  const [useBrandColors, setUseBrandColors] = useState(true);
-  const colourChoice: ColourChoice = palette !== "auto" ? palette : useBrandColors && brandColors ? "brand" : "template";
+  const [logoColors, setLogoColors] = useState<Brand["colors"]>(undefined);
+  /** Which brand colours drive the film: detected across the site (auto), the logo's, or none. */
+  const [brandMode, setBrandMode] = useState<"site" | "logo" | "off">("site");
+  const activeColors = brandMode === "logo" ? logoColors : brandMode === "site" ? brandColors : undefined;
+  const colourChoice: ColourChoice =
+    palette !== "auto" ? palette : brandMode === "logo" && logoColors ? "logo" : brandMode === "site" && brandColors ? "brand" : "template";
   /** Apply a colour choice to the current film instantly (and to future generations). */
   const chooseColours = (c: ColourChoice) => {
-    const brandOn = c === "brand";
-    setUseBrandColors(brandOn);
-    setPalette(c === "template" || c === "brand" ? "auto" : c);
+    const mode = c === "logo" ? "logo" : c === "brand" ? "site" : "off";
+    const colors = mode === "logo" ? logoColors : mode === "site" ? brandColors : undefined;
+    const keepTemplate = c === "template" || c === "brand" || c === "logo";
+    setBrandMode(mode);
+    setPalette(keepTemplate ? "auto" : c);
     setPlan((p) => {
       const tplPalette = TEMPLATE_MAP[p.template ?? templateRef.current]?.palette;
-      const pal = c === "template" || c === "brand" ? (p.style === "saas" && tplPalette ? tplPalette : p.palette) : c;
-      return { ...p, palette: pal, brand: p.brand ? { ...p.brand, colors: brandOn ? brandColors : undefined } : p.brand };
+      const pal = keepTemplate ? (p.style === "saas" && tplPalette ? tplPalette : p.palette) : c;
+      return { ...p, palette: pal, brand: p.brand ? { ...p.brand, colors: colors } : p.brand };
     });
   };
   const [importing, setImporting] = useState(false);
@@ -149,7 +155,7 @@ export default function Studio() {
   /** One storyboard from the director (server AI or built-in; falls back to in-browser). */
   const direct = async (opts: GenOpts): Promise<Take> => {
     const s = opts.site !== undefined ? opts.site : site;
-    const colors = opts.colors !== undefined ? opts.colors : useBrandColors ? brandColors : undefined;
+    const colors = opts.colors !== undefined ? opts.colors : activeColors;
     const p = (opts.prompt ?? prompt).trim() || (s ? "" : EXAMPLE_PROMPTS[0]);
     const a = opts.aspect ?? aspect;
     const pal = opts.palette ?? palette;
@@ -252,12 +258,16 @@ export default function Studio() {
       clearInterval(timer);
       setImportStage("Detecting brand colours…");
       const colors = (await extractBrandColors(colorSources, s.themeColor)) ?? undefined;
+      const fromLogo = (s.logo ? await extractLogoColors(assetUrl(s.logo)) : null) ?? undefined;
       setBrandColors(colors);
+      setLogoColors(fromLogo);
       // A full story arc needs room: websites default to the long cut.
       const len = length === "standard" ? "long" : length;
       setLength(len);
       setImportStage(`Directing your ${s.name} film…`);
-      await generate({ site: s, colors: useBrandColors ? colors : undefined, length: len });
+      const chosen = brandMode === "logo" ? fromLogo ?? colors : brandMode === "site" ? colors : undefined;
+      if (brandMode === "logo" && !fromLogo) setBrandMode("site");
+      await generate({ site: s, colors: chosen, length: len });
     } catch (e) {
       clearInterval(timer);
       setImportError((e as Error).message);
@@ -448,12 +458,33 @@ export default function Studio() {
               {!site.shots?.full && (
                 <p className="hint">Tip: install Google Chrome or Microsoft Edge to capture live screenshots of the site.</p>
               )}
-              {brandColors && (
-                <button className={`brand-colors ${colourChoice === "brand" ? "on" : ""}`} onClick={() => chooseColours(colourChoice === "brand" ? "template" : "brand")}>
-                  <span className="swatch lg" style={{ background: brandColors.primary }} />
-                  <span className="swatch lg" style={{ background: brandColors.secondary }} />
-                  {colourChoice === "brand" ? "Using brand colours ✓" : "Use brand colours"}
-                </button>
+              {(brandColors || logoColors) && (
+                <div className="brand-color-row">
+                  {brandColors && (
+                    <button
+                      className={`brand-colors ${colourChoice === "brand" ? "on" : ""}`}
+                      onClick={() => chooseColours(colourChoice === "brand" ? "template" : "brand")}
+                      title="Detected automatically from the website: its theme colour, logo and images"
+                    >
+                      <span className="swatch lg" style={{ background: brandColors.primary }} />
+                      <span className="swatch lg" style={{ background: brandColors.secondary }} />
+                      {colourChoice === "brand" ? "Auto brand colours ✓" : "Auto brand colours"}
+                    </button>
+                  )}
+                  {logoColors ? (
+                    <button
+                      className={`brand-colors ${colourChoice === "logo" ? "on" : ""}`}
+                      onClick={() => chooseColours(colourChoice === "logo" ? "template" : "logo")}
+                      title="Colours taken from the logo alone"
+                    >
+                      <span className="swatch lg" style={{ background: logoColors.primary }} />
+                      <span className="swatch lg" style={{ background: logoColors.secondary }} />
+                      {colourChoice === "logo" ? "Logo colours ✓" : "Logo colours"}
+                    </button>
+                  ) : (
+                    site.logo && <span className="hint">Logo is black &amp; white: no logo colours.</span>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -542,7 +573,7 @@ export default function Studio() {
           </div>
 
           <label className="field-label">
-            Colours <span className="tpl-desc">{colourChoice === "template" ? "Template" : colourChoice === "brand" ? "Brand" : PALETTES[colourChoice].name}</span>
+            Colours <span className="tpl-desc">{colourChoice === "template" ? "Template" : colourChoice === "brand" ? "Brand (auto)" : colourChoice === "logo" ? "Logo" : PALETTES[colourChoice].name}</span>
           </label>
           <div className="seg-control">
             {(
@@ -567,6 +598,8 @@ export default function Studio() {
             templatePalette={(style !== "trailer" && TEMPLATE_MAP[template]?.palette) || plan.palette}
             templateName={style !== "trailer" ? TEMPLATE_MAP[template]?.name : undefined}
             brandColors={brandColors}
+            logoColors={logoColors}
+            hasLogo={!!site?.logo}
           />
 
           <div className="gen-row">

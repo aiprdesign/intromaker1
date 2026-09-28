@@ -1548,3 +1548,19 @@ button.brand-colors.on {
 .vo-count.over {
   color: #ffb14d;
 }
+
+/* Auto brand colours and logo colours, side by side. */
+.brand-color-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+.brand-color-row .brand-colors {
+  margin-top: 0;
+}
+.pal-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
