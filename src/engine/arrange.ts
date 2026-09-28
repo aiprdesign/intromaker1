@@ -36,6 +36,18 @@ type PlanLike = Pick<VideoPlan, "bpm"> & { scenes: Pick<Scene, "duration" | "rol
 
 const BREAK_ROLES = new Set(["promise", "quote", "how"]);
 
+/**
+ * When the brand reveal's big hit lands: after a one-beat charge-up (logo-reveal and the other
+ * reveal skills use the same moment). The music drops here, not on the cut.
+ */
+export const revealHit = (duration: number, beat: number) => Math.min(duration * 0.3, beat);
+
+/** When the cursor clicks the CTA button: on a beat, so the final chord lands with the click. */
+export function ctaClickAt(duration: number, beat: number) {
+  const natural = Math.min(1.5, duration * 0.4) + 0.4;
+  return Math.min(duration - beat, Math.max(beat * 2, Math.round(natural / beat) * beat));
+}
+
 export function arrange(plan: PlanLike): Arrangement {
   const beat = 60 / (plan.bpm || 120);
   const bar = beat * 4;
@@ -47,7 +59,10 @@ export function arrange(plan: PlanLike): Arrangement {
   }
   const total = acc;
   const n = plan.scenes.length;
-  const ending = Math.max(0, total - beat * 2);
+  // The groove stops and the last chord rings out when the CTA button is clicked.
+  const last = plan.scenes[n - 1];
+  const ending =
+    n > 1 && last?.role === "cta" && last.duration > beat * 3 ? starts[n - 1] + ctaClickAt(last.duration, beat) : Math.max(0, total - beat * 2);
   // One breakdown, on the calm beat nearest the middle of a film long enough to need one.
   let breakAt = -1;
   if (total >= 20 && n >= 5) {
@@ -67,7 +82,13 @@ export function arrange(plan: PlanLike): Arrangement {
   });
   const drops: number[] = [];
   const builds: [number, number][] = [];
-  const dropAt = n > 2 ? starts[1] : 0;
+  const reveal = n > 2 && plan.scenes[1].role === "reveal";
+  const dropAt = n > 2 ? starts[1] + (reveal ? revealHit(plan.scenes[1].duration, beat) : 0) : 0;
+  if (n > 2 && dropAt > starts[1]) {
+    // The intro (and its build) rides through the reveal's charge-up into the hit.
+    sections[0].end = dropAt;
+    sections[1].start = dropAt;
+  }
   if (dropAt > beat * 1.5) {
     drops.push(dropAt);
     builds.push([Math.max(0, dropAt - Math.min(bar, dropAt * 0.55)), dropAt]);

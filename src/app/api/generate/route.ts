@@ -112,7 +112,9 @@ function siteAssets(site: SiteData): { media: Media; label: string }[] {
   const sh = site.shots ?? { hero: null, full: null, sections: [] };
   return [
     ...(sh.full ? [{ media: { src: sh.full, kind: "image" as const }, label: "FULL-PAGE screenshot of the website (use with site-scroll)" }] : []),
-    ...(sh.hero ? [{ media: { src: sh.hero, kind: "image" as const }, label: "hero screenshot of the website (above the fold)" }] : []),
+    ...(sh.hero
+      ? [{ media: { src: sh.hero, kind: "image" as const }, label: `hero screenshot of the website (above the fold)${(sh.parts?.length ?? 0) >= 3 ? `; its ${sh.parts!.length} UI components were captured — use with ui-assemble` : " (use with ui-assemble)"}` }]
+      : []),
     ...sh.sections.map((src, i) => ({ media: { src, kind: "image" as const }, label: `screenshot of page section ${i + 1}` })),
     ...brand.images.map((src, i) => ({ media: { src, kind: "image" as const }, label: `image from the page${i === 0 ? " (social card / hero)" : ""}: ${site.images[i]}` })),
     ...brand.videos.map((src, i) => ({ media: { src, kind: "video" as const }, label: `product video: ${site.videos[i]}` })),
@@ -143,13 +145,13 @@ const SITE_RULES = `
 This storyboard is a product intro for the website below, built from its own brand assets. Use the SAAS style unless told otherwise.
 - Use the site's real name, claims, features and stats as copy. Never invent numbers, quotes or customers.
 - If a logo is available, use logo-reveal for the brand reveal (headline = brand name).
-- Show the real product: site-scroll, ui-tour and ui-cards take "media" = the ASSETS index of the best screenshot/video for them.
+- Show the real product: ui-assemble, site-scroll, ui-tour and ui-cards take "media" = the ASSETS index of the best screenshot/video for them. Prefer ui-assemble over a flat screenshot; use ui-tour for real product images/video, not page-section screenshots.
 - TRAILER style only: product-showcase with the hero image/video, photo-montage feature beats over other images, screen-wall once with 3+ images, logo-reveal again as the outro.
 - For skills without media set "media" to -1. End with a cta scene whose subtext is the site's real call-to-action label.
 - testimonial: use a quote from TESTIMONIALS verbatim (text = quote, subtext = "Name · Role"). logo-marquee only if CUSTOMER LOGOS > 0.
 - Tell ONE coherent story with a clear arc, each scene setting up the next, with an "eyebrow" chapter label:
   1 Hook ("The old way": pain-strike with the real pains → "There's a *better* way", or blur-reveal with the promise)
-  2 Reveal (logo-reveal, subtext = the promise) 3 Meet (site-scroll on the FULL-PAGE screenshot, eyebrow "Meet <Name>")
+  2 Reveal (logo-reveal, subtext = the promise) 3 Meet (ui-assemble on the HERO screenshot: the product rebuilt from its real UI components; site-scroll on the FULL-PAGE screenshot only when there is no hero; eyebrow "Meet <Name>")
   4 How it works (steps with the real steps) 5 Features (ui-tour on the best product image/video with 2 callouts; bento)
   5b Product in action: one interaction moment (command-k / ai-prompt / click-flow / notify-stack) that suits the product
   6 Proof ("Loved by teams" testimonial, "Customers" logo-marquee, "Results" ui-cards or chart-grow with a real stat) 7 Integrations 8 CTA.

@@ -280,6 +280,25 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
     }
   }
 
+  // The stage breathes with the score: a soft light swell on each kick, a bloom on each drop.
+  if (sc.music) {
+    const m = sc.music;
+    const kick = Number.isFinite(m.kick) ? Math.exp(-m.kick * 9) * 0.05 * m.energy : 0;
+    const drop = m.drop < 1.2 ? Math.exp(-m.drop * 3.5) * 0.16 : 0;
+    const k = kick + drop;
+    if (k > 0.004) {
+      ctx.save();
+      ctx.globalCompositeOperation = glowOp;
+      const g = ctx.createRadialGradient(w / 2, h * 0.45, 0, w / 2, h * 0.45, Math.max(w, h) * 0.65);
+      g.addColorStop(0, rgba(light ? palette.primary : palette.text, k * (light ? 0.5 : 1)));
+      g.addColorStop(0.5, rgba(palette.primary, k * 0.5));
+      g.addColorStop(1, rgba(palette.primary, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
+  }
+
   // Spotlight cone from above.
   if (light || backdrop === "plain" || backdrop === "scanlines") return;
   ctx.save();

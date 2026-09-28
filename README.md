@@ -5,11 +5,18 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, logo, screenshots, product videos and brand colours, then storyboards a launch film around them. The film follows a hook, logo, a product tour of the real UI, a features bento, proof (real testimonials and customer logos only), integrations, and a CTA with the site's own button label.
 - **SaaS launch-film mode**: modelled on today's best product videos. It uses sentence-case blur reveals with gradient accent words, rotating word swaps, a cursor-driven UI zoom tour with callouts, bento feature grids with live micro-animations, floating glass UI widgets, pain-to-solution strikes, an integration orbit, real testimonials, a customer-logo marquee and a CTA button that the cursor clicks. It has a grid, spotlight and beam backdrop, spring physics and glass cards with animated border beams, and is scored with an upbeat track plus UI sound effects synced to every click, pop and whoosh.
 - **Two styles**: *SaaS launch* (auto-selected for websites and product prompts) or *Epic trailer*.
-- **33 motion skills**: Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
+- **40 motion skills**: UI Assemble, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
 - **AI Director**: Claude storyboards the prompt into a hook, a title reveal, feature beats and an outro. It picks the skills, palette, typeface and tempo. When no API key is set, a built-in rule-based director does the same job offline.
 - **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remix, and share a link.
-- **Generated trailer score**: a WebAudio synth follows the storyboard, playing a minor chord progression with bass, sidechain-pumped pads, a half-time hook that builds into the full groove, trailer braams on the title and outro, risers and reverse swells into each cut, and a reverb tail at the end.
-- **Beat-synced direction**: scene lengths snap to whole beats, so every cut lands on the kick. A virtual camera drifts handheld and punches in on each beat.
+- **A produced soundtrack, arranged to the film**: SaaS films get a modern cue synthesised in the browser, with no stock music and no licences. It's edited like a record:
+  - filtered keys under the hook;
+  - a snare-roll, riser and filter-sweep build that **drops exactly as the logo hits**;
+  - a groove through the product beats (sidechain-pumped keys and bass, swung and open hats, ping-pong delay);
+  - one breakdown mid-film with a re-drop;
+  - a final chord that **lands on the CTA button click** and rings out under the end card.
+
+  There are five production styles, one per template family: deep house (Rhodes chords, off-beat bass), lo-fi chill keys, future bass (chopped supersaw chords), tech-house stabs and synthwave. The mix goes through a saturated drum bus, a glue compressor, a limiter and a clip-free ceiling. Trailer films keep the epic trailer score.
+- **Beat-synced direction**: scene lengths snap to whole beats, so every cut lands on the kick. The picture and the score share one arrangement: the camera punches on the kicks the music actually plays, holds still in the breakdown and hits harder on each drop. Component entrances land on the eighth-note grid.
 - **Cinematic finishing**: two-scale highlight bloom, a colour grade, light leaks, lens bokeh, extruded 3D type, vignette and film grain.
 - **Export presets**: YouTube 1080p60, Reels/TikTok/Shorts 9:16, LinkedIn/Instagram 1:1 and web 720p. The same storyboard re-lays itself out for each format, so nothing is cropped. There's also a one-click PNG thumbnail of the end card. Output is MP4 where the browser supports it (WebM otherwise) with the soundtrack mixed in, rendered entirely in the browser.
 
@@ -25,7 +32,17 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   Each style has its own palette, typeface, GPU background, card style (glass, frosted, flat, brutalist or clay), text motion (blur, mask, pop, glow or typewriter), optional 3D stage and HUD or frame overlay, transitions, music and pacing. Switching restyles the film instantly.
 - **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 20 dark and light palettes. A palette you pick survives template switches.
 - **Edited like a real film**: whip pans, dolly zoom-throughs, pushes, dissolves and light leaks show the outgoing and incoming shots at the same time, and every cut lands on the beat.
-- **A product tour that clicks real UI**: the screenshot (or first video frame) is analysed for its busiest interface regions, and the camera zooms and the cursor clicks there.
+- **Real UI, animated piece by piece — not flat screenshots**:
+  - When a site is imported, the real browser also cuts out the page's UI components (product shots, app panels, KPI cards, charts, feature cards, buttons) with their exact positions. On other screenshots, image segmentation finds the blocks instead.
+  - **UI Assemble** rebuilds the product from those pieces. They fly in one at a time with motion trails, land in skeleton placeholders with a glow on the beat, the finished page resolves with a light sweep, and the hero component lifts off the page.
+  - Bento tiles show the product's real UI instead of placeholder graphics, and the floating-UI scene uses the real app panel.
+- **A product tour that clicks real UI**: the screenshot (or first video frame) is analysed for its busiest interface regions. The camera zooms there, the cursor clicks, the focus ring hugs the actual component under the cursor, and the rest of the screen dims around it.
+- **Signature interaction moments**, as the best launch films stage them, chosen to suit the product:
+  - a ⌘K command palette (keycaps, live filtering, a result card);
+  - an AI prompt that streams its answer, in the product's own words;
+  - a one-click flow (micro-zoom, then a task cascade);
+  - an iOS-style notification stack;
+  - a growth chart for one real metric.
 - **Brand polish**: an anamorphic logo reveal, a corner brand bug through the body of the film, and an end card that holds on the logo, closing line, button and URL.
 - **Copy that reads like a designer wrote it**: the site's headlines are ranked for on-screen quality, the emphasis word is chosen by meaning ("*300+ tools*", "*whole team*"), bento cards carry the site's own one-line feature descriptions, and CTAs vary, including social proof ("Join *12,000+ teams*").
 - **Takes**: "3 more takes" directs alternative cuts (product-first, proof-first, a fresh story) in parallel. They appear as live previews, and you click one to use it.
@@ -36,10 +53,12 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **60-30-10 colour rule** (default for SaaS films): 60% dominant background, 30% supporting colour for cards, panels and gradient fields, and 10% accent for highlight words, buttons, cursor and progress, in one hue. Shader gradients weight their colour spots in the same proportion, and the accent is the palette's most vivid colour. Switch to *Vibrant* in the studio for full-strength colour.
 - **High-end GPU backgrounds**: animated mesh gradients, grainy gradients, silk flow, smoke rings, a neural glow and light rays, rendered frame-exactly on the GPU with the open-source [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0). They're tinted from the palette and kept deep enough for text to stay readable. Every style has a signature background, and the studio's *Background* picker can put any gradient behind any style. Preview and export match exactly.
 - **Every format**: all SaaS scenes are laid out for 16:9, 9:16 and 1:1.
+- **Colour theory with guard rails**: on top of 60-30-10, highlight words, buttons and beams are kept at ≥3:1 contrast with the background and body text at ≥7:1 (WCAG). A dark navy brand colour on a dark style is lifted until it reads.
+- **Honest copy**: KPI figures inside a product mockup are never taken as company stats, quotes drop their inline attribution, and section headings aren't mistaken for features.
 
 ## Quality: Kaizen scorecard
 
-`npm run kaizen` generates 672 storyboards and scores each out of 100. The corpus covers 8 websites (sales, developer tool, AI, fintech, security, e-commerce, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc, length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+`npm run kaizen` generates 744 storyboards and scores each out of 100. The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
 
 ## Run it
 
@@ -64,12 +83,14 @@ npm run dev                  # http://localhost:3000
 ```
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
-  skills/         the 33 skills (saas.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  skills/         the 40 skills (saas.ts, interactions.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
   saasfx.ts       SaaS design toolkit: springs, grid/beam backdrop, glass cards, border beams, cursor, icons, blur-in type
   media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass
   planner.ts      built-in director + plan sanitising + share-link encoding
-  audio.ts        procedural trailer score arranged to the storyboard (WebAudio)
+  audio.ts        the synthesiser: produced SaaS cue + trailer score + UI sound design (WebAudio)
+  music.ts        production sheets per music style (harmony, instruments, groove, mix)
+  arrange.ts      the film's musical arrangement (intro, builds, drops, breakdown, ending) shared by score and camera
   shaderbg.ts     WebGL2 runner for Paper Shaders gradients (frame-exact, shared context)
   templates.ts    style templates (look, motion, music, pacing, role → skill)
   export.ts       WebCodecs offline export, export presets, PNG thumbnail
@@ -78,6 +99,7 @@ src/lib/providers.ts            provider registry (endpoint, auth, key prefix, s
 src/lib/ai.ts                   AI director over 3 protocols (Anthropic SDK, OpenAI-compatible, Gemini) + model listing
 src/lib/localai.ts              browser-side local AI (scan, test, director) for online deployments
 src/lib/review.ts               storyboard checklist, self-review brief and repair
+src/lib/capture.ts              live browser capture: hero/full/section screenshots + the page's UI components cut out one by one
 src/lib/scrape.ts               website extraction (name, copy, features, stats, CTA, testimonials, customer logos, logo, images, videos, theme colour)
 src/lib/netguard.ts             SSRF guard: only public http(s) hosts, re-checked on every redirect
 ```

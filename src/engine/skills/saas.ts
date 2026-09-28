@@ -26,6 +26,7 @@ import {
   type IconKind,
 } from "../saasfx";
 import { autoAccent, displayFont, subFont } from "../text";
+import { ctaClickAt } from "../arrange";
 import { CONCEPT_MAP } from "../concepts";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { parseStat } from "./worlds";
@@ -857,7 +858,11 @@ function uiCards(sc: SkillContext) {
   ctx.roundRect(-sw / 2, -sh / 2, sw, sh, 16 * u);
   ctx.clip();
   const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
+  // No product image: the app's own panel captured from the live page, before any mock UI.
+  const panel = media ? null : [...(brand?.parts ?? [])].filter((p) => p.kind === "panel" || p.kind === "media").sort((a, b) => b.w * b.h - a.w * a.h)[0];
+  const panelImg = panel ? getImage(panel.src) : null;
   if (media) drawCover(ctx, media, -sw / 2, -sh / 2, sw, sh, 1.02, 0.5, 0.25);
+  else if (panelImg?.naturalWidth) drawCover(ctx, panelImg, -sw / 2, -sh / 2, sw, sh, 1, 0.5, 0);
   else mockUi(sc, -sw / 2, -sh / 2, sw, sh);
   ctx.restore();
   borderBeam(sc, -sw / 2, -sh / 2, sw, sh, t * 0.35, { r: 16 * u, alpha: 0.8 });
@@ -1239,16 +1244,17 @@ function marquee(sc: SkillContext) {
 
 /* ───────────────────────── CTA Lock-up ───────────────────────── */
 
-function ctaTiming(d: number) {
-  const hover = Math.min(1.5, d * 0.4);
-  const click = hover + 0.4;
-  return { button: 0.75, hover, click };
+function ctaTiming(d: number, beat: number) {
+  // The click lands on a beat, with the score's final chord (see arrange.ts).
+  const click = ctaClickAt(d, beat);
+  const hover = click - 0.4;
+  return { button: Math.min(0.75, hover - 0.3), hover, click };
 }
 
 function ctaLockup(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 3 });
-  const T = ctaTiming(d);
+  const T = ctaTiming(d, sc.beat);
   const S = h > w ? 1.3 : 1; // vertical frames: bigger lock-up
   // The end card holds (its last frame doubles as the thumbnail) with a slow settle push-in.
   const ex = 0;
@@ -1268,6 +1274,32 @@ function ctaLockup(sc: SkillContext) {
     ctx.shadowColor = rgba(palette.primary, 0.8);
     ctx.shadowBlur = 40 * u;
     drawLogoMark(sc, brand?.logo, 0, 0, Math.min(w, h) * 0.11 * S);
+    ctx.restore();
+  } else if (brand?.name) {
+    // No logo image (CSS/SVG logos): a generated wordmark — gradient mark + the name.
+    const size = Math.min(w, h) * 0.05 * S;
+    ctx.save();
+    ctx.globalAlpha = clamp(lk) * (1 - ex);
+    ctx.font = `800 ${Math.round(size * 1.05)}px Inter, sans-serif`;
+    const tw = ctx.measureText(brand.name).width;
+    const gw = size + size * 0.4 + tw;
+    ctx.translate(w / 2, h * 0.25);
+    ctx.scale(0.85 + 0.15 * lk, 0.85 + 0.15 * lk);
+    const mx = -gw / 2;
+    ctx.beginPath();
+    ctx.roundRect(mx, -size / 2, size, size, size * 0.3);
+    const g = ctx.createLinearGradient(mx, -size / 2, mx + size, size / 2);
+    g.addColorStop(0, palette.primary);
+    g.addColorStop(1, palette.secondary);
+    ctx.fillStyle = g;
+    ctx.shadowColor = rgba(palette.primary, 0.7);
+    ctx.shadowBlur = 30 * u;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = palette.text;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(brand.name, mx + size * 1.4, size * 0.04);
     ctx.restore();
   }
   const layout = sentence(sc, { text: accented(scene.text), cy: h * (hasLogo ? 0.44 : 0.4), sizeFrac: 0.1, widthFrac: 0.8, maxLines: 2 });
@@ -1686,8 +1718,8 @@ export const saasSkills: Skill[] = [
     bestFor: "The final scene. Headline = closing line; subtext = button label ('Start free trial').",
     sample: { text: "Start building *today*", subtext: "Start free trial" },
     render: ctaLockup,
-    sfx: (scene) => {
-      const T = ctaTiming(scene.duration);
+    sfx: (scene, beat) => {
+      const T = ctaTiming(scene.duration, beat);
       return [at(T.button, "pop"), at(T.click, "click"), at(T.click + 0.05, "shimmer")];
     },
   },

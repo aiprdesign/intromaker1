@@ -1,3 +1,4 @@
+import { revealHit } from "../arrange";
 import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
 import { saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
@@ -65,7 +66,8 @@ function logoReveal(sc: SkillContext) {
   const cx = w / 2;
   const short = Math.min(w, h);
   const cy = logo ? h * 0.4 : h * 0.47;
-  const hit = Math.min(d * 0.3, sc.beat);
+  // The mark hits exactly when the score drops (see arrange.ts).
+  const hit = revealHit(d, sc.beat);
   const k = ease.outBack(range(t, hit - 0.25, hit + 0.45), 1.6);
   const ex = ease.inCubic(exitT(sc, 0.45));
 
