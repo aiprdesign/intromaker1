@@ -15,13 +15,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "IntroMaker — Prompt to epic motion graphics",
   description:
-    "Type a prompt, get a cinematic motion-graphics video. 33 pro animation skills, SaaS launch films, website import, AI director, generated soundtrack and one-click export.",
+    "Type a prompt, get a cinematic motion-graphics video. 40 pro animation skills, SaaS launch films, website import, AI director, produced soundtrack, voice-over and one-click export.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    // Browser extensions (Grammarly, ColorZilla, Dark Reader, password managers…) add attributes
+    // to <html>/<body> before React loads; ignore those two tags only. Real mismatches anywhere
+    // inside the app are still reported.
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
