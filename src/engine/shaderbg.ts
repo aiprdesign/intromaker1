@@ -379,7 +379,8 @@ export function renderShaderBg(kind: ShaderBg, palette: Palette, w: number, h: n
     void ensureShaderAssets();
     return null;
   }
-  const scale = Math.min(1, 900 / Math.max(w, h));
+  // Smooth fields upscale invisibly; grainy / fine-line shaders keep more resolution.
+  const scale = Math.min(1, (kind === "grain" || kind === "neuro" ? 900 : 640) / Math.max(w, h));
   const rw = Math.max(2, Math.round(w * scale));
   const rh = Math.max(2, Math.round(h * scale));
   if (glCanvas.width !== rw || glCanvas.height !== rh) {

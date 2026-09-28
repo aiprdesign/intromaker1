@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { ensureFonts } from "@/engine/fonts";
+import { mediaState } from "@/engine/media";
 import { aspectSize, renderFrame, renderScene, totalDuration } from "@/engine/renderer";
 import type { Scene, VideoPlan } from "@/engine/types";
 import { useVisible } from "./useVisible";
@@ -49,7 +50,8 @@ export default function LoopCanvas(props: Props) {
       t0 = performance.now();
       const tick = (now: number) => {
         raf = requestAnimationFrame(tick);
-        if (now - last < 1000 / fps - 2) return;
+        // Previews pause while a video exports so every GPU/CPU cycle goes to the export.
+        if (mediaState.exporting || now - last < 1000 / fps - 2) return;
         last = now;
         const p = propsRef.current;
         const time = (now - t0) / 1000;
