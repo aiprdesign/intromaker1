@@ -7,7 +7,7 @@ import { Logo } from "@/components/Nav";
 import ArcStrip from "@/components/ArcStrip";
 import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
-import BackgroundPicker, { applyBackground, type BgChoice } from "@/components/BackgroundPicker";
+import BackgroundPicker, { applyBackground, type BgChoice, BG_OPTIONS } from "@/components/BackgroundPicker";
 import { runBrowserDirector } from "@/lib/localai";
 import { isLocalProvider } from "@/lib/providers";
 import TemplatePicker from "@/components/TemplatePicker";
@@ -60,6 +60,25 @@ export default function Studio() {
     setScheme(sc);
     schemeRef.current = sc;
     setPlan((p) => ({ ...p, scheme: sc }));
+  };
+  // Settings live in tabs, so the panel fits the screen; the last tab used is remembered.
+  type PanelTab = "create" | "style" | "colours" | "voice";
+  const [tab, setTab] = useState<PanelTab>("create");
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem("intromaker.tab");
+      if (t === "create" || t === "style" || t === "colours" || t === "voice") setTab(t);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseTab = (t: PanelTab) => {
+    setTab(t);
+    try {
+      localStorage.setItem("intromaker.tab", t);
+    } catch {
+      /* ignore */
+    }
   };
   // Claim-safe copy: generic wording with no superlatives, guarantees, speed claims or numbers.
   // On by default; the site's own claims (stats, quotes, customer logos) only when switched off.
@@ -427,7 +446,25 @@ export default function Studio() {
       {aiOpen && <AiSettings value={ai} onChange={setAi} onClose={() => setAiOpen(false)} serverClaude={!!aiAvailable} localViaServer={localViaServer} />}
       <div className="studio-body">
         <aside className="panel">
-          <h2>From a website</h2>
+          <nav className="panel-tabs" role="tablist" aria-label="Settings">
+            {(
+              [
+                ["create", "Create"],
+                ["style", "Style"],
+                ["colours", "Colours"],
+                ["voice", "Voice"],
+              ] as [PanelTab, string][]
+            ).map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "active" : ""} onClick={() => chooseTab(id)}>
+                {label}
+                {id === "voice" && voice.enabled && <span className="tab-dot" aria-label="on" />}
+              </button>
+            ))}
+          </nav>
+          <div className="panel-scroll">
+            {tab === "create" && (
+              <>
+          <label className="field-label first">From a website</label>
           <form
             className="url-row"
             onSubmit={(e) => {
@@ -488,15 +525,22 @@ export default function Studio() {
               )}
               <div className="site-stats">
                 <span className={site.shots?.full ? "live" : ""}>{site.shots?.full ? "● Live capture" : "Static import"}</span>
-                <span>{(site.shots?.sections.length ?? 0) + (site.shots?.full ? 2 : 0)} screenshots</span>
-                <span>{site.images.length} images</span>
-                <span>{site.videos.length} videos</span>
-                <span>{site.headlines.length} features</span>
-                <span>{site.stats.length} stats</span>
-                <span>{site.steps?.length ?? 0} steps</span>
-                <span>{site.testimonials.length} quotes</span>
-                <span>{site.clientLogos.length} customer logos</span>
-                {site.font && <span>Font: {site.font}</span>}
+                {[
+                  [(site.shots?.sections.length ?? 0) + (site.shots?.full ? 2 : 0), "shots"],
+                  [site.images.length, "images"],
+                  [site.videos.length, "videos"],
+                  [site.headlines.length, "features"],
+                  [site.steps?.length ?? 0, "steps"],
+                  [site.stats.length, "stats"],
+                  [site.testimonials.length, "quotes"],
+                  [site.clientLogos.length, "logos"],
+                ]
+                  .filter(([n]) => (n as number) > 0)
+                  .map(([n, label]) => (
+                    <span key={label as string}>
+                      {n} {label}
+                    </span>
+                  ))}
               </div>
               {!site.shots?.full && (
                 <p className="hint">Tip: install Google Chrome or Microsoft Edge to capture live screenshots of the site.</p>
@@ -532,24 +576,31 @@ export default function Studio() {
             </div>
           )}
 
-          <h2 className="mt">{site ? "Extra direction (optional)" : "Prompt"}</h2>
+          <label className="field-label">{site ? "Extra direction (optional)" : "Or describe it"}</label>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={site ? "e.g. focus on speed, end with 'Start free trial'" : "Describe your video: brand, vibe, claims, numbers…"}
-            rows={5}
+            placeholder={site ? "e.g. focus on the dashboard, end with 'Book a demo'" : "Describe your video: product, what it does, the vibe…"}
+            rows={site ? 2 : 3}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) generate();
             }}
           />
-          <div className="examples compact">
-            {EXAMPLE_PROMPTS.map((p) => (
-              <button key={p} className="chip" onClick={() => setPrompt(p)} title={p}>
-                {p.length > 38 ? `${p.slice(0, 36)}…` : p}
-              </button>
-            ))}
-          </div>
+          {!site && (
+            <details className="examples-fold">
+              <summary>Example prompts</summary>
+              <div className="examples compact">
+                {EXAMPLE_PROMPTS.map((p) => (
+                  <button key={p} className="chip" onClick={() => setPrompt(p)} title={p}>
+                    {p.length > 38 ? `${p.slice(0, 36)}…` : p}
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
 
+          <div className="field-pair">
+            <div>
           <label className="field-label">Format</label>
           <div className="seg-control">
             {(["16:9", "9:16", "1:1"] as Aspect[]).map((a) => (
@@ -561,11 +612,43 @@ export default function Studio() {
                   setGlobal({ aspect: a });
                 }}
               >
-                {a === "16:9" ? "Landscape" : a === "9:16" ? "Vertical" : "Square"}
+                {a === "16:9" ? "16:9" : a === "9:16" ? "9:16" : "1:1"}
               </button>
             ))}
           </div>
+            </div>
+            <div>
+          <label className="field-label">Length</label>
+          <div className="seg-control">
+            {(["short", "standard", "long"] as Length[]).map((l) => (
+              <button key={l} className={length === l ? "active" : ""} onClick={() => setLength(l)}>
+                {l === "short" ? "12s" : l === "standard" ? "20s" : "34s"}
+              </button>
+            ))}
+          </div>
+            </div>
+          </div>
+          <label className="field-label">
+            Wording <span className="tpl-desc">{safe ? "Claim-safe" : "Site's claims"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={safe ? "active" : ""} onClick={() => chooseSafe(true)}>
+              Claim-safe (generic)
+            </button>
+            <button className={!safe ? "active" : ""} onClick={() => chooseSafe(false)}>
+              Use site&apos;s claims
+            </button>
+          </div>
+          <p className="hint" title="Automated screening, not legal advice: review the copy before publishing.">
+            {safe
+              ? "No superlatives, guarantees, results, numbers, certifications, green claims or endorsements; health claims always removed. Not legal advice."
+              : "Adds the site's stats, quotes, certifications and logos: you must be able to back them up. Health claims still removed."}
+          </p>
 
+              </>
+            )}
+            {tab === "style" && (
+              <>
           <label className="field-label">Style</label>
           <div className="seg-control">
             {(
@@ -600,38 +683,35 @@ export default function Studio() {
               )}
               <TemplatePicker value={template} onChange={chooseTemplate} />
               <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
-              <label className="field-label">Background</label>
-              <BackgroundPicker value={bg} onChange={chooseBackground} palette={plan.style === "saas" ? plan.palette : TEMPLATE_MAP[template].palette} look={plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look} />
-              <p className="hint">GPU gradient stages rendered with the open-source Paper Shaders (Apache-2.0).</p>
+
             </>
           )}
 
-          <label className="field-label">Length</label>
-          <div className="seg-control">
-            {(["short", "standard", "long"] as Length[]).map((l) => (
-              <button key={l} className={length === l ? "active" : ""} onClick={() => setLength(l)}>
-                {l === "short" ? "~12s" : l === "standard" ? "~20s" : "~34s"}
-              </button>
-            ))}
-          </div>
-
           <label className="field-label">
-            Wording <span className="tpl-desc">{safe ? "Claim-safe" : "Site's claims"}</span>
+            Text glow <span className="tpl-desc">{glow ? "On" : "Off"}</span>
           </label>
           <div className="seg-control">
-            <button className={safe ? "active" : ""} onClick={() => chooseSafe(true)}>
-              Claim-safe (generic)
+            <button className={!glow ? "active" : ""} onClick={() => chooseGlow(false)}>
+              Crisp (no glow)
             </button>
-            <button className={!safe ? "active" : ""} onClick={() => chooseSafe(false)}>
-              Use site&apos;s claims
+            <button className={glow ? "active" : ""} onClick={() => chooseGlow(true)}>
+              Glow
             </button>
           </div>
-          <p className="hint">
-            {safe
-              ? "Generic, descriptive copy (FTC-minded): no superlatives, guarantees, results or numbers, no certifications, green claims, endorsements, testimonials or customer logos. Health and medical claims are always removed (FDA). Automated screening, not legal advice: review before publishing."
-              : "Also uses the site's own stats, quotes, certifications and customer logos: you must be able to substantiate them. Health and medical claims are still removed. Automated screening, not legal advice."}
-          </p>
-
+          <p className="hint">{glow ? "Soft halo around text and highlights." : "Sharp text, no halo or bloom."}</p>
+          {style !== "trailer" && (
+            <details className="fold">
+              <summary>
+                <span className="field-label inline">Background</span> <span className="tpl-desc">{BG_OPTIONS.find((o) => o.id === bg)?.name ?? "Template default"}</span>
+              </summary>
+              <BackgroundPicker value={bg} onChange={chooseBackground} palette={plan.style === "saas" ? plan.palette : TEMPLATE_MAP[template].palette} look={plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look} />
+              <p className="hint">GPU gradient stages rendered with the open-source Paper Shaders (Apache-2.0).</p>
+            </details>
+          )}
+              </>
+            )}
+            {tab === "colours" && (
+              <>
           <label className="field-label">
             Colours <span className="tpl-desc">{colourChoice === "template" ? "Template" : colourChoice === "brand" ? "Brand (auto)" : colourChoice === "logo" ? "Logo" : PALETTES[colourChoice].name}</span>
           </label>
@@ -649,21 +729,9 @@ export default function Studio() {
           </div>
           <p className="hint">
             {scheme === "60-30-10"
-              ? "Designer's 60-30-10 rule: 60% dominant background, 30% supporting colour for cards and gradients, 10% accent for highlights and buttons."
-              : "Every palette colour at full strength: louder, more colourful."}
+              ? "60% background, 30% cards and gradients, 10% accent for highlights."
+              : "Every palette colour at full strength."}
           </p>
-          <label className="field-label">
-            Text glow <span className="tpl-desc">{glow ? "On" : "Off"}</span>
-          </label>
-          <div className="seg-control">
-            <button className={!glow ? "active" : ""} onClick={() => chooseGlow(false)}>
-              Crisp (no glow)
-            </button>
-            <button className={glow ? "active" : ""} onClick={() => chooseGlow(true)}>
-              Glow
-            </button>
-          </div>
-          <p className="hint">{glow ? "Soft glow around text and highlights. Can look blurred on small or busy text." : "Sharp text with no halo, and no highlight bloom."}</p>
           <PaletteChooser
             value={colourChoice}
             onChange={chooseColours}
@@ -674,6 +742,21 @@ export default function Studio() {
             hasLogo={!!site?.logo}
           />
 
+              </>
+            )}
+            {tab === "voice" && (
+              <>
+          <VoicePanel
+            voice={voice}
+            onVoice={onVoice}
+            plan={plan}
+            onPlan={(p) => setPlan(p)}
+            onRewrite={() => setPlan((p) => writeVoiceover(p, { overwrite: true }))}
+          />
+              </>
+            )}
+          </div>
+          <div className="panel-foot">
           <div className="gen-row">
             <button className="btn btn-primary btn-lg grow" onClick={() => generate()} disabled={loading}>
               {loading ? "Directing…" : "Generate ✦"}
@@ -701,14 +784,7 @@ export default function Studio() {
           </p>
           {note && <p className="hint warn">{note}</p>}
 
-          <h2 className="mt">Voice-over</h2>
-          <VoicePanel
-            voice={voice}
-            onVoice={onVoice}
-            plan={plan}
-            onPlan={(p) => setPlan(p)}
-            onRewrite={() => setPlan((p) => writeVoiceover(p, { overwrite: true }))}
-          />
+          </div>
         </aside>
 
         <section className="main">

@@ -572,13 +572,122 @@ textarea {
   flex: 1;
   min-height: 0;
 }
+/* The settings panel fits the screen: tabs on top, its own scroll area, Generate pinned below. */
 .panel {
-  padding: 22px;
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  gap: 8px;
   background: rgba(255, 255, 255, 0.015);
+  position: sticky;
+  top: var(--bar-h, 65px);
+  height: calc(100vh - var(--bar-h, 65px));
+  min-height: 0;
+}
+.panel-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 12px 0;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.panel-tabs button {
+  flex: 1;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  padding: 9px 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  position: relative;
+  transition: color 0.15s, border-color 0.15s;
+}
+.panel-tabs button:hover {
+  color: var(--text);
+}
+.panel-tabs button.active {
+  color: var(--text);
+  border-bottom-color: var(--cyan);
+}
+.tab-dot {
+  position: absolute;
+  top: 8px;
+  margin-left: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+}
+.panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scrollbar-width: thin;
+}
+.panel-foot {
+  flex: none;
+  padding: 10px 18px 12px;
+  border-top: 1px solid var(--line);
+  background: rgba(8, 7, 16, 0.9);
+}
+.panel-foot .gen-row {
+  margin-top: 0;
+}
+.panel-foot .hint {
+  margin-top: 6px;
+  font-size: 11.5px;
+}
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.field-pair .seg-control button {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.field-label.first {
+  margin-top: 0;
+}
+.fold {
+  margin-top: 10px;
+}
+.fold summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 0;
+}
+.fold summary::before {
+  content: "▸";
+  color: var(--muted);
+  margin-right: 6px;
+  font-size: 11px;
+}
+.fold[open] summary::before {
+  content: "▾";
+}
+.field-label.inline {
+  margin-top: 0;
+}
+.examples-fold summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 4px 0;
+  list-style: none;
+}
+.examples-fold summary::before {
+  content: "▸ ";
+}
+.examples-fold[open] summary::before {
+  content: "▾ ";
 }
 .panel h2,
 .storyboard-head h2 {
@@ -589,12 +698,12 @@ textarea {
   font-weight: 600;
 }
 .field-label {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 .seg-control {
   display: flex;
@@ -900,6 +1009,18 @@ textarea {
   .panel {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    position: static;
+    height: auto;
+  }
+  .panel-scroll {
+    overflow: visible;
+  }
+  .studio-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .studio-bar .engine-badge {
+    display: none;
   }
   .nav-links {
     display: none;
@@ -991,7 +1112,7 @@ textarea {
 }
 .site-thumbs img {
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 8;
   object-fit: cover;
   border-radius: 6px;
   background: #000;
@@ -1117,15 +1238,15 @@ textarea {
 
 .template-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 .template-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 4px 4px 6px;
-  border-radius: 12px;
+  gap: 3px;
+  padding: 3px 3px 5px;
+  border-radius: 10px;
   border: 1.5px solid var(--line);
   background: var(--panel);
   text-align: left;
@@ -1147,9 +1268,12 @@ textarea {
   background: #000;
 }
 .template-name {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 0 4px;
+  padding: 0 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tpl-desc {
   color: var(--cyan);
@@ -1551,14 +1675,38 @@ button.brand-colors.on {
 
 /* Auto brand colours and logo colours, side by side. */
 .brand-color-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
   align-items: center;
   margin-top: 10px;
 }
 .brand-color-row .brand-colors {
   margin-top: 0;
+  font-size: 12px;
+  padding: 6px 8px;
+  gap: 6px;
+  white-space: nowrap;
+}
+.brand-color-row .hint {
+  grid-column: span 1;
+  margin: 0;
+  align-self: center;
+}
+.template-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.template-cats .chip {
+  font-size: 11.5px;
+  padding: 4px 9px;
+}
+.template-cats .chip.on {
+  color: var(--text);
+  border-color: var(--cyan);
+  background: rgba(0, 240, 255, 0.08);
 }
 .pal-card:disabled {
   opacity: 0.45;

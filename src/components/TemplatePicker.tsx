@@ -1,34 +1,33 @@
 "use client";
 
-import { TEMPLATE_CATEGORIES, TEMPLATES } from "@/engine/templates";
+import { useState } from "react";
+import { TEMPLATE_CATEGORIES, TEMPLATE_MAP, TEMPLATES, type TemplateCategory } from "@/engine/templates";
 import LoopCanvas from "./LoopCanvas";
 
-/** Gallery of SaaS style templates, grouped by category, each previewed live in its own look. */
+/**
+ * Gallery of SaaS style templates, one category at a time (chips on top) so it stays compact;
+ * each template previews live in its own look.
+ */
 export default function TemplatePicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [cat, setCat] = useState<TemplateCategory>((TEMPLATE_MAP[value]?.category as TemplateCategory) ?? "Modern");
+  const items = TEMPLATES.map((t, i) => ({ t, i })).filter(({ t }) => (t.category ?? "Modern") === cat);
   return (
     <div className="template-groups">
-      {TEMPLATE_CATEGORIES.map((cat) => {
-        const items = TEMPLATES.map((t, i) => ({ t, i })).filter(({ t }) => (t.category ?? "Modern") === cat);
-        if (!items.length) return null;
-        return (
-          <div key={cat}>
-            <div className="template-group">{cat}</div>
-            <div className="template-grid">
-              {items.map(({ t, i }) => (
-                <button key={t.id} className={`template-card ${value === t.id ? "active" : ""}`} onClick={() => onChange(t.id)} title={t.description}>
-                  <LoopCanvas
-                    scene={t.sample}
-                    plan={{ palette: t.palette, font: t.font, seed: 300 + i, style: "saas", look: t.look, bpm: t.bpm }}
-                    long={320}
-                    fps={15}
-                  />
-                  <span className="template-name">{t.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      <div className="template-cats" role="tablist" aria-label="Template category">
+        {TEMPLATE_CATEGORIES.map((c) => (
+          <button key={c} role="tab" aria-selected={c === cat} className={`chip ${c === cat ? "on" : ""}`} onClick={() => setCat(c)}>
+            {c}
+          </button>
+        ))}
+      </div>
+      <div className="template-grid">
+        {items.map(({ t, i }) => (
+          <button key={t.id} className={`template-card ${value === t.id ? "active" : ""}`} onClick={() => onChange(t.id)} title={t.description}>
+            <LoopCanvas scene={t.sample} plan={{ palette: t.palette, font: t.font, seed: 300 + i, style: "saas", look: t.look, bpm: t.bpm }} long={320} fps={15} />
+            <span className="template-name">{t.name}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
