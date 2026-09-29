@@ -6,6 +6,7 @@ import { typeFxSkills } from "./typefx";
 import { gallerySkills } from "./gallery";
 import { mediaSkills } from "./media";
 import { momentSkills } from "./moments";
+import { slideSkills } from "./slides";
 import { saasSkills } from "./saas";
 import { signatureSkills } from "./signature";
 import { typographySkills } from "./typography";
@@ -16,6 +17,7 @@ export const SKILLS: Skill[] = [
   ...saasSkills,
   ...interactionSkills,
   ...momentSkills,
+  ...slideSkills,
   ...typeFxSkills,
   ...gallerySkills,
   ...componentSkills,

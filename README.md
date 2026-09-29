@@ -5,7 +5,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, header logo, screenshots, product videos and brand colours, then storyboards a launch film around them. The film follows a hook, logo, a product tour of the real UI, a features bento, integrations, and a CTA with the site's own button label. Copy is claim-safe by default (see below); proof beats (real testimonials, customer logos and stats only) are added when you switch to *Use site's claims*.
 - **SaaS launch-film mode**: modelled on popular product-launch videos. It uses sentence-case blur reveals with gradient accent words, rotating word swaps, a cursor-driven UI zoom tour with callouts, bento feature grids with live micro-animations, floating glass UI widgets, pain-to-solution strikes, an integration orbit, real testimonials, a customer-logo marquee and a CTA button that the cursor clicks. It has a grid, spotlight and beam backdrop, spring physics and glass cards with animated border beams, and is scored with an upbeat track plus UI sound effects synced to every click, pop and whoosh.
 - **Two styles**: *SaaS launch* (auto-selected for websites and product prompts) or *Epic trailer*.
-- **53 motion skills**: Code to Deploy, Dot Globe, Live Cursors, Kanban Board, Before / After, Chat Thread, Gallery Flow, 3D Carousel, Tilt Wall, UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
+- **57 motion skills**: Support, World Map, Feature Slides, Problem → Solution, Code to Deploy, Dot Globe, Live Cursors, Kanban Board, Before / After, Chat Thread, Gallery Flow, 3D Carousel, Tilt Wall, UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
 - **AI Director**: Claude storyboards the prompt into a hook, a title reveal, feature beats and an outro. It picks the skills, palette, typeface and tempo. When no API key is set, a built-in rule-based director does the same job offline.
 - **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remix, and share a link.
 - **A produced soundtrack, arranged to the film**: SaaS films get a modern cue synthesised in the browser, with no stock music and no licences. It's edited like a record:
@@ -29,8 +29,8 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ### What makes the SaaS films look pro
 
-- **24 style templates**, modelled on the most popular SaaS intro looks and grouped in the picker:
-  - **Modern**: Midnight Grid, Aurora Gradient, Mono Pro, AI Glow.
+- **25 style templates**, modelled on the most popular SaaS intro looks and grouped in the picker:
+  - **Modern**: Midnight Grid, Aurora Gradient, Mono Pro, AI Glow, Liquid Motion (headlines pour in as glossy liquid and every scene rises in on a liquid wave).
   - **3D & Sci-Fi**: 3D Spatial (content on an orbiting 3D plane over glowing 3D panels), Sci-Fi HUD (brackets, timecode, readouts, scan lines), Synthwave 3D (neon grid floor to the horizon), Deep Space (parallax starfield and nebula), Holographic, Liquid Chrome, Neon Tech, Dev Terminal.
   - **Clean & Light**: Minimal Light, Swiss Clean (hairline layout frame), Enterprise Clean, Frosted Glass.
   - **Bold & Playful**: Bold Pop, Kinetic Type, Neo-Brutalist, Clay 3D (puffy claymorphism cards and gooey metaballs), Retro Dither.
@@ -47,6 +47,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - *Focus*: the line appears dimmed and lights up word by word;
   - *Highlight*: a marker box wipes in behind the key word;
   - *Shine*: the headline settles dimmed, then a light band sweeps across it;
+  - *Liquid*: letters pour in left to right as glossy fluid that merges between neighbours, then snap into crisp type, and melt away on exit (GPU, frame-exact in export);
   - plus the originals (blur rise, mask slide, pop, typewriter, glow).
 
   Pick one in *Style → Text effect* (live previews), or keep each template's own. All effects are deterministic per frame and stay crisp (no blur filters or halos). Two signature moments join them:
@@ -72,6 +73,12 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - a chat thread with typing indicators, a reaction and the product's own update card (messaging and support).
 
   The director picks the moment that suits the product best, every time. Each moment is scored on the words the site itself uses (its tagline and description count double), the moment its category's films typically stage, and what the site has to show. A deploy platform gets code to deploy, a whiteboard gets live cursors, a CRM its deal pipeline, a hiring tool its candidate board, and a support inbox a customer chat. The AI director is briefed with the same ranking. Hover a beat in the story-arc strip to see why it was chosen ("Best fit: the site talks about deals, pipeline").
+- **Liquid transitions**: the next scene rises in behind a wavy liquid front, with blobs racing ahead that merge into the surface and a refracting meniscus. It's used by the Liquid Motion style and available in any film's transition list.
+- **Classic launch-film slides**, each used only when the site gives it material:
+  - *Support*: a help centre where a question types into search and articles appear, then the support chat widget answers (when the site mentions support, docs or onboarding; no response-time claims);
+  - *World Map*: a flat dotted map with pulsing pins, flying arcs and live event cards (instead of the globe when the site talks about countries, regions, currencies or languages);
+  - *Feature Slides*: one full slide per feature with its number, icon, title, benefit and the product's own UI, with story-style progress bars (long films with real feature descriptions and product imagery);
+  - *Problem → Solution*: each of the site's pains is struck through and answered by the feature that solves it (pairs matched by shared words and topic, e.g. "Lost receipts → Receipts matched automatically"); otherwise the before/after slider.
 - **Scene moments**, used only when the site gives them material: a dotted globe that turns while arcs fly between cities and land with live events (only when the site talks about global use), and a before/after slider that drags from a grey, cluttered "old way" (the site's own pains) to the product screenshot.
 - **The real logo, whatever it's made of**: the brand mark is found in the site header the way a person would find it (the home link or a logo-named element near the top-left), and taken in its best form:
   - SVG first: inline SVG logos serialised with their real colours, an SVG offered in `<picture>` or `srcset`, or an SVG twin served beside a raster logo (`logo.png` → `logo.svg`);
@@ -120,7 +127,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ## Quality: Kaizen scorecard
 
-`npm run kaizen` generates the storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 24 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+`npm run kaizen` generates the storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 25 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
 
 The corpus now has 10 websites, including a hype-heavy site whose copy is almost all claims, and scores 1,586 storyboards. That covers both wording modes, vertical 9:16 cuts and take variety. When the scorecard saturated, its bar was raised with what a viewer notices:
 - **specificity**: headlines in the product's own words, not boilerplate;
@@ -202,7 +209,7 @@ Known limits:
 ```
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
-  skills/         the 53 skills (saas.ts, interactions.ts, moments.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  skills/         the 57 skills (saas.ts, interactions.ts, moments.ts, slides.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
   saasfx.ts       SaaS design toolkit: springs, grid/beam backdrop, glass cards, border beams, cursor, icons, blur-in type
   media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass

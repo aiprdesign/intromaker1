@@ -52,6 +52,10 @@ export const SKILL_IDS = [
   "kanban",
   "before-after",
   "chat-thread",
+  "support",
+  "world-map",
+  "feature-slides",
+  "problem-solution",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -88,7 +92,7 @@ export const PALETTE_IDS = [
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
 
-export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve"] as const;
+export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
 export const FONTS = ["anton", "grotesk", "inter", "serif", "mono"] as const;
@@ -210,7 +214,7 @@ export interface VoiceSettings {
 
 /** Headline text effects: the five originals plus the modern AI-video set (decode, roll, letters,
  * streak, chroma, flip, focus, highlight, shine). */
-export const TEXT_FX = ["blur", "mask", "pop", "glow", "type", "decode", "roll", "letters", "streak", "chroma", "flip", "focus", "highlight", "shine"] as const;
+export const TEXT_FX = ["blur", "mask", "pop", "glow", "type", "decode", "roll", "letters", "streak", "chroma", "flip", "focus", "highlight", "shine", "liquid"] as const;
 export type TextFx = (typeof TEXT_FX)[number];
 
 export interface VideoPlan {

@@ -16,6 +16,7 @@ export const TEXT_FX_OPTIONS: { id: TextFx; name: string; note: string }[] = [
   { id: "focus", name: "Focus", note: "The line lights up word by word" },
   { id: "highlight", name: "Highlight", note: "A marker wipes behind the key word" },
   { id: "shine", name: "Shine", note: "A light sweep crosses the headline" },
+  { id: "liquid", name: "Liquid", note: "Letters pour in as glossy liquid and merge into crisp type" },
   { id: "pop", name: "Pop", note: "Words spring up from small" },
   { id: "type", name: "Typewriter", note: "Typed out behind a block cursor" },
   { id: "glow", name: "Glow", note: "Slow glowing fade-in" },

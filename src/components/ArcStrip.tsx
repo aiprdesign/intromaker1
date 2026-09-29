@@ -24,6 +24,8 @@ const ROLE_NAMES: Partial<Record<string, string>> = {
   gallery: "Gallery",
   reach: "Global",
   compare: "Before & after",
+  solve: "Problem → solution",
+  support: "Support",
   cta: "Call to action",
 };
 

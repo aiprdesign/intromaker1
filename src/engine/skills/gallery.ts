@@ -33,7 +33,7 @@ type Img = Drawable | HTMLCanvasElement;
  * components (cards, panels, media blocks). Falls back to generated UI mock-ups in the brand
  * palette, so the skill also works for prompt-only films and the showcase.
  */
-function gallery(sc: SkillContext, want: number, aspect = 1.6): Img[] {
+export function gallery(sc: SkillContext, want: number, aspect = 1.6): Img[] {
   const { scene, brand, t } = sc;
   const out: Img[] = [];
   const seen = new Set<string>();

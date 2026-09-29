@@ -25,6 +25,8 @@ export type ConceptRole =
   | "gallery"
   | "reach"
   | "compare"
+  | "solve"
+  | "support"
   | "cta";
 
 export interface Concept {
@@ -288,6 +290,8 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
   gallery: "Images",
   reach: "Earth",
   compare: "ArrowLeftRight",
+  solve: "CircleCheck",
+  support: "LifeBuoy",
 };
 
 /**

@@ -181,3 +181,186 @@ export function renderTransition(name: string, from: Drawable | HTMLCanvasElemen
   r.render({ scene: m.mesh });
   return r.gl.canvas as HTMLCanvasElement;
 }
+
+/* ───────── Liquid: gooey text and liquid scene transitions ───────── */
+
+/** Textures for canvases that change every frame (re-uploaded on each use). */
+const live = new Map<string, Texture>();
+function liveTexture(r: Renderer, key: string, src: HTMLCanvasElement) {
+  let tex = live.get(key);
+  if (!tex || tex.gl !== r.gl) {
+    const gl = r.gl;
+    tex = new Texture(gl, { image: src, generateMipmaps: false, minFilter: gl.LINEAR, magFilter: gl.LINEAR });
+    live.set(key, tex);
+  } else {
+    tex.image = src;
+    tex.needsUpdate = true;
+  }
+  return tex;
+}
+
+const liquidPrograms = new Map<string, { program: Program; mesh: Mesh } | null>();
+function fullscreen(r: Renderer, key: string, frag: string, uniforms: Record<string, { value: unknown }>) {
+  if (liquidPrograms.has(key)) return liquidPrograms.get(key)!;
+  try {
+    const program = new Program(r.gl, { vertex: VERT, fragment: frag, uniforms, transparent: true, depthTest: false, depthWrite: false });
+    const out = { program, mesh: new Mesh(r.gl, { geometry: new Triangle(r.gl), program }) };
+    liquidPrograms.set(key, out);
+    return out;
+  } catch {
+    liquidPrograms.set(key, null);
+    return null;
+  }
+}
+
+/**
+ * Liquid type: the headline pours in left to right. Each letter drops into place as a gooey blob
+ * (its blurred alpha re-thresholded, so neighbouring letters merge like fluid), catches a glossy
+ * highlight while it moves, and snaps into crisp type as it settles. On exit it melts downwards.
+ */
+const LIQUID_TEXT = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2 uPx;
+uniform float uT;
+uniform float uSpread;
+uniform float uDur;
+uniform float uExit;
+uniform float uDrop;
+uniform float uGoo;
+vec4 tap(vec2 p) {
+  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return vec4(0.0);
+  vec4 c = texture2D(uTex, p);
+  return vec4(c.rgb * c.a, c.a);
+}
+void main() {
+  float order = vUv.x * 0.8 + (1.0 - vUv.y) * 0.2;
+  float k = clamp((uT - order * uSpread) / uDur, 0.0, 1.0);
+  float e = 1.0 - pow(1.0 - k, 2.0);
+  float inv = 1.0 - e;
+  float ex = uExit;
+  vec2 p = vUv;
+  p.x += sin(vUv.y * 22.0 + uT * 16.0) * 0.006 * (inv + ex);
+  p.y -= inv * inv * uDrop;
+  p.y += ex * ex * uDrop * 0.8;
+  float r = inv * uGoo + ex * uGoo * 1.3;
+  vec4 acc = tap(p) * 2.0;
+  for (int i = 0; i < 12; i++) {
+    float a = float(i) * 2.39996;
+    float rr = sqrt((float(i) + 0.5) / 12.0) * r;
+    acc += tap(p + vec2(cos(a), sin(a)) * rr * uPx);
+  }
+  acc /= 14.0;
+  vec4 crisp = tap(p);
+  float settle = smoothstep(0.82, 1.0, e) * (1.0 - smoothstep(0.0, 0.3, ex));
+  float gooA = smoothstep(0.28, 0.55, acc.a);
+  float alpha = mix(gooA, crisp.a, settle);
+  vec3 col = acc.a > 0.001 ? acc.rgb / acc.a : vec3(0.0);
+  if (crisp.a > 0.001) col = mix(col, crisp.rgb / crisp.a, settle);
+  // Glossy highlight on the moving liquid's upper-left edges.
+  float d = max(1.5, r * 0.6);
+  float gx = tap(p + vec2(uPx.x * d, 0.0)).a - tap(p - vec2(uPx.x * d, 0.0)).a;
+  float gy = tap(p + vec2(0.0, uPx.y * d)).a - tap(p - vec2(0.0, uPx.y * d)).a;
+  vec2 n = vec2(gx, gy);
+  float spec = length(n) > 0.02 ? clamp(dot(normalize(n), normalize(vec2(0.6, -0.8))), 0.0, 1.0) : 0.0;
+  col += pow(spec, 2.0) * 0.45 * (1.0 - settle);
+  alpha *= smoothstep(0.0, 0.12, k) * (1.0 - smoothstep(0.55, 1.0, ex));
+  gl_FragColor = vec4(col * alpha, alpha);
+}`;
+
+/** Render liquid text from `src` (the finished headline on a transparent canvas); null without WebGL. */
+export function liquidText(src: HTMLCanvasElement, o: { t: number; spread: number; dur: number; exit: number; drop: number; goo: number }): HTMLCanvasElement | null {
+  const r = glRenderer(src.width, src.height);
+  if (!r) return null;
+  const m = fullscreen(r, "liquid-text", LIQUID_TEXT, {
+    uTex: { value: null }, uPx: { value: [1, 1] }, uT: { value: 0 }, uSpread: { value: 0.4 }, uDur: { value: 0.5 },
+    uExit: { value: 0 }, uDrop: { value: 0.3 }, uGoo: { value: 8 },
+  });
+  if (!m) return null;
+  const u = m.program.uniforms as Record<string, { value: unknown }>;
+  u.uTex.value = liveTexture(r, "liquid-text", src);
+  u.uPx.value = [1 / src.width, 1 / src.height];
+  u.uT.value = o.t;
+  u.uSpread.value = o.spread;
+  u.uDur.value = o.dur;
+  u.uExit.value = o.exit;
+  u.uDrop.value = o.drop;
+  u.uGoo.value = o.goo;
+  r.render({ scene: m.mesh });
+  return r.gl.canvas as HTMLCanvasElement;
+}
+
+/**
+ * Liquid scene transition: the incoming shot rises in behind a wavy liquid front, with blobs
+ * racing ahead of it that merge into the surface (smooth-min metaballs), a refracting meniscus
+ * and a bright rim. A pure function of progress, so preview and export match.
+ */
+const LIQUID_WIPE = /* glsl */ `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uA;
+uniform sampler2D uB;
+uniform float uP;
+uniform float uRatio;
+uniform float uSeed;
+uniform vec2 uDir;
+float hash(float n) { return fract(sin(n) * 43758.5453123); }
+float noise(vec2 x) {
+  vec2 i = floor(x);
+  vec2 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  float n = i.x + i.y * 57.0;
+  return mix(mix(hash(n), hash(n + 1.0), f.x), mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y);
+}
+float smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+void main() {
+  vec2 uv = vUv;
+  vec2 perp = vec2(-uDir.y, uDir.x);
+  float s = dot(uv - 0.5, uDir) / (abs(uDir.x) + abs(uDir.y)) + 0.5;
+  float across = dot(uv - 0.5, perp) + 0.5;
+  float P = uP * 1.4 - 0.2;
+  float wave = (noise(vec2(across * 5.0 + uSeed, uP * 3.0)) - 0.5) * 0.16 + sin(across * 11.0 + uP * 9.0 + uSeed) * 0.02;
+  float d = s - (P + wave);
+  float grow = smoothstep(0.0, 0.25, uP) * (1.0 - smoothstep(0.75, 1.0, uP));
+  for (int i = 0; i < 7; i++) {
+    float fi = float(i) + uSeed * 0.13;
+    float bx = hash(fi * 7.13 + 1.7);
+    float lead = 0.05 + 0.22 * hash(fi * 3.71 + 4.1);
+    float by = P + lead * (0.6 + 0.4 * sin(uP * 6.0 + fi));
+    float br = (0.025 + 0.05 * hash(fi * 1.93 + 2.2)) * grow;
+    vec2 c = 0.5 + uDir * (by - 0.5) + perp * (bx - 0.5);
+    vec2 q = uv - c;
+    q.x *= uRatio;
+    d = smin(d, length(q) - br, 0.07);
+  }
+  float m = 1.0 - smoothstep(-0.003, 0.003, d);
+  float edge = exp(-abs(d) * 28.0);
+  vec2 off = uDir * edge * 0.03 + (vec2(noise(uv * 9.0 + uP * 4.0), noise(uv * 9.0 + 7.0 - uP * 4.0)) - 0.5) * edge * 0.03;
+  vec3 A = texture2D(uA, clamp(uv + off, 0.0, 1.0)).rgb;
+  vec3 B = texture2D(uB, clamp(uv - off * 0.6, 0.0, 1.0)).rgb;
+  vec3 col = mix(A, B, m);
+  col += exp(-abs(d) * 140.0) * 0.4 + edge * 0.05;
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+/** Composite a liquid transition from shot `a` to shot `b` at progress 0..1; null without WebGL. */
+export function liquidWipe(a: HTMLCanvasElement, b: HTMLCanvasElement, progress: number, seed: number): HTMLCanvasElement | null {
+  const r = glRenderer(a.width, a.height);
+  if (!r) return null;
+  const m = fullscreen(r, "liquid-wipe", LIQUID_WIPE, { uA: { value: null }, uB: { value: null }, uP: { value: 0 }, uRatio: { value: 1 }, uSeed: { value: 0 }, uDir: { value: [0, 1] } });
+  if (!m) return null;
+  const dirs: [number, number][] = [[0, 1], [1, 0], [0.7071, 0.7071], [-0.7071, 0.7071]];
+  const u = m.program.uniforms as Record<string, { value: unknown }>;
+  u.uA.value = liveTexture(r, "liquid-a", a);
+  u.uB.value = liveTexture(r, "liquid-b", b);
+  u.uP.value = Math.min(1, Math.max(0, progress));
+  u.uRatio.value = a.width / a.height;
+  u.uSeed.value = seed % 97;
+  u.uDir.value = dirs[seed % dirs.length];
+  r.render({ scene: m.mesh });
+  return r.gl.canvas as HTMLCanvasElement;
+}

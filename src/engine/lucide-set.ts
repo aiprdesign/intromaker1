@@ -213,6 +213,10 @@ import {
   Kanban,
   GitCommitHorizontal,
   AtSign,
+  ArrowRight,
+  ChevronRight,
+  Droplets,
+  Waves,
 } from "lucide";
 
 export type IconNode = [tag: string, attrs: Record<string, string | number | undefined>][];
@@ -431,4 +435,8 @@ export const LUCIDE = {
   Kanban,
   GitCommitHorizontal,
   AtSign,
+  ArrowRight,
+  ChevronRight,
+  Droplets,
+  Waves,
 } as unknown as Record<string, IconNode>;

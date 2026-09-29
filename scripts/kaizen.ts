@@ -25,7 +25,7 @@ const words = (s: string) => s.replace(/\*/g, "").split(/\s+/).filter(Boolean);
 const norm = (s: string) => s.toLowerCase().replace(/\*/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 const PRODUCT = new Set(["meet", "tour", "cards", "gallery", "compare"]);
 // A demo beat (command palette, AI answer, one-click flow, live notifications) shows value too.
-const VALUE = new Set(["features", "how", "bento", "demo"]);
+const VALUE = new Set(["features", "how", "bento", "demo", "solve"]);
 const IN_ACTION = new Set(["tour", "meet", "cards", "demo", "gallery", "reach"]);
 const ROLE_OK = new Set(["promise"]);
 const PROOF = new Set(["quote", "logos", "cards", "stat"]);
@@ -99,7 +99,8 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
   // ── Variety (15).
   for (let i = 1; i < sc.length; i++) {
     if (sc[i].skill === sc[i - 1].skill) add("variety", 5, `${sc[i].skill} twice in a row`);
-    if (sc[i].transition === sc[i - 1].transition && sc[i].transition !== "cut") add("variety", 1, `transition ${sc[i].transition} twice in a row`);
+    // (Liquid is the Liquid Motion style's signature; each one flows from a different direction.)
+    if (sc[i].transition === sc[i - 1].transition && sc[i].transition !== "cut" && sc[i].transition !== "liquid") add("variety", 1, `transition ${sc[i].transition} twice in a row`);
   }
   const distinct = new Set(sc.map((s) => s.skill)).size;
   if (distinct < Math.min(5, sc.length)) add("variety", 4, `only ${distinct} distinct skills`);

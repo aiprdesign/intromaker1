@@ -28,6 +28,8 @@ export type Role =
   | "gallery"
   | "reach"
   | "compare"
+  | "solve"
+  | "support"
   | "cta";
 
 export type TemplateCategory = "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
@@ -78,6 +80,8 @@ export const DEFAULT_ROLE_SKILL: Record<Role, SkillId> = {
   gallery: "gallery-flow",
   reach: "globe",
   compare: "before-after",
+  solve: "problem-solution",
+  support: "support",
   cta: "cta",
 };
 
@@ -106,6 +110,10 @@ function roleLength(scene: Scene, role: Role): [number, number] {
       return [11, 5.4];
     case "compare":
       return [10, 5];
+    case "solve":
+      return [(scene.items?.length ?? 3) * 2.5 + 4, 5];
+    case "support":
+      return [12, 5.6];
     case "bento":
       return [10, 4.4];
     case "cards":
@@ -121,6 +129,7 @@ function roleLength(scene: Scene, role: Role): [number, number] {
     case "promise":
       return [8, 3.8];
     case "features":
+      if (scene.skill === "feature-slides") return [(scene.items?.length ?? 3) * 4.5 + 2, 6.4];
       return [(scene.items?.length ?? 4) * 1.5 + 6, 4.6];
     case "demo":
       if (scene.skill === "ai-prompt" || scene.skill === "code-deploy" || scene.skill === "kanban") return [12, 5.6];
@@ -486,6 +495,24 @@ export const TEMPLATES: Template[] = [
     sample: sample("Polished to *perfection*."),
   },
   {
+    id: "liquid",
+    name: "Liquid Motion",
+    category: "Modern",
+    description: "Everything flows: headlines pour in as glossy liquid, and every scene rises in on a fast liquid wave over fluid metaball gradients.",
+    vibe: "Fluid, fast and playful-premium. Short punchy lines, quick liquid reveals and liquid wave transitions between every scene.",
+    palette: "ocean",
+    font: "inter",
+    bpm: 126,
+    music: "saas",
+    flavor: "pop",
+    look: { grid: false, beams: 0, aurora: 0.35, card: "frost", text: "liquid", grain: 0.5, shader: "metaballs", shaderStrength: 0.85, shaderSpeed: 1.3 },
+    transitions: ["liquid"],
+    pace: 0.92,
+    roles: {},
+    revealNoLogo: "logo-reveal",
+    sample: sample("Ideas that *flow*."),
+  },
+  {
     id: "holo",
     name: "Holographic",
     category: "3D & Sci-Fi",
@@ -611,6 +638,10 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "chat-thread": "demo",
   globe: "reach",
   "before-after": "compare",
+  "problem-solution": "solve",
+  support: "support",
+  "world-map": "reach",
+  "feature-slides": "features",
   cta: "cta",
 };
 
@@ -639,7 +670,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // The product assembled from its own components beats a flat page scroll whenever it's available.
     if (role === "meet" && scene.skill === "ui-assemble") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

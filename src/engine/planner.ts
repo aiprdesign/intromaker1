@@ -28,6 +28,46 @@ export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20,
 
 /** The site talks about being used across countries (the globe beat's evidence). */
 const GLOBAL = /\b(global(ly)?|worldwide|international(ly)?|countries|currencies|cross-border|around the world|multi-region|edge network|borders)\b/i;
+/** The site talks about places: a flat world map suits it better than a globe. */
+const MAP_WORDS = /\b(countries|country|regions?|currencies|languages|markets|offices|cities|locations)\b/i;
+/** The site talks about helping its customers. */
+const SUPPORT = /\b(customer support|support team|help (center|centre|desk)|documentation|docs|knowledge base|onboarding|customer success|live chat|dedicated (support|success)|here to help)\b/i;
+
+/** Pair each pain with the feature that answers it: shared words, or words from the same family. */
+const FAMILIES = [
+  ["spreadsheet", "sheet", "excel", "data", "dashboard", "report", "insight", "analytic", "chart", "metric"],
+  ["meeting", "status", "update", "standup", "progress", "async", "visibility"],
+  ["email", "inbox", "message", "chat", "thread", "conversation", "reply"],
+  ["manual", "copy", "paste", "busywork", "repetitive", "automat", "workflow", "hand"],
+  ["slow", "wait", "delay", "fast", "instant", "real-time", "real time", "speed", "quick", "hours"],
+  ["scattered", "silo", "disconnect", "switch", "tools", "connect", "integrat", "one place", "all-in-one", "workspace", "sync"],
+  ["error", "mistake", "bug", "broken", "reliab", "check", "review", "catch"],
+  ["security", "risk", "breach", "leak", "protect", "secur", "complian", "threat"],
+  ["cost", "expensive", "spend", "budget", "save", "invoice", "expense", "billing"],
+  ["lost", "find", "search", "organi", "track", "miss", "forget", "remind"],
+  ["deploy", "release", "ship", "build", "preview", "rollback"],
+];
+export function pairPains(pains: string[], fixes: string[]) {
+  const words = (x: string) => new Set(x.toLowerCase().split(/[^a-z]+/).filter((wd) => wd.length >= 4).map((wd) => wd.replace(/(ing|ed|es|s)$/, "")));
+  const fam = (x: string) => new Set(FAMILIES.map((f, i) => (f.some((k) => x.toLowerCase().includes(k)) ? i : -1)).filter((i) => i >= 0));
+  const pool = [...new Set(fixes)].filter(Boolean);
+  const out: { pain: string; fix: string; score: number }[] = [];
+  for (const pain of pains.slice(0, 4)) {
+    const pw = words(pain);
+    const pf = fam(pain);
+    let best = -1;
+    let bestScore = -1;
+    pool.forEach((f, i) => {
+      const score = [...words(f)].filter((wd) => pw.has(wd)).length * 2 + [...fam(f)].filter((k) => pf.has(k)).length;
+      if (score > bestScore) (best = i), (bestScore = score);
+    });
+    if (best < 0) break;
+    out.push({ pain, fix: pool[best], score: bestScore });
+    pool.splice(best, 1);
+  }
+  return out;
+}
+
 /** The globe's neutral headline and generic live events, per category. */
 const REACH: Record<string, { title: string; items: string[] }> = {
   fintech: { title: "Money that moves *across borders*", items: ["Payment received", "Invoice paid", "Transfer sent", "Card approved"] },
@@ -1039,7 +1079,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // One value beat, always: icon tiles for up to four features, a bento for a richer set.
   // (In a product-first teaser the tour already carries the features.)
   const valuePriority = target < 20 && ((angle === "product" && tourMedia) || (angle === "proof" && quote)) ? 5 : 2;
-  if (featureItems.length >= 5) {
+  // Long films with real feature descriptions and product UI to show give each feature its own
+  // slide; otherwise a bento for a rich set, or the classic icon row.
+  const withBenefit = featureItems.filter((it) => (it.split(/\s+[—–]\s+/)[1] ?? "").split(/\s+/).length >= 4);
+  const featureSlides = target >= 30 && withBenefit.length >= 3 && visuals >= 2;
+  if (featureSlides) {
+    add(valuePriority, {
+      role: "features", skill: "feature-slides",
+      text: `Inside *${site.name}*`,
+      items: withBenefit.slice(0, 3),
+      eyebrow: "Features",
+      why: `${withBenefit.length} features with real descriptions and ${visuals} product images to show`,
+      duration: beats(15.5),
+      transition: "dolly",
+    });
+  } else if (featureItems.length >= 5) {
     add(valuePriority, {
       role: "bento", skill: "bento",
       text: `Inside *${site.name}*`,
@@ -1062,7 +1116,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
   // Products that lead with AI get the AI moment whatever their category.
   const aiLed = concept.id !== "ai" && [site.tagline, ...site.headlines.slice(0, 4)].some((x) => /\b(ai|assistant|copilot|gpt)\b/i.test(x ?? ""));
-  const shownTitles = new Set([...featureItems.slice(0, featureItems.length >= 5 ? 6 : 4), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
+  const shownTitles = new Set([...(featureSlides ? withBenefit.slice(0, 3) : featureItems.slice(0, featureItems.length >= 5 ? 6 : 4)), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
   const spareFeatures = shortFeatures.filter((f) => !shownTitles.has(norm(f)));
   // The moment that suits this product best, scored on the site's own words, its category and its
   // material (see rankMoments): a dev platform that talks about deploys gets code → deploy, a
@@ -1136,19 +1190,35 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (target >= 20 && globalLine) {
     const own = sentenceCopy(globalLine, 8);
     const n = own.split(/\s+/).length;
+    // A flat map when the site talks about places (countries, regions, currencies, languages);
+    // the turning globe when it talks about a global network or reach.
+    const flatMap = MAP_WORDS.test([whole.tagline, whole.description, ...whole.headlines, ...whole.features].join(" "));
     add(target >= 30 ? 4 : 6, {
-      role: "reach", skill: "globe",
+      role: "reach", skill: flatMap ? "world-map" : "globe",
       text: own && !/\d/.test(own) && n >= 3 && n <= 8 ? own : REACH[concept.id]?.title ?? REACH.general.title,
       items: (REACH[concept.id] ?? REACH.general).items,
       eyebrow: "Global",
-      why: "The site talks about global use",
+      why: flatMap ? "The site talks about countries, regions or currencies" : "The site talks about global use",
       duration: beats(11),
       transition: "dolly",
     });
   }
-  // 5e. Before / after: the site's own pains next to the product, when the film doesn't open on them.
+  // 5e. The site's own pains, when the film doesn't open on them: each answered by the feature that
+  // solves it (when they line up), else the old way next to the product on a before/after slider.
   const compareMedia = images[0] ?? img(shots.hero) ?? img(shots.sections[0]);
-  if (target >= 20 && pains.length >= 2 && !painHook && compareMedia) {
+  const pairs = target >= 20 && pains.length >= 2 && !painHook ? pairPains(pains, [...spareFeatures, ...shortFeatures]) : [];
+  const matched = pairs.filter((p) => p.score > 0).length;
+  if (pairs.length >= 2 && (matched >= 2 || !compareMedia)) {
+    add(target >= 30 ? 4 : 6, {
+      role: "solve", skill: "problem-solution",
+      text: "From problem to *solution*",
+      items: pairs.slice(0, 3).map((p) => `${p.pain} → ${p.fix}`),
+      eyebrow: "Problem → solution",
+      why: matched >= 2 ? "The site's pains line up with its features" : "The site names the problems it solves",
+      duration: beats(Math.min(3, pairs.length) * 2.5 + 4),
+      transition: "whip",
+    });
+  } else if (target >= 20 && pains.length >= 2 && !painHook && compareMedia) {
     add(target >= 30 ? 4 : 6, {
       role: "compare", skill: "before-after",
       text: "Leave the old way *behind*",
@@ -1158,6 +1228,20 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: beats(10),
       transition: "whip",
       media: compareMedia,
+    });
+  }
+  // 5f. Support: when the site talks about help, docs or onboarding (and the demo isn't already a
+  // support chat).
+  if (target >= 20 && SUPPORT.test([whole.tagline, whole.description, ...whole.headlines, ...whole.features].join(" ")) && demo.skill !== "chat-thread") {
+    add(target >= 30 ? 5 : 7, {
+      role: "support", skill: "support",
+      text: "Support, *built in*",
+      subtext: "How do I invite my team?",
+      items: [`Getting started with ${site.name}`, "Invite your team", "Connect your tools", "Manage your account"],
+      eyebrow: "Support",
+      why: "The site talks about support, docs or onboarding",
+      duration: beats(12),
+      transition: "dolly",
     });
   }
 
@@ -1259,6 +1343,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     // The gallery follows the product tour (or the features, when there's no tour in the arc).
     if (role === "gallery") return (rank.indexOf("tour") >= 0 ? rank.indexOf("tour") : rank.indexOf("features")) + 0.4;
     // Before / after follows the product's first appearance; the globe follows the features.
+    if (role === "solve") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.6;
+    if (role === "support") return rank.indexOf("cta") - 0.6;
     if (role === "compare") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.6;
     if (role === "reach") return (["features", "bento", "tour"].map((r) => rank.indexOf(r)).find((i) => i >= 0) ?? rank.length - 2) + 0.6;
     // The product assembled from its own components is the first thing after the reveal.

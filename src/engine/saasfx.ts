@@ -6,6 +6,7 @@
 import { headline } from "./fx";
 import { clamp, mixHex, range, rgba, rng, TAU } from "./math";
 import { CONCEPT_MAP, ROLE_ICONS, type ConceptRole } from "./concepts";
+import { liquidText } from "./gl";
 import { drawLucide, iconFor as lucideFor, iconsFor as lucideIconsFor } from "./icons";
 import { scratch } from "./scratch";
 import { renderShaderBg } from "./shaderbg";
@@ -582,7 +583,13 @@ export function blurInLayout(
   const { ctx, t, u, w, palette } = sc;
   const exit = opts.exitAt !== undefined ? range(t, opts.exitAt, opts.exitAt + 0.4) : 0;
   const alpha0 = (opts.alpha ?? 1) * (1 - exit);
-  const mode: TextFx = sc.look?.text ?? "blur";
+  const want: TextFx = sc.look?.text ?? "blur";
+  if (want === "liquid") {
+    const n = liquidLayout(sc, layout, start, stagger, opts);
+    if (n !== null) return n;
+  }
+  // (Liquid falls back to the blur-in where WebGL isn't available.)
+  const mode: TextFx = want === "liquid" ? "blur" : want;
   let wi = 0;
   // Typewriter mode: characters appear one by one behind a block cursor.
   const typing = mode === "type";
@@ -876,6 +883,49 @@ export function blurInLayout(
 const DECODE_GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/?";
 
 /** How far apart words start (× the scene's stagger) and how long each word's reveal takes. */
+/**
+ * Liquid headline: the finished type is drawn to an offscreen canvas, then poured in on the GPU
+ * (gl.ts liquidText). Returns the word count, or null when WebGL isn't available.
+ */
+function liquidLayout(sc: SkillContext, layout: HeadlineLayout, start: number, stagger: number, opts: { alpha?: number; exitAt?: number; gradient?: [string, string] }): number | null {
+  const { ctx, t, w } = sc;
+  const size = layout.size;
+  let maxW = 0;
+  for (const line of layout.lines) {
+    const words = line.split(" ").map((wd) => wd.replace(/\*/g, ""));
+    const lw = words.reduce((a, wd) => a + ctx.measureText(wd).width + layout.tracking * Math.max(0, wd.length - 1), 0) + ctx.measureText(" ").width * (words.length - 1);
+    maxW = Math.max(maxW, lw);
+  }
+  const padX = size * 0.45;
+  const padTop = size * 1.2;
+  const padBottom = size * 0.9;
+  const bx = Math.floor(w / 2 - maxW / 2 - padX);
+  const by = Math.floor(layout.ys[0] - size * 0.7 - padTop);
+  const bw = Math.max(2, Math.ceil(maxW + padX * 2));
+  const bh = Math.max(2, Math.ceil(layout.ys[layout.ys.length - 1] - layout.ys[0] + size * 1.4 + padTop + padBottom));
+  const off = scratch("liquid-text", bw, bh);
+  off.ctx.font = ctx.font;
+  off.ctx.textBaseline = ctx.textBaseline;
+  off.ctx.translate(-bx, -by);
+  const settled = { ...sc, ctx: off.ctx, t: start + 60, look: sc.look ? { ...sc.look, text: "blur" as const } : undefined };
+  const words = blurInLayout(settled, layout, start, stagger, { alpha: 1, gradient: opts.gradient });
+  const exit = opts.exitAt !== undefined ? range(t, opts.exitAt, opts.exitAt + 0.45) : 0;
+  const out = liquidText(off.canvas, {
+    t: t - start,
+    spread: Math.min(0.75, 0.2 + words * stagger * 0.6),
+    dur: 0.7,
+    exit,
+    drop: (size * 0.85) / bh,
+    goo: size * 0.2,
+  });
+  if (!out) return null;
+  ctx.save();
+  ctx.globalAlpha *= opts.alpha ?? 1;
+  ctx.drawImage(out, bx, by, bw, bh);
+  ctx.restore();
+  return words;
+}
+
 const FX_PACE: Partial<Record<TextFx, { stagger: number; dur: number }>> = {
   blur: { stagger: 1, dur: 0.7 },
   mask: { stagger: 1, dur: 0.7 },

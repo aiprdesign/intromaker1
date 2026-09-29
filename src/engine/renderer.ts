@@ -10,12 +10,13 @@ import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
 import { setCrispText } from "./fx";
+import { liquidWipe } from "./gl";
 import type { Aspect, MusicPulse, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
 export const TRANSITION_LEN = 0.45;
 
 /** Transitions where outgoing and incoming shots overlap on screen. */
-export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak"]);
+export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak", "liquid"]);
 /** How long past its end an overlapped scene keeps rendering (exit suppressed). */
 const OVERLAP_EXTEND = TRANSITION_LEN + 0.25;
 
@@ -578,7 +579,11 @@ function compositeOverlap(sc: SkillContext, a: HTMLCanvasElement, b: HTMLCanvasE
   ctx.fillStyle = palette.bg0;
   ctx.fillRect(0, 0, w, h);
   const kind = sc.scene.transition;
-  if (kind === "whip" || kind === "push") {
+  // Liquid: the next shot rises in behind a wavy, blobby liquid front (GPU; dissolves without WebGL).
+  const liquid = kind === "liquid" ? liquidWipe(a, b, ease.inOutCubic(k), seed) : null;
+  if (liquid) {
+    ctx.drawImage(liquid, 0, 0, w, h);
+  } else if (kind === "whip" || kind === "push") {
     const e = kind === "whip" ? ease.inOutExpo(k) : ease.inOutCubic(k);
     const dir = seed % 2 ? 1 : -1;
     const smear = kind === "whip" ? Math.sin(Math.PI * k) * w * 0.12 : 0;

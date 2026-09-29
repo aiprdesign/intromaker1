@@ -33,7 +33,7 @@ const mono = (size: number, weight = 500) => `${weight} ${Math.round(size)}px "J
 const hair = (p: Palette, a = 0.08) => (p.light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`);
 
 /** Teammates in collaborative scenes: generic first names in the classic multiplayer colours. */
-const PEOPLE = [
+export const PEOPLE = [
   { name: "Maya", color: "#f43f5e" },
   { name: "Leo", color: "#3b82f6" },
   { name: "Priya", color: "#10b981" },
@@ -41,7 +41,7 @@ const PEOPLE = [
 ];
 
 /** Window entrance: springs up and fades in; returns the eased 0..1 used for alpha. */
-function enter(sc: SkillContext, start = 0.15, lift = 60) {
+export function enter(sc: SkillContext, start = 0.15, lift = 60) {
   const { ctx, t, u } = sc;
   const k = clamp(spring(t - start, 10, 7), 0, 1.05);
   ctx.translate(0, (1 - Math.min(1, k)) * lift * u);
@@ -49,7 +49,7 @@ function enter(sc: SkillContext, start = 0.15, lift = 60) {
 }
 
 /** Completion badge below a window. */
-function doneBadge(sc: SkillContext, label: string, cx: number, cy: number, lt: number, S: number) {
+export function doneBadge(sc: SkillContext, label: string, cx: number, cy: number, lt: number, S: number) {
   if (lt <= 0) return;
   const { ctx, u, palette } = sc;
   const k = clamp(spring(lt, 13, 7), 0, 1.1);
@@ -68,7 +68,7 @@ function doneBadge(sc: SkillContext, label: string, cx: number, cy: number, lt: 
 }
 
 /** A small round avatar with an initial. */
-function avatar(sc: SkillContext, name: string, color: string, cx: number, cy: number, r: number, ring?: string) {
+export function avatar(sc: SkillContext, name: string, color: string, cx: number, cy: number, r: number, ring?: string) {
   const { ctx, u } = sc;
   ctx.save();
   ctx.beginPath();
@@ -102,7 +102,7 @@ function spinner(sc: SkillContext, cx: number, cy: number, r: number, color: str
 }
 
 /** Compress a timeline so it fits a shorter scene (keeps the finish ~0.9s before the end). */
-function fitTimes<T extends Record<string, number | number[]>>(T: T, end: number, d: number): T {
+export function fitTimes<T extends Record<string, number | number[]>>(T: T, end: number, d: number): T {
   const f = Math.max(0.6, Math.min(1, (d - 0.9) / end));
   if (f >= 1) return T;
   const out = {} as Record<string, number | number[]>;
@@ -278,7 +278,7 @@ function codeDeploy(sc: SkillContext) {
 
 const D2R = Math.PI / 180;
 /** Rough continent outlines (lon, lat): enough for a dotted globe to read as the world. */
-const LAND: number[][] = [
+export const LAND: number[][] = [
   // North America
   [-168, 65, -140, 70, -95, 72, -80, 63, -62, 57, -55, 48, -67, 45, -75, 38, -81, 31, -80, 25, -90, 29, -97, 27, -97, 21, -88, 21, -83, 10, -78, 8, -92, 15, -105, 20, -112, 30, -117, 33, -124, 40, -124, 48, -135, 58, -150, 60, -165, 60],
   // Greenland
@@ -301,7 +301,7 @@ const LAND: number[][] = [
   [167, -46, 174, -41, 178, -38, 173, -35, 172, -41],
 ];
 
-function onLand(lon: number, lat: number) {
+export function onLand(lon: number, lat: number) {
   for (const poly of LAND) {
     let inside = false;
     for (let i = 0, j = poly.length - 2; i < poly.length; j = i, i += 2) {
