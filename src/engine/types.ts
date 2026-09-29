@@ -46,6 +46,12 @@ export const SKILL_IDS = [
   "gallery-flow",
   "carousel-3d",
   "tilt-wall",
+  "code-deploy",
+  "globe",
+  "live-cursors",
+  "kanban",
+  "before-after",
+  "chat-thread",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];

@@ -1,6 +1,6 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
-import { CONCEPT_MAP, CONCEPTS, DEMOS, detectConcept } from "./concepts";
+import { COLLAB_DEMO, CONCEPT_MAP, CONCEPTS, DEMO_ALTS, DEMOS, detectConcept } from "./concepts";
 import { writeVoiceover } from "./script";
 import { isHealthClaim, isNumericClaim, isUnsafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength } from "./templates";
@@ -25,6 +25,18 @@ import {
 
 export type Length = "short" | "standard" | "long";
 export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20, long: 34 };
+
+/** The site talks about being used across countries (the globe beat's evidence). */
+const GLOBAL = /\b(global(ly)?|worldwide|international(ly)?|countries|currencies|cross-border|around the world|multi-region|edge network|borders)\b/i;
+/** The globe's neutral headline and generic live events, per category. */
+const REACH: Record<string, { title: string; items: string[] }> = {
+  fintech: { title: "Money that moves *across borders*", items: ["Payment received", "Invoice paid", "Transfer sent", "Card approved"] },
+  ecommerce: { title: "Sell to customers *across borders*", items: ["New order", "Order shipped", "Payment received", "New review"] },
+  devtools: { title: "Ship to users *worldwide*", items: ["Deployed", "Preview ready", "Request served", "Build finished"] },
+  communication: { title: "Stay close, *across time zones*", items: ["New message", "Call started", "Thread replied", "File shared"] },
+  security: { title: "Protect *distributed* teams", items: ["Login verified", "Device checked", "Alert resolved", "Policy applied"] },
+  general: { title: "Built for *distributed* teams", items: ["New signup", "Task completed", "Update synced", "Report shared"] },
+};
 
 export type StyleChoice = "auto" | "saas" | "trailer";
 
@@ -938,6 +950,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const valueHook = valueFirst ? [longFeatures[2], longFeatures[3], longFeatures[1], descClause].find((x) => usable(x) && norm(x) !== norm(productLine)) ?? "" : "";
   // The tagline is used once: in the hook, or (if the hook is pains/proof/value) under the logo.
   const taglineFree = painHook || proofHook || !!valueHook || !!productHook;
+  // Whether the film opens on the wall of product images (then the gallery beat is optional).
+  let wall = false;
   if (proofHook) {
     add(1, { role: "hook", skill: "blur-reveal", text: `Trusted by *${teamStat.toLowerCase()}*`, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
   } else if (painHook) {
@@ -954,7 +968,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   } else {
     // Story-led films with plenty of product imagery open on the whole product: a tilted wall of
     // its screenshots drifting behind the promise (Linear / Vercel hero look).
-    const wall = angle === "story" && !productHook && target >= 20 && visuals >= 4;
+    wall = angle === "story" && !productHook && target >= 20 && visuals >= 4;
     add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: productHook || tagline, eyebrow: wall ? undefined : `Introducing ${site.name}`, duration: beats(wall ? 9 : 7), transition: "cut" });
   }
   // 2. Reveal.
@@ -1047,7 +1061,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
   // Products that lead with AI get the AI moment whatever their category.
   const aiLed = concept.id !== "ai" && [site.tagline, ...site.headlines.slice(0, 4)].some((x) => /\b(ai|assistant|copilot|gpt)\b/i.test(x ?? ""));
-  const demo = aiLed ? DEMOS.ai : DEMOS[concept.id] ?? DEMOS.general;
+  // Each category has more than one signature moment; the seed picks, so takes differ. Products
+  // that are about working together on a shared canvas get the multiplayer board.
+  const collab = /\b(collaborat\w*|multiplayer|whiteboards?|co-?edit\w*|live cursors?|canvas)\b/i.test([whole.tagline, whole.description, ...whole.headlines.slice(0, 6)].join(" "));
+  const demoOptions = [DEMOS[concept.id] ?? DEMOS.general, ...(DEMO_ALTS[concept.id] ?? [])];
+  const demo = aiLed ? DEMOS.ai : collab && ["productivity", "creative", "general", "marketing", "education"].includes(concept.id) ? COLLAB_DEMO : demoOptions[seed % demoOptions.length];
   const shownTitles = new Set([...featureItems.slice(0, featureItems.length >= 5 ? 6 : 4), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
   const spareFeatures = shortFeatures.filter((f) => !shownTitles.has(norm(f)));
   let demoScene: Scene | null = null;
@@ -1070,6 +1088,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       items: [(said.firstPerson ? demo.items[0] : "Tell me about {name}").replace(/\{name\}/g, site.name), ...(points.length >= 2 ? points : spareFeatures.slice(0, 3))],
       eyebrow: demo.eyebrow, duration: beats(12), transition: "whip",
     };
+  } else if (demo.skill === "code-deploy") {
+    demoScene = { role: "demo", skill: "code-deploy", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(12), transition: "whip" };
+  } else if (demo.skill === "kanban") {
+    demoScene = { role: "demo", skill: "kanban", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(12), transition: "whip" };
+  } else if (demo.skill === "live-cursors") {
+    // The shared board holds the product's own features when the film hasn't shown them yet.
+    const cards = spareFeatures.length >= 3 ? spareFeatures.slice(0, 4) : demo.items;
+    demoScene = { role: "demo", skill: "live-cursors", text: demo.title, subtext: demo.action, items: cards, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
+  } else if (demo.skill === "chat-thread") {
+    demoScene = { role: "demo", skill: "chat-thread", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else if (demo.skill === "click-flow") {
     demoScene = { role: "demo", skill: "click-flow", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
   } else {
@@ -1083,7 +1111,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // carousel for visual products and proof-first cuts).
   if (target >= 20 && visuals >= 3) {
     const carousel = concept.id === "creative" || concept.id === "ecommerce" || angle === "proof";
-    add(target >= 30 ? 3 : 5, {
+    add(target >= 30 ? (wall ? 4.5 : 3) : 5, {
       role: "gallery",
       skill: carousel ? "carousel-3d" : "gallery-flow",
       text: carousel ? `Made with *${site.name}*` : `A closer look at *${site.name}*`,
@@ -1092,6 +1120,34 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: beats(12),
       transition: "whip",
       media: images[0] ?? img(shots.sections[0]),
+    });
+  }
+  // 5d. Reach: a dotted globe with live events, only when the site itself talks about global use.
+  // (The site's own line when it's a short, number-free sentence; else a neutral one.)
+  const globalLine = [site.tagline, site.description, ...site.headlines, ...site.features].find((x) => GLOBAL.test(x ?? ""));
+  if (target >= 20 && globalLine) {
+    const own = sentenceCopy(globalLine, 8);
+    const n = own.split(/\s+/).length;
+    add(target >= 30 ? 4 : 6, {
+      role: "reach", skill: "globe",
+      text: own && !/\d/.test(own) && n >= 3 && n <= 8 ? own : REACH[concept.id]?.title ?? REACH.general.title,
+      items: (REACH[concept.id] ?? REACH.general).items,
+      eyebrow: "Global",
+      duration: beats(11),
+      transition: "dolly",
+    });
+  }
+  // 5e. Before / after: the site's own pains next to the product, when the film doesn't open on them.
+  const compareMedia = images[0] ?? img(shots.hero) ?? img(shots.sections[0]);
+  if (target >= 20 && pains.length >= 2 && !painHook && compareMedia) {
+    add(target >= 30 ? 4 : 6, {
+      role: "compare", skill: "before-after",
+      text: "Leave the old way *behind*",
+      items: pains,
+      eyebrow: "Before & after",
+      duration: beats(10),
+      transition: "whip",
+      media: compareMedia,
     });
   }
 
@@ -1192,6 +1248,9 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     if (role === "demo") return valueFirst ? rank.indexOf("demo") : rank.indexOf("tour") - 0.5;
     // The gallery follows the product tour (or the features, when there's no tour in the arc).
     if (role === "gallery") return (rank.indexOf("tour") >= 0 ? rank.indexOf("tour") : rank.indexOf("features")) + 0.4;
+    // Before / after follows the product's first appearance; the globe follows the features.
+    if (role === "compare") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.6;
+    if (role === "reach") return (["features", "bento", "tour"].map((r) => rank.indexOf(r)).find((i) => i >= 0) ?? rank.length - 2) + 0.6;
     // The product assembled from its own components is the first thing after the reveal.
     if (role === "meet" && scenes0.some((c) => c.role === "meet" && c.skill === "ui-assemble")) return rank.indexOf("reveal") + 0.3;
     if (role === "metric") return rank.indexOf("cards") - 0.25;

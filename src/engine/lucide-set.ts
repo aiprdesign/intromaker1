@@ -208,6 +208,11 @@ import {
   Command,
   Keyboard,
   BellRing,
+  ChevronsLeftRight,
+  Hash,
+  Kanban,
+  GitCommitHorizontal,
+  AtSign,
 } from "lucide";
 
 export type IconNode = [tag: string, attrs: Record<string, string | number | undefined>][];
@@ -421,4 +426,9 @@ export const LUCIDE = {
   Command,
   Keyboard,
   BellRing,
+  ChevronsLeftRight,
+  Hash,
+  Kanban,
+  GitCommitHorizontal,
+  AtSign,
 } as unknown as Record<string, IconNode>;

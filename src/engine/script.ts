@@ -74,7 +74,11 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
       return fit([head.split("|").map((w, k) => (k ? sentence(w.trim()) : sentence(w.trim()))).join(" ")], budget);
     case "demo":
     case "gallery":
+    case "reach":
       return fit([sentence(head)], budget);
+    case "compare":
+      // The old way, then the product: "Less time on spreadsheets and status meetings."
+      return fit([items.length >= 2 ? `${sentence(`Less time on ${list(items, 2)}`)} ${sentence(head)}` : "", sentence(head)], budget);
     case "features":
     case "bento":
       return fit([`${sentence(head)} ${sentence(list(items, 3))}`, `${sentence(head)} ${sentence(list(items, 2))}`, sentence(head)], budget);

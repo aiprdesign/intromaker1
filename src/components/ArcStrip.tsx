@@ -22,11 +22,22 @@ const ROLE_NAMES: Partial<Record<string, string>> = {
   promise: "Promise",
   metric: "Numbers",
   gallery: "Gallery",
+  reach: "Global",
+  compare: "Before & after",
   cta: "Call to action",
 };
 
 /** Interaction moments are named after what the viewer sees. */
-const DEMO_ICONS: Record<string, string> = { "command-k": "Command", "ai-prompt": "Sparkles", "click-flow": "MousePointerClick", "notify-stack": "BellRing" };
+const DEMO_ICONS: Record<string, string> = {
+  "command-k": "Command",
+  "ai-prompt": "Sparkles",
+  "click-flow": "MousePointerClick",
+  "notify-stack": "BellRing",
+  "code-deploy": "SquareTerminal",
+  kanban: "SquareKanban",
+  "live-cursors": "Users",
+  "chat-thread": "MessagesSquare",
+};
 
 /** The film's story arc at a glance: one chip per beat; click to jump to its editor. */
 export default function ArcStrip({ plan, onPick }: { plan: VideoPlan; onPick: (i: number) => void }) {

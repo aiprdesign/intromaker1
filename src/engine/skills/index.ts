@@ -5,6 +5,7 @@ import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
 import { gallerySkills } from "./gallery";
 import { mediaSkills } from "./media";
+import { momentSkills } from "./moments";
 import { saasSkills } from "./saas";
 import { signatureSkills } from "./signature";
 import { typographySkills } from "./typography";
@@ -14,6 +15,7 @@ export const SKILLS: Skill[] = [
   // Ordered for the showcase: SaaS launch toolkit first.
   ...saasSkills,
   ...interactionSkills,
+  ...momentSkills,
   ...typeFxSkills,
   ...gallerySkills,
   ...componentSkills,

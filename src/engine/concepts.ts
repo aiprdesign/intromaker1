@@ -23,6 +23,8 @@ export type ConceptRole =
   | "demo"
   | "metric"
   | "gallery"
+  | "reach"
+  | "compare"
   | "cta";
 
 export interface Concept {
@@ -284,6 +286,8 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
   demo: "MousePointerClick",
   metric: "TrendingUp",
   gallery: "Images",
+  reach: "Earth",
+  compare: "ArrowLeftRight",
 };
 
 /**
@@ -295,12 +299,15 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
  * is filled from the product's real features by the director.
  */
 export interface DemoSpec {
-  skill: "command-k" | "ai-prompt" | "click-flow" | "notify-stack";
+  skill: "command-k" | "ai-prompt" | "click-flow" | "notify-stack" | "code-deploy" | "kanban" | "live-cursors" | "chat-thread";
   title: string;
   eyebrow: string;
-  /** click-flow: the button label. */
+  /** click-flow: the button label; kanban: its columns ("A / B / C"); live-cursors: the comment; chat-thread: the product's card ("Title — detail"). */
   action?: string;
-  /** command-k: supporting commands; click-flow: tasks; notify-stack: "Event — detail"; ai-prompt: [prompt]. */
+  /**
+   * command-k: supporting commands; click-flow: tasks; notify-stack: "Event — detail"; ai-prompt: [prompt];
+   * code-deploy: pipeline steps; kanban / live-cursors: cards; chat-thread: messages.
+   */
   items: string[];
 }
 
@@ -358,4 +365,36 @@ export const DEMOS: Record<string, DemoSpec> = {
     skill: "notify-stack", title: "Every conversation, *one place*", eyebrow: "Live",
     items: ["New message — The team replied", "You were mentioned — In #launch", "Call starting — The team is joining", "Thread resolved — Marked done"],
   },
+};
+
+/**
+ * More moments a category's films stage, so takes and variations differ: the director picks
+ * between the category's main moment and these by seed.
+ */
+export const DEMO_ALTS: Record<string, DemoSpec[]> = {
+  devtools: [{ skill: "code-deploy", title: "From commit to *live*", eyebrow: "Ship it", items: ["Build started", "Checks passed", "Preview ready", "Deployed to production"] }],
+  productivity: [
+    { skill: "kanban", title: "Work that *moves*", eyebrow: "In action", action: "To do / In progress / Done", items: ["Plan the launch", "Design the homepage", "Write release notes", "Review with the team"] },
+  ],
+  sales: [
+    { skill: "kanban", title: "Every deal, *moving forward*", eyebrow: "Pipeline", action: "Lead / Demo / Won", items: ["New inbound lead", "Discovery call", "Proposal sent", "Contract review"] },
+  ],
+  hr: [
+    { skill: "kanban", title: "Hiring, *in one view*", eyebrow: "Pipeline", action: "Applied / Interview / Hired", items: ["Product designer", "Frontend engineer", "Account executive", "Support lead"] },
+  ],
+  communication: [
+    {
+      skill: "chat-thread", title: "Every conversation, *one place*", eyebrow: "In action", action: "Launch checklist — All tasks complete",
+      items: ["Is the launch page ready to go?", "Final copy is in, checking the visuals now", "Looks great, let's ship it"],
+    },
+  ],
+  creative: [
+    { skill: "live-cursors", title: "Create it *together*", eyebrow: "Multiplayer", action: "Love this direction", items: ["Moodboard", "Homepage hero", "Brand colours", "Launch visuals"] },
+  ],
+};
+
+/** A board every teammate works on at once: the live-cursors moment. */
+export const COLLAB_DEMO: DemoSpec = {
+  skill: "live-cursors", title: "Build it *together*", eyebrow: "Multiplayer", action: "Looks great, let's ship it",
+  items: ["Launch plan", "Homepage design", "Customer research", "Release notes"],
 };

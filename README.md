@@ -5,7 +5,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, header logo, screenshots, product videos and brand colours, then storyboards a launch film around them. The film follows a hook, logo, a product tour of the real UI, a features bento, integrations, and a CTA with the site's own button label. Copy is claim-safe by default (see below); proof beats (real testimonials, customer logos and stats only) are added when you switch to *Use site's claims*.
 - **SaaS launch-film mode**: modelled on popular product-launch videos. It uses sentence-case blur reveals with gradient accent words, rotating word swaps, a cursor-driven UI zoom tour with callouts, bento feature grids with live micro-animations, floating glass UI widgets, pain-to-solution strikes, an integration orbit, real testimonials, a customer-logo marquee and a CTA button that the cursor clicks. It has a grid, spotlight and beam backdrop, spring physics and glass cards with animated border beams, and is scored with an upbeat track plus UI sound effects synced to every click, pop and whoosh.
 - **Two styles**: *SaaS launch* (auto-selected for websites and product prompts) or *Epic trailer*.
-- **47 motion skills**: Gallery Flow, 3D Carousel, Tilt Wall, UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
+- **53 motion skills**: Code to Deploy, Dot Globe, Live Cursors, Kanban Board, Before / After, Chat Thread, Gallery Flow, 3D Carousel, Tilt Wall, UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
 - **AI Director**: Claude storyboards the prompt into a hook, a title reveal, feature beats and an outro. It picks the skills, palette, typeface and tempo. When no API key is set, a built-in rule-based director does the same job offline.
 - **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remix, and share a link.
 - **A produced soundtrack, arranged to the film**: SaaS films get a modern cue synthesised in the browser, with no stock music and no licences. It's edited like a record:
@@ -65,7 +65,14 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - an AI prompt that streams its answer, in the product's own words;
   - a one-click flow (micro-zoom, then a task cascade);
   - an iOS-style notification stack;
-  - a growth chart for one real metric.
+  - a growth chart for one real metric;
+  - code to deploy: code types into an editor, `git push` runs and the pipeline ticks green (developer tools);
+  - a kanban board where a cursor drags a card and the rest of the work flows into Done (projects, hiring and sales pipelines);
+  - live cursors: named teammates move, lasso and comment on a shared board (collaboration tools);
+  - a chat thread with typing indicators, a reaction and the product's own update card (messaging and support).
+
+  Each category has more than one moment it can stage, and the seed picks between them, so takes and variations differ.
+- **Scene moments**: a dotted globe that turns while arcs fly between cities and land with live events (only when the site talks about global use), and a before/after slider that drags from a grey, cluttered "old way" (the site's own pains) to the product screenshot.
 - **The real logo, whatever it's made of**: the brand mark is found in the site header the way a person would find it (the home link or a logo-named element near the top-left), and taken in its best form:
   - SVG first: inline SVG logos serialised with their real colours, an SVG offered in `<picture>` or `srcset`, or an SVG twin served beside a raster logo (`logo.png` → `logo.svg`);
   - otherwise the largest raster the page offers (PNG, WebP, JPG; GIF only as a last resort);
@@ -194,7 +201,7 @@ Known limits:
 ```
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
-  skills/         the 47 skills (saas.ts, interactions.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  skills/         the 53 skills (saas.ts, interactions.ts, moments.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
   saasfx.ts       SaaS design toolkit: springs, grid/beam backdrop, glass cards, border beams, cursor, icons, blur-in type
   media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass

@@ -28,7 +28,7 @@ const PLANS = [
     name: "Free",
     price: "$0",
     period: "forever",
-    features: ["All 47 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
+    features: ["All 53 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
     cta: "Start creating",
   },
   {
@@ -82,7 +82,7 @@ export default function Home() {
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See all 47 skills →
+            See all 53 skills →
           </Link>
         </div>
       </section>

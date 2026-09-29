@@ -23,10 +23,10 @@ type Issue = { metric: string; points: number; msg: string };
 const STOP = new Set("a an the of to in on at by for with and or but your our my their this that is are be as from into".split(" "));
 const words = (s: string) => s.replace(/\*/g, "").split(/\s+/).filter(Boolean);
 const norm = (s: string) => s.toLowerCase().replace(/\*/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-const PRODUCT = new Set(["meet", "tour", "cards", "gallery"]);
+const PRODUCT = new Set(["meet", "tour", "cards", "gallery", "compare"]);
 // A demo beat (command palette, AI answer, one-click flow, live notifications) shows value too.
 const VALUE = new Set(["features", "how", "bento", "demo"]);
-const IN_ACTION = new Set(["tour", "meet", "cards", "demo", "gallery"]);
+const IN_ACTION = new Set(["tour", "meet", "cards", "demo", "gallery", "reach"]);
 const ROLE_OK = new Set(["promise"]);
 const PROOF = new Set(["quote", "logos", "cards", "stat"]);
 

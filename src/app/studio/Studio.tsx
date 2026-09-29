@@ -385,15 +385,18 @@ export default function Studio() {
     const skill = params.get("skill") as SkillId | null;
     if (skill && SKILL_MAP[skill]) {
       const s = SKILL_MAP[skill];
+      // Preview one skill with its sample content (?aspect=9:16 and ?dur=6 for other formats and lengths).
+      const asp = params.get("aspect") as Aspect | null;
+      const dur = Number(params.get("dur")) || 4.5;
       setPlan(
         sanitizePlan({
           title: s.name,
           palette: pal ?? "cyber",
           font: "anton",
-          aspect: "16:9",
+          aspect: asp === "9:16" || asp === "1:1" ? asp : "16:9",
           bpm: 124,
           seed: 7,
-          scenes: [{ skill, text: s.sample.text, subtext: s.sample.subtext, duration: 4.5, transition: "cut" }],
+          scenes: [{ skill, text: s.sample.text, subtext: s.sample.subtext, items: s.sample.items, duration: dur, transition: "cut" }],
         }),
       );
       return;

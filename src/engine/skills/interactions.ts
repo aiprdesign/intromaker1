@@ -30,14 +30,14 @@ const titleOf = (item: string) => item.split(/\s+[—–]\s+/)[0].trim();
 const descOf = (item: string) => item.split(/\s+[—–]\s+/)[1]?.trim() ?? "";
 const isPortrait = (sc: SkillContext) => sc.h > sc.w;
 
-function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
+export function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
   if (ctx.measureText(text).width <= maxW) return text;
   let s = text;
   while (s.length > 1 && ctx.measureText(`${s}…`).width > maxW) s = s.slice(0, -1);
   return `${s.replace(/[\s,.;:]+$/, "")}…`;
 }
 
-function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
+export function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
   const out: string[] = [];
   let line = "";
   for (const wd of text.split(/\s+/).filter(Boolean)) {
@@ -52,7 +52,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number) {
 }
 
 /** Focal isolation: dim the periphery around the UI that matters. */
-function focus(sc: SkillContext, cx: number, cy: number, r: number, k: number) {
+export function focus(sc: SkillContext, cx: number, cy: number, r: number, k: number) {
   if (k <= 0) return;
   const { ctx, w, h, palette } = sc;
   const g = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, Math.max(w, h) * 0.75);
@@ -103,7 +103,7 @@ function keycap(sc: SkillContext, label: string, cx: number, cy: number, size: n
 }
 
 /** Gradient app-icon tile with a Lucide glyph. */
-function iconTile(sc: SkillContext, icon: string, cx: number, cy: number, s: number, progress = 1) {
+export function iconTile(sc: SkillContext, icon: string, cx: number, cy: number, s: number, progress = 1) {
   const { ctx, palette } = sc;
   ctx.save();
   ctx.beginPath();
@@ -118,7 +118,7 @@ function iconTile(sc: SkillContext, icon: string, cx: number, cy: number, s: num
 }
 
 /** Round check mark badge (done state). */
-function checkBadge(sc: SkillContext, cx: number, cy: number, r: number, k: number) {
+export function checkBadge(sc: SkillContext, cx: number, cy: number, r: number, k: number) {
   const { ctx, palette } = sc;
   if (k <= 0) return;
   ctx.save();
@@ -134,7 +134,7 @@ function checkBadge(sc: SkillContext, cx: number, cy: number, r: number, k: numb
 }
 
 /** macOS-style window chrome; returns the top of the content area. */
-function windowChrome(sc: SkillContext, x: number, y: number, ww: number, wh: number, title: string) {
+export function windowChrome(sc: SkillContext, x: number, y: number, ww: number, wh: number, title: string) {
   const { ctx, u, palette } = sc;
   glassCard(sc, x, y, ww, wh, { r: 18 * u });
   const bar = 46 * u;
@@ -160,7 +160,7 @@ function windowChrome(sc: SkillContext, x: number, y: number, ww: number, wh: nu
 }
 
 /** Cursor that glides along a curved path (asymmetric ease: fast out, soft landing). */
-function cursorPath(x0: number, y0: number, x1: number, y1: number, k: number) {
+export function cursorPath(x0: number, y0: number, x1: number, y1: number, k: number) {
   const e = ease.outQuart(clamp(k));
   const cx = lerp(x0, x1, 0.15) + (y1 - y0) * 0.18;
   const cy = lerp(y0, y1, 0.85);

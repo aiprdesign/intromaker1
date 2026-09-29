@@ -58,7 +58,7 @@ const fits = new Map<string, HTMLCanvasElement>();
  * colour with a margin, like a product shot. Close-enough images and videos are left as they are
  * (UI components only when nearly exact: their text runs right to the edges).
  */
-function fitted(img: Img, key: string, aspect: number, p: Palette, ui: boolean): Img {
+export function fitted(img: Img, key: string, aspect: number, p: Palette, ui: boolean): Img {
   if (img instanceof HTMLVideoElement) return img;
   const { w, h } = sizeOf(img);
   if (Math.abs(Math.log(w / h / aspect)) < Math.log(ui ? 1.04 : 1.2)) return img;
@@ -94,7 +94,7 @@ function fitted(img: Img, key: string, aspect: number, p: Palette, ui: boolean):
 
 const mocks = new Map<string, HTMLCanvasElement>();
 /** A generated product screenshot (dashboard, table, chart) in the brand palette. */
-function mockShot(p: Palette, seed: number, i: number): HTMLCanvasElement {
+export function mockShot(p: Palette, seed: number, i: number): HTMLCanvasElement {
   const key = `${p.primary}${p.secondary}${p.bg0}${i % 6}`;
   const hit = mocks.get(key);
   if (hit) return hit;
@@ -195,7 +195,7 @@ function mockShot(p: Palette, seed: number, i: number): HTMLCanvasElement {
   return c;
 }
 
-function coverDraw(ctx: CanvasRenderingContext2D, img: Img, x: number, y: number, w: number, h: number, zoom = 1) {
+export function coverDraw(ctx: CanvasRenderingContext2D, img: Img, x: number, y: number, w: number, h: number, zoom = 1) {
   const s = sizeOf(img);
   if (!s.w || !s.h) return;
   const k = Math.max(w / s.w, h / s.h) * zoom;
@@ -556,7 +556,7 @@ export const gallerySkills: Skill[] = [
   {
     id: "gallery-flow",
     name: "Gallery Flow",
-    tagline: "The product's images in a rounded frame, joined by GPU transitions (warps, dreamy zooms, window slices, grid flips) with captions.",
+    tagline: "The product's images in a rounded frame, joined by GPU transitions (warps, zooms, window slices, grid flips) with captions.",
     bestFor: "Showing 3–5 real product images, screenshots or UI components in sequence. Headline = what they show; items = one caption per image.",
     sample: { text: "See it *in action*", items: ["Dashboards", "Reports", "Automations", "Team spaces"] },
     itemsHint: "One caption per image",

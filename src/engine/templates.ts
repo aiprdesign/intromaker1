@@ -26,6 +26,8 @@ export type Role =
   | "demo"
   | "metric"
   | "gallery"
+  | "reach"
+  | "compare"
   | "cta";
 
 export type TemplateCategory = "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
@@ -74,11 +76,13 @@ export const DEFAULT_ROLE_SKILL: Record<Role, SkillId> = {
   demo: "click-flow",
   metric: "chart-grow",
   gallery: "gallery-flow",
+  reach: "globe",
+  compare: "before-after",
   cta: "cta",
 };
 
 /** Interaction moments: the director picks one per film to suit the product, and templates keep it. */
-export const DEMO_SKILLS = new Set<SkillId>(["command-k", "ai-prompt", "click-flow", "notify-stack"]);
+export const DEMO_SKILLS = new Set<SkillId>(["command-k", "ai-prompt", "click-flow", "notify-stack", "code-deploy", "kanban", "live-cursors", "chat-thread"]);
 
 /** Base length of each role in beats (and a floor in seconds). */
 function roleLength(scene: Scene, role: Role): [number, number] {
@@ -98,6 +102,10 @@ function roleLength(scene: Scene, role: Role): [number, number] {
       return [12, 5.6];
     case "gallery":
       return [12, 5.8];
+    case "reach":
+      return [11, 5.4];
+    case "compare":
+      return [10, 5];
     case "bento":
       return [10, 4.4];
     case "cards":
@@ -115,7 +123,9 @@ function roleLength(scene: Scene, role: Role): [number, number] {
     case "features":
       return [(scene.items?.length ?? 4) * 1.5 + 6, 4.6];
     case "demo":
-      return scene.skill === "ai-prompt" ? [12, 5.6] : scene.skill === "notify-stack" ? [(scene.items?.length ?? 4) * 1.2 + 5, 4.4] : [10, 4.8];
+      if (scene.skill === "ai-prompt" || scene.skill === "code-deploy" || scene.skill === "kanban") return [12, 5.6];
+      if (scene.skill === "chat-thread") return [11, 5.2];
+      return scene.skill === "notify-stack" ? [(scene.items?.length ?? 4) * 1.2 + 5, 4.4] : [10, 4.8];
     case "metric":
       return [8, 4];
     case "cta":
@@ -595,6 +605,12 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "gallery-flow": "gallery",
   "carousel-3d": "gallery",
   "tilt-wall": "hook",
+  "code-deploy": "demo",
+  kanban: "demo",
+  "live-cursors": "demo",
+  "chat-thread": "demo",
+  globe: "reach",
+  "before-after": "compare",
   cta: "cta",
 };
 
