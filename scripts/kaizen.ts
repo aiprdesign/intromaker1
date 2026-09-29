@@ -196,7 +196,8 @@ function experience(plan: VideoPlan, site: SiteData | null, requested: number, a
     if (bad && damage++ < 3) add("damage", 2, `${where} ${bad}: "${x.slice(0, 60)}"`);
   }
   // Brand: the real logo is revealed when there is one; the close names the brand.
-  if (plan.brand?.logo && !sc.some((s) => s.skill === "logo-reveal")) add("brand", 3, "site has a logo but the film never reveals it");
+  // (Video in text shows the logo above its letters.)
+  if (plan.brand?.logo && !sc.some((s) => s.skill === "logo-reveal" || s.skill === "type-mask")) add("brand", 3, "site has a logo but the film never reveals it");
   const last = sc[sc.length - 1];
   if (last?.role === "cta" && last.vo && !last.vo.includes(name) && !(plan.brand?.domain && last.vo.includes(plan.brand.domain))) add("brand", 1, "CTA line doesn't name the brand");
   // The real product: captured UI and imagery should be on screen.

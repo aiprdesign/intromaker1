@@ -30,7 +30,7 @@ export interface LintContext {
 }
 
 const HOOKS = new Set(["blur-reveal", "pain-strike", "word-swap", "cinematic-title", "type-cascade"]);
-const NEEDS_ITEMS: Record<string, number> = { "ui-tour": 2, bento: 3, "pain-strike": 2, steps: 2, "word-swap": 2, "command-k": 3, "click-flow": 3, "notify-stack": 3, "ai-prompt": 1 };
+const NEEDS_ITEMS: Record<string, number> = { "node-graph": 2, "ui-tour": 2, bento: 3, "pain-strike": 2, steps: 2, "word-swap": 2, "command-k": 3, "click-flow": 3, "notify-stack": 3, "ai-prompt": 1 };
 const DEMO_SKILLS = new Set(["command-k", "ai-prompt", "click-flow", "notify-stack"]);
 
 const words = (s: string) => s.replace(/\*/g, "").split(/\s+/).filter(Boolean).length;

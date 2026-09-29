@@ -5,7 +5,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, header logo, screenshots, product videos and brand colours, then storyboards a launch film around them. The film follows a hook, logo, a product tour of the real UI, a features bento, integrations, and a CTA with the site's own button label. Copy is claim-safe by default (see below); proof beats (real testimonials, customer logos and stats only) are added when you switch to *Use site's claims*.
 - **SaaS launch-film mode**: modelled on popular product-launch videos. It uses sentence-case blur reveals with gradient accent words, rotating word swaps, a cursor-driven UI zoom tour with callouts, bento feature grids with live micro-animations, floating glass UI widgets, pain-to-solution strikes, an integration orbit, real testimonials, a customer-logo marquee and a CTA button that the cursor clicks. It has a grid, spotlight and beam backdrop, spring physics and glass cards with animated border beams, and is scored with an upbeat track plus UI sound effects synced to every click, pop and whoosh.
 - **Two styles**: *SaaS launch* (auto-selected for websites and product prompts) or *Epic trailer*.
-- **40 motion skills**: UI Assemble, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
+- **44 motion skills**: UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
 - **AI Director**: Claude storyboards the prompt into a hook, a title reveal, feature beats and an outro. It picks the skills, palette, typeface and tempo. When no API key is set, a built-in rule-based director does the same job offline.
 - **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remix, and share a link.
 - **A produced soundtrack, arranged to the film**: SaaS films get a modern cue synthesised in the browser, with no stock music and no licences. It's edited like a record:
@@ -37,6 +37,21 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - **Premium**: Cinematic Keynote, Editorial Serif, Luxe Noir.
 
   Each style has its own palette, typeface, GPU background, card style (glass, frosted, flat, brutalist or clay), text motion (blur, mask, pop, glow or typewriter), optional 3D stage and HUD or frame overlay, transitions, music and pacing. Switching restyles the film instantly.
+- **Modern text effects**, inspired by AI-video launch films (Runway, Higgsfield, ComfyUI). Every SaaS headline can use:
+  - *Decode*: characters scramble through random glyphs, then lock in left to right;
+  - *Odometer*: letters roll up out of a mask;
+  - *Letter wave*: letters spring up one by one;
+  - *Streak*: words fly in on motion trails and stretch as they brake;
+  - *Chromatic*: cyan and magenta ghosts converge into crisp type;
+  - *Flip*: words flip up like a split-flap board;
+  - *Focus*: the line appears dimmed and lights up word by word;
+  - *Highlight*: a marker box wipes in behind the key word;
+  - *Shine*: the headline settles dimmed, then a light band sweeps across it;
+  - plus the originals (blur rise, mask slide, pop, typewriter, glow).
+
+  Pick one in *Style → Text effect* (live previews), or keep each template's own. All effects are deterministic per frame and stay crisp (no blur filters or halos). Two signature moments join them:
+  - **Video in Text**: the product name as giant type filled with the product's own footage, with the real logo above it. The camera then dives through a letter into the footage. Used as the brand moment of product-first cuts of 20 seconds or more.
+  - **Node Graph**: the steps as a ComfyUI-style workflow. Nodes pop in, wires draw between their ports and data pulses through to an output that completes. Used for how-it-works in AI and creative products.
 - **A studio that fits the screen**: settings sit in four tabs (*Create*, *Style*, *Colours*, *Voice*) with **Generate** and **Remix** pinned at the bottom. Create, Style and Voice fit a laptop screen without scrolling, and the preview stays in view. Templates show one category at a time, the background picker and example prompts fold away, and the last tab you used is remembered.
 - **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 20 dark and light palettes. A palette you pick survives template switches. After a website import, two buttons sit side by side on the site card: *Auto brand colours* (read from the whole page, the default) and *Logo colours* (read from the header logo alone; a one-colour logo gets a close analogous partner hue). A black-and-white logo has no colours to offer, so that option is greyed out.
 - **Edited like a real film**: whip pans, dolly zoom-throughs, pushes, dissolves and light leaks show the outgoing and incoming shots at the same time, and every cut lands on the beat.
@@ -124,7 +139,7 @@ npm run dev                  # http://localhost:3000
 | Route | What it is |
 |---|---|
 | `/` | Landing page with a live hero render, the skill showcase, how it works and pricing |
-| `/skills` | All 33 skills rendered live, with a palette switcher |
+| `/skills` | All the skills rendered live, with a palette switcher |
 | `/studio` | The editor. Accepts `?prompt=…`, `?skill=…&palette=…`, or `#plan=…` (shared links) |
 | `/studio?url=…` | Imports a website and generates an intro from it |
 | `POST /api/scrape` | `{ url }` → `{ site }`: brand, copy and asset URLs extracted from a web page |
@@ -173,7 +188,7 @@ Known limits:
 ```
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
-  skills/         the 40 skills (saas.ts, interactions.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  skills/         the 44 skills (saas.ts, interactions.ts, typefx.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
   saasfx.ts       SaaS design toolkit: springs, grid/beam backdrop, glass cards, border beams, cursor, icons, blur-in type
   media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass

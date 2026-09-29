@@ -41,6 +41,8 @@ export const SKILL_IDS = [
   "notify-stack",
   "chart-grow",
   "ui-assemble",
+  "type-mask",
+  "node-graph",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];

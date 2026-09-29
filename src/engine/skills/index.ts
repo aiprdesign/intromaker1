@@ -2,6 +2,7 @@ import type { Skill, SkillId } from "../types";
 import { componentSkills } from "./components";
 import { energySkills } from "./energy";
 import { interactionSkills } from "./interactions";
+import { typeFxSkills } from "./typefx";
 import { mediaSkills } from "./media";
 import { saasSkills } from "./saas";
 import { signatureSkills } from "./signature";
@@ -12,6 +13,7 @@ export const SKILLS: Skill[] = [
   // Ordered for the showcase: SaaS launch toolkit first.
   ...saasSkills,
   ...interactionSkills,
+  ...typeFxSkills,
   ...componentSkills,
   signatureSkills[0],
   signatureSkills[1],

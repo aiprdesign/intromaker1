@@ -86,11 +86,12 @@ function roleLength(scene: Scene, role: Role): [number, number] {
     case "hook":
       return [7, 3.2];
     case "reveal":
-      return [6, 2.8];
+      // Video in text needs time to hold the letters before diving through them.
+      return scene.skill === "type-mask" ? [9, 4.2] : [6, 2.8];
     case "meet":
       return [10, 5];
     case "how":
-      return [(scene.items?.length ?? 3) * 2 + 4, 4.4];
+      return scene.skill === "node-graph" ? [(scene.items?.length ?? 3) * 2 + 6, 5.2] : [(scene.items?.length ?? 3) * 2 + 4, 4.4];
     case "tour":
       return [12, 5.6];
     case "bento":
@@ -614,6 +615,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (role === "demo" && DEMO_SKILLS.has(scene.skill)) skill = scene.skill;
     // The product assembled from its own components beats a flat page scroll whenever it's available.
     if (role === "meet" && scene.skill === "ui-assemble") skill = scene.skill;
+    // Signature text moments the director chose on purpose (video in text, node graph) stay.
+    if (scene.skill === "type-mask" || scene.skill === "node-graph") skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

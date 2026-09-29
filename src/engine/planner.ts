@@ -953,13 +953,18 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     add(1, { role: "hook", skill: "blur-reveal", text: productHook || tagline, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
   }
   // 2. Reveal.
-  add(1, {
-    role: "reveal", skill: brand.logo ? "logo-reveal" : "particle-assemble",
-    text: site.name,
-    subtext: taglineFree ? tagline : site.domain,
-    duration: beats(6),
-    transition: "dolly",
-  });
+  // Product-first with real product footage: the name as giant type filled with the product,
+  // diving through a letter into it (Runway-style). Otherwise the logo reveal.
+  const revealMedia = angle === "product" && target >= 20 ? (video ?? images[0] ?? img(shots.hero)) : undefined;
+  add(1, revealMedia && site.name.length <= 14
+    ? { role: "reveal", skill: "type-mask", text: site.name, subtext: taglineFree ? tagline : undefined, duration: beats(9), transition: "dolly", media: revealMedia }
+    : {
+        role: "reveal", skill: brand.logo ? "logo-reveal" : "particle-assemble",
+        text: site.name,
+        subtext: taglineFree ? tagline : site.domain,
+        duration: beats(6),
+        transition: "dolly",
+      });
   // 3. Meet: the real product, rebuilt from its own UI components (or the page scrolling by).
   if (shots.hero || shots.full) {
     const assemble = !!shots.hero;
@@ -975,7 +980,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 4. How it works.
   if (site.steps && site.steps.length >= 2) {
     add(target >= 30 ? 3 : 5, {
-      role: "how", skill: "steps",
+      // AI and creative tools show their steps as a node workflow (ComfyUI-style).
+      role: "how", skill: (concept.id === "ai" || concept.id === "creative") && site.steps.length >= 3 ? "node-graph" : "steps",
       text: `Get started in *${site.steps.length} steps*`,
       items: site.steps.slice(0, 4),
       eyebrow: "How it works",
