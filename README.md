@@ -129,7 +129,44 @@ npm run dev                  # http://localhost:3000
 | `/studio?url=…` | Imports a website and generates an intro from it |
 | `POST /api/scrape` | `{ url }` → `{ site }`: brand, copy and asset URLs extracted from a web page |
 | `GET /api/asset?url=…` | Same-origin image/video proxy (with Range support) so website media can be drawn and exported |
-| `POST /api/generate` | `{ prompt, aspect, length, palette?, seed?, site?, colors? }` → `{ plan, engine }` |
+| `POST /api/generate` | `{ prompt, aspect, length, palette?, seed?, site?, colors?, safe? }` → `{ plan, engine }` |
+| `GET /api/health` | Liveness for the host: `{ ok, storage, persistent, rateLimits }` |
+| `/privacy` | What happens to imported sites, API keys and videos |
+
+## Deploy (Docker)
+
+The image runs Next's standalone server with a headless Chromium for live website capture. Videos are rendered in each visitor's browser, so the server does no video work.
+
+```bash
+docker build -t intromaker .
+docker run -p 3000:3000 -v intromaker-data:/data intromaker     # http://localhost:3000
+```
+
+**Render**: New → Blueprint → this repo. `render.yaml` defines one web service from the Dockerfile, a 1 GB persistent disk at `/data`, the health check and the settings below. Railway, Fly.io or any VPS run the same image; mount a volume at `/data`.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `INTROMAKER_DATA_DIR` | `/data` in the image | Where captured screenshots are stored; mount a persistent volume here |
+| `INTROMAKER_SHOT_TTL_DAYS` / `INTROMAKER_SHOT_MAX_MB` | 7 / 1024 | Captures are deleted after this many days; the folder is held under this size, oldest first |
+| `INTROMAKER_MAX_CAPTURES` | 2 | Headless browser sessions at once (about 300 MB each); more wait briefly, then fall back to reading the HTML |
+| `INTROMAKER_PROXY_HOPS` | 1 | Trusted reverse proxies in front; the client address is read from `X-Forwarded-For` counted from the right, so it can't be spoofed. Use 0 when the server faces the internet directly |
+| `INTROMAKER_RATE_LIMIT` | on in production | `off` disables the limits |
+| `ANTHROPIC_API_KEY` | none | Optional Claude key for the AI director; visitors can bring their own |
+| `INTROMAKER_AI_DAILY_BUDGET` | 200 | Generations per day, all visitors combined, paid by the server's key; after it, the built-in director is used |
+
+**What protects a public deploy**:
+- **Rate limits** per visitor on import (8 per 10 min), the image proxy, generation, voice and key checks. Over the limit you get a `429` with `Retry-After`. Generation that the server's own AI key pays for also has a per-visitor and a shared daily budget, and degrades to the built-in director rather than failing.
+- **Capture queue**: live captures run a bounded number of browser sessions, with a wait list and a hard timeout.
+- **SSRF guard**: only public `http(s)` addresses; loopback, private, link-local, CGNAT, cloud-metadata, IPv4-mapped and NAT64 IPv6 forms and numeric IP tricks are refused. Every redirect hop is re-checked. Server-side fetches are pinned to the checked address at connect time, which defeats DNS rebinding. Live capture checks every request the page makes.
+- **Local AI** (Ollama, LM Studio) is only reachable from the server when it runs on your own machine; hosted, it runs from the visitor's browser.
+- **Headers**: `nosniff`, `X-Frame-Options: DENY`, a strict referrer policy, a permissions policy and HSTS; captured SVGs are served with a sandboxing CSP.
+- **Keys** stay in the visitor's browser and are removed from error messages.
+
+`npm run check:hosting` verifies all of this in production mode (rate limits, spoofing, the AI budget, storage clean-up, around 30 SSRF cases including DNS rebinding, local AI).
+
+Known limits:
+- Rate limits and the AI budget are in memory, which suits a single instance. Several instances would share them through Redis behind the same `rateLimit()` interface.
+- The headless browser resolves DNS itself, so for defence in depth run it where the container has no route to internal services (the default on Render, Railway and Fly).
 
 ## Architecture
 

@@ -1712,3 +1712,37 @@ button.brand-colors.on {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ───────── Privacy ───────── */
+.legal {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 120px 24px 64px;
+  line-height: 1.65;
+}
+.legal h1 {
+  font-family: var(--display);
+  font-size: 44px;
+  margin-bottom: 12px;
+}
+.legal h2 {
+  font-size: 18px;
+  margin: 32px 0 8px;
+}
+.legal p,
+.legal li {
+  color: var(--muted);
+}
+.legal .lead {
+  font-size: 18px;
+  color: var(--text);
+}
+.legal ul {
+  padding-left: 20px;
+}
+.legal code {
+  font-family: var(--mono, monospace);
+}
+.legal .back {
+  margin-top: 36px;
+}

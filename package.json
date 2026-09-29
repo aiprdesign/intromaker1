@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "kaizen": "tsx scripts/kaizen.ts"
+    "kaizen": "tsx scripts/kaizen.ts",
+    "check:hosting": "tsx scripts/hosting-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -24,6 +25,7 @@
     "playwright-core": "^1.56.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "undici": "^7.30.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

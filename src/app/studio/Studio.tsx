@@ -780,7 +780,10 @@ export default function Studio() {
               <button className="link-btn" onClick={() => setAiOpen(true)}>
                 Add an AI key
               </button>
-            )}
+            )} ·{" "}
+            <a href="/privacy" target="_blank" rel="noopener">
+              Privacy
+            </a>
           </p>
           {note && <p className="hint warn">{note}</p>}
 

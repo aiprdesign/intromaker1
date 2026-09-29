@@ -1,0 +1,28 @@
+# Render Blueprint: New → Blueprint → pick this repo. One web service from the Dockerfile, with a
+# persistent disk for captured screenshots. (Disks need a paid instance; on the free plan remove
+# the `disk` block and captures live until the next restart.)
+services:
+  - type: web
+    name: intromaker
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      # Render's proxy adds the visitor's address to X-Forwarded-For.
+      - key: INTROMAKER_PROXY_HOPS
+        value: "1"
+      # One headless browser at a time fits a 512 MB instance; raise on bigger plans.
+      - key: INTROMAKER_MAX_CAPTURES
+        value: "1"
+      - key: INTROMAKER_SHOT_MAX_MB
+        value: "800"
+      # Optional: a Claude key for the AI director. Visitors can always bring their own.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: INTROMAKER_AI_DAILY_BUDGET
+        value: "100"

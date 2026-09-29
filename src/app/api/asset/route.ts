@@ -1,4 +1,5 @@
 import { safeFetch, UrlError } from "@/lib/netguard";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,8 @@ const MAX_VIDEO = 150 * 1024 * 1024;
  * can seek.
  */
 export async function GET(req: Request) {
+  const limited = rateLimit(req, "asset");
+  if (limited) return limited;
   const target = new URL(req.url).searchParams.get("url");
   if (!target) return new Response("Missing url", { status: 400 });
   try {

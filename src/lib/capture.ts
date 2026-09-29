@@ -1,10 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { Browser, Page } from "playwright-core";
 import type { SitePart } from "@/engine/types";
 import { assertPublicUrl } from "./netguard";
+import { saveShot } from "./storage";
 
 /**
  * Live website capture with the user's own installed Chrome/Edge (no browser download):
@@ -14,7 +12,7 @@ import { assertPublicUrl } from "./netguard";
  * Falls back gracefully (returns null) when no browser is available.
  */
 
-export const SHOT_DIR = join(tmpdir(), "intromaker-shots");
+export { SHOT_DIR } from "./storage";
 
 export interface Capture {
   html: string;
@@ -31,7 +29,8 @@ async function launch(): Promise<Browser | null> {
   const { chromium } = await import("playwright-core");
   const attempts: Parameters<typeof chromium.launch>[0][] = [];
   if (process.env.INTROMAKER_BROWSER) attempts.push({ executablePath: process.env.INTROMAKER_BROWSER });
-  attempts.push({ channel: "chrome" }, { channel: "msedge" }, { channel: "chromium" });
+  // Your installed Chrome or Edge locally; in the Docker image, the Chromium Playwright installed.
+  attempts.push({ channel: "chrome" }, { channel: "msedge" }, { channel: "chromium" }, {});
   for (const opts of attempts) {
     try {
       return await chromium.launch({ ...opts, headless: true, timeout: 15_000 });
@@ -62,9 +61,7 @@ function hostAllowed(url: string) {
 }
 
 export async function save(id: string, data: Buffer | string, ext: "jpg" | "png" | "svg" = "jpg") {
-  await mkdir(SHOT_DIR, { recursive: true });
-  await writeFile(join(SHOT_DIR, `${id}.${ext}`), data);
-  return `/api/shot?id=${id}`;
+  return saveShot(id, data, ext);
 }
 
 /** Remove script/handlers from site SVG markup before we store and serve it. */
@@ -347,7 +344,56 @@ async function captureLogo(page: Page, key: string): Promise<string | null> {
   return save(`${key}-logo`, Buffer.from(keyed, "base64"), "png");
 }
 
+/*
+ * Capture queue. Each capture is a headless browser session (a few hundred MB of memory), so a
+ * hosted server runs at most INTROMAKER_MAX_CAPTURES at once (default 2); a few more wait their
+ * turn, and beyond that (or after a hard timeout) the import falls back to reading the HTML.
+ */
+const MAX_ACTIVE = Math.max(1, Number(process.env.INTROMAKER_MAX_CAPTURES ?? 2) || 2);
+const MAX_WAITING = 6;
+const WAIT_MS = 45_000;
+const HARD_TIMEOUT_MS = 90_000;
+let active = 0;
+const waiting: (() => void)[] = [];
+
+async function slot(): Promise<(() => void) | null> {
+  if (active >= MAX_ACTIVE) {
+    if (waiting.length >= MAX_WAITING) return null;
+    const got = await new Promise<boolean>((resolve) => {
+      const go = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        const i = waiting.indexOf(go);
+        if (i >= 0) waiting.splice(i, 1);
+        resolve(false);
+      }, WAIT_MS);
+      waiting.push(go);
+    });
+    if (!got) return null;
+  } else active++;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const next = waiting.shift();
+    if (next) next(); // the slot passes straight to the next in line
+    else active--;
+  };
+}
+
+/** Live capture through the queue; null means "use the static import instead". */
 export async function captureSite(url: string): Promise<Capture | null> {
+  const release = await slot();
+  if (!release) return null;
+  const run = captureSiteNow(url).finally(release);
+  // The caller stops waiting after the hard timeout; the session still finishes (and frees its
+  // slot) on its own.
+  return Promise.race([run.catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), HARD_TIMEOUT_MS).unref?.())]);
+}
+
+async function captureSiteNow(url: string): Promise<Capture | null> {
   const browser = await launch();
   if (!browser) return null;
   const key = createHash("sha1").update(url + Date.now()).digest("hex").slice(0, 16);

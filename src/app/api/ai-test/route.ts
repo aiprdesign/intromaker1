@@ -1,10 +1,13 @@
 import { z } from "zod/v4";
 import { AiError, describe, readAiConfig, runDirector } from "@/lib/ai";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
 /** Checks a provider/key/model with a tiny structured request. */
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "aiCheck");
+  if (limited) return limited;
   const cfg = readAiConfig(await req.json().catch(() => null));
   if (!cfg || cfg.provider === "builtin") return Response.json({ ok: true, label: "Built-in director (no AI key needed)" });
   try {

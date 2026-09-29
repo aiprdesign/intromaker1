@@ -6,6 +6,7 @@ import { AiError, describe, envClaudeAvailable, readAiConfig, runDirector, serve
 import { SHOT_DIR } from "@/lib/capture";
 import { lintStoryboard, repairStoryboard, reviewBrief } from "@/lib/review";
 import { PALETTES } from "@/engine/palettes";
+import { rateLimit, spendServerAi } from "@/lib/ratelimit";
 import {
   beatSync,
   brandFromSite,
@@ -304,6 +305,8 @@ function readDraft(schema: z.ZodType, raw: unknown): z.infer<typeof SitePlanSche
 }
 
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "generate");
+  if (limited) return limited;
   let body: Body;
   try {
     body = await req.json();
@@ -353,6 +356,11 @@ export async function POST(req: Request) {
         : null;
   if (!ai || (!c.prompt.trim() && !c.site)) {
     return Response.json({ plan: c.builtin(), engine: "builtin" });
+  }
+  // The server's own key is a shared budget: per visitor and per day. Visitors' own keys aren't counted.
+  if (!userAi) {
+    const spend = spendServerAi(req);
+    if (!spend.ok) return Response.json({ plan: c.builtin(), engine: "builtin", note: `${spend.reason}; used the built-in director. Add your own AI key for more.` });
   }
 
   try {

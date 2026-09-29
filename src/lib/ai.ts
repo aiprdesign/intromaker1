@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod/v4";
-import { assertPublicUrl } from "./netguard";
+import { assertPublicUrl, guardedFetch } from "./netguard";
 import { PRESET_MAP, PROVIDER_PRESETS, type ProviderPreset } from "./providers";
 
 /**
@@ -200,7 +200,8 @@ async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: Di
       { type: "text", text: call.text + instruction },
       ...(withImages ? call.images.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mediaType};base64,${i.data}` } })) : []),
     ];
-    return fetch(`${base}/chat/completions`, {
+    return guardedFetch(`${base}/chat/completions`, {
+      local: serverReachesLocal(),
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
@@ -325,7 +326,7 @@ export async function listModels(cfg: AiConfig): Promise<string[]> {
         .map((m) => m.name.replace(/^models\//, ""));
     } else {
       const { base, headers } = await openAiEndpoint(cfg);
-      const res = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(20_000) });
+      const res = await guardedFetch(`${base}/models`, { headers, signal: AbortSignal.timeout(20_000), local: serverReachesLocal() });
       if (res.status === 401 || res.status === 403) throw new AiError("The provider rejected the API key.");
       if (!res.ok) throw new AiError(`${preset.name} doesn't list models (${res.status}); type the model name instead.`);
       const data = (await res.json()) as { data?: { id: string }[]; models?: { id?: string; name?: string }[] };

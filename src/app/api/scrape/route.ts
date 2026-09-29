@@ -1,9 +1,12 @@
 import { UrlError } from "@/lib/netguard";
 import { scrapeSite } from "@/lib/scrape";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "scrape");
+  if (limited) return limited;
   let url = "";
   try {
     url = String((await req.json()).url ?? "").slice(0, 2000);

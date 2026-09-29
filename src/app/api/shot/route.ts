@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SHOT_DIR } from "@/lib/capture";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,8 @@ const TYPES = { jpg: "image/jpeg", png: "image/png", svg: "image/svg+xml" } as c
 
 /** Serves screenshots, UI components and header logos captured from websites. */
 export async function GET(req: Request) {
+  const limited = rateLimit(req, "shot");
+  if (limited) return limited;
   const id = new URL(req.url).searchParams.get("id") ?? "";
   if (!/^[a-f0-9]{16}-(hero|full|s\d|p\d{1,2}|logo)$/.test(id)) return new Response("Bad id", { status: 400 });
   // Logos are PNG or SVG; everything else is JPEG.

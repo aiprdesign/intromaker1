@@ -1,4 +1,6 @@
-import { AiError, checkBaseUrl, redact } from "@/lib/ai";
+import { AiError, checkBaseUrl, redact, serverReachesLocal } from "@/lib/ai";
+import { guardedFetch } from "@/lib/netguard";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -14,6 +16,8 @@ const NARRATOR =
   "Speak as a confident, warm product-launch narrator: clear and upbeat, unhurried, with a natural smile in the voice. Short pauses at full stops.";
 
 export async function POST(req: Request) {
+  const limited = rateLimit(req, "tts");
+  if (limited) return limited;
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   const provider = String(body?.provider ?? "");
   const text = String(body?.text ?? "").trim().slice(0, 600);
@@ -50,7 +54,8 @@ export async function POST(req: Request) {
         key = clientKey;
       } else if (!key) throw new AiError("Add your OpenAI API key in the voice-over settings.");
       const m = model ?? (provider === "openai" ? "gpt-4o-mini-tts" : "kokoro");
-      const res = await fetch(`${base}/audio/speech`, {
+      const res = await guardedFetch(`${base}/audio/speech`, {
+        local: provider === "custom" ? serverReachesLocal() : true,
         method: "POST",
         headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
         body: JSON.stringify({
