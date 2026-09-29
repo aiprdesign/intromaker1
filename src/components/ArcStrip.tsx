@@ -21,6 +21,7 @@ const ROLE_NAMES: Partial<Record<string, string>> = {
   integrations: "Integrations",
   promise: "Promise",
   metric: "Numbers",
+  gallery: "Gallery",
   cta: "Call to action",
 };
 

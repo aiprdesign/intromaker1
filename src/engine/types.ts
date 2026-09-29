@@ -43,6 +43,9 @@ export const SKILL_IDS = [
   "ui-assemble",
   "type-mask",
   "node-graph",
+  "gallery-flow",
+  "carousel-3d",
+  "tilt-wall",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];

@@ -5,7 +5,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Website → intro**: paste a URL and IntroMaker imports the site's name, tagline, feature headlines, stats, call to action, header logo, screenshots, product videos and brand colours, then storyboards a launch film around them. The film follows a hook, logo, a product tour of the real UI, a features bento, integrations, and a CTA with the site's own button label. Copy is claim-safe by default (see below); proof beats (real testimonials, customer logos and stats only) are added when you switch to *Use site's claims*.
 - **SaaS launch-film mode**: modelled on popular product-launch videos. It uses sentence-case blur reveals with gradient accent words, rotating word swaps, a cursor-driven UI zoom tour with callouts, bento feature grids with live micro-animations, floating glass UI widgets, pain-to-solution strikes, an integration orbit, real testimonials, a customer-logo marquee and a CTA button that the cursor clicks. It has a grid, spotlight and beam backdrop, spring physics and glass cards with animated border beams, and is scored with an upbeat track plus UI sound effects synced to every click, pop and whoosh.
 - **Two styles**: *SaaS launch* (auto-selected for websites and product prompts) or *Epic trailer*.
-- **44 motion skills**: UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
+- **47 motion skills**: Gallery Flow, 3D Carousel, Tilt Wall, UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
 - **AI Director**: Claude storyboards the prompt into a hook, a title reveal, feature beats and an outro. It picks the skills, palette, typeface and tempo. When no API key is set, a built-in rule-based director does the same job offline.
 - **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remix, and share a link.
 - **A produced soundtrack, arranged to the film**: SaaS films get a modern cue synthesised in the browser, with no stock music and no licences. It's edited like a record:
@@ -101,6 +101,12 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **New skill: Feature Icons**, the classic SaaS feature row. Glowing icon tiles draw themselves on, each with a title and a one-line benefit.
 - **60-30-10 colour rule** (default for SaaS films): 60% dominant background, 30% supporting colour for cards, panels and gradient fields, and 10% accent for highlight words, buttons, cursor and progress, in one hue. Shader gradients weight their colour spots in the same proportion, and the accent is the palette's most vivid colour. Switch to *Vibrant* in the studio for full-strength colour.
 - **High-end GPU backgrounds**: animated mesh gradients, grainy gradients, silk flow, smoke rings, a neural glow and light rays, rendered frame-exactly on the GPU with the open-source [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0). They're tinted from the palette and kept deep enough for text to stay readable. Every style has a signature background, and the studio's *Background* picker can put any gradient behind any style. Preview and export match exactly.
+- **Animated product galleries**: the site's own images, screenshots and captured UI components, animated on the GPU with two open-source libraries, [OGL](https://github.com/oframe/ogl) and [gl-transitions](https://github.com/gl-transitions/gl-transitions):
+  - *Gallery Flow*: images in sequence in a rounded frame, joined by shader transitions (cross-warp, directional warp, cross zoom, window slices, grid flip, morph, ripple, and a cube or swap on dark styles), each with a caption;
+  - *3D Carousel*: the images on a curved ring that turns card by card, the front card lit with its caption and a floor reflection;
+  - *Tilt Wall*: a perspective wall of product screenshots drifting behind the headline, the Linear- and Vercel-style hero look.
+
+  The director adds a gallery beat to 20s+ films when the page has enough imagery (a carousel for creative and e-commerce products and proof-first cuts), and story-led films can open on the tilt wall. UI components whose shape doesn't suit the frame are shown whole on their own surface colour, never cropped through their text. Every transition is a pure function of time, so preview and export match; without WebGL, each skill falls back to 2D.
 - **Every format**: all SaaS scenes are laid out for 16:9, 9:16 and 1:1.
 - **Colour theory with guard rails**: on top of 60-30-10, highlight words, buttons and beams are kept at ≥3:1 contrast with the background and body text at ≥7:1 (WCAG). A dark navy brand colour on a dark style is lifted until it reads.
 - **Honest copy**: KPI figures inside a product mockup are never taken as company stats, quotes drop their inline attribution, and section headings aren't mistaken for features.
@@ -188,7 +194,7 @@ Known limits:
 ```
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
-  skills/         the 44 skills (saas.ts, interactions.ts, typefx.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  skills/         the 47 skills (saas.ts, interactions.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
   saasfx.ts       SaaS design toolkit: springs, grid/beam backdrop, glass cards, border beams, cursor, icons, blur-in type
   media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass
@@ -200,6 +206,7 @@ src/engine/
   voice.ts        voice-over: voices, clip store, speakable text, word timings, timeline, captions
   script.ts       narrator script writer (one line per scene, sized to the scene)
   shaderbg.ts     WebGL2 runner for Paper Shaders gradients (frame-exact, shared context)
+  gl.ts           shared OGL renderer, image textures and gl-transitions for the gallery skills
   templates.ts    style templates (look, motion, music, pacing, role → skill)
   export.ts       WebCodecs offline export, export presets, PNG thumbnail
 src/app/api/generate/route.ts   Claude AI Director (structured output), falls back to planner.ts
@@ -249,6 +256,8 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 ## Third-party
 
 - [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0) by Paper Design. `src/engine/shaderbg.ts` includes their vertex shader source.
+- [OGL](https://github.com/oframe/ogl) (Unlicense), the minimal WebGL library behind the gallery skills.
+- [gl-transitions](https://github.com/gl-transitions/gl-transitions) (MIT; each transition carries its author's licence, all MIT), the GLSL transitions used by Gallery Flow.
 - Fonts via Fontsource: Inter, Space Grotesk, Anton, Instrument Serif and JetBrains Mono (SIL Open Font License).
 - [Lucide](https://lucide.dev) icons (ISC).
 - Voice-over (optional, loaded at runtime when chosen): [kokoro-js](https://github.com/hexgrad/kokoro) and the Kokoro-82M voice model (Apache-2.0).

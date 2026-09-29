@@ -25,6 +25,7 @@ export type Role =
   | "promise"
   | "demo"
   | "metric"
+  | "gallery"
   | "cta";
 
 export type TemplateCategory = "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
@@ -72,6 +73,7 @@ export const DEFAULT_ROLE_SKILL: Record<Role, SkillId> = {
   promise: "word-swap",
   demo: "click-flow",
   metric: "chart-grow",
+  gallery: "gallery-flow",
   cta: "cta",
 };
 
@@ -94,6 +96,8 @@ function roleLength(scene: Scene, role: Role): [number, number] {
       return scene.skill === "node-graph" ? [(scene.items?.length ?? 3) * 2 + 6, 5.2] : [(scene.items?.length ?? 3) * 2 + 4, 4.4];
     case "tour":
       return [12, 5.6];
+    case "gallery":
+      return [12, 5.8];
     case "bento":
       return [10, 4.4];
     case "cards":
@@ -588,6 +592,9 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "notify-stack": "demo",
   "chart-grow": "metric",
   "ui-assemble": "meet",
+  "gallery-flow": "gallery",
+  "carousel-3d": "gallery",
+  "tilt-wall": "hook",
   cta: "cta",
 };
 
@@ -616,7 +623,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // The product assembled from its own components beats a flat page scroll whenever it's available.
     if (role === "meet" && scene.skill === "ui-assemble") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (scene.skill === "type-mask" || scene.skill === "node-graph") skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

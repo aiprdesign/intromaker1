@@ -22,6 +22,7 @@ export type ConceptRole =
   | "promise"
   | "demo"
   | "metric"
+  | "gallery"
   | "cta";
 
 export interface Concept {
@@ -282,6 +283,7 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
   promise: "Zap",
   demo: "MousePointerClick",
   metric: "TrendingUp",
+  gallery: "Images",
 };
 
 /**

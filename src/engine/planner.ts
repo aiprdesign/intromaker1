@@ -917,6 +917,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     [...whole.headlines, ...whole.features, ...(whole.steps ?? []), ...(whole.pains ?? [])].join(" "),
   );
   const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
+  // Product imagery available to the gallery skills: the site's images and captured UI components.
+  const visuals = brand.images.length + (shots.parts ?? []).filter((p) => p.kind !== "button" && p.w * p.h > 120 * 90).length;
   // 1. Hook: the problem, the promise, or the proof.
   // Open on the problem only in categories whose films do (e-commerce / creative lead with the promise).
   const painHook = angle === "story" && target >= 20 && pains.length >= 2 && concept.arc.indexOf("pain") < concept.arc.indexOf("reveal");
@@ -950,7 +952,10 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   } else if (valueFirst && valueHook) {
     add(1, { role: "hook", skill: "blur-reveal", text: valueHook, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
   } else {
-    add(1, { role: "hook", skill: "blur-reveal", text: productHook || tagline, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
+    // Story-led films with plenty of product imagery open on the whole product: a tilted wall of
+    // its screenshots drifting behind the promise (Linear / Vercel hero look).
+    const wall = angle === "story" && !productHook && target >= 20 && visuals >= 4;
+    add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: productHook || tagline, eyebrow: wall ? undefined : `Introducing ${site.name}`, duration: beats(wall ? 9 : 7), transition: "cut" });
   }
   // 2. Reveal.
   // Product-first with real product footage: the name as giant type filled with the product,
@@ -1074,6 +1079,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // (When the film already shows the real product — a tour or the assembled page — it's optional.)
   const productShown = !!tourMedia || !!shots.hero;
   add(valueFirst && target >= 20 ? 2 : target < 20 ? (angle === "product" && !productShown ? 3 : 6) : !productShown ? 2 : target >= 30 ? 3 : 4, demoScene);
+  // 5c. Gallery: the product's own images and UI components, animated (GPU transitions, or a 3D
+  // carousel for visual products and proof-first cuts).
+  if (target >= 20 && visuals >= 3) {
+    const carousel = concept.id === "creative" || concept.id === "ecommerce" || angle === "proof";
+    add(target >= 30 ? 3 : 5, {
+      role: "gallery",
+      skill: carousel ? "carousel-3d" : "gallery-flow",
+      text: carousel ? `Made with *${site.name}*` : `A closer look at *${site.name}*`,
+      items: spareFeatures.slice(1, 5).length >= 2 ? spareFeatures.slice(1, 5) : undefined,
+      eyebrow: "Gallery",
+      duration: beats(12),
+      transition: "whip",
+      media: images[0] ?? img(shots.sections[0]),
+    });
+  }
 
   // 6. Proof — only real quotes, logos and numbers.
   // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
@@ -1170,6 +1190,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Beats an arc doesn't list (the positioning line) sit right after the reveal.
   const rankOf = (role?: string) => {
     if (role === "demo") return valueFirst ? rank.indexOf("demo") : rank.indexOf("tour") - 0.5;
+    // The gallery follows the product tour (or the features, when there's no tour in the arc).
+    if (role === "gallery") return (rank.indexOf("tour") >= 0 ? rank.indexOf("tour") : rank.indexOf("features")) + 0.4;
     // The product assembled from its own components is the first thing after the reveal.
     if (role === "meet" && scenes0.some((c) => c.role === "meet" && c.skill === "ui-assemble")) return rank.indexOf("reveal") + 0.3;
     if (role === "metric") return rank.indexOf("cards") - 0.25;

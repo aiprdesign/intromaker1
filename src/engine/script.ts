@@ -73,6 +73,7 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
     case "promise":
       return fit([head.split("|").map((w, k) => (k ? sentence(w.trim()) : sentence(w.trim()))).join(" ")], budget);
     case "demo":
+    case "gallery":
       return fit([sentence(head)], budget);
     case "features":
     case "bento":

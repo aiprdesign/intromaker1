@@ -124,7 +124,11 @@ function planAssets(plan: VideoPlan) {
 /** Resolve once every asset the plan uses has loaded (or failed). */
 export async function preloadPlanMedia(plan: VideoPlan) {
   const { imgs, vids } = planAssets(plan);
-  await Promise.all([...imgs.map(loadImage), ...vids.map(loadVideo), loadBrandFont(plan.brand?.font)]);
+  // GPU transitions are a separate chunk, fetched only when the film uses them.
+  const transitions = plan.scenes.some((s) => s.skill === "gallery-flow")
+    ? import("./gl").then((m) => m.loadTransitions()).then(() => notifyReady())
+    : Promise.resolve();
+  await Promise.all([...imgs.map(loadImage), ...vids.map(loadVideo), loadBrandFont(plan.brand?.font), transitions]);
 }
 
 /** Export: seek every video used at time `time` to its exact frame. */

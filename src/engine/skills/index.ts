@@ -3,6 +3,7 @@ import { componentSkills } from "./components";
 import { energySkills } from "./energy";
 import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
+import { gallerySkills } from "./gallery";
 import { mediaSkills } from "./media";
 import { saasSkills } from "./saas";
 import { signatureSkills } from "./signature";
@@ -14,6 +15,7 @@ export const SKILLS: Skill[] = [
   ...saasSkills,
   ...interactionSkills,
   ...typeFxSkills,
+  ...gallerySkills,
   ...componentSkills,
   signatureSkills[0],
   signatureSkills[1],
