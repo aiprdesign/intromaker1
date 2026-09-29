@@ -1746,3 +1746,54 @@ button.brand-colors.on {
 .legal .back {
   margin-top: 36px;
 }
+
+/* ───────── Text effect picker ───────── */
+.fx-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+.fx-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 3px 3px 5px;
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.fx-card:hover {
+  border-color: var(--line-2);
+}
+.fx-card.active {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15);
+}
+.fx-card canvas {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 7px;
+  display: block;
+  background: #000;
+}
+.fx-card.default {
+  justify-content: center;
+  padding: 8px;
+}
+.fx-name {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fx-note {
+  font-size: 10.5px;
+  color: var(--muted);
+  padding: 0 3px;
+}

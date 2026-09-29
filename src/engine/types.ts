@@ -195,6 +195,11 @@ export interface VoiceSettings {
   offset?: number;
 }
 
+/** Headline text effects: the five originals plus the modern AI-video set (decode, roll, letters,
+ * streak, chroma, flip, focus, highlight, shine). */
+export const TEXT_FX = ["blur", "mask", "pop", "glow", "type", "decode", "roll", "letters", "streak", "chroma", "flip", "focus", "highlight", "shine"] as const;
+export type TextFx = (typeof TEXT_FX)[number];
+
 export interface VideoPlan {
   title: string;
   palette: PaletteId;
@@ -222,6 +227,8 @@ export interface VideoPlan {
   scheme?: "60-30-10" | "vibrant";
   /** Glow on type and the highlight bloom (default on). Off gives crisp, halo-free text. */
   glow?: boolean;
+  /** Headline text effect chosen in the studio; overrides the template's (look.text). */
+  textFx?: TextFx;
   /** Flavour of the SaaS score. */
   flavor?: "tech" | "soft" | "pop" | "minimal" | "neon";
   /** Voice-over settings (the lines live on the scenes; audio in the clip store). */
@@ -249,7 +256,7 @@ export interface Look {
   beams: number;
   aurora: number;
   /** Headline animation: blur-in, crisp mask slide, bouncy pop, or slow glowing reveal. */
-  text?: "blur" | "mask" | "pop" | "glow" | "type";
+  text?: TextFx;
   /** Foreground lens bokeh (off for SaaS looks unless true). */
   bokeh?: boolean;
   /** Film grain strength multiplier. */

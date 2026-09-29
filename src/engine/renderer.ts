@@ -69,8 +69,12 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
   glow?: VideoPlan["glow"];
+  textFx?: VideoPlan["textFx"];
   concept?: VideoPlan["concept"];
 };
+
+/** Renders exactly like an absent look (bokeh on, one beam set, full aurora, grid). */
+const NO_LOOK: NonNullable<VideoPlan["look"]> = { grid: true, beams: 1, aurora: 1, bokeh: true };
 
 /** Draw a scene's content (camera + skill), without transitions or post, into `target`. */
 function drawScene(
@@ -104,7 +108,9 @@ function drawScene(
     beat: 60 / (plan.bpm ?? 120),
     brand: plan.brand,
     style: plan.style,
-    look: plan.look,
+    // The studio's text effect overrides the template's. (A plan without a look renders like
+    // NO_LOOK, so the override starts from that.)
+    look: plan.textFx ? { ...(plan.look ?? NO_LOOK), text: plan.textFx } : plan.look,
     globalT,
     concept: plan.concept,
     music,

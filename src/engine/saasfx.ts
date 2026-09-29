@@ -10,7 +10,7 @@ import { drawLucide, iconFor as lucideFor, iconsFor as lucideIconsFor } from "./
 import { scratch } from "./scratch";
 import { renderShaderBg } from "./shaderbg";
 import { subFont, type HeadlineLayout } from "./text";
-import type { FontId, SkillContext } from "./types";
+import type { FontId, SkillContext, TextFx } from "./types";
 
 /** Critically-damped-ish spring: fast settle with a gentle overshoot. t in seconds since start. */
 export function spring(t: number, stiffness = 12, damping = 7) {
@@ -581,12 +581,21 @@ export function blurInLayout(
 ) {
   const { ctx, t, u, w, palette } = sc;
   const exit = opts.exitAt !== undefined ? range(t, opts.exitAt, opts.exitAt + 0.4) : 0;
+  const alpha0 = (opts.alpha ?? 1) * (1 - exit);
+  const mode: TextFx = sc.look?.text ?? "blur";
   let wi = 0;
   // Typewriter mode: characters appear one by one behind a block cursor.
-  const typing = sc.look?.text === "type";
+  const typing = mode === "type";
   const totalChars = layout.lines.reduce((a, l) => a + l.replace(/\*/g, "").length + 1, 0);
+  const totalWords = layout.lines.reduce((a, l) => a + l.split(" ").length, 0);
   const charDur = Math.min(0.045, 1.5 / Math.max(1, totalChars));
   const visible = typing ? Math.floor(Math.max(0, t - start) / charDur) : Infinity;
+  // Per-mode pacing: how far apart words start, and how long each takes.
+  const pace = FX_PACE[mode] ?? { stagger: 1, dur: 0.7 };
+  // Shine: one specular sweep across the finished headline.
+  const sweepAt = start + (totalWords - 1) * stagger * pace.stagger + pace.dur + 0.15;
+  const sweep = mode === "shine" ? range(t, sweepAt, sweepAt + 0.9) : 0;
+  const frame = Math.floor(t * 24);
   let gi = 0;
   let cursor: { x: number; y: number } | null = null;
   layout.lines.forEach((line, li) => {
@@ -595,67 +604,247 @@ export function blurInLayout(
     const widths = words.map((wd) => ctx.measureText(wd.replace(/\*/g, "")).width + layout.tracking * Math.max(0, wd.length - 1));
     const space = ctx.measureText(" ").width;
     const total = widths.reduce((a, b) => a + b, 0) + space * (words.length - 1);
-    let x = w / 2 - total / 2;
+    const lineX0 = w / 2 - total / 2;
+    let x = lineX0;
     words.forEach((word, i) => {
       const accent = /^\*.*\*$/.test(word) || word.startsWith("*") || word.endsWith("*");
       const clean = word.replace(/\*/g, "");
-      const mode = sc.look?.text ?? "blur";
-      const t0 = start + wi * stagger * (mode === "glow" ? 1.6 : 1);
-      const k = clamp(range(t, t0, t0 + (mode === "glow" ? 1.2 : 0.7)));
+      const t0 = start + wi * stagger * pace.stagger;
+      const k = clamp(range(t, t0, t0 + pace.dur));
       const e = mode === "glow" ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 3);
+      const size = layout.size;
+      const charX = (ci: number) => x + (ci ? ctx.measureText(clean.slice(0, ci)).width : 0) + layout.tracking * ci;
+      const accentFill = () => {
+        const g = ctx.createLinearGradient(x, y - size / 2, x + widths[i], y + size / 2);
+        g.addColorStop(0, (opts.gradient ?? [palette.primary, palette.secondary])[0]);
+        g.addColorStop(1, (opts.gradient ?? [palette.primary, palette.secondary])[1]);
+        return g;
+      };
+      /** The word's glyphs, each at its kerned position (optionally per-glyph transformed). */
+      const drawGlyphs = (dx = 0, dy = 0, each?: (ci: number, cx: number) => boolean | void) => {
+        for (let ci = 0; ci < clean.length; ci++) {
+          const cx = charX(ci);
+          if (each) {
+            ctx.save();
+            const skip = each(ci, cx);
+            if (!skip) ctx.fillText(clean[ci], cx + dx, y + dy);
+            ctx.restore();
+          } else ctx.fillText(clean[ci], cx + dx, y + dy);
+        }
+      };
       ctx.save();
+      ctx.textAlign = "left";
+      const fill = accent ? accentFill() : palette.text;
+      ctx.fillStyle = fill;
+      let drawn = false;
       if (mode === "type") {
-        ctx.globalAlpha = (opts.alpha ?? 1) * (1 - exit);
+        ctx.globalAlpha = alpha0;
       } else if (mode === "mask") {
         // Crisp editorial reveal: each word slides up out of a mask.
         const m = 1 - Math.pow(1 - clamp(range(t, t0, t0 + 0.55)), 4);
         ctx.beginPath();
-        ctx.rect(x - layout.size * 0.1, y - layout.size * 0.62, widths[i] + layout.size * 0.2, layout.size * 1.24);
+        ctx.rect(x - size * 0.1, y - size * 0.62, widths[i] + size * 0.2, size * 1.24);
         ctx.clip();
-        ctx.globalAlpha = (opts.alpha ?? 1) * (1 - exit);
-        ctx.translate(0, (1 - m) * layout.size * 1.1 - exit * layout.size * 1.1);
+        ctx.globalAlpha = alpha0;
+        ctx.translate(0, (1 - m) * size * 1.1 - exit * size * 1.1);
       } else if (mode === "pop") {
         // Bouncy: words spring up from small.
-        const s = Math.max(0, spring(t - t0, 13, 6));
-        ctx.globalAlpha = (opts.alpha ?? 1) * clamp((t - t0) / 0.12) * (1 - exit);
+        const sp = Math.max(0, spring(t - t0, 13, 6));
+        ctx.globalAlpha = alpha0 * clamp((t - t0) / 0.12);
         const cx = x + widths[i] / 2;
         // Overshoot only as far as the word gap allows, so neighbours never collide.
-        const sz = Math.min(0.3 + 0.7 * s * (1 - exit * 0.5), 1 + (space * 0.9) / Math.max(1, widths[i]));
+        const sz = Math.min(0.3 + 0.7 * sp * (1 - exit * 0.5), 1 + (space * 0.9) / Math.max(1, widths[i]));
         ctx.translate(cx, y);
         ctx.scale(sz, sz);
-        ctx.rotate((1 - Math.min(1, s)) * (wi % 2 ? 0.12 : -0.12));
+        ctx.rotate((1 - Math.min(1, sp)) * (wi % 2 ? 0.12 : -0.12));
         ctx.translate(-cx, -y);
+      } else if (mode === "decode") {
+        // Characters scramble through random glyphs, then lock in left to right.
+        ctx.globalAlpha = alpha0;
+        drawGlyphs(0, 0, (ci) => {
+          const on = t0 + ci * 0.022;
+          const lock = t0 + 0.28 + ci * 0.045;
+          if (t < on) return true;
+          if (t < lock) {
+            const hsh = (Math.imul(gi + ci + 1, 2654435761) ^ Math.imul(frame + 7, 40503) ^ sc.seed) >>> 0;
+            ctx.globalAlpha = alpha0 * (0.45 + 0.4 * ((hsh >> 8) % 100) / 100);
+            if (!accent) ctx.fillStyle = mixHex(palette.text, palette.primary, 0.55);
+            ctx.fillText(DECODE_GLYPHS[hsh % DECODE_GLYPHS.length], charX(ci), y);
+            return true;
+          }
+          const snap = clamp((t - lock) / 0.12);
+          ctx.globalAlpha = alpha0 * (0.7 + 0.3 * snap);
+        });
+        drawn = true;
+      } else if (mode === "roll") {
+        // Odometer: each letter rolls up out of a mask, a touch after its neighbour.
+        ctx.beginPath();
+        ctx.rect(x - size * 0.1, y - size * 0.64, widths[i] + size * 0.2, size * 1.28);
+        ctx.clip();
+        ctx.globalAlpha = alpha0;
+        drawGlyphs(0, 0, (ci) => {
+          const kc = clamp(range(t, t0 + ci * 0.035, t0 + ci * 0.035 + 0.5));
+          const ec = 1 - Math.pow(1 - kc, 4);
+          ctx.translate(0, (1 - ec) * size * 1.15 - exit * size * 1.1);
+          return kc <= 0;
+        });
+        drawn = true;
+      } else if (mode === "letters") {
+        // Letters spring up one after another in a wave.
+        drawGlyphs(0, 0, (ci, cx) => {
+          const tc = t0 + ci * 0.028;
+          if (t < tc) return true;
+          const sp = spring(t - tc, 14, 7);
+          ctx.globalAlpha = alpha0 * clamp((t - tc) / 0.14);
+          const cw = ctx.measureText(clean[ci]).width;
+          ctx.translate(cx + cw / 2, y);
+          ctx.rotate((1 - Math.min(1, sp)) * 0.35 * (ci % 2 ? 1 : -1));
+          ctx.translate(-(cx + cw / 2), -y + (1 - sp) * size * 0.55);
+        });
+        drawn = true;
+      } else if (mode === "streak") {
+        // Words fly in from the right on motion streaks and stretch as they brake.
+        const ek = 1 - Math.pow(1 - k, 5);
+        if (k <= 0) drawn = true;
+        else {
+          const dx = (1 - ek) * size * 3.2;
+          const stretch = 1 + (1 - ek) * 1.1;
+          ctx.translate(x, y);
+          ctx.scale(stretch, 1);
+          ctx.translate(-x, -y);
+          for (let j = 4; j >= 1; j--) {
+            ctx.globalAlpha = alpha0 * 0.16 * (1 - ek) * (1 - j / 5);
+            drawGlyphs(dx / stretch + j * size * 0.28 * (1 - ek), 0);
+          }
+          ctx.globalAlpha = alpha0 * Math.min(1, k * 3);
+          drawGlyphs(dx / stretch, 0);
+          drawn = true;
+        }
+      } else if (mode === "chroma") {
+        // RGB split: cyan and magenta ghosts converge into crisp type.
+        if (k <= 0) drawn = true;
+        else {
+          const d = (1 - e) * size * 0.14 + (k < 1 ? Math.sin(frame * 2.3 + wi) * size * 0.012 * (1 - e) : 0);
+          const ghosts = palette.light ? ["#00a3c4", "#d4007a"] : ["#00f0ff", "#ff2bd6"];
+          ctx.globalAlpha = alpha0 * 0.75 * (1 - e * 0.9);
+          ctx.fillStyle = ghosts[0];
+          drawGlyphs(-d, d * 0.2);
+          ctx.fillStyle = ghosts[1];
+          drawGlyphs(d, -d * 0.2);
+          ctx.fillStyle = fill;
+          ctx.globalAlpha = alpha0 * Math.min(1, k * 2.5);
+          drawGlyphs();
+          drawn = true;
+        }
+      } else if (mode === "flip") {
+        // Split-flap: each word flips up on its baseline, darker until it faces the camera.
+        const sp = Math.min(1.08, Math.max(0, spring(t - t0, 11, 7)));
+        const sy = Math.max(0.02, Math.abs(Math.cos((1 - sp) * Math.PI * 0.5)));
+        ctx.globalAlpha = alpha0 * clamp((t - t0) / 0.1) * (0.35 + 0.65 * Math.min(1, sp));
+        ctx.translate(0, y + size * 0.36);
+        ctx.transform(1, 0, (1 - Math.min(1, sp)) * -0.25, sy, 0, 0);
+        ctx.translate(0, -(y + size * 0.36));
+      } else if (mode === "focus") {
+        // Runway-style: the whole line is there, dimmed; each word lights up as it's reached.
+        const lit = 1 - Math.pow(1 - k, 3);
+        ctx.globalAlpha = alpha0 * clamp(range(t, start - 0.1, start + 0.3)) * (0.16 + 0.84 * lit);
+        const cx = x + widths[i] / 2;
+        const sz = 1 + 0.06 * Math.sin(Math.PI * clamp(k * 1.2));
+        ctx.translate(cx, y);
+        ctx.scale(sz, sz);
+        ctx.translate(-cx, -y);
+        if (!accent && lit < 1) ctx.fillStyle = mixHex(palette.text, palette.bg1, 0.25 * (1 - lit));
+      } else if (mode === "highlight") {
+        // Words rise in; a marker box wipes in behind the key word, which flips to contrast.
+        const key = accent || (!layout.lines.join(" ").includes("*") && li === layout.lines.length - 1 && i === words.length - 1);
+        ctx.globalAlpha = alpha0 * e;
+        ctx.translate(0, (1 - e) * size * 0.25);
+        if (key) {
+          const wk = 1 - Math.pow(1 - clamp(range(t, t0 + 0.3, t0 + 0.75)), 3);
+          if (wk > 0) {
+            const padX = size * 0.14;
+            const bw = (widths[i] + padX * 2) * wk;
+            ctx.save();
+            ctx.fillStyle = palette.primary;
+            ctx.globalAlpha = alpha0 * e * 0.95;
+            ctx.beginPath();
+            ctx.roundRect(x - padX, y - size * 0.52, bw, size * 1.02, size * 0.14);
+            ctx.fill();
+            ctx.restore();
+            // Text over the box: whichever of white / the stage's darkest colour reads.
+            const onBox = luminance(palette.primary) > 0.45 ? palette.bg0 : "#ffffff";
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x - padX, y - size, bw, size * 2);
+            ctx.clip();
+            ctx.fillStyle = onBox;
+            drawGlyphs();
+            ctx.restore();
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x - padX + bw, y - size, widths[i] + padX * 2, size * 2);
+            ctx.clip();
+            drawGlyphs();
+            ctx.restore();
+            drawn = true;
+          }
+        }
+      } else if (mode === "shine") {
+        // Words rise in slightly dimmed; a light band then sweeps across the whole headline,
+        // leaving what it has passed at full brightness (with a thin edge in the brand colour).
+        ctx.globalAlpha = alpha0 * e;
+        ctx.translate(0, (1 - e) * size * 0.3);
+        const bx = sweep >= 1 ? Infinity : sweep <= 0 ? -Infinity : lineX0 - size + (total + size * 2) * sweep + li * size * 0.4;
+        const lit = (x0: number, x1: number, style: string | CanvasGradient) => {
+          if (x1 <= x0) return;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x0, y - size, x1 - x0, size * 2);
+          ctx.clip();
+          ctx.fillStyle = style;
+          drawGlyphs();
+          ctx.restore();
+        };
+        const x0 = x - size;
+        const x1 = x + widths[i] + size;
+        // Not yet swept: dimmed. Swept: full colour.
+        lit(Math.max(x0, bx), x1, accent ? fill : mixHex(palette.text, palette.bg1, 0.42));
+        lit(x0, Math.min(x1, bx), fill);
+        if (sweep > 0 && sweep < 1) {
+          const band = ctx.createLinearGradient(bx - size * 0.7, 0, bx + size * 0.25, 0);
+          band.addColorStop(0, "rgba(255,255,255,0)");
+          band.addColorStop(0.72, palette.light ? "rgba(255,255,255,0.95)" : "#ffffff");
+          band.addColorStop(0.86, palette.primary);
+          band.addColorStop(1, rgba(palette.primary, 0));
+          lit(bx - size * 0.7, bx + size * 0.25, band);
+        }
+        drawn = true;
       } else {
         const blur = (1 - e) * (mode === "glow" ? 22 : 14) * u + exit * 10 * u;
-        ctx.globalAlpha = (opts.alpha ?? 1) * e * (1 - exit);
+        ctx.globalAlpha = alpha0 * e;
         if (blur > 0.6) ctx.filter = `blur(${blur.toFixed(1)}px)`;
         if (mode === "glow") {
           ctx.shadowColor = rgba(palette.primary, 0.8 * (1 - e * 0.6));
           ctx.shadowBlur = 30 * u;
         }
-        ctx.translate(0, (1 - e) * layout.size * (mode === "glow" ? 0.12 : 0.35) - exit * layout.size * 0.2);
+        ctx.translate(0, (1 - e) * size * (mode === "glow" ? 0.12 : 0.35) - exit * size * 0.2);
       }
-      if (accent) {
-        const g = ctx.createLinearGradient(x, y - layout.size / 2, x + widths[i], y + layout.size / 2);
-        g.addColorStop(0, (opts.gradient ?? [palette.primary, palette.secondary])[0]);
-        g.addColorStop(1, (opts.gradient ?? [palette.primary, palette.secondary])[1]);
-        ctx.fillStyle = g;
-      } else ctx.fillStyle = palette.text;
-      ctx.textAlign = "left";
-      // Glyphs are placed by prefix width so kerning is kept: summing single-glyph widths
-      // runs long and pushes the word into its neighbour.
       let cx = x;
       let complete = true;
-      for (let ci = 0; ci < clean.length; ci++) {
-        cx = x + (ci ? ctx.measureText(clean.slice(0, ci)).width : 0) + layout.tracking * ci;
-        if (gi >= visible) {
-          cursor ??= { x: cx, y };
-          complete = false;
-          break;
+      if (!drawn) {
+        // Glyphs are placed by prefix width so kerning is kept: summing single-glyph widths
+        // runs long and pushes the word into its neighbour.
+        for (let ci = 0; ci < clean.length; ci++) {
+          cx = charX(ci);
+          if (gi >= visible) {
+            cursor ??= { x: cx, y };
+            complete = false;
+            break;
+          }
+          ctx.fillText(clean[ci], cx, y);
+          gi++;
         }
-        ctx.fillText(clean[ci], cx, y);
-        gi++;
-      }
+      } else gi += clean.length;
       if (complete) cx = x + widths[i];
       if (typing && gi >= visible) cursor ??= { x: cx, y };
       ctx.restore();
@@ -671,7 +860,7 @@ export function blurInLayout(
     const pos = cursor ?? { x: w / 2 + ctx.measureText(layout.lines[last].replace(/\*/g, "")).width / 2 + layout.size * 0.08, y: layout.ys[last] };
     if (t >= start && (!done || Math.floor(t * 2) % 2 === 0)) {
       ctx.save();
-      ctx.globalAlpha = (opts.alpha ?? 1) * (1 - exit);
+      ctx.globalAlpha = alpha0;
       ctx.fillStyle = palette.primary;
       ctx.shadowColor = palette.primary;
       ctx.shadowBlur = 14 * u;
@@ -681,6 +870,36 @@ export function blurInLayout(
   }
   ctx.textAlign = "center";
   return wi;
+}
+
+/** Glyphs the decode effect cycles through before a character locks in. */
+const DECODE_GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/?";
+
+/** How far apart words start (× the scene's stagger) and how long each word's reveal takes. */
+const FX_PACE: Partial<Record<TextFx, { stagger: number; dur: number }>> = {
+  blur: { stagger: 1, dur: 0.7 },
+  mask: { stagger: 1, dur: 0.7 },
+  pop: { stagger: 1, dur: 0.7 },
+  glow: { stagger: 1.6, dur: 1.2 },
+  type: { stagger: 1, dur: 0.7 },
+  decode: { stagger: 0.9, dur: 0.7 },
+  roll: { stagger: 1, dur: 0.7 },
+  letters: { stagger: 1.1, dur: 0.7 },
+  streak: { stagger: 0.8, dur: 0.75 },
+  chroma: { stagger: 1, dur: 0.8 },
+  flip: { stagger: 1, dur: 0.7 },
+  focus: { stagger: 1.5, dur: 0.45 },
+  highlight: { stagger: 1, dur: 0.6 },
+  shine: { stagger: 1, dur: 0.6 },
+};
+
+function luminance(hex: string) {
+  const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }
 
 /** Shared "eyebrow" label above SaaS headlines (e.g. "Introducing", "Features"). */

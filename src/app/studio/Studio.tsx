@@ -11,6 +11,7 @@ import BackgroundPicker, { applyBackground, type BgChoice, BG_OPTIONS } from "@/
 import { runBrowserDirector } from "@/lib/localai";
 import { isLocalProvider } from "@/lib/providers";
 import TemplatePicker from "@/components/TemplatePicker";
+import TextFxPicker, { TEXT_FX_OPTIONS } from "@/components/TextFxPicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import { CONCEPT_MAP } from "@/engine/concepts";
 import Player from "@/components/Player";
@@ -22,7 +23,7 @@ import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
 import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { SKILL_MAP, SKILLS } from "@/engine/skills";
-import { PALETTE_IDS, TRANSITIONS, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
@@ -101,6 +102,28 @@ export default function Studio() {
       /* ignore */
     }
   };
+  // Headline text effect: null keeps each template's own; a choice applies to every headline.
+  const [textFx, setTextFx] = useState<TextFx | null>(null);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("intromaker.textfx");
+      if (v && (TEXT_FX as readonly string[]).includes(v)) setTextFx(v as TextFx);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseTextFx = (fx: TextFx | null) => {
+    setTextFx(fx);
+    try {
+      if (fx) localStorage.setItem("intromaker.textfx", fx);
+      else localStorage.removeItem("intromaker.textfx");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.textFx ?? null) !== textFx) setPlan((p) => ({ ...p, textFx: textFx ?? undefined }));
+  }, [plan, textFx]);
   // Glow on type and the highlight bloom. Off by default: crisp, halo-free text.
   const [glow, setGlow] = useState(false);
   useEffect(() => {
@@ -683,6 +706,13 @@ export default function Studio() {
               )}
               <TemplatePicker value={template} onChange={chooseTemplate} />
               <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
+              <details className="fold">
+                <summary>
+                  <span className="field-label inline">Text effect</span>{" "}
+                  <span className="tpl-desc">{textFx ? TEXT_FX_OPTIONS.find((o) => o.id === textFx)?.name : "Template default"}</span>
+                </summary>
+                <TextFxPicker value={textFx} onChange={chooseTextFx} plan={{ palette: plan.palette, font: plan.font, seed: plan.seed, bpm: plan.bpm, look: plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look }} />
+              </details>
 
             </>
           )}
