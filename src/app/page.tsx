@@ -3,13 +3,13 @@ import HeroPrompt from "@/components/HeroPrompt";
 import LoopCanvas from "@/components/LoopCanvas";
 import Nav, { Logo } from "@/components/Nav";
 import SkillGrid from "@/components/SkillGrid";
-import { HERO_PLAN } from "@/engine/demos";
+import { HOME_BACKDROP } from "@/engine/demos";
 
 const STEPS = [
   {
     n: "01",
-    title: "Prompt or paste a URL",
-    body: "Describe the vibe, brand, claims and numbers — or paste your website and we'll import your logo, product shots, video, copy and colours.",
+    title: "Enter your URL",
+    body: "Paste your website and we'll import your logo, product shots, UI, copy and colours. No website yet? Describe your product instead.",
   },
   {
     n: "02",
@@ -54,20 +54,19 @@ export default function Home() {
       <Nav />
       <section className="hero">
         <div className="hero-bg" aria-hidden>
-          <LoopCanvas plan={HERO_PLAN} long={1280} fps={60} className="hero-canvas" />
+          <LoopCanvas plan={HOME_BACKDROP} long={1280} fps={60} className="hero-canvas" />
           <div className="hero-fade" />
         </div>
         <div className="hero-content">
-          <span className="eyebrow">✦ Prompt → Motion Graphics</span>
+          <span className="eyebrow">✦ SaaS video from your URL</span>
           <h1>
-            Epic motion graphics
+            SaaS launch videos,
             <br />
-            <span className="grad">from a single prompt.</span>
+            <span className="grad">from your URL.</span>
           </h1>
           <p className="lede">
-            IntroMaker turns a prompt, or your website, into a product launch film or an epic trailer. Paste a URL and it pulls
-            your logo, screenshots, video, copy, testimonials and brand colours into a beat-synced video with a cursor-driven
-            product tour, bento features and a clicked CTA.
+            Enter your website below. IntroMaker reads your logo, brand colours, screenshots, UI and copy, picks the scenes that suit your
+            product, and directs a beat-synced launch film you can edit and export in 1080p.
           </p>
           <HeroPrompt />
         </div>
@@ -76,7 +75,7 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>33 pro motion skills. All rendered live.</h2>
+          <h2>57 pro motion skills. All rendered live.</h2>
           <p>Every card below is real-time output of the engine — the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />

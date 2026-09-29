@@ -14,11 +14,29 @@ export const HERO_PLAN: VideoPlan = {
     {
       skill: "bento",
       text: "Made in *one studio*",
-      items: ["AI director", "33 motion skills", "Website import", "Beat-synced score", "Video export", "Vertical & square"],
+      items: ["AI director", "57 motion skills", "Website import", "Beat-synced score", "Video export", "Vertical & square"],
       duration: 5,
       transition: "whip",
     },
     { skill: "cta", text: "Make yours *now*", subtext: "Open the studio", duration: 4, transition: "dolly" },
+  ],
+};
+
+/**
+ * The homepage backdrop: product UI turning on a 3D carousel, then flowing through GPU
+ * transitions, with no words competing with the headline on top of it.
+ */
+export const HOME_BACKDROP: VideoPlan = {
+  title: "IntroMaker",
+  palette: "cosmos",
+  font: "inter",
+  aspect: "16:9",
+  bpm: 120,
+  seed: 4242,
+  style: "saas",
+  scenes: [
+    { skill: "carousel-3d", text: "", duration: 7, transition: "cut" },
+    { skill: "gallery-flow", text: "", duration: 6, transition: "dissolve" },
   ],
 };
 
