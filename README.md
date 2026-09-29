@@ -71,8 +71,8 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - live cursors: named teammates move, lasso and comment on a shared board (collaboration tools);
   - a chat thread with typing indicators, a reaction and the product's own update card (messaging and support).
 
-  Each category has more than one moment it can stage, and the seed picks between them, so takes and variations differ.
-- **Scene moments**: a dotted globe that turns while arcs fly between cities and land with live events (only when the site talks about global use), and a before/after slider that drags from a grey, cluttered "old way" (the site's own pains) to the product screenshot.
+  The director picks the moment that suits the product best, every time. Each moment is scored on the words the site itself uses (its tagline and description count double), the moment its category's films typically stage, and what the site has to show. A deploy platform gets code to deploy, a whiteboard gets live cursors, a CRM its deal pipeline, a hiring tool its candidate board, and a support inbox a customer chat. The AI director is briefed with the same ranking. Hover a beat in the story-arc strip to see why it was chosen ("Best fit: the site talks about deals, pipeline").
+- **Scene moments**, used only when the site gives them material: a dotted globe that turns while arcs fly between cities and land with live events (only when the site talks about global use), and a before/after slider that drags from a grey, cluttered "old way" (the site's own pains) to the product screenshot.
 - **The real logo, whatever it's made of**: the brand mark is found in the site header the way a person would find it (the home link or a logo-named element near the top-left), and taken in its best form:
   - SVG first: inline SVG logos serialised with their real colours, an SVG offered in `<picture>` or `srcset`, or an SVG twin served beside a raster logo (`logo.png` → `logo.svg`);
   - otherwise the largest raster the page offers (PNG, WebP, JPG; GIF only as a last resort);

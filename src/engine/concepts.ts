@@ -367,10 +367,7 @@ export const DEMOS: Record<string, DemoSpec> = {
   },
 };
 
-/**
- * More moments a category's films stage, so takes and variations differ: the director picks
- * between the category's main moment and these by seed.
- */
+/** Other moments a category's films also stage (candidates for the fit ranking below). */
 export const DEMO_ALTS: Record<string, DemoSpec[]> = {
   devtools: [{ skill: "code-deploy", title: "From commit to *live*", eyebrow: "Ship it", items: ["Build started", "Checks passed", "Preview ready", "Deployed to production"] }],
   productivity: [
@@ -398,3 +395,101 @@ export const COLLAB_DEMO: DemoSpec = {
   skill: "live-cursors", title: "Build it *together*", eyebrow: "Multiplayer", action: "Looks great, let's ship it",
   items: ["Launch plan", "Homepage design", "Customer research", "Release notes"],
 };
+
+/* ───────── Which moment suits this product best ───────── */
+
+type MomentSkill = DemoSpec["skill"];
+
+/** What each moment shows, as the words a site uses when that's what its product does. */
+const MOMENT_SIGNALS: Record<MomentSkill, RegExp> = {
+  "command-k": /\b(keyboard|shortcuts?|command (menu|palette|bar)|cmd ?\+? ?k|⌘ ?k|launcher|power users?|hotkeys?|keystrokes?)\b/gi,
+  "ai-prompt": /\b(ai|a\.i\.|artificial intelligence|assistants?|copilots?|gpt|llms?|chatbots?|ask (it )?(anything|questions?)|prompts?|generative)\b/gi,
+  "click-flow": /\b(automat\w*|autopilot|workflows?|one[- ]click|busywork|reconcil\w*|approvals?|approve|scheduling|no[- ]code|hands[- ]free)\b/gi,
+  "notify-stack": /\b(alerts?|notifications?|notify|real[- ]time|monitor\w*|orders?|incidents?|instant(ly)?|as it happens|stay on top)\b/gi,
+  "code-deploy": /\b(deploy\w*|git(hub|lab)?|commits?|ci\/cd|build (logs|pipelines?)|preview (urls?|deployments?)|hosting|serverless|edge functions?|rollbacks?|apis?|sdks?|cli|developers?|repos?|codebase)\b/gi,
+  kanban: /\b(kanban|boards?|tasks?|to-?dos?|projects?|sprints?|roadmaps?|backlogs?|issues?|tickets?|pipelines?|deals?|stages?|candidates?|applicants?|hiring|recruit\w*)\b/gi,
+  "live-cursors": /\b(collaborat\w*|multiplayer|whiteboards?|canvas(es)?|co-?edit\w*|brainstorm\w*|together|design files?|mood ?boards?)\b/gi,
+  "chat-thread": /\b(chat|messag\w*|channels?|conversations?|threads?|dms?|inbox(es)?|help ?desk|live chat|team communication|support tickets?)\b/gi,
+};
+
+/** The copy each moment falls back on when the product's own category has none for it. */
+const GENERIC_MOMENT: Record<MomentSkill, DemoSpec> = {
+  "command-k": { skill: "command-k", title: "Your tools, one *keystroke* away", eyebrow: "Keyboard-first", items: ["Search your workspace", "Invite a teammate", "Open settings"] },
+  "ai-prompt": { skill: "ai-prompt", title: "Just *ask*.", eyebrow: "AI built in", items: ["What can you do, {name}?"] },
+  "click-flow": { skill: "click-flow", title: "Busywork, *handled*", eyebrow: "In action", action: "Run", items: ["Sync your data", "Update the records", "Notify the team", "Share the summary"] },
+  "notify-stack": {
+    skill: "notify-stack", title: "Everything, *as it happens*", eyebrow: "Live",
+    items: ["New update — The team made changes", "Task completed — Marked done", "Report ready — This week's summary", "You were mentioned — In a comment"],
+  },
+  "code-deploy": { skill: "code-deploy", title: "From commit to *live*", eyebrow: "Ship it", items: ["Build started", "Checks passed", "Preview ready", "Deployed to production"] },
+  kanban: { skill: "kanban", title: "Work that *moves*", eyebrow: "In action", action: "To do / In progress / Done", items: ["Plan the launch", "Design the homepage", "Write release notes", "Review with the team"] },
+  "live-cursors": COLLAB_DEMO,
+  "chat-thread": {
+    skill: "chat-thread", title: "Every conversation, *one place*", eyebrow: "In action", action: "Update — All tasks complete",
+    items: ["Is the launch page ready to go?", "Final copy is in, checking the visuals now", "Looks great, let's ship it"],
+  },
+};
+
+const CHAT_SUPPORT: DemoSpec = {
+  skill: "chat-thread", title: "Every customer, *one inbox*", eyebrow: "In action", action: "Conversation resolved — Marked done",
+  items: ["Hi, where can I find my invoice?", "It's in Billing, I've sent you the link", "Found it, thank you!"],
+};
+const CHAT_CARE: DemoSpec = {
+  skill: "chat-thread", title: "Care, *a message away*", eyebrow: "In action", action: "Appointment updated — Reminder sent",
+  items: ["Can I move my appointment to Friday?", "Of course, Friday morning works", "Great, thank you!"],
+};
+
+export interface MomentFit {
+  spec: DemoSpec;
+  score: number;
+  /** The site's own words that point to this moment (for the director's note). */
+  because: string[];
+}
+
+/**
+ * Rank the interaction moments for a product by how well each suits it: the words the site
+ * itself uses (its tagline and description count double), the moment its category's films
+ * typically stage, and what the site has to show. The director uses the best fit; nothing is
+ * left to chance.
+ */
+export function rankMoments(lead: string, body: string, conceptId: string, opts: { aiLed?: boolean; spareFeatures?: number } = {}): MomentFit[] {
+  const main = DEMOS[conceptId] ?? DEMOS.general;
+  const alts = DEMO_ALTS[conceptId] ?? [];
+  const pick = (skill: MomentSkill): DemoSpec => {
+    // Pipelines: a sales or hiring board when that's what the words describe.
+    if (skill === "kanban") {
+      if (/\b(deals?|leads?|prospects?|crm|sales pipeline)\b/i.test(`${lead} ${body}`)) return DEMO_ALTS.sales[0];
+      if (/\b(candidates?|applicants?|hiring|recruit\w*|talent)\b/i.test(`${lead} ${body}`)) return DEMO_ALTS.hr[0];
+    }
+    // Conversations in the product's own world: patients and a care team, customers and support.
+    if (skill === "chat-thread") {
+      if (conceptId === "health") return CHAT_CARE;
+      if (/\b(customers?|help ?desk|support (team|tickets?)|live chat|tickets?)\b/i.test(`${lead} ${body}`)) return CHAT_SUPPORT;
+    }
+    return main.skill === skill ? main : alts.find((a) => a.skill === skill) ?? GENERIC_MOMENT[skill];
+  };
+  const out = (Object.keys(MOMENT_SIGNALS) as MomentSkill[]).map((skill) => {
+    const re = MOMENT_SIGNALS[skill];
+    const hits = [...lead.matchAll(re)].map((m) => m[0].toLowerCase());
+    const more = [...body.matchAll(re)].map((m) => m[0].toLowerCase());
+    // Distinct words count, repeats count less: one page saying "tasks" ten times isn't ten signals.
+    const words = new Set([...hits, ...more]);
+    let score = Math.min(8, hits.length * 2 + Math.min(more.length, 4) + words.size * 0.5);
+    if (main.skill === skill) score += 3;
+    else if (alts.some((a) => a.skill === skill)) score += 2;
+    if (skill === "ai-prompt" && opts.aiLed) score += 3;
+    // A shared board shows the product's own features as its cards: better with enough of them.
+    if (skill === "live-cursors" && (opts.spareFeatures ?? 0) >= 3) score += 0.5;
+    // The words behind it, once each ("pipeline" and "pipelines", "real time" and "real-time").
+    const stems = new Map<string, string>();
+    for (const wd of words) {
+      const stem = wd.replace(/[-\s]+/g, " ").replace(/s$/, "").replace(/e$/, "");
+      if (!stems.has(stem)) stems.set(stem, wd);
+    }
+    return { spec: pick(skill), score, because: [...stems.values()].slice(0, 4) };
+  });
+  // Ties go to the category's own moment, then to its alternates, then to the list order.
+  const order = (x: MomentFit) => (x.spec.skill === main.skill ? 0 : alts.some((a) => a.skill === x.spec.skill) ? 1 : 2);
+  return out.sort((a, b) => b.score - a.score || order(a) - order(b));
+}
+

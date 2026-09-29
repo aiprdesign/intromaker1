@@ -189,6 +189,8 @@ export interface Scene {
   role?: string;
   /** Narrator's line for this scene (voice-over), in speakable sentence case. */
   vo?: string;
+  /** Why the director chose this beat for this product (shown on the story-arc chip). */
+  why?: string;
 }
 
 export type VoiceSource = "local" | "openai" | "elevenlabs" | "custom" | "upload";

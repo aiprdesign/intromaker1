@@ -28,7 +28,7 @@ import {
 } from "@/engine/planner";
 import { SKILLS } from "@/engine/skills";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
-import { DEMOS, detectConcept } from "@/engine/concepts";
+import { rankMoments, detectConcept } from "@/engine/concepts";
 import { writeVoiceover } from "@/engine/script";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData } from "@/engine/types";
 
@@ -249,6 +249,21 @@ function readBody(body: Body) {
 }
 type Ctx = ReturnType<typeof readBody>;
 
+/** The interaction moment that suits this product best (the same ranking the built-in director uses). */
+function momentBrief(c: Ctx) {
+  const s = c.site;
+  const lead = s ? `${s.tagline} ${s.description}` : c.prompt ?? "";
+  const body = s ? [...s.headlines, ...s.features, ...(s.steps ?? [])].join(" ") : "";
+  const aiLed = c.concept.id !== "ai" && /\b(ai|assistant|copilot|gpt)\b/i.test(s ? [s.tagline, ...s.headlines.slice(0, 4)].join(" ") : lead);
+  const [best, next] = rankMoments(lead, body, c.concept.id, { aiLed });
+  const spec = best.spec;
+  return (
+    `\nINTERACTION MOMENT that suits this product best: ${spec.skill}${best.because.length ? ` (its copy talks about ${best.because.join(", ")})` : ""}, e.g. headline "${spec.title.replace(/\*/g, "")}"` +
+    `${spec.action ? `, subtext "${spec.action}"` : ""}; fill it from the product's real features.` +
+    (next && next.score >= best.score * 0.8 ? ` A close second: ${next.spec.skill}.` : "")
+  );
+}
+
 /** Everything the AI director is sent: system prompt, brief, screenshots and output schema. */
 async function directorRequest(c: Ctx) {
   const schema = c.site ? SitePlanSchema : PlanSchema;
@@ -258,7 +273,7 @@ async function directorRequest(c: Ctx) {
     (c.prompt ? `Prompt: ${c.prompt}\n\n` : "") +
     `Style: ${c.wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${c.aspect}. Target total length: ${LENGTH_SECONDS[c.length]} seconds.` +
     (c.wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[c.template].name}": ${TEMPLATE_MAP[c.template].vibe} Write copy in this voice.` : "") +
-    (c.wantSaas ? `\nINTERACTION MOMENT for this product: ${DEMOS[c.concept.id]?.skill ?? DEMOS.general.skill} (e.g. headline "${(DEMOS[c.concept.id] ?? DEMOS.general).title.replace(/\*/g, "")}"); fill it from the product's real features.` : "") +
+    (c.wantSaas ? momentBrief(c) : "") +
     (c.wantSaas && c.concept.id !== "general"
       ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat" && !(c.safe && ["quote", "logos", "metric"].includes(r))).join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${(c.concept.cta.find((l) => !/free/i.test(l)) ?? c.concept.cta[0]).replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
       : "") +

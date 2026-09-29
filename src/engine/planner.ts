@@ -1,6 +1,6 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
-import { COLLAB_DEMO, CONCEPT_MAP, CONCEPTS, DEMO_ALTS, DEMOS, detectConcept } from "./concepts";
+import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { writeVoiceover } from "./script";
 import { isHealthClaim, isNumericClaim, isUnsafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength } from "./templates";
@@ -969,7 +969,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     // Story-led films with plenty of product imagery open on the whole product: a tilted wall of
     // its screenshots drifting behind the promise (Linear / Vercel hero look).
     wall = angle === "story" && !productHook && target >= 20 && visuals >= 4;
-    add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: productHook || tagline, eyebrow: wall ? undefined : `Introducing ${site.name}`, duration: beats(wall ? 9 : 7), transition: "cut" });
+    add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: productHook || tagline, eyebrow: wall ? undefined : `Introducing ${site.name}`, duration: beats(wall ? 9 : 7), transition: "cut", why: wall ? `${visuals} product images and UI components: a wall of the product behind the promise` : undefined });
   }
   // 2. Reveal.
   // Product-first with real product footage: the name as giant type filled with the product,
@@ -1000,7 +1000,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (site.steps && site.steps.length >= 2) {
     add(target >= 30 ? 3 : 5, {
       // AI and creative tools show their steps as a node workflow (ComfyUI-style).
-      role: "how", skill: (concept.id === "ai" || concept.id === "creative") && site.steps.length >= 3 ? "node-graph" : "steps",
+      // (Or any product whose steps read as a pipeline: connect, trigger, transform, publish.)
+      role: "how", skill: site.steps.length >= 3 && (concept.id === "ai" || concept.id === "creative" || /\b(workflows?|pipelines?|automat\w*|nodes?|connect\w*|triggers?|integrat\w*)\b/i.test(site.steps.join(" "))) ? "node-graph" : "steps",
       text: `Get started in *${site.steps.length} steps*`,
       items: site.steps.slice(0, 4),
       eyebrow: "How it works",
@@ -1061,13 +1062,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
   // Products that lead with AI get the AI moment whatever their category.
   const aiLed = concept.id !== "ai" && [site.tagline, ...site.headlines.slice(0, 4)].some((x) => /\b(ai|assistant|copilot|gpt)\b/i.test(x ?? ""));
-  // Each category has more than one signature moment; the seed picks, so takes differ. Products
-  // that are about working together on a shared canvas get the multiplayer board.
-  const collab = /\b(collaborat\w*|multiplayer|whiteboards?|co-?edit\w*|live cursors?|canvas)\b/i.test([whole.tagline, whole.description, ...whole.headlines.slice(0, 6)].join(" "));
-  const demoOptions = [DEMOS[concept.id] ?? DEMOS.general, ...(DEMO_ALTS[concept.id] ?? [])];
-  const demo = aiLed ? DEMOS.ai : collab && ["productivity", "creative", "general", "marketing", "education"].includes(concept.id) ? COLLAB_DEMO : demoOptions[seed % demoOptions.length];
   const shownTitles = new Set([...featureItems.slice(0, featureItems.length >= 5 ? 6 : 4), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
   const spareFeatures = shortFeatures.filter((f) => !shownTitles.has(norm(f)));
+  // The moment that suits this product best, scored on the site's own words, its category and its
+  // material (see rankMoments): a dev platform that talks about deploys gets code → deploy, a
+  // whiteboard gets live cursors, a hiring tool its candidate board.
+  const leadCopy = [whole.tagline, whole.description].join(" ");
+  const bodyCopy = [...whole.headlines, ...whole.features, ...(whole.steps ?? [])].join(" ");
+  const fit = rankMoments(leadCopy, bodyCopy, concept.id, { aiLed, spareFeatures: spareFeatures.length })[0];
+  const demo = fit.spec;
+  const demoWhy = fit.because.length ? `Best fit: the site talks about ${fit.because.slice(0, 3).join(", ")}` : `Typical of ${concept.name.toLowerCase()} launch films`;
   let demoScene: Scene | null = null;
   if (demo.skill === "command-k") {
     // The command that runs is a real feature; the rest are the palette's everyday commands.
@@ -1106,17 +1110,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // A product-first or media-less film leans on it; teasers keep it only when it is the product.
   // (When the film already shows the real product — a tour or the assembled page — it's optional.)
   const productShown = !!tourMedia || !!shots.hero;
+  if (demoScene) demoScene.why = demoWhy;
   add(valueFirst && target >= 20 ? 2 : target < 20 ? (angle === "product" && !productShown ? 3 : 6) : !productShown ? 2 : target >= 30 ? 3 : 4, demoScene);
   // 5c. Gallery: the product's own images and UI components, animated (GPU transitions, or a 3D
-  // carousel for visual products and proof-first cuts).
+  // carousel for visual products).
   if (target >= 20 && visuals >= 3) {
-    const carousel = concept.id === "creative" || concept.id === "ecommerce" || angle === "proof";
+    // Visual products (stores, templates, creative work) turn on a 3D carousel; product UI flows
+    // through the framed gallery.
+    const carousel = concept.id === "creative" || concept.id === "ecommerce";
     add(target >= 30 ? (wall ? 4.5 : 3) : 5, {
       role: "gallery",
       skill: carousel ? "carousel-3d" : "gallery-flow",
       text: carousel ? `Made with *${site.name}*` : `A closer look at *${site.name}*`,
       items: spareFeatures.slice(1, 5).length >= 2 ? spareFeatures.slice(1, 5) : undefined,
       eyebrow: "Gallery",
+      why: `${visuals} product images and UI components to show${carousel ? " (a visual product: 3D carousel)" : ""}`,
       duration: beats(12),
       transition: "whip",
       media: images[0] ?? img(shots.sections[0]),
@@ -1133,6 +1141,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       text: own && !/\d/.test(own) && n >= 3 && n <= 8 ? own : REACH[concept.id]?.title ?? REACH.general.title,
       items: (REACH[concept.id] ?? REACH.general).items,
       eyebrow: "Global",
+      why: "The site talks about global use",
       duration: beats(11),
       transition: "dolly",
     });
@@ -1145,6 +1154,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       text: "Leave the old way *behind*",
       items: pains,
       eyebrow: "Before & after",
+      why: "The site names the problems it solves",
       duration: beats(10),
       transition: "whip",
       media: compareMedia,
@@ -1512,6 +1522,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
         ? s.items.filter((i) => typeof i === "string" && i.trim()).slice(0, 8).map((i) => String(i).slice(0, 140))
         : undefined,
       vo: typeof s.vo === "string" && s.vo.trim() ? s.vo.trim().slice(0, 240) : undefined,
+      why: typeof s.why === "string" && s.why.trim() ? s.why.trim().slice(0, 160) : undefined,
     }));
   if (!scenes.length) scenes.push({ skill: "particle-assemble", text: "HELLO", duration: 3, transition: "cut" });
   return {

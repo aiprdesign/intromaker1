@@ -49,7 +49,7 @@ export default function ArcStrip({ plan, onPick }: { plan: VideoPlan; onPick: (i
         const name = (role === "demo" ? SKILL_MAP[s.skill]?.name : ROLE_NAMES[role]) ?? SKILL_MAP[s.skill]?.name ?? s.skill;
         const icon = (role === "demo" ? DEMO_ICONS[s.skill] : undefined) ?? ROLE_ICONS[role as ConceptRole] ?? (role === "reveal" ? "Sparkles" : role === "cta" ? "MousePointerClick" : "Clapperboard");
         return (
-          <button key={i} className="arc-chip" onClick={() => onPick(i)} title={`${name}: ${s.text.replace(/\*/g, "")}`} style={{ flexGrow: s.duration / total }}>
+          <button key={i} className="arc-chip" onClick={() => onPick(i)} title={`${name}: ${s.text.replace(/\*/g, "")}${s.why ? `\n${s.why}` : ""}`} style={{ flexGrow: s.duration / total }}>
             <Icon name={icon} size={13} />
             <span>{name}</span>
             <small>{s.duration.toFixed(1)}s</small>
