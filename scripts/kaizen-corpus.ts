@@ -189,6 +189,39 @@ export const SITES: { id: string; site: SiteData }[] = [
       cta: "Start your free trial",
     }),
   },
+  {
+    // Health / wellness copy full of FDA- and FTC-sensitive claims: none of them may reach the film.
+    id: "vitalia (health claims)",
+    site: base({
+      ...media,
+      url: "https://vitalia.health",
+      domain: "vitalia.health",
+      name: "Vitalia",
+      tagline: "Clinically proven care that treats anxiety and insomnia",
+      description: "Vitalia is the HIPAA-compliant telehealth app that helps you book visits, message your care team and manage prescriptions. Doctor-recommended and eco-friendly.",
+      headlines: [
+        "Book a visit in two taps",
+        "Message your care team",
+        "Improve your sleep in 7 days",
+        "Prescription refills, handled",
+        "HIPAA-compliant and bank-grade secure",
+        "Recommended by 2,000 doctors",
+      ],
+      features: [
+        "Pick a time that works and join from your phone.",
+        "Secure messaging with your clinicians between visits.",
+        "Our program reduces stress and boosts your immunity.",
+        "Request refills and get reminders when it's time.",
+        "SOC 2 certified infrastructure.",
+        "",
+      ],
+      stats: ["2,000 doctors", "4.9/5 rating"],
+      testimonials: [q("Vitalia cured my insomnia in a week.", "Dana K.", "Patient")],
+      steps: ["Create your account", "Book your first visit", "Meet your clinician"],
+      pains: ["Waiting rooms", "Phone tag", "Lost paperwork"],
+      cta: "Book a visit",
+    }),
+  },
 ];
 
 export const PROMPTS: string[] = [
@@ -200,4 +233,5 @@ export const PROMPTS: string[] = [
   "Shopwave helps brands sell online with beautiful stores, fast checkout and easy shipping",
   "Hirely: an applicant tracking system for fast-growing recruiting teams",
   "A productivity app",
+  "Calmly, a clinically proven sleep app that treats insomnia, FDA cleared, eco-friendly and made in USA",
 ];

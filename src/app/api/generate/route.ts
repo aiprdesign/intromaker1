@@ -15,8 +15,10 @@ import {
   ANGLES,
   type Angle,
   planFromSite,
+  healthPlan,
   safePlan,
   safeSite,
+  stripHealth,
   readSite,
   sanitizePlan,
   type Length,
@@ -101,6 +103,10 @@ SAAS: a polished product-launch film in the style of Linear, Vercel, Stripe and 
 - Hit the requested total length (sum of durations) within ±1.5 seconds.
 - Voice-over ("vo"): write the narrator's line for every scene as one flowing script, like a launch-film voice-over: warm, confident, second person, plain words. Each line must be speakable within its scene (about 2.5 words per second, minus half a second), may paraphrase but never add claims, and should complement rather than just read out the headline where there's room. Say the brand name on the reveal ("Meet Nimbus."). Leave vo empty on testimonial scenes so the quote reads.`;
 
+/** Always in force: health and medical claims never go into a film. */
+const HEALTH_RULES = `HEALTH CLAIMS (required): no health or medical claims of any kind: nothing that treats, cures, prevents, diagnoses or heals; no "clinically proven", "FDA approved/cleared", "doctor recommended"; no effects on the body or mind (sleep, stress, mood, immunity, weight, energy).
+OFFERS (required): say "free" (free trial, start free) only when the website itself offers it; otherwise use "Get started", "Book a demo" or "Try <name>".`;
+
 /** Added to the system prompt when claim-safe copy is on (the default). */
 const CLAIM_RULES = `CLAIM-SAFE COPY (required — overrides the rules above): every on-screen line and narrator line is generic and descriptive: what the product is and what it does, in plain words.
 - No superlatives or rankings: best, #1, leading, top, world's first, fastest, most powerful, award-winning, ultimate.
@@ -108,7 +114,9 @@ const CLAIM_RULES = `CLAIM-SAFE COPY (required — overrides the rules above): e
 - No speed or multiplier claims: in seconds, in minutes, instantly, 10x faster, 50% more.
 - No comparatives without a comparison: faster, better, smarter, easier.
 - No numbers used as claims (customer counts, percentages, ratings, uptime, revenue), no testimonials, no customer-logo walls, no metric or number scenes (testimonial, logo-marquee, chart-grow, number-ticker are not used).
-- Word-swap lines use neutral verbs ("Your work, planned|built|shared"). CTAs are simple actions ("Get started", "Try Acme").`;
+- No efficacy or outcome promises ("stops every threat", "boost your revenue", "save money") — describe what the product does, not results it guarantees.
+- FTC/FDA: no health or medical claims of any kind (treats, cures, prevents, diagnoses, heals, improves sleep/stress/mood, clinically proven, FDA approved, doctor recommended); no certification or compliance claims (SOC 2, HIPAA, GDPR, "compliant", "certified", "bank-grade"); no green claims (eco-friendly, sustainable, carbon neutral); no endorsements ("as seen on", "recommended by"); no origin claims ("Made in USA").
+- Word-swap lines use neutral verbs ("Your work, planned|built|shared"). CTAs are simple actions ("Get started", "Try Acme"); "free" only when the website itself offers it.`;
 
 function hasCredentials() {
   return envClaudeAvailable();
@@ -220,7 +228,8 @@ function readBody(body: Body) {
   const safe = body.safe !== false;
   // Claim-safe: the director (built-in or AI) only ever sees the site's claim-free copy.
   const rawSite = readSite(body.site);
-  const site = rawSite && safe ? safeSite(rawSite) : rawSite;
+  // Health and medical claims are screened out in every mode.
+  const site = rawSite ? (safe ? safeSite(rawSite) : stripHealth(rawSite)) : rawSite;
   const colors =
     body.colors && /^#[0-9a-f]{6}$/i.test(body.colors.primary) && /^#[0-9a-f]{6}$/i.test(body.colors.secondary) ? body.colors : undefined;
   const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
@@ -228,8 +237,8 @@ function readBody(body: Body) {
   const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
   const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
   const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template, safe };
-  const concept = site
-    ? detectConcept(`${site.name} ${site.tagline} ${site.description}`, [...site.headlines, ...site.features, ...site.steps, ...site.pains].join(" "))
+  const concept = rawSite
+    ? detectConcept(`${rawSite.name} ${rawSite.tagline} ${rawSite.description}`, [...rawSite.headlines, ...rawSite.features, ...rawSite.steps, ...rawSite.pains].join(" "))
     : detectConcept(prompt);
   const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle, safe }) : planFromPrompt(request));
   return { prompt, aspect, length, palette, seed, site, colors, style, template, angle, wantSaas, builtin, concept, safe };
@@ -247,12 +256,12 @@ async function directorRequest(c: Ctx) {
     (c.wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[c.template].name}": ${TEMPLATE_MAP[c.template].vibe} Write copy in this voice.` : "") +
     (c.wantSaas ? `\nINTERACTION MOMENT for this product: ${DEMOS[c.concept.id]?.skill ?? DEMOS.general.skill} (e.g. headline "${(DEMOS[c.concept.id] ?? DEMOS.general).title.replace(/\*/g, "")}"); fill it from the product's real features.` : "") +
     (c.wantSaas && c.concept.id !== "general"
-      ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat" && !(c.safe && ["quote", "logos", "metric"].includes(r))).join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${c.concept.cta[0].replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
+      ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat" && !(c.safe && ["quote", "logos", "metric"].includes(r))).join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${(c.concept.cta.find((l) => !/free/i.test(l)) ?? c.concept.cta[0]).replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
       : "") +
     (c.palette !== "auto" ? ` Use the "${c.palette}" palette.` : "") +
     (c.angle ? `\nCREATIVE ANGLE "${ANGLES.find((a) => a.id === c.angle)!.name}": ${ANGLES.find((a) => a.id === c.angle)!.brief}` : "") +
     (c.seed ? ` Variation #${c.seed % 1000}: take a fresh creative angle.` : "");
-  const system = (c.site ? SYSTEM + "\n" + SITE_RULES : SYSTEM) + (c.safe ? "\n" + CLAIM_RULES : "");
+  const system = (c.site ? SYSTEM + "\n" + SITE_RULES : SYSTEM) + "\n" + (c.safe ? CLAIM_RULES : HEALTH_RULES);
   return { schema, images, text, system };
 }
 
@@ -283,7 +292,7 @@ function finishPlan(c: Ctx, raw: z.infer<typeof SitePlanSchema>) {
   const styled = c.wantSaas ? applyTemplate({ ...directed, brand: directed.brand }, c.template, { palette: c.palette !== "auto" ? c.palette : undefined }) : directed;
   // Any scene the AI left without a narrator line gets one from the built-in script writer.
   const voiced = writeVoiceover(styled);
-  return c.safe ? safePlan(voiced) : voiced;
+  return c.safe ? safePlan(voiced) : healthPlan(voiced);
 }
 
 /** Validate model output against the storyboard schema (tolerating small deviations). */

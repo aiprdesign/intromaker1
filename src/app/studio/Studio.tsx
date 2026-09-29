@@ -628,8 +628,8 @@ export default function Studio() {
           </div>
           <p className="hint">
             {safe
-              ? "Generic, descriptive copy: no superlatives, guarantees, speed claims or numbers, and no testimonials or customer logos. Applies to the next generation."
-              : "Also uses the site's own stats, quotes and customer logos. You're responsible for checking any claims before publishing. Applies to the next generation."}
+              ? "Generic, descriptive copy (FTC-minded): no superlatives, guarantees, results or numbers, no certifications, green claims, endorsements, testimonials or customer logos. Health and medical claims are always removed (FDA). Automated screening, not legal advice: review before publishing."
+              : "Also uses the site's own stats, quotes, certifications and customer logos: you must be able to substantiate them. Health and medical claims are still removed. Automated screening, not legal advice."}
           </p>
 
           <label className="field-label">

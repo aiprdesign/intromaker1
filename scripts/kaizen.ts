@@ -11,8 +11,8 @@
  */
 import { CONCEPT_MAP } from "../src/engine/concepts";
 import { iconsFor } from "../src/engine/icons";
-import { hasClaim } from "../src/engine/claims";
-import { LENGTH_SECONDS, planFromPrompt, planFromSite, safeSite, type Angle, type Length } from "../src/engine/planner";
+import { hasClaim, isHealthClaim } from "../src/engine/claims";
+import { LENGTH_SECONDS, planFromPrompt, planFromSite, safeSite, stripHealth, type Angle, type Length } from "../src/engine/planner";
 import { TEMPLATES } from "../src/engine/templates";
 import { speakable, wordBudget } from "../src/engine/voice";
 import type { SiteData, VideoPlan } from "../src/engine/types";
@@ -136,6 +136,10 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
   if (sc[sc.length - 1]?.role === "cta" && !sc[sc.length - 1].vo) add("voice", 1, "CTA has no voice line");
 
   // ── Claims: claim-safe films say what the product is and does, never how much better it is.
+  for (const s of sc) {
+    const health = [s.text, s.subtext, s.eyebrow, s.vo, ...(s.items ?? [])].find((x) => x && isHealthClaim(x));
+    if (health) add("claims", 10, `${s.role} makes a health claim: "${health.replace(/\*/g, "").slice(0, 60)}"`);
+  }
   if (safe) {
     for (const s of sc) {
       const claim = [s.text, s.subtext, s.eyebrow, s.vo, ...(s.items ?? [])].find((x) => x && hasClaim(x));
@@ -230,7 +234,7 @@ for (const { id, site } of SITES) {
         // on the full site.
         for (const safe of [true, false]) {
           const plan = planFromSite(site, { aspect: "16:9", length, template, angle, seed: 7, safe });
-          results.push({ name: `site:${id} ${length}/${angle}/${template}${safe ? "" : " +claims"}`, ...score(plan, LENGTH_SECONDS[length], safe ? safeSite(site) : site, safe) });
+          results.push({ name: `site:${id} ${length}/${angle}/${template}${safe ? "" : " +claims"}`, ...score(plan, LENGTH_SECONDS[length], safe ? safeSite(site) : stripHealth(site), safe) });
         }
       }
 }

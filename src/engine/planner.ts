@@ -2,7 +2,7 @@ import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, DEMOS, detectConcept } from "./concepts";
 import { writeVoiceover } from "./script";
-import { isNumericClaim, safeCopy } from "./claims";
+import { isHealthClaim, isNumericClaim, isUnsafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength } from "./templates";
 import {
   FONTS,
@@ -388,12 +388,15 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
 /** Prompt → intro, with a narrator line on every scene (used when voice-over is on). */
 export function planFromPrompt(req: PlanRequest): VideoPlan {
-  if (req.safe === false) return writeVoiceover(planFromPromptRaw(req));
+  if (req.safe === false) {
+    const prompt = req.prompt.split(/,(?!\d{3})|;|(?<=[.!?])\s+/).filter((part) => !isHealthClaim(part)).join(", ");
+    return healthPlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt })));
+  }
   // Claim-safe: the prompt's claims ("10M+ users", "the #1 copilot", "10x faster") are taken
   // out before directing, so the film is built from what the product is rather than trimmed later.
   const prompt = req.prompt
     .split(/,(?!\d{3})|;|(?<=[.!?])\s+/)
-    .map((part) => (isNumericClaim(part) ? "" : safeCopy(part.trim())))
+    .map((part) => (isNumericClaim(part) || isUnsafe(part) ? "" : safeCopy(part.trim())))
     .filter((part) => part.replace(/[^a-z0-9]/gi, "").length > 1)
     .join(", ");
   return safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt })));
@@ -641,10 +644,51 @@ export function aiSelfIntro(text: string, name: string): { answer: string; first
 /** Website → intro. SaaS launch-film structure by default; epic trailer cut on request. */
 export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
   const safe = req.safe !== false;
-  const input = safe ? safeSite(site) : site;
+  const input = safe ? safeSite(site) : stripHealth(site);
   const plan = writeVoiceover(req.style === "trailer" ? planFromSiteTrailer(input, req) : trimToTarget(planFromSiteSaas(input, req)));
-  return safe ? safePlan(plan) : plan;
+  return safe ? safePlan(plan) : healthPlan(plan);
 }
+
+/**
+ * "Use site's claims" still never carries health or medical claims (treats, cures, clinically
+ * proven, FDA approved, improves sleep…): those lines of the site's copy are left out.
+ */
+export function stripHealth(site: SiteData): SiteData {
+  const ok = (x: string | null | undefined) => !!x && !isHealthClaim(x);
+  const pairs = site.headlines.map((h, i) => ({ h, f: site.features[i] ?? "" })).filter((p) => ok(p.h));
+  const tagline = ok(site.tagline) ? site.tagline : pairs[0]?.h ?? site.name;
+  const out: SiteData = {
+    ...site,
+    tagline,
+    description: site.description.split(/(?<=[.!?])\s+/).filter(ok).join(" "),
+    headlines: pairs.map((p) => p.h),
+    features: pairs.map((p) => (ok(p.f) ? p.f : "")),
+    steps: site.steps.filter(ok),
+    pains: site.pains.filter(ok),
+    stats: site.stats.filter(ok),
+    testimonials: site.testimonials.filter((q) => ok(q.quote)),
+  };
+  ORIGINAL.set(out, site);
+  return out;
+}
+
+/** The finished plan with any health claim that slipped in (AI output, prompts) taken out. */
+export function healthPlan(plan: VideoPlan): VideoPlan {
+  const name = plan.brand?.name ?? plan.title;
+  const scenes = plan.scenes
+    .filter((sc, i) => i === 0 || !(sc.role === "quote" && isHealthClaim(sc.text)))
+    .map((sc) => ({
+      ...sc,
+      text: isHealthClaim(sc.text) ? (sc.role === "hook" ? `Introducing *${name}*` : `See *${name}* in action`) : sc.text,
+      subtext: sc.subtext && isHealthClaim(sc.subtext) ? undefined : sc.subtext,
+      items: sc.items?.filter((it) => !isHealthClaim(it)),
+      vo: sc.vo && isHealthClaim(sc.vo) ? undefined : sc.vo,
+    }));
+  return writeVoiceover({ ...plan, scenes });
+}
+
+/** The site as captured, for category detection (vocabulary and icons, never on-screen claims). */
+const ORIGINAL = new WeakMap<SiteData, SiteData>();
 
 /** Beats that can go when a film runs long, least essential first. */
 const DROPPABLE = ["integrations", "promise", "cards", "how", "bento", "features", "meet"];
@@ -680,7 +724,7 @@ function trimToTarget(plan: VideoPlan): VideoPlan {
  * product is and does.
  */
 export function safeSite(site: SiteData): SiteData {
-  const line = (x: string | null | undefined) => (x && !isNumericClaim(x) ? safeCopy(x) : "");
+  const line = (x: string | null | undefined) => (x && !isNumericClaim(x) && !isUnsafe(x) ? safeCopy(x) : "");
   const words = (x: string) => x.replace(/\*/g, "").trim().split(/\s+/).filter(Boolean).length;
   // Lines the site wrote without claims lead; rewritten ones follow (a boast with its claim taken
   // out reads thinner), minus a leftover article ("The most powerful lead scoring" → "Lead scoring").
@@ -714,9 +758,10 @@ export function safeSite(site: SiteData): SiteData {
     stats: [],
     testimonials: [],
     clientLogos: [],
-    cta: site.cta && !isNumericClaim(site.cta) ? safeCopy(site.cta) || "Get started" : site.cta && "Get started",
+    cta: site.cta && !isNumericClaim(site.cta) && !isUnsafe(site.cta) ? safeCopy(site.cta) || "Get started" : site.cta && "Get started",
   };
   REWRITTEN.set(out, new Set(pairs.filter((p) => p.rewritten).map((p) => p.head)));
+  ORIGINAL.set(out, site);
   return out;
 }
 
@@ -744,20 +789,20 @@ export function safePlan(plan: VideoPlan): VideoPlan {
     const text = sc.text.includes("|")
       ? sc.text
           .split("|")
-          .map((part, k) => (k === 0 ? safeCopy(part) : isNumericClaim(part) ? "" : safeCopy(part)))
+          .map((part, k) => (k === 0 ? safeCopy(part) : isNumericClaim(part) || isUnsafe(part) ? "" : safeCopy(part)))
           .filter(Boolean)
           .join("|")
-      : isNumericClaim(sc.text) && sc.role !== "reveal"
+      : (isNumericClaim(sc.text) || isUnsafe(sc.text)) && sc.role !== "reveal"
         ? neutral(sc.role)
         : safeCopy(sc.text) || neutral(sc.role);
-    const items = sc.items?.filter((it) => !isNumericClaim(it)).map((it) => safeCopy(it)).filter(Boolean);
+    const items = sc.items?.filter((it) => !isNumericClaim(it) && !isUnsafe(it)).map((it) => safeCopy(it)).filter(Boolean);
     return {
       ...sc,
       text,
-      subtext: sc.subtext && isNumericClaim(sc.subtext) && sc.role !== "cta" ? undefined : fix(sc.subtext),
-      eyebrow: fix(sc.eyebrow),
+      subtext: sc.subtext && (isNumericClaim(sc.subtext) || isUnsafe(sc.subtext)) && sc.role !== "cta" ? undefined : fix(sc.subtext),
+      eyebrow: sc.eyebrow && isUnsafe(sc.eyebrow) ? undefined : fix(sc.eyebrow),
       items: items?.length ? items : sc.items?.length ? undefined : sc.items,
-      vo: sc.vo && !isNumericClaim(sc.vo) ? fix(sc.vo) : sc.vo ? undefined : sc.vo,
+      vo: sc.vo && !isNumericClaim(sc.vo) && !isUnsafe(sc.vo) ? fix(sc.vo) : sc.vo ? undefined : sc.vo,
     };
   });
   // Keep the film's length: the time of any scene left out goes to the scenes around it.
@@ -864,9 +909,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
 
   const angle: Angle = req.angle ?? "story";
   // What kind of product this is decides the arc, chapter labels, CTA voice and icons.
+  // (From the site as captured: screening a claim out mustn't change what kind of product it is.)
+  const whole = ORIGINAL.get(site) ?? site;
   const concept = detectConcept(
-    `${site.name} ${site.tagline} ${site.description}`,
-    [...site.headlines, ...site.features, ...(site.steps ?? []), ...(site.pains ?? [])].join(" "),
+    `${whole.name} ${whole.tagline} ${whole.description}`,
+    [...whole.headlines, ...whole.features, ...(whole.steps ?? []), ...(whole.pains ?? [])].join(" "),
   );
   const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
   // 1. Hook: the problem, the promise, or the proof.
@@ -1142,7 +1189,9 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     const eb = concept.eyebrows[sc.role as keyof typeof concept.eyebrows];
     if (eb && sc.role !== "reveal" && sc.role !== "cta") sc.eyebrow = eb;
   }
-  const lines = concept.cta.map((l) => l.replace(/\{name\}/g, site.name));
+  // "Free" is an offer, and an offer must be real: only when the site itself offers something free.
+  const offersFree = /\bfree\b/i.test([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features].join(" "));
+  const lines = concept.cta.filter((l) => offersFree || !/\bfree\b/i.test(l)).map((l) => l.replace(/\{name\}/g, site.name));
   if (/free/i.test(site.cta ?? "")) lines.push("Start *free* today");
   if (cta?.role === "cta") {
     // The closing line mustn't just repeat the button under it ("Start free" / "Start free trial").

@@ -1,9 +1,17 @@
 /**
- * Claim-safe copy. Launch films are advertising, so the words on screen and in the voice-over
- * stay generic: no superlatives ("the best", "#1", "world's fastest"), no absolutes or guarantees
- * ("100%", "guaranteed", "never miss"), no speed or multiplier claims ("in seconds", "10x faster")
- * and no social-proof numbers ("trusted by 12,000+ teams"). The site's own wording is kept where
- * it's neutral and softened where it isn't.
+ * Claim-safe copy. Launch films are advertising, and advertising claims need substantiation
+ * (the FTC's standard; the FDA's for anything health-related). The words on screen and in the
+ * voice-over stay generic and descriptive:
+ * - no superlatives ("the best", "#1", "world's fastest"), absolutes or guarantees ("100%",
+ *   "guaranteed", "never miss"), speed or multiplier claims ("in seconds", "10x faster") and no
+ *   social-proof numbers ("trusted by 12,000+ teams");
+ * - no efficacy or outcome promises ("stops every threat", "boost your revenue", "clinically
+ *   proven"), health or medical claims (treats, cures, prevents a disease; FDA approved),
+ *   certification or compliance claims (SOC 2, HIPAA compliant, bank-grade), green claims
+ *   (eco-friendly, carbon neutral), endorsements ("as seen on", "recommended by") or origin
+ *   claims ("Made in USA").
+ * The site's own wording is kept where it's neutral, softened where that is safe, and left out
+ * where it isn't. This is an automated screen, not legal review.
  */
 
 const SUPERLATIVE =
@@ -45,6 +53,10 @@ const RULES: Rule[] = [
   [/\beverything\b/gi, "it all"],
   [/\bno more\b/gi, "less time on"],
   [/\s+again\b(?=[.!?]?$)/gi, ""],
+  // Efficacy: "Sentinel stops cyber threats" → "Sentinel helps you monitor cyber threats".
+  [/\b(stops?|blocks?|prevents?|eliminates?|kills?)\s+(?:all\s+|every\s+|any\s+)?((?:cyber\s*|online\s+|payment\s+)?(?:threats?|attacks?|breaches|fraud|hacks?|malware|phishing|errors?|bugs?|downtime|spam|bots?))\b/gi, (_m, verb: string, what: string) => `${/s$/i.test(verb) ? "helps you monitor" : "monitor"} ${what}`],
+  [/\b(?:clinically|scientifically|independently)?\s*(?:proven|tested|validated)\s+(?:to\s+\w+\s*)?/gi, ""],
+  [/\bget results\b/gi, "get started"],
   // Speed and multiplier claims.
   [/\s*\bat the speed of (?:thought|light|sound)\b/gi, ""],
   [/\b(?:blazing(?:ly)?|lightning)[- ]fast\b\s*/gi, ""],
@@ -87,8 +99,50 @@ export function isNumericClaim(text: string) {
   return /\d[\d,.]*\s*[kmb]?\+|\d\s?%|\b\d+(?:\.\d+)?\s?[x×]\b|\b\d(?:\.\d)?\s?\/\s?5\b|\b\d[\d,.]*\s*(?:[kmb]\s+)?(?:teams?|customers?|companies|users?|businesses|developers|people|brands|merchants|members|orgs?|organizations|downloads|installs|reviews)\b/i.test(text);
 }
 
+/**
+ * Health and medical claims (the FDA's territory): disease, treatment and body-effect claims,
+ * clinical proof, approvals and professional endorsements. Screened out in every wording mode.
+ */
+const HEALTH: RegExp[] = [
+  // FDA: disease, treatment and body-effect claims; approvals.
+  /\b(?:cures?|cured|treats?|treatment\s+(?:for|of)|heals?|healing|diagnos\w*|mitigat\w*|remed(?:y|ies))\b/i,
+  /\bprevents?\s+(?:\w+\s+)?(?:disease|illness|infection|cancer|diabetes|flu|covid|heart)/i,
+  /\bclinical(?:ly)?\b|\b(?:reduces?|relieves?|improves?|boosts?|restores?|balances?)\s+(?:your\s+)?(?:stress|sleep|pain|energy|mood|focus|skin|health|wellbeing|well-being|hormones?|gut|memory)\b/i,
+  /\b(?:sleep|feel|look|breathe|recover|live|age)\s+(?:better|younger|healthier|longer|great)\b|\bhealthier\b/i,
+  /\bFDA\b|\b(?:doctor|physician|dermatologist|dentist)[- ](?:recommended|approved|tested)\b|\b(?:medical|pharmaceutical|clinical)[- ]grade\b/i,
+  /\b(?:immun\w*|weight[- ]loss|lose weight|burns?\s+fat|fat[- ]burning|detox\w*|anti[- ]aging|reverses?\s+aging|metabolism|disease|cancer|diabetes|covid|anxiety|depression|insomnia|symptoms?)\b/i,
+];
+
+/** A health or medical claim: never put on screen, whatever the wording mode. */
+export function isHealthClaim(text: string) {
+  return HEALTH.some((re) => re.test(text));
+}
+
+/**
+ * Claims that can't be softened into something true-by-default, so the line is left out:
+ * health and medical claims, certifications and compliance, green claims, endorsements, origin,
+ * and promised business outcomes.
+ */
+const UNSAFE: RegExp[] = [
+  ...HEALTH,
+  // Certifications, compliance and security grades.
+  /\b(?:SOC\s?2|ISO\s?27001|HIPAA|GDPR|PCI(?:[- ]DSS)?|FedRAMP|CCPA|HITRUST)\b/i,
+  /\b(?:compliant|compliance[- ]ready|certified|accredited|unhackable|hack[- ]proof)\b|\b(?:bank|military|enterprise)[- ]grade\b/i,
+  // Green claims.
+  /\b(?:eco[- ]friendly|environmentally[- ]friendly|carbon[- ](?:neutral|negative|free)|net[- ]zero|climate[- ](?:positive|neutral)|sustainabl\w*|biodegradable|compostable|recyclable|non[- ]toxic|all[- ]natural|chemical[- ]free|plastic[- ]free)\b/i,
+  // Endorsements and origin.
+  /\b(?:as seen (?:on|in)|recommended by|endorsed by|approved by|official (?:partner|sponsor)|made in (?:the\s+)?(?:usa|u\.s\.a?\.?|america|uk|germany))\b/i,
+  // Promised business outcomes.
+  /\b(?:boost|increase|double|triple|maximi[sz]e|skyrocket|supercharge|grow|improve|cut|reduce|slash|lower|save|drive)s?\s+(?:your\s+|more\s+)?(?:revenue|sales|profits?|conversions?|roi|productivity|efficiency|costs?|churn|retention|leads|money|spend)\b/i,
+];
+
+/** A claim that can't be made safe by rewording: the line is left out. */
+export function isUnsafe(text: string) {
+  return UNSAFE.some((re) => re.test(text));
+}
+
 /** Does this line still make a claim? (Used by the self-review.) */
 export function hasClaim(text: string | undefined) {
   if (!text) return false;
-  return safeCopy(text) !== tidy(text) || isNumericClaim(text);
+  return safeCopy(text) !== tidy(text) || isNumericClaim(text) || isUnsafe(text);
 }

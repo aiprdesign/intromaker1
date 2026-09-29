@@ -1,5 +1,5 @@
 import type { SiteData } from "@/engine/types";
-import { hasClaim } from "@/engine/claims";
+import { hasClaim, isHealthClaim } from "@/engine/claims";
 
 /**
  * Storyboard QA for AI drafts: a deterministic checklist (story arc, copy length, pacing,
@@ -78,6 +78,8 @@ export function lintStoryboard(draft: Draft, ctx: LintContext): string[] {
     if (s.skill === "chart-grow" && !/\d/.test(s.subtext ?? "")) issues.push(`${n} needs subtext = one real stat with a number (e.g. "30,000+ businesses").`);
     if (s.skill === "cta" && !s.subtext?.trim()) issues.push(`${n} needs subtext = the button label${ctx.site?.cta ? ` ("${ctx.site.cta}")` : ""}.`);
     if (s.duration < 1.8 || s.duration > 8) issues.push(`${n} lasts ${s.duration}s; keep scenes between 2.5 and 6.5 seconds.`);
+    const health = [s.text, s.subtext, s.eyebrow, ...(s.items ?? []), (s as { vo?: string }).vo].find((x): x is string => !!x && isHealthClaim(x));
+    if (health) issues.push(`${n} makes a health or medical claim ("${health.replace(/\*/g, "")}"); remove it: no treats/cures/prevents, clinical proof, approvals or body-effect claims.`);
     if (ctx.safe) {
       const claims = [s.text, s.subtext, s.eyebrow, ...(s.items ?? []), (s as { vo?: string }).vo].filter((x): x is string => !!x && hasClaim(x));
       if (claims.length) issues.push(`${n} makes a claim ("${claims[0].replace(/\*/g, "")}"); use generic, descriptive wording: no superlatives, guarantees, speed claims or numbers.`);
