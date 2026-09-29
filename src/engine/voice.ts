@@ -16,13 +16,21 @@ export interface VoiceOption {
   name: string;
 }
 
-export const VOICE_SOURCES: { id: VoiceSource; name: string; note: string }[] = [
-  { id: "local", name: "Free voice on this computer (Kokoro)", note: "Open-source Kokoro voice model running in your browser: free, private, no key. One-time download (~90 MB)." },
+/**
+ * The in-browser Kokoro voice downloads kokoro-js, whose phonemizer is eSpeak NG (GPL-3.0-or-later).
+ * A deployment that wants only permissively licensed code can remove it at build time with
+ * NEXT_PUBLIC_INTROMAKER_LOCAL_VOICE=off (see THIRD_PARTY_NOTICES.md).
+ */
+export const LOCAL_VOICE = process.env.NEXT_PUBLIC_INTROMAKER_LOCAL_VOICE !== "off";
+
+const ALL_SOURCES: { id: VoiceSource; name: string; note: string }[] = [
+  { id: "local", name: "Free voice on this computer (Kokoro)", note: "Open-source Kokoro voice model running in your browser: free, private, no key. One-time download (~90 MB). Uses eSpeak NG (GPL-3.0) for pronunciation." },
   { id: "openai", name: "OpenAI voices", note: "Natural, expressive voices (gpt-4o-mini-tts). Uses your OpenAI key." },
   { id: "elevenlabs", name: "ElevenLabs voices", note: "Studio-quality voices, or any voice ID from your ElevenLabs library." },
   { id: "custom", name: "Any OpenAI-compatible voice server", note: "E.g. Kokoro-FastAPI or openedai-speech on your own machine (…/v1/audio/speech)." },
   { id: "upload", name: "Upload my own recording", note: "Your narration (MP3/WAV/M4A) laid over the film." },
 ];
+export const VOICE_SOURCES = ALL_SOURCES.filter((s) => LOCAL_VOICE || s.id !== "local");
 
 export const VOICES: Record<Exclude<VoiceSource, "upload">, VoiceOption[]> = {
   local: [
@@ -62,7 +70,9 @@ export const VOICES: Record<Exclude<VoiceSource, "upload">, VoiceOption[]> = {
   ],
 };
 
-export const DEFAULT_VOICE: VoiceSettings = { enabled: false, source: "local", voice: "af_heart", captions: true };
+export const DEFAULT_VOICE: VoiceSettings = LOCAL_VOICE
+  ? { enabled: false, source: "local", voice: "af_heart", captions: true }
+  : { enabled: false, source: "openai", voice: "coral", captions: true };
 
 /* ───────── speech-friendly text ───────── */
 

@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["172.18.144.1", "127.0.0.1", "*.local"],
   // Live website capture drives a headless browser; keep it out of the bundle.
   serverExternalPackages: ["playwright-core"],
+  // No next/image optimisation: frames are drawn on canvas. So Next's optional sharp / libvips
+  // (LGPL-3.0) is never loaded, and the Dockerfile deletes it from the standalone build.
+  images: { unoptimized: true },
   // Captures are read from a runtime folder (INTROMAKER_DATA_DIR), which the file tracer can't see
   // statically; keep the project's own files out of the standalone build.
   outputFileTracingExcludes: {

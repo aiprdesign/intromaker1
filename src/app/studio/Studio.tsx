@@ -816,6 +816,10 @@ export default function Studio() {
             )} ·{" "}
             <a href="/privacy" target="_blank" rel="noopener">
               Privacy
+            </a>{" "}
+            ·{" "}
+            <a href="/licenses" target="_blank" rel="noopener">
+              Licences
             </a>
           </p>
           {note && <p className="hint warn">{note}</p>}

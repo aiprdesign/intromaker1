@@ -1797,3 +1797,26 @@ button.brand-colors.on {
   color: var(--muted);
   padding: 0 3px;
 }
+
+.legal details.licence {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 0;
+}
+.legal details.licence summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.legal details.licence .muted {
+  opacity: 0.6;
+  font-weight: 400;
+}
+.legal details.licence pre {
+  white-space: pre-wrap;
+  font-size: 12px;
+  opacity: 0.8;
+  max-height: 320px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px;
+  border-radius: 8px;
+}

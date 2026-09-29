@@ -1,7 +1,8 @@
 /**
  * Voice-over generation in the browser.
  *
- * - local:  the open-source Kokoro voice model (kokoro-js, Apache-2.0) running on this computer,
+ * - local:  the open-source Kokoro voice model (kokoro-js, Apache-2.0; its phonemizer is eSpeak NG,
+ *           GPL-3.0-or-later, so NEXT_PUBLIC_INTROMAKER_LOCAL_VOICE=off removes it) running on this computer,
  *           loaded on first use (WebGPU when available, else WebAssembly). Free and private.
  * - openai / elevenlabs / custom: through /api/tts (keys stay out of the page's code paths).
  * - upload: your own recording.
@@ -9,7 +10,7 @@
  * Every clip is decoded to mono samples and stored in the engine's clip store, where the score,
  * the captions and the export pick it up.
  */
-import { clipKey, estimateWords, fitScenesToVoice, getClip, putClip, speakable, UPLOAD_KEY, wordsFromAlignment, type Clip } from "@/engine/voice";
+import { clipKey, estimateWords, fitScenesToVoice, getClip, LOCAL_VOICE, putClip, speakable, UPLOAD_KEY, wordsFromAlignment, type Clip } from "@/engine/voice";
 import type { VideoPlan, VoiceSettings } from "@/engine/types";
 
 export interface VoiceKeys {
@@ -90,6 +91,7 @@ function loadKokoro(onProgress?: (msg: string) => void) {
 export async function synthesize(text: string, v: VoiceSettings, keys: VoiceKeys, onProgress?: (msg: string) => void): Promise<Clip> {
   const say = speakable(text);
   if (v.source === "local") {
+    if (!LOCAL_VOICE) throw new Error("The on-device voice is turned off on this deployment. Pick another voice source.");
     const tts = await loadKokoro(onProgress);
     const out = await tts.generate(say, { voice: v.voice });
     const samples = out.audio instanceof Float32Array ? out.audio : new Float32Array(out.audio);

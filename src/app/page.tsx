@@ -140,7 +140,7 @@ export default function Home() {
       <footer className="footer">
         <Logo />
         <span>
-          © {new Date().getFullYear()} IntroMaker. Rendered in your browser. · <Link href="/privacy">Privacy</Link>
+          © {new Date().getFullYear()} IntroMaker. Rendered in your browser. · <Link href="/privacy">Privacy</Link> · <Link href="/licenses">Open-source licences</Link>
         </span>
       </footer>
     </main>

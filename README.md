@@ -179,6 +179,7 @@ docker run -p 3000:3000 -v intromaker-data:/data intromaker     # http://localho
 | `INTROMAKER_MAX_CAPTURES` | 2 | Headless browser sessions at once (about 300 MB each); more wait briefly, then fall back to reading the HTML |
 | `INTROMAKER_PROXY_HOPS` | 1 | Trusted reverse proxies in front; the client address is read from `X-Forwarded-For` counted from the right, so it can't be spoofed. Use 0 when the server faces the internet directly |
 | `INTROMAKER_RATE_LIMIT` | on in production | `off` disables the limits |
+| `NEXT_PUBLIC_INTROMAKER_LOCAL_VOICE` | on | Build-time. `off` removes the on-device Kokoro voice, whose phonemizer is GPL-3.0 (see Third-party and licences) |
 | `ANTHROPIC_API_KEY` | none | Optional Claude key for the AI director; visitors can bring their own |
 | `INTROMAKER_AI_DAILY_BUDGET` | 200 | Generations per day, all visitors combined, paid by the server's key; after it, the built-in director is used |
 
@@ -260,11 +261,13 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 - The pricing tiers on the landing page are marketing UI only. Auth and billing are not wired up.
 - Export renders every frame offline with WebCodecs (Chrome, Edge, Safari 17+), so videos come out smooth and exactly the right length on any machine. Other browsers fall back to real-time recording.
 
-## Third-party
+## Third-party and licences
 
-- [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0) by Paper Design. `src/engine/shaderbg.ts` includes their vertex shader source.
-- [OGL](https://github.com/oframe/ogl) (Unlicense), the minimal WebGL library behind the gallery skills.
-- [gl-transitions](https://github.com/gl-transitions/gl-transitions) (MIT; each transition carries its author's licence, all MIT), the GLSL transitions used by Gallery Flow.
-- Fonts via Fontsource: Inter, Space Grotesk, Anton, Instrument Serif and JetBrains Mono (SIL Open Font License).
-- [Lucide](https://lucide.dev) icons (ISC).
-- Voice-over (optional, loaded at runtime when chosen): [kokoro-js](https://github.com/hexgrad/kokoro) and the Kokoro-82M voice model (Apache-2.0).
+Every component IntroMaker uses is open source, and each licence allows commercial use. `npm run check:licenses` checks all of them: every production package in the lockfile (including optional platform binaries), the dev tools, and what's loaded at runtime. It fails if a licence isn't on the commercial-friendly allowlist. `npm run licenses` regenerates [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (full licence texts and NOTICE files) and the in-app **/licenses** page, which is linked from every footer and the studio.
+
+- **Permissive (MIT, ISC, Apache-2.0, BSD, 0BSD, Unlicense)**: Next.js, React, zod, undici, the Anthropic SDK, playwright-core, [OGL](https://github.com/oframe/ogl), [Lucide](https://lucide.dev) icons, [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0, NOTICE reproduced; `src/engine/shaderbg.ts` includes their vertex shader source) and [gl-transitions](https://github.com/gl-transitions/gl-transitions) (MIT; two of its 125 shaders, which Gallery Flow doesn't use, are BSD).
+- **Fonts (SIL OFL-1.1)**: Inter, Space Grotesk, Anton, Instrument Serif and JetBrains Mono via Fontsource. They're free to use and embed commercially, including in rendered videos.
+- **[mediabunny](https://github.com/Vanilagy/mediabunny) (MPL-2.0)**: the MP4/WebM muxer. The copyleft is file-level: commercial use is fine, and only changes to its own files would have to be shared. It is used unmodified.
+- **caniuse-lite (CC-BY-4.0)**: browser-support data used at build time, attributed in the notices.
+- **Not shipped**: Next.js installs sharp / libvips (LGPL-3.0) as an optional image optimiser. IntroMaker turns image optimisation off, so it is never loaded, and the Docker build deletes it from the production server.
+- **Optional on-device voice**: [kokoro-js](https://github.com/hexgrad/kokoro), transformers.js and the Kokoro-82M model are Apache-2.0, but the phonemizer they use is a WebAssembly build of [eSpeak NG](https://github.com/espeak-ng/espeak-ng) (GPL-3.0-or-later). It is open source and allowed commercially, but copyleft. The viewer's browser downloads it from jsDelivr only when that voice is chosen; it is never bundled or served by IntroMaker. To offer only permissively licensed code, build with `NEXT_PUBLIC_INTROMAKER_LOCAL_VOICE=off`: the source is removed, and the OpenAI, ElevenLabs, custom-server and upload options remain.

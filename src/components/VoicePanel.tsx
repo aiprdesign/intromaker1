@@ -11,7 +11,9 @@ const STORAGE = "intromaker.voice.v1";
 export function loadVoiceSettings(fallback: VoiceSettings): VoiceSettings {
   try {
     const raw = localStorage.getItem(STORAGE);
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
+    const saved: VoiceSettings = raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
+    // A source this deployment doesn't offer (e.g. the local voice switched off) falls back.
+    return VOICE_SOURCES.some((s) => s.id === saved.source) ? saved : { ...fallback, enabled: saved.enabled, captions: saved.captions };
   } catch {
     return fallback;
   }
