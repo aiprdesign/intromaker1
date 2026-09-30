@@ -181,6 +181,8 @@ npm run dev                  # http://localhost:3000
 
 The image runs Next's standalone server with a headless Chromium for live website capture. Videos are rendered in each visitor's browser, so the server does no video work.
 
+**What the server stores.** A website's own images and videos are streamed through `/api/asset` and never stored; the relay is needed because browsers won't export a video drawn from another site's images. Screenshots and the UI pieces cut from a page don't exist on the site, so the headless browser makes them. By default they're kept on the data volume for 7 days, so share links, saved intros and admin previews show them. The studio also caches every capture it loads in the visitor's browser (IndexedDB), so their films keep their screenshots after the server's copy expires. Set `INTROMAKER_CAPTURE_STORAGE=browser` to keep none on the server at all.
+
 ```bash
 docker build -t intromaker .
 docker run -p 3000:3000 -v intromaker-data:/data intromaker     # http://localhost:3000
@@ -196,6 +198,7 @@ Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instan
 |---|---|---|
 | `INTROMAKER_DATA_DIR` | `/data` in the image | Where captured screenshots are stored; mount a persistent volume here |
 | `INTROMAKER_SHOT_TTL_DAYS` / `INTROMAKER_SHOT_MAX_MB` | 7 / 1024 | Captures are deleted after this many days; the folder is held under this size, oldest first |
+| `INTROMAKER_CAPTURE_STORAGE` | `server` | `browser`: website screenshots are never written to disk. The server holds them in memory only while the film is made (`INTROMAKER_MEMORY_TTL_MIN`, 30), and each visitor's browser keeps its own copy. Share links opened elsewhere, saved intros on another device and admin previews then show the film without them |
 | `INTROMAKER_MAX_CAPTURES` | 2 | Headless browser sessions at once (about 300 MB each); more wait briefly, then fall back to reading the HTML |
 | `INTROMAKER_PROXY_HOPS` | 1 | Trusted reverse proxies in front; the client address is read from `X-Forwarded-For` counted from the right, so it can't be spoofed. Use 0 when the server faces the internet directly |
 | `INTROMAKER_RATE_LIMIT` | on in production | `off` disables the limits |

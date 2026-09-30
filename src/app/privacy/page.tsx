@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Nav, { Logo } from "@/components/Nav";
 import { adminEnabled } from "@/lib/admin";
+import { CAPTURE_STORAGE } from "@/lib/storage";
 
 // Whether this server keeps a log of films depends on its settings, read at request time.
 export const dynamic = "force-dynamic";
@@ -48,9 +49,12 @@ export default function Privacy() {
 
         <h2>Websites you import</h2>
         <p>
-          The server opens the public page you enter in a headless browser, reads its text and takes screenshots of it, its UI components and its logo. The
-          screenshots are stored on the server so the studio can show them, and are deleted automatically after 7 days. Only public addresses can be imported:
-          private and internal networks are refused. Please import only sites you have the right to use.
+          The server opens the public page you enter in a headless browser, reads its text and takes screenshots of it, its UI components and its logo.{" "}
+          {CAPTURE_STORAGE === "browser"
+            ? "The screenshots are never written to the server's disk: it holds them in memory only while your film is being made (up to 30 minutes), and your browser keeps its own copy."
+            : "The screenshots are stored on the server so the studio, share links and saved intros can show them, and are deleted automatically after 7 days. Your browser also keeps its own copy."}{" "}
+          The site&apos;s own images and videos are passed through to your browser and not stored. Only public addresses can be imported: private and internal
+          networks are refused. Please import only sites you have the right to use.
         </p>
 
         <h2>API keys</h2>
@@ -69,7 +73,11 @@ export default function Privacy() {
 
         <h2>What the server keeps</h2>
         <ul>
-          <li>Screenshots of imported sites, for 7 days.</li>
+          {CAPTURE_STORAGE === "browser" ? (
+            <li>Screenshots of imported sites, in memory only, for up to 30 minutes; never on disk.</li>
+          ) : (
+            <li>Screenshots of imported sites, for 7 days.</li>
+          )}
           <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits. It is never written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>
           {logging && <li>The film log described above, up to the most recent few thousand films, until the owner deletes it.</li>}

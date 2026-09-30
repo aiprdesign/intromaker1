@@ -1,9 +1,7 @@
 import { z } from "zod/v4";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { assetUrl } from "@/engine/assets";
 import { AiError, describe, modelOf, readAiConfig, runDirector, serverReachesLocal, type AiConfig } from "@/lib/ai";
-import { SHOT_DIR } from "@/lib/capture";
+import { readShot } from "@/lib/storage";
 import { lintStoryboard, repairStoryboard, reviewBrief } from "@/lib/review";
 import { PALETTES } from "@/engine/palettes";
 import { rateLimit, spendServerAi } from "@/lib/ratelimit";
@@ -193,7 +191,8 @@ async function siteImages(site: SiteData) {
     const id = src.match(/id=([a-f0-9]{16}-(?:hero|full|s\d|p\d{1,2}))$/)?.[1];
     if (!id) continue;
     try {
-      const data = await readFile(join(SHOT_DIR, `${id}.jpg`));
+      const data = await readShot(`${id}.jpg`);
+      if (!data) continue;
       if (data.length <= 4_500_000) out.push({ data: data.toString("base64"), mediaType: "image/jpeg" });
     } catch {
       /* screenshot expired */

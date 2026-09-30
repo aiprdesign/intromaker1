@@ -1,6 +1,4 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { SHOT_DIR } from "@/lib/capture";
+import { readShot } from "@/lib/storage";
 import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -16,8 +14,8 @@ export async function GET(req: Request) {
   // Logos are PNG or SVG; everything else is JPEG.
   const exts = id.endsWith("-logo") ? (["png", "svg"] as const) : (["jpg"] as const);
   for (const ext of exts) {
-    try {
-      const data = await readFile(join(SHOT_DIR, `${id}.${ext}`));
+    const data = await readShot(`${id}.${ext}`);
+    if (data) {
       return new Response(new Uint8Array(data), {
         headers: {
           "Content-Type": TYPES[ext],
@@ -27,8 +25,6 @@ export async function GET(req: Request) {
           "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
         },
       });
-    } catch {
-      /* try the next format */
     }
   }
   return new Response("Not found", { status: 404 });

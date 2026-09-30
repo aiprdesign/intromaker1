@@ -30,6 +30,29 @@ function loadImage(src: string) {
   const p = new Promise<void>((resolve) => {
     const img = new Image();
     img.decoding = "async";
+    img.onerror = () => resolve();
+    const shot = shotKey(src);
+    if (shot) {
+      // Website captures come from this browser's own copy when it has one (the server may have
+      // let them go), else from the server, keeping a copy for next time.
+      void cachedShot(src, shot).then((blob) => {
+        let url = src;
+        if (blob) {
+          url = URL.createObjectURL(blob);
+          if (/svg/i.test(blob.type)) {
+            vectorLogos.add(url);
+            probes.set(url, Promise.resolve());
+          }
+        }
+        img.onload = () => {
+          images.set(src, img);
+          resolve();
+          notifyReady();
+        };
+        img.src = url;
+      });
+      return;
+    }
     // Captured logos: learn whether the file is SVG before first use, so it's drawn as vector
     // from the first frame.
     const kind = /-logo$/.test(src) ? probeVector(src) : Promise.resolve();
@@ -40,11 +63,81 @@ function loadImage(src: string) {
         notifyReady();
       });
     };
-    img.onerror = () => resolve();
     img.src = src;
   });
   pending.set(src, p);
   return p;
+}
+
+/* ── This browser's copy of website captures (IndexedDB) ── */
+
+const SHOT_DB = "intromaker-captures";
+const SHOT_STORE = "shots";
+const SHOT_KEEP = 400;
+
+/** The capture id in a /api/shot URL, or null. */
+function shotKey(src: string) {
+  return src.match(/\/api\/shot\?id=([a-f0-9]{16}-[a-z0-9]+)$/)?.[1] ?? null;
+}
+
+let dbPromise: Promise<IDBDatabase | null> | null = null;
+function shotDb() {
+  dbPromise ??= new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(SHOT_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(SHOT_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    } catch {
+      resolve(null); // private mode or no IndexedDB: go to the server every time
+    }
+  });
+  return dbPromise;
+}
+
+function idb<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T | null> {
+  return shotDb().then(
+    (db) =>
+      new Promise((resolve) => {
+        if (!db) return resolve(null);
+        try {
+          const req = run(db.transaction(SHOT_STORE, mode).objectStore(SHOT_STORE));
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+        } catch {
+          resolve(null);
+        }
+      }),
+  );
+}
+
+let stored = 0;
+async function cachedShot(src: string, key: string): Promise<Blob | null> {
+  const hit = await idb<{ blob: Blob; at: number } | undefined>("readonly", (st) => st.get(key));
+  if (hit?.blob) {
+    void idb("readwrite", (st) => st.put({ blob: hit.blob, at: Date.now() }, key));
+    return hit.blob;
+  }
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    await idb("readwrite", (st) => st.put({ blob, at: Date.now() }, key));
+    if (++stored % 25 === 0) void pruneShots();
+    return blob;
+  } catch {
+    return null;
+  }
+}
+
+/** Keep the most recently used captures. */
+async function pruneShots() {
+  const all = await idb<{ blob: Blob; at: number }[]>("readonly", (st) => st.getAll());
+  const keys = await idb<IDBValidKey[]>("readonly", (st) => st.getAllKeys());
+  if (!all || !keys || all.length <= SHOT_KEEP) return;
+  const order = keys.map((k, i) => ({ k, at: all[i]?.at ?? 0 })).sort((a, b) => a.at - b.at);
+  for (const { k } of order.slice(0, all.length - SHOT_KEEP)) await idb("readwrite", (st) => st.delete(k));
 }
 
 function loadVideo(src: string) {

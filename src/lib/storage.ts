@@ -1,4 +1,4 @@
-import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -20,12 +20,51 @@ const SWEEP_EVERY_MS = 60 * 60_000;
 let lastSweep = 0;
 let sweeping: Promise<unknown> | null = null;
 
+/**
+ * Where captures live. "server" (default): on disk, as above, so share links, saved intros and the
+ * admin area show them for the TTL. "browser" (INTROMAKER_CAPTURE_STORAGE=browser): nothing is
+ * written to disk. The server holds each capture in memory only for the minutes it takes to build
+ * the film (INTROMAKER_MEMORY_TTL_MIN, default 30), and the visitor's browser keeps its own copy
+ * (the studio caches every capture it loads in IndexedDB either way).
+ */
+export const CAPTURE_STORAGE: "server" | "browser" = process.env.INTROMAKER_CAPTURE_STORAGE === "browser" ? "browser" : "server";
+const MEM_TTL_MS = Math.max(1, Number(process.env.INTROMAKER_MEMORY_TTL_MIN ?? 30) || 30) * 60_000;
+const MEM_MAX_BYTES = 256 * 1_048_576;
+const memory = new Map<string, { data: Buffer; at: number }>();
+let memoryBytes = 0;
+
+function remember(name: string, data: Buffer, now = Date.now()) {
+  const old = memory.get(name);
+  if (old) memoryBytes -= old.data.length;
+  memory.set(name, { data, at: now });
+  memoryBytes += data.length;
+  // Forget expired captures, then the oldest while over the cap (Map order is insertion order).
+  for (const [k, v] of memory) {
+    if (now - v.at <= MEM_TTL_MS && memoryBytes <= MEM_MAX_BYTES) break;
+    memory.delete(k);
+    memoryBytes -= v.data.length;
+  }
+}
+
 /** Store one capture file; returns its same-origin URL. */
 export async function saveShot(id: string, data: Buffer | string, ext: "jpg" | "png" | "svg") {
+  if (CAPTURE_STORAGE === "browser") {
+    remember(`${id}.${ext}`, typeof data === "string" ? Buffer.from(data) : data);
+    return `/api/shot?id=${id}`;
+  }
   await mkdir(SHOT_DIR, { recursive: true });
   await writeFile(join(SHOT_DIR, `${id}.${ext}`), data);
   maybeSweep();
   return `/api/shot?id=${id}`;
+}
+
+/** Read one capture file ("<id>.<ext>"), or null when it's gone. */
+export async function readShot(name: string): Promise<Buffer | null> {
+  if (CAPTURE_STORAGE === "browser") {
+    const hit = memory.get(name);
+    return hit && Date.now() - hit.at <= MEM_TTL_MS ? hit.data : null;
+  }
+  return readFile(join(SHOT_DIR, name)).catch(() => null);
 }
 
 function maybeSweep(now = Date.now()) {

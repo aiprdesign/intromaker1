@@ -1,5 +1,5 @@
 import { access, constants, mkdir } from "node:fs/promises";
-import { SHOT_DIR } from "@/lib/storage";
+import { CAPTURE_STORAGE, SHOT_DIR } from "@/lib/storage";
 import { enabled as rateLimited } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ export async function GET() {
     .then(() => "writable")
     .catch(() => "unavailable");
   return Response.json(
-    { ok: storage === "writable", storage, persistent: !!process.env.INTROMAKER_DATA_DIR, rateLimits: rateLimited(), uptime: Math.round(process.uptime()) },
+    { ok: storage === "writable", storage, persistent: !!process.env.INTROMAKER_DATA_DIR, captures: CAPTURE_STORAGE, rateLimits: rateLimited(), uptime: Math.round(process.uptime()) },
     { status: storage === "writable" ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );
 }
