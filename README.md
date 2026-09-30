@@ -184,7 +184,11 @@ docker build -t intromaker .
 docker run -p 3000:3000 -v intromaker-data:/data intromaker     # http://localhost:3000
 ```
 
-**Render**: New → Blueprint → this repo. `render.yaml` defines one web service from the Dockerfile, a 1 GB persistent disk at `/data`, the health check and the settings below. Railway, Fly.io or any VPS run the same image; mount a volume at `/data`.
+**Render**: New → Blueprint → this repo. `render.yaml` defines one web service from the Dockerfile, a 1 GB persistent disk at `/data`, the health check and the settings below. Disks need a paid instance (Starter or above); on the free plan remove the `disk` block and captures last until the next restart.
+
+**Railway**: New Project → Deploy from GitHub repo. `railway.json` builds the Dockerfile and sets the health check; Railway supplies `PORT` and the server listens on it. Then add a Volume mounted at `/data` (captured screenshots), generate a public domain under Settings → Networking, and set any of the variables below (`INTROMAKER_MAX_CAPTURES=1` on small instances). No `RAILWAY_RUN_UID` is needed: hosts mount volumes owned by root, so the container starts as root only long enough for `docker-entry.js` to hand `/data` to the `node` user, then serves as `node`. (The Dockerfile has no `VOLUME` line, which Railway's builder rejects.)
+
+Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instance at least 1 GB of memory for comfortable live capture (each headless browser session uses about 300 MB); 512 MB works with one capture at a time.
 
 | Setting | Default | What it does |
 |---|---|---|

@@ -30,10 +30,12 @@ COPY --from=build /app/.next/standalone ./
 # (images.unoptimized): leave it out, so the image ships only permissively licensed code.
 RUN rm -rf node_modules/sharp node_modules/@img
 COPY --from=build /app/.next/static ./.next/static
+COPY docker-entry.js ./
 RUN mkdir -p /data && chown -R node:node /data /ms-playwright
-USER node
+# No USER or VOLUME here: docker-entry.js starts as root only to hand the mounted data volume to
+# the `node` user, then drops to it before serving (hosts mount volumes owned by root). Railway
+# rejects the VOLUME instruction; mount a volume at /data on the host instead.
 EXPOSE 3000
-VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "server.js"]
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "docker-entry.js"]
