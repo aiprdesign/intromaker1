@@ -731,25 +731,68 @@ export interface SiteRequest {
 }
 
 /**
- * The end card's button, worded for what the intro is about: the site's own button when it has
- * one, else an action that matches the product (a waitlist, a demo, an app download, a shop,
- * a course…), then the product category. "Free" is only offered when the material offers it.
+ * Whether the copy really offers something free (a free plan, trial, tier or account), as opposed
+ * to "hassle-free", "free up your time" or "free of errors". Free offers must be real (FTC).
+ */
+export function offersFree(text: string): boolean {
+  const t = ` ${text.toLowerCase().replace(/\s+/g, " ")} `;
+  // Not offers: compounds and verbs ("error-free", "free up", "free of", "feel free").
+  const cleaned = t.replace(/\b[\w]+-free\b|\bfree (up|of|from|yourself|your time|time|to (use|explore|ask))\b|\b(feel|set|break) free\b|\btoll[- ]free\b|\bfreedom\b/g, " ");
+  return /\b(free (plan|trial|tier|account|version|forever|to start|for (ever|everyone|individuals|teams|students|life))|(try|start|use|get started|sign up|join|download)( it| now)? (for )?free|for free|is free|always free|100% free|free\b[^.]{0,20}\bno (credit )?card)\b/.test(cleaned);
+}
+
+/** A site's own button text, cleaned: arrows, emoji and shouting removed; null when unusable. */
+export function cleanCta(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let v = raw
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+    .replace(/[→›»>←‹«<↗➜➔➝⟶]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s\-–—:·•|]+|[\s\-–—:·•|.,;]+$/g, "")
+    .trim();
+  if (!v || v.length > 28 || v.split(" ").length > 5 || !/[a-z]/i.test(v)) return null;
+  // SHOUTED LABELS read as sentence case ("START FREE TRIAL" → "Start free trial"); acronyms stay.
+  if (v === v.toUpperCase() && /[A-Z]{3}/.test(v)) v = v.charAt(0) + v.slice(1).toLowerCase();
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+
+/** "Book a demo" → "book a demo" for "Scan to …"; acronyms and names keep their capitals. */
+export function lowerFirst(label: string): string {
+  const [first, ...rest] = label.split(" ");
+  const keep = /^[A-Z0-9]{2,}$/.test(first) || /[A-Z]/.test(first.slice(1));
+  return [keep ? first : first.charAt(0).toLowerCase() + first.slice(1), ...rest].join(" ");
+}
+
+/**
+ * The end card's button, worded for what the intro is about: the site's own button when it has a
+ * usable one, else the action the product invites, chosen by weighing every signal in the copy
+ * (not the first word that happens to match), then the product category. The product's name is
+ * never read as a signal. "Free" is only offered when the copy really offers something free.
  */
 export function contextCta(site: Pick<SiteData, "cta" | "name" | "tagline" | "description" | "headlines" | "features">, concept?: string): string {
-  if (site.cta) return site.cta;
-  const text = [site.name, site.tagline, site.description, ...site.headlines, ...site.features].join(" ").toLowerCase();
-  const has = (re: RegExp) => re.test(text);
-  if (has(/\bfree trial\b/)) return "Start free trial";
-  if (has(/\b(waitlist|wait list|early access|coming soon|pre-?launch|private beta)\b/)) return "Join the waitlist";
-  if (has(/\b(book|schedule|request) (a )?(demo|call)\b|\benterprise\b/)) return "Book a demo";
-  if (has(/\b(download|ios|android|app store|google play|mobile app)\b/)) return "Download the app";
-  if (has(/\b(appointments?|reservations?|bookings?|salon|clinic|dentist)\b/)) return "Book now";
-  if (has(/\b(shop|store|collection|order online|add to cart|buy)\b/)) return "Shop now";
-  if (has(/\b(courses?|lessons?|learn|tutoring|classes|bootcamp)\b/)) return "Start learning";
-  if (has(/\b(api|sdk|developers?|deploy|cli|open source)\b/)) return "Start building";
-  if (has(/\b(newsletter|podcast|subscribe)\b/)) return "Subscribe";
-  if (has(/\b(agency|consulting|consultancy|our services|hire us)\b/)) return "Get in touch";
-  if (has(/\bfree\b/)) return "Try it free";
+  const own = cleanCta(site.cta);
+  if (own && (!/\bfree\b/i.test(own) || offersFree([own, site.tagline, site.description, ...site.headlines, ...site.features].join(" ")) || /free trial/i.test(own))) return own;
+  const name = site.name.trim().toLowerCase();
+  const text = ` ${[site.tagline, site.description, ...site.headlines, ...site.features].join(" . ").toLowerCase()} `
+    .split(name && name.length > 2 ? name : "\u0000")
+    .join(" ");
+  const count = (re: RegExp) => (text.match(re) ?? []).length;
+  // Each action scores its signals; strong phrases outweigh single words.
+  const scores: [string, number][] = [
+    ["Start free trial", count(/\bfree trial\b|\btrial (for|of) \d+ days\b|\b\d+-day (free )?trial\b/g) * 5],
+    ["Join the waitlist", count(/\b(waitlist|wait list|early access|coming soon|pre-?launch|private beta|launching soon)\b/g) * 4],
+    ["Book a demo", count(/\b(book|schedule|request|get) (a )?(demo|call)\b|\btalk to (sales|us)\b/g) * 4 + count(/\benterprise\b/g)],
+    ["Download the app", count(/\b(app store|google play|ios and android|iphone and android|mobile app|download (the|our) app)\b/g) * 4 + count(/\b(ios|android)\b/g)],
+    ["Book now", count(/\b(book (an |your )?(appointment|table|session|stay|room)|online booking|appointments?|reservations?)\b/g) * 3 + count(/\b(salon|clinic|dentist|spa|studio visit|restaurant|hotel)\b/g)],
+    ["Shop now", count(/\b(shop (now|the|our)|add to cart|free shipping|order online|our collection|new arrivals|online store|shop)\b/g) * 2 + count(/\b(products? line|apparel|jewelry|jewellery|skincare|clothing)\b/g)],
+    ["Start learning", count(/\b(online courses?|lessons?|tutoring|bootcamp|curriculum|certification|learn to|students?)\b/g) * 2 + count(/\bcourses?\b/g)],
+    ["Start building", count(/\b(api|sdk|cli|developers?|open source)\b/g) * 2 + count(/\b(deploy|git|framework|library|code)\b/g)],
+    ["Subscribe", count(/\b(newsletter|podcast|subscribe to|weekly digest)\b/g) * 3],
+    ["Get in touch", count(/\b(agency|consulting|consultancy|our services|hire us|we help (brands|companies)|work with us)\b/g) * 3],
+  ];
+  const best = scores.filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1])[0];
+  if (best) return best[0];
+  if (offersFree(text)) return "Try it free";
   const byConcept: Record<string, string> = {
     devtools: "Start building",
     ai: "Try it now",
@@ -1461,7 +1504,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   add(1, {
     role: "cta", skill: qr ? "qr-end" : "cta",
     text: `Try *${site.name}* today`,
-    subtext: qr ? `Scan to ${ctaLabel.charAt(0).toLowerCase()}${ctaLabel.slice(1)}` : ctaLabel,
+    subtext: qr ? `Scan to ${lowerFirst(ctaLabel)}` : ctaLabel,
     duration: Math.max(3.6, beats(8)),
     transition: "dolly",
   });
@@ -1516,9 +1559,9 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     if (eb && sc.role !== "reveal" && sc.role !== "cta") sc.eyebrow = eb;
   }
   // "Free" is an offer, and an offer must be real: only when the site itself offers something free.
-  const offersFree = /\bfree\b/i.test([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features].join(" "));
-  const lines = concept.cta.filter((l) => offersFree || !/\bfree\b/i.test(l)).map((l) => l.replace(/\{name\}/g, site.name));
-  if (/free/i.test(site.cta ?? "")) lines.push("Start *free* today");
+  const freeOffer = offersFree([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features].join(" "));
+  const lines = concept.cta.filter((l) => freeOffer || !/\bfree\b/i.test(l)).map((l) => l.replace(/\{name\}/g, site.name));
+  if (freeOffer && /\bfree\b/i.test(ctaLabel)) lines.push("Start *free* today");
   if (cta?.role === "cta") {
     // The closing line mustn't just repeat the button under it ("Start free" / "Start free trial").
     const button = norm(ctaLabel);

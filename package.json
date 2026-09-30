@@ -11,6 +11,7 @@
     "kaizen": "tsx scripts/kaizen.ts",
     "check:hosting": "tsx scripts/hosting-check.ts",
     "check:licenses": "tsx scripts/licenses.ts",
+    "check:copy": "tsx scripts/copy-check.ts",
     "licenses": "tsx scripts/licenses.ts --write"
   },
   "dependencies": {
