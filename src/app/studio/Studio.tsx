@@ -1118,9 +1118,11 @@ export default function Studio() {
                       onClick={() => chooseColours(colourChoice === "brand" ? "template" : "brand")}
                       title="Detected automatically from the website: its theme colour, logo and images"
                     >
-                      <span className="swatch lg" style={{ background: brandColors.primary }} />
-                      <span className="swatch lg" style={{ background: brandColors.secondary }} />
-                      {colourChoice === "brand" ? "Auto brand colours ✓" : "Auto brand colours"}
+                      <span className="swatch-pair">
+                        <span className="swatch lg" style={{ background: brandColors.primary }} />
+                        <span className="swatch lg" style={{ background: brandColors.secondary }} />
+                      </span>
+                      <span className="brand-colors-label">{colourChoice === "brand" ? "Auto brand colours ✓" : "Auto brand colours"}</span>
                     </button>
                   )}
                   {logoColors ? (
@@ -1129,9 +1131,11 @@ export default function Studio() {
                       onClick={() => chooseColours(colourChoice === "logo" ? "template" : "logo")}
                       title="Colours taken from the logo alone"
                     >
-                      <span className="swatch lg" style={{ background: logoColors.primary }} />
-                      <span className="swatch lg" style={{ background: logoColors.secondary }} />
-                      {colourChoice === "logo" ? "Logo colours ✓" : "Logo colours"}
+                      <span className="swatch-pair">
+                        <span className="swatch lg" style={{ background: logoColors.primary }} />
+                        <span className="swatch lg" style={{ background: logoColors.secondary }} />
+                      </span>
+                      <span className="brand-colors-label">{colourChoice === "logo" ? "Logo colours ✓" : "Logo colours"}</span>
                     </button>
                   ) : (
                     site.logo && <span className="hint">Logo is black &amp; white: no logo colours.</span>
