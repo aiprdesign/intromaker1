@@ -118,7 +118,9 @@ function drawScene(
     music,
   };
   resetCtx(target);
-  const depth = plan.style === "saas" ? plan.look?.depth ?? 0 : 0;
+  // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
+  // set their own depth); headline, logo and closing shots stay flat so their type reads cleanly.
+  const depth = plan.style === "saas" ? plan.look?.depth ?? (PRODUCT_SHOTS.has(scene.skill) ? 12 : 0) : 0;
   const turn = plan.style === "saas" ? plan.look?.turn ?? 0 : 0;
   const slab = plan.style === "saas" && !!plan.look?.slab;
   if (turn > 0 || slab) {
@@ -160,6 +162,12 @@ function drawScene(
   resetCtx(target);
   return sc;
 }
+
+/** Skills that show the product itself (screens, boards, flows): these get the 3D product stage. */
+const PRODUCT_SHOTS = new Set<string>([
+  "ui-assemble", "ui-tour", "site-scroll", "ui-cards", "kanban", "code-deploy", "command-k", "ai-prompt",
+  "click-flow", "notify-stack", "live-cursors", "chat-thread", "feature-slides", "before-after", "support",
+]);
 
 /**
  * Draw `src` as a plane tilted back by ~`depth` degrees (true perspective, via thin horizontal
@@ -462,6 +470,7 @@ export function renderFrame(
     extendSelf: !!next && OVERLAP.has(next.transition),
     music: musicPulse(plan, time),
   });
+  if (plan.style === "saas" && opts.grade !== false) epicPass(ctx, plan, at.local, at.index, time, musicPulse(plan, time), w, h);
   if (plan.style === "saas" && plan.look?.overlay) filmOverlay(ctx, plan, time, w, h, at.index);
   else brandBug(ctx, plan, time, w, h);
   drawCaptions(ctx, plan, time, w, h);
@@ -749,16 +758,123 @@ function applyCamera(sc: SkillContext, globalT: number) {
   // Cinematic dolly: every shot keeps pushing in slowly (about 4% over the shot, easing in from
   // rest), drifting a touch to one side, so no frame is ever static. Cuts hide the reset.
   const p = clamp(sc.t / Math.max(0.5, sc.d));
-  const push = 0.04 * (p * p * (3 - 2 * p) * 0.35 + p * 0.65);
+  const saas = sc.style === "saas";
+  const push = (saas ? 0.065 : 0.04) * (p * p * (3 - 2 * p) * 0.35 + p * 0.65);
   const side = sc.seed % 2 ? 1 : -1;
-  const s = 1.035 + push + pulse;
-  const dx = noise1(globalT * 0.45, 11) * 9 * u + side * p * 14 * u;
+  // SaaS shots land: a quick settle from slightly closer and turned, like a camera move ending.
+  const arrive = saas ? 1 - ease.outExpo(clamp(sc.t / 0.75)) : 0;
+  const s = 1.035 + push + pulse + 0.05 * arrive;
+  const dx = noise1(globalT * 0.45, 11) * 9 * u + side * p * 14 * u + side * arrive * 26 * u;
   const dy = noise1(globalT * 0.37, 23) * 7 * u - p * 6 * u;
-  const rot = noise1(globalT * 0.23, 37) * 0.007;
+  const rot = noise1(globalT * 0.23, 37) * 0.007 - side * arrive * 0.012;
   ctx.translate(w / 2 + dx, h / 2 + dy);
   ctx.rotate(rot);
+  // A slight perspective sway (a filmed product shot, not a flat slide).
+  if (saas) ctx.transform(1, noise1(globalT * 0.19, 41) * 0.006, noise1(globalT * 0.17, 43) * 0.005, 1, 0, 0);
   ctx.scale(s, s);
   ctx.translate(-w / 2, -h / 2);
+}
+
+/**
+ * The SaaS finish, over the whole frame: a two-tone brand grade (so frames aren't one flat
+ * hue), a glossy light sweep once per shot, a flash when the track drops, and drifting light
+ * motes in the foreground that twinkle with the kicks.
+ */
+function epicPass(ctx: CanvasRenderingContext2D, plan: VideoPlan, local: number, index: number, time: number, music: MusicPulse | undefined, w: number, h: number) {
+  const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  const u = Math.min(w, h) / 1080;
+  const light = !!palette.light;
+  resetCtx(ctx);
+  ctx.save();
+  // Two-tone grade: the brand colour lifts the top-left, the second colour the bottom-right.
+  ctx.globalCompositeOperation = "soft-light";
+  for (const [x, y, c] of [
+    [0, 0, palette.primary],
+    [w, h, palette.secondary],
+  ] as [number, number, string][]) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, Math.hypot(w, h) * 0.7);
+    g.addColorStop(0, rgba(c, light ? 0.18 : 0.32));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.globalCompositeOperation = light ? "source-over" : "screen";
+  // One glossy sweep per shot, once it has built (alternating direction shot to shot).
+  const sk = range(local, 0.45, 1.5);
+  if (sk > 0 && sk < 1) {
+    const dir = index % 2 ? -1 : 1;
+    const x = dir > 0 ? -w * 0.3 + sk * w * 1.6 : w * 1.3 - sk * w * 1.6;
+    const bw = w * 0.16;
+    ctx.save();
+    ctx.translate(x, h / 2);
+    ctx.rotate(dir * 0.35);
+    const g = ctx.createLinearGradient(-bw, 0, bw, 0);
+    const a = Math.sin(Math.PI * sk) * (light ? 0.1 : 0.13);
+    g.addColorStop(0, "rgba(255,255,255,0)");
+    g.addColorStop(0.5, `rgba(255,255,255,${a})`);
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-bw, -h, bw * 2, h * 2);
+    ctx.restore();
+  }
+  // Type-led shots (hooks, reveals, closing lines) get a hero light as they land: a bloom of the
+  // brand colours behind the headline and an anamorphic lens streak across it.
+  const skill = plan.scenes[index]?.skill ?? "";
+  // (Logo reveals have their own light, so they're left alone.)
+  if (!PRODUCT_SHOTS.has(skill) && !light && !/logo|particle|type-mask/.test(skill)) {
+    const cy = h * 0.46;
+    const land = range(local, 0.15, 0.9);
+    const glow = Math.sin(Math.PI * Math.min(1, land * 1.4)) * 0.22 + 0.08 * land;
+    if (glow > 0.005) {
+      const g = ctx.createRadialGradient(w / 2, cy, 0, w / 2, cy, Math.max(w, h) * 0.5);
+      g.addColorStop(0, rgba(palette.primary, glow));
+      g.addColorStop(0.45, rgba(palette.secondary, glow * 0.45));
+      g.addColorStop(1, rgba(palette.secondary, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    const st = range(local, 0.25, 1.4);
+    if (st > 0 && st < 1) {
+      const sw = w * 0.6 * ease.outExpo(st);
+      const sa = Math.sin(Math.PI * st) * 0.5;
+      for (const [th, al] of [[2.5, 1], [16, 0.3]] as const) {
+        const g = ctx.createLinearGradient(w / 2 - sw, 0, w / 2 + sw, 0);
+        g.addColorStop(0, rgba(palette.primary, 0));
+        g.addColorStop(0.5, `rgba(255,255,255,${sa * al})`);
+        g.addColorStop(1, rgba(palette.primary, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(w / 2, cy, sw, th * u, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  // Drop flash: the frame blooms white for a moment when the track drops.
+  if (music && music.drop < 0.35) {
+    ctx.fillStyle = `rgba(255,255,255,${(light ? 0.12 : 0.2) * Math.exp(-music.drop * 12)})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+  // Foreground light motes, drifting up; brighter on each kick.
+  const kick = music && Number.isFinite(music.kick) ? Math.exp(-music.kick * 9) * music.energy : 0;
+  const r = rng(plan.seed * 5 + 91);
+  const n = Math.round(18 * (w * h) / (1920 * 1080) + 8);
+  for (let i = 0; i < n; i++) {
+    const x0 = r();
+    const speed = 0.012 + r() * 0.03;
+    const y = (((r() - time * speed) % 1) + 1) % 1;
+    const x = (x0 + Math.sin(time * (0.2 + r() * 0.3) + i) * 0.01) * w;
+    const size = (1.2 + r() * 3.2) * u;
+    const tw = 0.5 + 0.5 * Math.sin(time * (1.5 + r() * 2) + i * 1.7);
+    const a = (light ? 0.25 : 0.45) * (0.35 + 0.65 * tw) * (0.7 + 0.8 * kick);
+    const c = i % 3 === 0 ? "#ffffff" : i % 3 === 1 ? palette.primary : palette.secondary;
+    const g = ctx.createRadialGradient(x, y * h, 0, x, y * h, size * 4);
+    g.addColorStop(0, rgba(c, Math.min(1, a)));
+    g.addColorStop(0.3, rgba(c, a * 0.35));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(x - size * 4, y * h - size * 4, size * 8, size * 8);
+  }
+  ctx.restore();
 }
 
 /**
