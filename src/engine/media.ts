@@ -205,6 +205,7 @@ function planAssets(plan: VideoPlan) {
   const imgs = new Set<string>();
   const vids = new Set<string>();
   if (plan.brand?.logo) imgs.add(plan.brand.logo);
+  if (plan.brand?.icon) imgs.add(plan.brand.icon);
   for (const i of plan.brand?.images ?? []) imgs.add(i);
   for (const part of plan.brand?.parts ?? []) imgs.add(part.src);
   for (const s of plan.scenes) {
@@ -284,6 +285,31 @@ const baseCache = new Map<string, HTMLCanvasElement | null>();
  * upscaled with high-quality filtering), then scaled down in steps so small copies (the brand bug)
  * stay smooth instead of aliased. Neutral ink adapts to the stage (see adaptInk).
  */
+/** Logos this much wider than tall are wordmarks: too small in a centred lock-up. */
+export const WIDE_LOGO = 1.8;
+export const isWideLogo = (img: HTMLImageElement | null | undefined) => !!img && !!img.naturalWidth && img.naturalWidth / Math.max(1, img.naturalHeight) >= WIDE_LOGO;
+
+/**
+ * The mark for a centred lock-up: the logo itself, or — when the logo is a wide wordmark — the
+ * site's app icon (null: draw the generated brand glyph). `stacked` means the name goes beneath.
+ */
+export function lockupMark(brand: { logo?: string; icon?: string } | undefined): { img: HTMLImageElement | null; icon: boolean; stacked: boolean } {
+  const logo = getImage(brand?.logo);
+  if (!isWideLogo(logo)) return { img: logo && logo.naturalWidth ? logo : null, icon: false, stacked: false };
+  const icon = getImage(brand?.icon);
+  return { img: icon && icon.naturalWidth ? icon : null, icon: true, stacked: true };
+}
+
+/** An app icon as a rounded tile, like on a phone's home screen. */
+export function drawAppIcon(ctx: CanvasRenderingContext2D, img: HTMLImageElement, lightStage: boolean, x: number, y: number, w: number, h: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, Math.min(w, h) * 0.22);
+  ctx.clip();
+  drawLogo(ctx, img, lightStage, x, y, w, h);
+  ctx.restore();
+}
+
 export function drawLogo(ctx: CanvasRenderingContext2D, img: HTMLImageElement, lightStage: boolean, x: number, y: number, w: number, h: number) {
   const m = ctx.getTransform();
   const px = Math.max(w, h) * Math.max(1e-3, Math.hypot(m.a, m.b));

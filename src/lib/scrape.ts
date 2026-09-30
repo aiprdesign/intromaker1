@@ -136,12 +136,21 @@ async function findLogo(root: HTMLElement, rawHtml: string, base: URL, siteName:
   const og = absolute(meta(root, "og:logo") ?? root.querySelector('[itemprop="logo"]')?.getAttribute("content") ?? root.querySelector('img[itemprop="logo"]')?.getAttribute("src"), base);
   if (og) return og;
   // App icons, only when large enough to read as a logo (a 16px favicon isn't one).
+  return appIcon(root, base);
+}
+
+/**
+ * The site's app icon: an SVG icon, else the largest apple-touch / declared icon (64px or more).
+ * A square mark, used in place of a wide wordmark where the wordmark would read too small.
+ */
+export function appIcon(root: HTMLElement, base: URL): string | null {
   const icons = root
     .querySelectorAll('link[rel~="apple-touch-icon"], link[rel~="icon"], link[rel="shortcut icon"], link[rel="mask-icon"]')
     .map((l) => {
       const href = l.getAttribute("href") ?? "";
       const rel = l.getAttribute("rel") ?? "";
-      const size = /\.svg(\?|$)/i.test(href) ? 512 : /apple-touch/.test(rel) ? 180 : parseInt(l.getAttribute("sizes")?.split("x")[0] ?? "0", 10) || 16;
+      // Safari pinned-tab icons are one-colour silhouettes: a last resort.
+      const size = rel === "mask-icon" ? 64 : /\.svg(\?|$)/i.test(href) ? 512 : /apple-touch/.test(rel) ? 180 : parseInt(l.getAttribute("sizes")?.split("x")[0] ?? "0", 10) || 16;
       return { href: absolute(href, base), size };
     })
     .filter((i) => i.href && i.size >= 64)
@@ -532,6 +541,7 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
     shots: { hero: live?.hero ?? null, full: live?.full ?? null, sections: live?.sections ?? [], parts: live?.parts ?? [] },
     cta,
     logo,
+    icon: appIcon(root, pageBase),
     images,
     videos,
     themeColor: themeColor && /^#[0-9a-f]{3,8}$/i.test(themeColor) ? themeColor : null,

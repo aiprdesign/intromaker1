@@ -8,7 +8,7 @@
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
-import { drawLogo, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, segmentShot } from "../media";
+import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, segmentShot } from "../media";
 import {
   blurInLayout,
   borderBeam,
@@ -1281,9 +1281,38 @@ function ctaLockup(sc: SkillContext) {
   ctx.translate(-w / 2, -h / 2);
   const hasLogo = !!brand?.logo;
   if (imageless(sc)) iconConstellation(sc, { count: h > w ? 6 : 8, clear: 1.12, start: 0.2 });
-  // Logo mark.
+  // Logo mark. A wide wordmark shows as the app icon (or the generated mark) with the name
+  // centred beneath it, which reads better than a thin strip of logo.
   const lk = clamp(spring(t - 0.05, 9, 7), 0, 1.05);
-  if (hasLogo) {
+  const lm = lockupMark(brand);
+  if (hasLogo && lm.stacked) {
+    const size = Math.min(w, h) * 0.1 * S;
+    const iy = h * 0.18;
+    ctx.save();
+    ctx.globalAlpha = clamp(lk) * (1 - ex);
+    ctx.translate(w / 2, iy);
+    ctx.scale(0.85 + 0.15 * lk, 0.85 + 0.15 * lk);
+    if (lm.img) {
+      ctx.shadowColor = rgba(palette.primary, 0.7);
+      ctx.shadowBlur = 36 * u;
+      const ar = lm.img.naturalWidth / lm.img.naturalHeight;
+      const iw = ar >= 1 ? size : size * ar;
+      const ih = iw / ar;
+      drawAppIcon(ctx, lm.img, !!palette.light, -iw / 2, -ih / 2, iw, ih);
+    } else {
+      brandGlyph(sc, 0, 0, size, 1, 0.8);
+    }
+    ctx.shadowBlur = 0;
+    if (brand?.name) {
+      const ns = Math.min(w, h) * 0.048 * S;
+      ctx.font = `800 ${Math.round(ns)}px Inter, sans-serif`;
+      ctx.fillStyle = palette.text;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(brand.name, 0, size / 2 + ns * 0.95);
+    }
+    ctx.restore();
+  } else if (hasLogo) {
     ctx.save();
     ctx.globalAlpha = clamp(lk) * (1 - ex);
     ctx.translate(w / 2, h * 0.27);

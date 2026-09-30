@@ -7,7 +7,7 @@ import { ctaClickAt, revealHit } from "../arrange";
 import { exitT, subline } from "../fx";
 import { liquidText } from "../gl";
 import { clamp, ease, lerp, range, rgba, TAU } from "../math";
-import { drawLogo, getImage } from "../media";
+import { drawAppIcon, drawLogo, lockupMark } from "../media";
 import { blurInLayout, borderBeam, brandGlyph, pill, saasBackground, sentence, spring } from "../saasfx";
 import { scratch } from "../scratch";
 import { autoAccent, subFont } from "../text";
@@ -29,11 +29,10 @@ function liquidTiming(d: number, beat: number) {
  */
 function lockup(sc: SkillContext) {
   const { w, h, palette, brand, scene } = sc;
-  const img = getImage(brand?.logo);
-  const logo = img && img.naturalWidth ? img : null;
+  // A wide wordmark shows as the app icon (or the generated mark) with the name centred beneath.
+  const lm = lockupMark(brand);
+  const logo = lm.img;
   const ar = logo ? logo.naturalWidth / logo.naturalHeight : 1;
-  // A wide wordmark already spells the name.
-  const wordmark = !!logo && ar >= 1.8;
   const name = plain(scene.text) || brand?.name || "";
   const tall = h > w;
   const short = Math.min(w, h);
@@ -41,12 +40,12 @@ function lockup(sc: SkillContext) {
   const font = `800 ${Math.round(mark * (tall ? 0.42 : 0.5))}px Inter, sans-serif`;
   const probe = scratch("liquid-logo-probe", 4, 4).ctx;
   probe.font = font;
-  const nameW = wordmark || !name ? 0 : probe.measureText(name).width;
-  const markW = wordmark ? Math.min(w * 0.62, mark * 1.1 * ar) : logo ? Math.min(mark * 1.6, mark * ar) : mark;
-  const markH = wordmark ? markW / ar : logo ? markW / ar : mark;
+  const nameW = name ? probe.measureText(name).width : 0;
+  const markW = logo ? Math.min(mark * 1.6, mark * ar) : mark;
+  const markH = logo ? markW / ar : mark;
   const gap = mark * 0.28;
   // Side by side on wide frames; stacked on tall ones or when the name is long.
-  const stacked = !wordmark && !!name && (tall || markW + gap + nameW > w * 0.8);
+  const stacked = !!name && (lm.stacked || tall || markW + gap + nameW > w * 0.8);
   const pad = mark * 0.5;
   const bw = Math.ceil((stacked ? Math.max(markW, nameW) : markW + (nameW ? gap + nameW : 0)) + pad * 2);
   const nameH = nameW ? mark * 0.62 : 0;
@@ -55,7 +54,7 @@ function lockup(sc: SkillContext) {
   const c = off.ctx;
   const mx = stacked ? bw / 2 - markW / 2 : pad;
   const my = stacked ? pad : bh / 2 - markH / 2;
-  if (logo) drawLogo(c, logo, !!palette.light, mx, my, markW, markH);
+  if (logo) (lm.icon ? drawAppIcon : drawLogo)(c, logo, !!palette.light, mx, my, markW, markH);
   else brandGlyph({ ...sc, ctx: c }, mx + markW / 2, my + markH / 2, markW * 0.86, 1, 0.9);
   if (nameW) {
     c.font = font;
@@ -339,12 +338,14 @@ function qrEnd(sc: SkillContext) {
     ctx.roundRect(mx - (ms * mk) / 2 - mod * 0.6, my - (ms * mk) / 2 - mod * 0.6, ms * mk + mod * 1.2, ms * mk + mod * 1.2, ms * 0.3);
     ctx.fill();
     ctx.restore();
-    const img = getImage(brand?.logo);
-    if (img && img.naturalWidth && img.naturalWidth / img.naturalHeight < 1.8) {
+    // The logo, or the app icon when the logo is a wide wordmark; else the generated mark.
+    const lm = lockupMark(brand);
+    const img = lm.img;
+    if (img) {
       const ar = img.naturalWidth / img.naturalHeight;
       const lw = ar >= 1 ? ms * mk : ms * mk * ar;
       const lh = lw / ar;
-      drawLogo(ctx, img, true, mx - lw / 2, my - lh / 2, lw, lh);
+      (lm.icon ? drawAppIcon : drawLogo)(ctx, img, true, mx - lw / 2, my - lh / 2, lw, lh);
     } else {
       brandGlyph({ ...sc, ctx }, mx, my, ms, mk, 0);
     }

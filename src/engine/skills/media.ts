@@ -3,7 +3,7 @@ import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headl
 import { brandGlyph, iconConstellation, imageless, saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { fitSafeTop, tokens } from "../grid";
-import { drawLogo, logoMaxWidth, getImage, getMedia, mediaSize, type Drawable } from "../media";
+import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, getImage, getMedia, mediaSize, type Drawable } from "../media";
 import { scratch } from "../scratch";
 import { subFont } from "../text";
 import type { Skill, SkillContext } from "../types";
@@ -61,9 +61,13 @@ function logoReveal(sc: SkillContext) {
     background(sc, { hot: palette.primary, hotAlpha: 0.22 });
     dust(sc, 70, palette.secondary, 0.15);
   }
-  const logo = getImage(brand?.logo);
-  // A wide wordmark already spells the name; don't repeat it underneath.
-  const wordmark = !!logo && logo.naturalWidth / Math.max(1, logo.naturalHeight) >= 1.8;
+  // A wide wordmark reads small centred on its own: it shows as the site's app icon (or, in SaaS
+  // films, the generated mark) with the name centred beneath it. Trailer films without an icon keep
+  // the wordmark itself, which already spells the name.
+  const mark = lockupMark(brand);
+  const logo = mark.img ?? (mark.stacked && !saas ? getImage(brand?.logo) : null);
+  const asIcon = mark.icon && !!mark.img;
+  const wordmark = mark.stacked && !mark.img && !saas;
   const cx = w / 2;
   const short = Math.min(w, h);
   const cy = logo ? h * 0.4 : h * 0.47;
@@ -151,7 +155,7 @@ function logoReveal(sc: SkillContext) {
     nameY = h * 0.4 + gs / 2 + short * 0.13;
   }
   if (logo && logo.naturalWidth) {
-    const box = short * (h > w ? 0.34 : 0.3) * (wordmark ? 1.25 : 1);
+    const box = short * (h > w ? 0.34 : 0.3) * (wordmark ? 1.25 : asIcon ? 0.62 : 1);
     const ar = logo.naturalWidth / logo.naturalHeight;
     const lw = Math.min(ar >= 1 ? Math.min(box * 1.9, box * ar) : box * ar, logoMaxWidth(ctx, logo));
     const lh = lw / ar;
@@ -164,7 +168,7 @@ function logoReveal(sc: SkillContext) {
     const res = Math.min(2.5, Math.max(1, Math.hypot(m.a, m.b) * Math.max(1, s)));
     const buf = scratch("logo", Math.ceil((lw + pad * 2) * res), Math.ceil((lh + pad * 2) * res));
     buf.ctx.setTransform(res, 0, 0, res, 0, 0);
-    drawLogo(buf.ctx, logo, !!palette.light, pad, pad, lw, lh);
+    (asIcon ? drawAppIcon : drawLogo)(buf.ctx, logo, !!palette.light, pad, pad, lw, lh);
     const gx = lerp(-lw * 0.6, lw * 1.6, range(t, hit + 0.3, hit + 1.2));
     const glint = buf.ctx.createLinearGradient(gx - lw * 0.25, 0, gx + lw * 0.25, lh);
     glint.addColorStop(0, "rgba(255,255,255,0)");
@@ -186,7 +190,7 @@ function logoReveal(sc: SkillContext) {
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(buf.canvas, 0, 0, Math.ceil((lw + pad * 2) * res), Math.ceil((lh + pad * 2) * res), -lw / 2 - pad, -lh / 2 - pad, Math.ceil((lw + pad * 2) * res) / res, Math.ceil((lh + pad * 2) * res) / res);
     ctx.restore();
-    nameY = (wordmark ? logoY : cy) + lh / 2 + short * 0.12;
+    nameY = (wordmark ? logoY : cy) + lh / 2 + short * (asIcon ? 0.15 : 0.12);
   }
 
   if (wordmark) {

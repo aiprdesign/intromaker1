@@ -131,6 +131,8 @@ export interface Brand {
   /** Display domain, e.g. "acme.com". */
   domain?: string;
   logo?: string;
+  /** App icon: shown with the name beneath it when the logo is a wide wordmark. */
+  icon?: string;
   images: string[];
   videos: string[];
   /** Customer / partner logos for "Trusted by" scenes. */
@@ -170,6 +172,8 @@ export interface SiteData {
   shots: { hero: string | null; full: string | null; sections: string[]; parts?: SitePart[] };
   cta: string | null;
   logo: string | null;
+  /** The site's app icon (apple-touch / SVG icon), used where a wide wordmark won't fit. */
+  icon?: string | null;
   images: string[];
   videos: string[];
   themeColor: string | null;
