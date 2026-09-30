@@ -90,6 +90,12 @@ export const PALETTE_IDS = [
   "chrome",
   "holo",
   "dither",
+  "eclipse",
+  "studio",
+  "flow",
+  "ink",
+  "bloom",
+  "daybreak",
 ] as const;
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
@@ -293,8 +299,8 @@ export interface Look {
   grain?: number;
   /** Vignette strength multiplier. */
   vignette?: number;
-  /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, or plain. */
-  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars";
+  /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, plain, synthwave horizon, stars, or the clean-epic stages (eclipse rim, studio sweep, silk ribbons, light beam, colour bloom). */
+  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom";
   /** UI card treatment: frosted glass (default), frosted-light, flat, or neo-brutalist. */
   card?: "glass" | "frost" | "flat" | "brutal" | "clay";
   /** Headline size multiplier (kinetic-type styles go big). */

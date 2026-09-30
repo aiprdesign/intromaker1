@@ -48,7 +48,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   // The camera overscans slightly, so paint a little beyond the frame.
   const shaderKind = look?.shader ?? (look?.backdrop === "blobs" ? "mesh" : undefined);
   const shaded = shaderKind ? renderShaderBg(shaderKind, palette, w, h, sc.globalT ?? t, seed, look?.shaderSpeed ?? 0.6) : null;
-  if (shaded) {
+  if (shaded && look?.backdrop !== "ribbon") {
     ctx.save();
     ctx.globalAlpha = look?.shaderStrength ?? 1;
     ctx.imageSmoothingEnabled = true;
@@ -206,6 +206,12 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
     ctx.restore();
   }
 
+  if (backdrop === "eclipse") eclipseStage(sc, glowOp);
+  else if (backdrop === "studio") studioStage(sc);
+  else if (backdrop === "ribbon") ribbonStage(sc);
+  else if (backdrop === "beam") beamStage(sc, glowOp);
+  else if (backdrop === "bloom") bloomStage(sc, glowOp);
+
   if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
     // Over a shader stage the grid lives on its own layer, masked to fade at the edges;
     // on a flat stage it is drawn directly and faded with the base colour.
@@ -301,7 +307,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   }
 
   // Spotlight cone from above.
-  if (light || backdrop === "plain" || backdrop === "scanlines") return;
+  if (light || backdrop === "plain" || backdrop === "scanlines" || backdrop === "beam" || backdrop === "studio") return;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const sp = ctx.createRadialGradient(w / 2, -h * 0.1, 0, w / 2, -h * 0.1, h * 0.9);
@@ -310,6 +316,280 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   ctx.fillStyle = sp;
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
+}
+
+/**
+ * Linear-style eclipse: a planet's dark curve rising at the foot of the frame, its rim caught
+ * by a hairline of light that is brightest at the crest and drifts slowly, with a soft corona
+ * above. On a light palette the same shapes read as a sunrise arc.
+ */
+function eclipseStage(sc: SkillContext, glowOp: GlobalCompositeOperation) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const light = !!palette.light;
+  const R = Math.max(w, h) * 1.1;
+  const top = h * (0.8 - 0.012 * Math.sin(T * 0.25));
+  const cx = w / 2;
+  const cy = top + R;
+  const crest = cx + w * 0.08 * Math.sin(T * 0.2);
+  ctx.save();
+  ctx.globalCompositeOperation = glowOp;
+  const co = ctx.createRadialGradient(cx, cy, R * 0.99, cx, cy, R + h * 0.6);
+  co.addColorStop(0, rgba(palette.primary, light ? 0.3 : 0.4));
+  co.addColorStop(0.16, rgba(palette.primary, light ? 0.14 : 0.16));
+  co.addColorStop(0.5, rgba(palette.secondary, 0.04));
+  co.addColorStop(1, rgba(palette.primary, 0));
+  ctx.fillStyle = co;
+  ctx.fillRect(0, 0, w, h);
+  const hs = ctx.createRadialGradient(crest, top, 0, crest, top, w * 0.42);
+  hs.addColorStop(0, rgba(palette.accent, light ? 0.32 : 0.24));
+  hs.addColorStop(1, rgba(palette.accent, 0));
+  ctx.fillStyle = hs;
+  ctx.fillRect(0, 0, w, h);
+  // The planet body, lit faintly along its upper edge.
+  ctx.globalCompositeOperation = "source-over";
+  const body = ctx.createLinearGradient(0, top, 0, h);
+  body.addColorStop(0, light ? mixHex(palette.bg1, palette.primary, 0.1) : mixHex(palette.bg0, palette.primary, 0.1));
+  body.addColorStop(0.3, light ? palette.bg1 : palette.bg0);
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, TAU);
+  ctx.fill();
+  // Rim light: layered strokes (wide and faint to thin and bright) instead of a costly blur.
+  ctx.globalCompositeOperation = glowOp;
+  const hot = light ? palette.primary : "#ffffff";
+  const rim = mixHex(palette.secondary, palette.primary, 0.4);
+  for (const [lw, a] of [[26, 0.07], [9, 0.2], [2.2, 0.95]] as const) {
+    const g = ctx.createLinearGradient(crest - w * 0.62, 0, crest + w * 0.62, 0);
+    g.addColorStop(0, rgba(rim, 0));
+    g.addColorStop(0.3, rgba(rim, a * 0.5));
+    g.addColorStop(0.5, rgba(hot, a));
+    g.addColorStop(0.7, rgba(rim, a * 0.5));
+    g.addColorStop(1, rgba(rim, 0));
+    ctx.strokeStyle = g;
+    ctx.lineWidth = lw * u;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, Math.PI * 1.2, Math.PI * 1.8);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Apple-style studio: a seamless sweep lit from above, a soft key-light pool on the floor that
+ * drifts as if from a moving softbox, faint coloured bounce light at the sides and corners that
+ * fall into shade.
+ */
+function studioStage(sc: SkillContext) {
+  const { ctx, w, h, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const light = !!palette.light;
+  const wall = ctx.createLinearGradient(0, 0, 0, h);
+  wall.addColorStop(0, light ? mixHex(palette.bg0, palette.text, 0.03) : palette.bg0);
+  wall.addColorStop(0.55, palette.bg1);
+  wall.addColorStop(0.74, mixHex(palette.bg1, palette.bg0, 0.55));
+  wall.addColorStop(1, light ? mixHex(palette.bg0, palette.text, 0.07) : palette.bg0);
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, w, h);
+  const key = light ? "#ffffff" : palette.text;
+  ctx.save();
+  const top = ctx.createRadialGradient(w / 2, -h * 0.25, 0, w / 2, -h * 0.25, h * 1.15);
+  top.addColorStop(0, rgba(key, light ? 0.75 : 0.09));
+  top.addColorStop(1, rgba(key, 0));
+  ctx.fillStyle = top;
+  ctx.fillRect(0, 0, w, h);
+  for (const [x, c] of [[0, palette.primary], [w, palette.secondary]] as const) {
+    const g = ctx.createRadialGradient(x, h * 0.55, 0, x, h * 0.55, Math.max(w, h) * 0.5);
+    g.addColorStop(0, rgba(c, light ? 0.09 : 0.13));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.translate(w * (0.5 + 0.04 * Math.sin(T * 0.18)), h * 0.8);
+  ctx.scale(1, 0.2);
+  const pool = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h * 0.8) * 0.55);
+  pool.addColorStop(0, rgba(key, light ? 0.95 : 0.1));
+  pool.addColorStop(1, rgba(key, 0));
+  ctx.fillStyle = pool;
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(w, h * 0.8) * 0.55, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+  const vg = ctx.createRadialGradient(w / 2, h * 0.5, Math.min(w, h) * 0.35, w / 2, h * 0.5, Math.max(w, h) * 0.8);
+  vg.addColorStop(0, rgba(light ? palette.text : "#000000", 0));
+  vg.addColorStop(1, rgba(light ? palette.text : "#000000", light ? 0.1 : 0.5));
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/**
+ * Stripe-style silk: flowing bands of vivid gradient framing the top and foot of the frame,
+ * their wavy edges drifting, with a clean open stage between them for the type.
+ */
+function ribbonStage(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const edge = (x: number, base: number, k: number) =>
+    h * (base + k * (0.035 * Math.sin((x / w) * TAU * 0.9 + T * 0.5) + 0.02 * Math.sin((x / w) * TAU * 1.7 - T * 0.35)));
+  // A thin sweep along the top (clear of the headline) and a deeper band along the foot.
+  const bands: [number, number][] = [[0.055, 0.45], [0.82, -1]];
+  const fill = () => {
+    const shift = (T * 0.05) % 1;
+    const g = ctx.createLinearGradient(-w * shift, 0, w * (2 - shift), h * 0.2);
+    // Light and shade folded into the hues so the silk keeps its depth even when brand colours
+    // make the palette nearly one hue.
+    const P = palette.primary;
+    const cols = [P, mixHex(P, "#ffffff", 0.35), palette.secondary, mixHex(P, "#000000", 0.28), palette.accent, mixHex(palette.secondary, "#ffffff", 0.3), P];
+    cols.forEach((c, i) => g.addColorStop(i / (cols.length - 1), c));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // Moving highlights and depth inside the silk.
+    for (let i = 0; i < 3; i++) {
+      const bx = w * (0.5 + 0.45 * Math.sin(T * (0.2 + i * 0.07) + i * 2.1));
+      const by = h * (i % 2 ? 0.95 : 0.05);
+      const r = ctx.createRadialGradient(bx, by, 0, bx, by, w * 0.35);
+      r.addColorStop(0, rgba(i === 1 ? "#ffffff" : palette.accent, i === 1 ? 0.35 : 0.3));
+      r.addColorStop(1, rgba(palette.accent, 0));
+      ctx.fillStyle = r;
+      ctx.fillRect(0, 0, w, h);
+    }
+  };
+  const path = () => {
+    ctx.beginPath();
+    for (const [base, k] of bands) {
+      const y0 = k > 0 ? -2 : h + 2;
+      ctx.moveTo(-2, y0);
+      for (let x = -2; x <= w + 24; x += 24) ctx.lineTo(x, edge(x, base, k));
+      ctx.lineTo(w + 24, y0);
+      ctx.closePath();
+    }
+  };
+  ctx.save();
+  ctx.shadowColor = rgba(palette.primary, palette.light ? 0.28 : 0.5);
+  ctx.shadowBlur = 40 * u;
+  ctx.fillStyle = palette.primary;
+  path();
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  path();
+  ctx.clip();
+  fill();
+  ctx.restore();
+}
+
+/**
+ * Vercel-style light cone: one source just above the frame throwing a clean cone of light down
+ * onto a floor glow with a faint spectral fringe, dust drifting through the beam.
+ */
+function beamStage(sc: SkillContext, glowOp: GlobalCompositeOperation) {
+  const { ctx, w, h, u, palette, seed } = sc;
+  const T = sc.globalT ?? sc.t;
+  const light = !!palette.light;
+  const I = 0.9 + 0.1 * Math.sin(T * 0.6);
+  const sx = w / 2;
+  const sy = -h * 0.08;
+  const spread = Math.max(w * 0.42, h * 0.3);
+  const beam = light ? palette.primary : palette.text;
+  ctx.save();
+  ctx.globalCompositeOperation = glowOp;
+  ctx.beginPath();
+  ctx.moveTo(sx - w * 0.012, sy);
+  ctx.lineTo(sx + w * 0.012, sy);
+  ctx.lineTo(sx + spread, h);
+  ctx.lineTo(sx - spread, h);
+  ctx.closePath();
+  const cone = ctx.createRadialGradient(sx, sy, 0, sx, sy, h * 1.15);
+  cone.addColorStop(0, rgba(beam, 0.26 * I));
+  cone.addColorStop(0.5, rgba(beam, 0.08 * I));
+  cone.addColorStop(1, rgba(beam, 0.02));
+  ctx.fillStyle = cone;
+  ctx.fill();
+  // Brighter edges give the cone its volume.
+  for (const side of [-1, 1]) {
+    const g = ctx.createLinearGradient(0, sy, 0, h);
+    g.addColorStop(0, rgba(beam, 0.35 * I));
+    g.addColorStop(1, rgba(beam, 0));
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1.2 * u;
+    ctx.beginPath();
+    ctx.moveTo(sx + side * w * 0.012, sy);
+    ctx.lineTo(sx + side * spread, h);
+    ctx.stroke();
+  }
+  // Floor glow with a spectral fringe.
+  const fy = h * 0.93;
+  for (const [dx, c, a] of [[-0.06, palette.accent, 0.14], [0.06, palette.secondary, 0.1], [0, beam, 0.16]] as const) {
+    ctx.save();
+    ctx.translate(sx + dx * spread, fy);
+    ctx.scale(1, 0.16);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, spread * 1.1);
+    g.addColorStop(0, rgba(c, a * I));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(-spread * 1.2, -spread * 1.2, spread * 2.4, spread * 2.4);
+    ctx.restore();
+  }
+  // Source flare.
+  const fl = ctx.createRadialGradient(sx, 0, 0, sx, 0, h * 0.16);
+  fl.addColorStop(0, rgba(beam, 0.5 * I));
+  fl.addColorStop(1, rgba(beam, 0));
+  ctx.fillStyle = fl;
+  ctx.fillRect(sx - h * 0.2, 0, h * 0.4, h * 0.2);
+  // Dust motes, visible only inside the beam.
+  const r = rng(seed + 913);
+  for (let i = 0; i < 60; i++) {
+    const fy2 = (r() + T * (0.012 + r() * 0.02)) % 1;
+    const y = sy + (h - sy) * fy2;
+    const half = w * 0.012 + (spread - w * 0.012) * fy2;
+    const x = sx + (r() * 2 - 1) * half * 0.92 + Math.sin(T * 0.4 + i) * 6 * u;
+    const a = 0.5 * (1 - Math.abs(x - sx) / half) * Math.sin(Math.PI * fy2);
+    ctx.fillStyle = rgba(beam, a * 0.6);
+    ctx.fillRect(x, y, 1.6 * u, 1.6 * u);
+  }
+  ctx.restore();
+}
+
+/**
+ * Raycast-style bloom: a large soft orb of slowly rotating colour glowing up from below the
+ * headline, breathing gently.
+ */
+function bloomStage(sc: SkillContext, glowOp: GlobalCompositeOperation) {
+  const { ctx, w, h, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const light = !!palette.light;
+  const sw = 192;
+  const sh = Math.max(64, Math.round((sw * h) / w));
+  const { canvas, ctx: b } = scratch("bloom-stage", sw, sh);
+  const cx = sw / 2;
+  const cy = sh * 0.62;
+  const breathe = 1 + 0.05 * Math.sin(T * 0.5);
+  const rad = Math.min(sw, sh) * 0.62 * breathe;
+  const cg = b.createConicGradient(T * 0.22, cx, cy);
+  const cols = [palette.primary, palette.secondary, palette.accent, palette.primary];
+  cols.forEach((c, i) => cg.addColorStop(i / (cols.length - 1), c));
+  b.fillStyle = cg;
+  b.fillRect(0, 0, sw, sh);
+  b.globalCompositeOperation = "destination-in";
+  const m = b.createRadialGradient(cx, cy, 0, cx, cy, rad);
+  m.addColorStop(0, "rgba(0,0,0,0.95)");
+  m.addColorStop(0.45, "rgba(0,0,0,0.55)");
+  m.addColorStop(1, "rgba(0,0,0,0)");
+  b.fillStyle = m;
+  b.fillRect(0, 0, sw, sh);
+  ctx.save();
+  ctx.globalCompositeOperation = glowOp;
+  ctx.globalAlpha = light ? 0.55 : 0.62;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(canvas, 0, 0, w, h);
+  ctx.restore();
+  // A calm pocket of shade where the headline sits keeps the type crisp over the colour.
+  const veil = ctx.createRadialGradient(w / 2, h * 0.46, 0, w / 2, h * 0.46, Math.min(w, h) * 0.45);
+  veil.addColorStop(0, rgba(light ? palette.bg1 : palette.bg0, 0.4));
+  veil.addColorStop(1, rgba(light ? palette.bg1 : palette.bg0, 0));
+  ctx.fillStyle = veil;
+  ctx.fillRect(0, 0, w, h);
 }
 
 /** Frosted glass panel with inner highlight and hairline border. */
@@ -1042,7 +1322,9 @@ export function brandGlyph(sc: SkillContext, cx: number, cy: number, size: numbe
   ctx.strokeStyle = "rgba(255,255,255,0.35)";
   ctx.lineWidth = Math.max(1, 1.2 * u);
   ctx.stroke();
-  drawIcon(ctx, brandIcon(sc), 0, 0, s * 0.52, "#ffffff", clamp(k * 1.3));
+  // White ink on the tile, or the stage's dark ink when the palette's primary is itself near-white.
+  const ink = (luminance(palette.primary) + luminance(palette.secondary)) / 2 > 0.5 ? palette.bg0 : "#ffffff";
+  drawIcon(ctx, brandIcon(sc), 0, 0, s * 0.52, ink, clamp(k * 1.3));
   ctx.restore();
 }
 

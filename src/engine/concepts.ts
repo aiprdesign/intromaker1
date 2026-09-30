@@ -65,7 +65,7 @@ export const CONCEPTS: Concept[] = [
     eyebrows: { how: "Get started", tour: "Developer experience", features: "Built for developers", integrations: "Works with your stack", cards: "Performance" },
     featuresTitle: "Built for how you *ship*",
     cta: ["Start *building*", "Try *{name}*", "Ship with *{name}*"],
-    template: "midnight",
+    template: "ink",
     swap: "Your code, built|tested|shipped",
   },
   {
@@ -91,7 +91,7 @@ export const CONCEPTS: Concept[] = [
     eyebrows: { features: "Built for finance teams", cards: "Real results", tour: "Your money, one view" },
     featuresTitle: "Finance, *organised*",
     cta: ["Open an *account*", "Get started *free*", "Take control with *{name}*"],
-    template: "aurora",
+    template: "flow",
     swap: "Your spend, tracked|approved|reported",
   },
   {
@@ -156,7 +156,7 @@ export const CONCEPTS: Concept[] = [
     eyebrows: { features: "All in one place", integrations: "Works with your tools" },
     featuresTitle: "Your work, *in one place*",
     cta: ["Get started *free*", "Try it with your *team*", "Work with *{name}*"],
-    template: "frosted",
+    template: "eclipse",
     swap: "Your work, planned|tracked|shared",
   },
   {
@@ -208,7 +208,7 @@ export const CONCEPTS: Concept[] = [
     eyebrows: { features: "Learning tools", how: "How it works" },
     featuresTitle: "Learning that *sticks*",
     cta: ["Start *learning*", "Try it *free*", "Learn with *{name}*"],
-    template: "frosted",
+    template: "daybreak",
     swap: "Your courses, planned|published|tracked",
   },
   {

@@ -1842,7 +1842,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
             beams: Math.min(8, Math.max(0, Number(raw.look.beams) || 0)),
             aurora: Math.min(3, Math.max(0, Number(raw.look.aurora) || 0)),
             text: (TEXT_FX as readonly string[]).includes(raw.look.text as string) ? raw.look.text : undefined,
-            backdrop: ["grid", "dots", "blobs", "scanlines", "plain", "horizon", "stars"].includes(raw.look.backdrop as string) ? raw.look.backdrop : undefined,
+            backdrop: ["grid", "dots", "blobs", "scanlines", "plain", "horizon", "stars", "eclipse", "studio", "ribbon", "beam", "bloom"].includes(raw.look.backdrop as string) ? raw.look.backdrop : undefined,
             card: ["glass", "frost", "flat", "brutal", "clay"].includes(raw.look.card as string) ? raw.look.card : undefined,
             shader: ["mesh", "grain", "warp", "smoke", "neuro", "rays", "panels", "metaballs", "swirl", "voronoi", "dither", "waves"].includes(raw.look.shader as string) ? raw.look.shader : undefined,
             shaderStrength: raw.look.shaderStrength !== undefined ? Math.min(1, Math.max(0, Number(raw.look.shaderStrength) || 0)) : undefined,
