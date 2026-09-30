@@ -5,7 +5,8 @@
  *
  * rate limits (windows, 429s, spoofed X-Forwarded-For, the shared AI budget), capture storage
  * clean-up (age and size caps), the SSRF guard (localhost, private ranges, cloud metadata,
- * credentials, odd schemes) and the local-AI restriction. Exits non-zero on any failure.
+ * credentials, odd schemes), the local-AI restriction and the admin area (sign-in, sessions, the
+ * film log, the server AI key). Exits non-zero on any failure.
  */
 import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -67,6 +68,68 @@ async function main() {
   await storage.sweep(Date.now(), 7 * 86_400_000, 3500);
   left = await readdir(storage.SHOT_DIR);
   check(left.length === 1 && left[0] === "dddddddddddddddd-full.jpg", "oldest captures go first when over the size cap");
+
+  console.log("Admin area");
+  delete env.ADMIN_PASSWORD;
+  const admin = await import("../src/lib/admin");
+  const sessionRoute = await import("../src/app/api/admin/session/route");
+  const filmsRoute = await import("../src/app/api/admin/films/route");
+  const settingsRoute = await import("../src/app/api/admin/settings/route");
+  const { stat, readFile: read } = await import("node:fs/promises");
+  const A = "https://demo.example";
+  const areq = (path: string, init: RequestInit & { cookie?: string; origin?: string | null } = {}) => {
+    const headers: Record<string, string> = { "x-forwarded-for": "203.0.113.50", host: "demo.example", "content-type": "application/json" };
+    if (init.cookie) headers.cookie = init.cookie;
+    if (init.origin !== null && (init.method ?? "GET") !== "GET") headers.origin = init.origin ?? A;
+    return new Request(A + path, { ...init, headers });
+  };
+  const plan = { title: "Check", palette: "midnight", font: "inter", aspect: "16:9", bpm: 120, seed: 1, scenes: [{ skill: "blur-reveal", text: "Hi", duration: 3, transition: "cut" }] } as never;
+  check((await (await sessionRoute.GET(areq("/api/admin/session"))).json()).enabled === false, "off without ADMIN_PASSWORD");
+  check((await filmsRoute.GET(areq("/api/admin/films"))).status === 404, "admin API answers 404 while off");
+  await admin.recordFilm(areq("/api/generate", { method: "POST" }), { kind: "generated", plan, engine: "builtin", prompt: "secret prompt" });
+  check(!(await readdir(dataDir)).includes("admin"), "nothing is logged while the admin area is off");
+
+  env.ADMIN_PASSWORD = "correct horse battery staple";
+  rl.resetLimits();
+  const login = (pw: string, origin?: string | null) => sessionRoute.POST(areq("/api/admin/session", { method: "POST", body: JSON.stringify({ password: pw }), origin }));
+  check((await login("wrong")).status === 401, "a wrong password is refused");
+  check((await login(env.ADMIN_PASSWORD, "https://evil.example")).status === 403, "sign-in from another site is refused");
+  const ok = await login(env.ADMIN_PASSWORD);
+  const setCookie = ok.headers.get("set-cookie") ?? "";
+  check(ok.status === 200 && /HttpOnly/.test(setCookie) && /SameSite=Strict/.test(setCookie) && /Secure/.test(setCookie), "sign-in sets an HttpOnly, SameSite=Strict, Secure cookie");
+  const cookie = setCookie.split(";")[0];
+  check((await filmsRoute.GET(areq("/api/admin/films"))).status === 401, "the admin API needs the session");
+  check((await filmsRoute.GET(areq("/api/admin/films", { cookie }))).status === 200, "the session opens the admin API");
+  check((await filmsRoute.DELETE(areq("/api/admin/films", { method: "DELETE", cookie, origin: "https://evil.example", body: JSON.stringify({ all: true }) }))).status === 403, "a cross-site write with the cookie is refused");
+  const token = cookie.split("=")[1];
+  const tampered = token.slice(0, -2) + (token.endsWith("A") ? "B" : "A") + token.slice(-1);
+  check(!admin.validSession(tampered), "a tampered session is rejected");
+  check(!admin.validSession(token, Date.now() + 13 * 3_600_000), "sessions expire after 12 hours");
+
+  await admin.recordFilm(areq("/api/generate", { method: "POST" }), { kind: "generated", plan, engine: "builtin", prompt: "a CRM for teams" });
+  const listed = await (await filmsRoute.GET(areq("/api/admin/films", { cookie }))).json();
+  check(listed.total === 1 && listed.items[0].prompt === "a CRM for teams" && /^[a-f0-9]{10}$/.test(listed.items[0].visitor), "films are logged with a hashed visitor");
+  check(!JSON.stringify(listed).includes("203.0.113.50"), "the visitor's address is never stored");
+
+  const put = await settingsRoute.PUT(areq("/api/admin/settings", { method: "PUT", cookie, body: JSON.stringify({ provider: "openai", apiKey: "sk-test-1234567890abcdef", model: "gpt-5", dailyBudget: 7 }) }));
+  const view = await put.json();
+  check(put.status === 200 && view.keySet && !JSON.stringify(view).includes("1234567890abcdef"), "a saved key is never sent back (masked)");
+  const mode = (await stat(join(dataDir, "admin", "settings.json"))).mode & 0o777;
+  check(mode === 0o600, `settings file is private to the app (${mode.toString(8)})`);
+  const active = await admin.serverAi();
+  check(active?.source === "admin" && active.ai.apiKey === "sk-test-1234567890abcdef" && (await admin.readSettings()).dailyBudget === 7, "the server director uses the admin's AI and budget");
+  await settingsRoute.PUT(areq("/api/admin/settings", { method: "PUT", cookie, body: JSON.stringify({ provider: "openai", apiKey: "", model: "gpt-5" }) }));
+  check((await admin.serverAi())?.ai.apiKey === "sk-test-1234567890abcdef", "saving with an empty key keeps the saved key");
+  await settingsRoute.PUT(areq("/api/admin/settings", { method: "PUT", cookie, body: JSON.stringify({ provider: "openai", clearKey: true }) }));
+  check(!JSON.parse(await read(join(dataDir, "admin", "settings.json"), "utf8")).ai?.apiKey, "the key can be removed");
+
+  rl.resetLimits();
+  const tries: number[] = [];
+  for (let i = 0; i < rl.RULES.adminLogin.limit + 1; i++) tries.push((await login("guess" + i)).status);
+  check(tries.slice(0, -1).every((c) => c === 401) && tries.at(-1) === 429, `password guessing is limited (${rl.RULES.adminLogin.limit} tries, then 429)`);
+  env.ADMIN_PASSWORD = "a new password";
+  check(!admin.validSession(token), "changing ADMIN_PASSWORD signs everyone out");
+
   await rm(dataDir, { recursive: true, force: true });
 
   console.log("SSRF guard");

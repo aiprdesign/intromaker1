@@ -19,6 +19,7 @@ export default function Player({
   resetKey = 0,
   seek: seekTo,
   onScene,
+  onExported,
 }: {
   plan: VideoPlan;
   autoPlay?: boolean;
@@ -28,6 +29,8 @@ export default function Player({
   seek?: { t: number; key: number };
   /** Called when the slide under the playhead changes. */
   onScene?: (index: number) => void;
+  /** Called after a video export finishes, with the film as exported and the preset's name. */
+  onExported?: (plan: VideoPlan, preset: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playing, setPlaying] = useState(autoPlay);
@@ -244,6 +247,7 @@ export default function Player({
         signal: ac.signal,
       });
       download(blob, `${fileBase(out)}.${ext}`);
+      onExported?.(out, preset.name);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError((e as Error).message);
     } finally {

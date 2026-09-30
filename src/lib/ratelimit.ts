@@ -35,6 +35,10 @@ export const RULES = {
   tts: { limit: 80, windowMs: 10 * MIN },
   /** Checking an AI key / listing models. */
   aiCheck: { limit: 20, windowMs: 10 * MIN },
+  /** Admin sign-in attempts: slows password guessing to a crawl. */
+  adminLogin: { limit: 6, windowMs: 15 * MIN },
+  /** Film events the studio reports (exports). */
+  filmEvent: { limit: 60, windowMs: 10 * MIN },
 } satisfies Record<string, Rule>;
 export type RuleName = keyof typeof RULES;
 
@@ -65,8 +69,8 @@ function sweep(now: number) {
 }
 
 /** Count one request against `name` for this client; `ok: false` once the window is full. */
-export function take(name: RuleName, key: string, now = Date.now()): { ok: boolean; remaining: number; retryAfter: number; limit: number } {
-  const rule = RULES[name];
+export function take(name: RuleName, key: string, now = Date.now(), limit?: number): { ok: boolean; remaining: number; retryAfter: number; limit: number } {
+  const rule = { ...RULES[name], ...(limit !== undefined ? { limit } : {}) };
   sweep(now);
   const id = `${name}:${key}`;
   let b = buckets.get(id);
@@ -103,16 +107,20 @@ let budget = { day: "", used: 0 };
  * May this request spend the server's own AI key? Per visitor and per day overall. When it
  * can't, the caller falls back to the built-in director rather than failing.
  */
-export function spendServerAi(req: Request): { ok: true } | { ok: false; reason: string } {
+export function spendServerAi(req: Request, caps: { daily?: number; perVisitor?: number } = {}): { ok: true } | { ok: false; reason: string } {
   if (!enabled()) return { ok: true };
   const day = new Date().toISOString().slice(0, 10);
   if (budget.day !== day) budget = { day, used: 0 };
-  const cap = Math.max(0, Number(process.env.INTROMAKER_AI_DAILY_BUDGET ?? 200) || 0);
+  // The admin's settings win over the environment.
+  const cap = Math.max(0, caps.daily ?? (Number(process.env.INTROMAKER_AI_DAILY_BUDGET ?? 200) || 0));
   if (budget.used >= cap) return { ok: false, reason: "The demo's daily AI budget is used up" };
-  if (!take("serverAi", clientKey(req)).ok) return { ok: false, reason: "You've used today's AI generations on this demo" };
+  if (!take("serverAi", clientKey(req), Date.now(), caps.perVisitor).ok) return { ok: false, reason: "You've used today's AI generations on this demo" };
   budget.used++;
   return { ok: true };
 }
+
+/** Today's server-paid AI generations (for the admin overview). */
+export const serverAiUsedToday = () => (budget.day === new Date().toISOString().slice(0, 10) ? budget.used : 0);
 
 /** For tests. */
 export function resetLimits() {

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Nav, { Logo } from "@/components/Nav";
+import { adminEnabled } from "@/lib/admin";
+
+// Whether this server keeps a log of films depends on its settings, read at request time.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Privacy · IntroMaker",
@@ -9,20 +13,30 @@ export const metadata: Metadata = {
 
 /** Plain-language privacy note for the hosted demo. Kept in step with what the code does. */
 export default function Privacy() {
+  const logging = adminEnabled();
   return (
     <main>
       <Nav />
       <article className="legal">
         <h1>Privacy</h1>
         <p className="lead">
-          IntroMaker is a portfolio project. There are no accounts, no cookies and no analytics. Here is exactly what happens to what you give it.
+          IntroMaker is a portfolio project. There are no accounts, no tracking cookies and no analytics. Here is exactly what happens to what you give it.
         </p>
 
         <h2>Your videos</h2>
         <p>
-          Storyboards, edits and exports stay in your browser. Videos are rendered on your own computer and never uploaded. A share link carries the storyboard
-          after the <code>#</code> in the address, which browsers don&apos;t send to the server.
+          Videos are rendered on your own computer and never uploaded. Your work in progress is saved in your browser so a reload doesn&apos;t lose it. A share
+          link carries the storyboard after the <code>#</code> in the address, which browsers don&apos;t send to the server.
         </p>
+        {logging ? (
+          <p>
+            <strong>This site keeps a log of the films made on it</strong>, which its owner can review: the prompt or website address, the storyboard (the
+            text on each slide and the styles used) and when it was made, for each new film, remake and export. You appear in it only as an anonymous code
+            (a salted hash of your address), never by your address itself. The video file is not included. Don&apos;t put anything private in a prompt.
+          </p>
+        ) : (
+          <p>This site doesn&apos;t keep a log of the films made on it: storyboards and edits stay in your browser.</p>
+        )}
 
         <h2>Websites you import</h2>
         <p>
@@ -50,6 +64,7 @@ export default function Privacy() {
           <li>Screenshots of imported sites, for 7 days.</li>
           <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits. It is never written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>
+          {logging && <li>The film log described above, up to the most recent few thousand films, until the owner deletes it.</li>}
         </ul>
 
         <h2>Claims in generated copy</h2>

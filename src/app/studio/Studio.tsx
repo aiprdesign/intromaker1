@@ -1207,7 +1207,7 @@ export default function Studio() {
             {ai.provider !== "builtin"
               ? `AI director: ${aiLabel(ai)}.`
               : aiAvailable
-                ? "AI director: Claude (server key)."
+                ? "AI director: provided by this site."
                 : "Built-in director. "}
             {ai.provider === "builtin" && !aiAvailable && (
               <button className="link-btn" onClick={() => setAiOpen(true)}>
@@ -1229,7 +1229,20 @@ export default function Studio() {
 
         <section className="main">
           <div className={loading ? "dim" : ""}>
-            <Player plan={playPlan} resetKey={version} seek={seek} onScene={setActiveScene} />
+            <Player
+              plan={playPlan}
+              resetKey={version}
+              seek={seek}
+              onScene={setActiveScene}
+              onExported={(p, preset) => {
+                // Tell the owner's admin area what was made (ignored when it's off).
+                void fetch("/api/films", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ plan: { ...p, voiceover: undefined }, preset, prompt: promptRef.current, url: site?.url }),
+                }).catch(() => {});
+              }}
+            />
           </div>
 
           <div className="edit-bar">

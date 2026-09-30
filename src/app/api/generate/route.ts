@@ -2,11 +2,12 @@ import { z } from "zod/v4";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { assetUrl } from "@/engine/assets";
-import { AiError, describe, envClaudeAvailable, readAiConfig, runDirector, serverReachesLocal, type AiConfig } from "@/lib/ai";
+import { AiError, describe, modelOf, readAiConfig, runDirector, serverReachesLocal, type AiConfig } from "@/lib/ai";
 import { SHOT_DIR } from "@/lib/capture";
 import { lintStoryboard, repairStoryboard, reviewBrief } from "@/lib/review";
 import { PALETTES } from "@/engine/palettes";
 import { rateLimit, spendServerAi } from "@/lib/ratelimit";
+import { readSettings, recordFilm, serverAi } from "@/lib/admin";
 import {
   beatSync,
   brandFromSite,
@@ -30,7 +31,7 @@ import { SKILLS } from "@/engine/skills";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import { rankMoments, detectConcept } from "@/engine/concepts";
 import { writeVoiceover } from "@/engine/script";
-import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData } from "@/engine/types";
+import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData, type VideoPlan } from "@/engine/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -122,14 +123,11 @@ const CLAIM_RULES = `CLAIM-SAFE COPY (required — overrides the rules above): e
 - FTC/FDA: no health or medical claims of any kind (treats, cures, prevents, diagnoses, heals, improves sleep/stress/mood, clinically proven, FDA approved, doctor recommended); no certification or compliance claims (SOC 2, HIPAA, GDPR, "compliant", "certified", "bank-grade"); no green claims (eco-friendly, sustainable, carbon neutral); no endorsements ("as seen on", "recommended by"); no origin claims ("Made in USA").
 - Word-swap lines use neutral verbs ("Your work, planned|built|shared"). CTAs are simple actions ("Get started", "Try Acme"); "free" only when the website itself offers it.`;
 
-function hasCredentials() {
-  return envClaudeAvailable();
-}
-
 export async function GET() {
+  const server = await serverAi();
   return Response.json({
-    ai: hasCredentials(),
-    model: hasCredentials() ? process.env.INTROMAKER_MODEL || "claude-opus-5" : null,
+    ai: !!server,
+    model: server ? modelOf(server.ai) || null : null,
     // Local AI goes through this server only when it runs on the user's machine.
     localViaServer: serverReachesLocal(),
   });
@@ -338,6 +336,17 @@ export async function POST(req: Request) {
   }
   const c = readBody(body);
   const lintCtx = { site: c.site, targetSeconds: LENGTH_SECONDS[c.length], safe: c.safe };
+  // Every film made is logged for the owner's admin area (a remake, an alternative take, or new).
+  const film = async (out: { plan: VideoPlan; engine: string; engineLabel?: string; note?: string }) => {
+    await recordFilm(req, {
+      kind: c.variant ? "remake" : c.angle ? "take" : "generated",
+      plan: out.plan,
+      engine: out.engine === "ai" ? out.engineLabel || "AI" : "builtin",
+      prompt: c.site ? undefined : c.prompt,
+      url: c.site?.url,
+    });
+    return Response.json(out);
+  };
 
   // ── Browser-run AI: hand out the request, then finish what the model returned.
   if (body.phase === "prompt") {
@@ -349,7 +358,7 @@ export async function POST(req: Request) {
     const cfg = readAiConfig(body.ai);
     const label = (cfg ? describe(cfg) : "Local AI").slice(0, 80);
     const draft = readDraft(schema, body.draft);
-    if (!draft) return Response.json({ plan: c.builtin(), engine: "builtin", note: "The local model's reply wasn't a storyboard; used built-in director." });
+    if (!draft) return film({ plan: c.builtin(), engine: "builtin", note: "The local model's reply wasn't a storyboard; used built-in director." });
     const issues = lintStoryboard(draft, lintCtx);
     const mode = cfg?.mode ?? "balanced";
     const revised = body.revised ? readDraft(schema, body.revised) : null;
@@ -366,31 +375,29 @@ export async function POST(req: Request) {
         reviewed = fixed > 0 ? ` · self-reviewed, fixed ${fixed} issue${fixed > 1 ? "s" : ""}` : " · self-reviewed";
       }
     }
-    return Response.json({ plan: finishPlan(c, out), engine: "ai", engineLabel: `${label}${reviewed}` });
+    return film({ plan: finishPlan(c, out), engine: "ai", engineLabel: `${label}${reviewed}` });
   }
 
-  // Which AI runs the director: the user's own key/provider, else a server Claude key, else built-in.
+  // Which AI runs the director: the user's own key/provider, else the server's (the admin's saved
+  // provider, or ANTHROPIC_API_KEY), else built-in.
   const userAi = readAiConfig(body.ai);
-  const ai: AiConfig | null =
-    userAi && userAi.provider !== "builtin"
-      ? userAi
-      : !userAi && hasCredentials()
-        ? { provider: "anthropic", mode: "balanced", images: true }
-        : null;
+  const server = !userAi ? await serverAi() : null;
+  const ai: AiConfig | null = userAi && userAi.provider !== "builtin" ? userAi : (server?.ai ?? null);
   if (!ai || (!c.prompt.trim() && !c.site)) {
-    return Response.json({ plan: c.builtin(), engine: "builtin" });
+    return film({ plan: c.builtin(), engine: "builtin" });
   }
   // The server's own key is a shared budget: per visitor and per day. Visitors' own keys aren't counted.
   if (!userAi) {
-    const spend = spendServerAi(req);
-    if (!spend.ok) return Response.json({ plan: c.builtin(), engine: "builtin", note: `${spend.reason}; used the built-in director. Add your own AI key for more.` });
+    const settings = await readSettings();
+    const spend = spendServerAi(req, { daily: settings.dailyBudget, perVisitor: settings.perVisitor });
+    if (!spend.ok) return film({ plan: c.builtin(), engine: "builtin", note: `${spend.reason}; used the built-in director. Add your own AI key for more.` });
   }
 
   try {
     const { schema, images, text, system } = await directorRequest(c);
     const result = await runDirector(ai, { system, text, images, schema });
     if (result === "refusal") {
-      return Response.json({ plan: c.builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
+      return film({ plan: c.builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
     }
     // Self-review: Best mode always critiques and revises its draft; Balanced revises only
     // when the checklist finds real problems; Fast ships the first draft.
@@ -413,10 +420,10 @@ export async function POST(req: Request) {
         console.error("[generate] review pass failed, keeping draft:", err instanceof AiError ? err.message : (err as Error).name);
       }
     }
-    return Response.json({ plan: finishPlan(c, out), engine: "ai", engineLabel: describe(ai) + reviewed });
+    return film({ plan: finishPlan(c, out), engine: "ai", engineLabel: describe(ai) + reviewed });
   } catch (err) {
     const message = err instanceof AiError ? err.message : (err as Error).name === "TimeoutError" ? "AI request timed out" : "AI director unavailable";
     console.error("[generate] falling back to built-in director:", message);
-    return Response.json({ plan: c.builtin(), engine: "builtin", note: `AI director error (${message}); used built-in director.` });
+    return film({ plan: c.builtin(), engine: "builtin", note: `AI director error (${message}); used built-in director.` });
   }
 }

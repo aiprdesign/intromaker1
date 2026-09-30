@@ -200,6 +200,13 @@ Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instan
 | `NEXT_PUBLIC_INTROMAKER_LOCAL_VOICE` | on | Build-time. `off` removes the on-device Kokoro voice, whose phonemizer is GPL-3.0 (see Third-party and licences) |
 | `ANTHROPIC_API_KEY` | none | Optional Claude key for the AI director; visitors can bring their own |
 | `INTROMAKER_AI_DAILY_BUDGET` | 200 | Generations per day, all visitors combined, paid by the server's key; after it, the built-in director is used |
+| `ADMIN_PASSWORD` | none | Turns on the admin area at `/admin` (see below). Unset: no admin, and nothing is logged |
+| `INTROMAKER_FILMS_MAX` | 3000 | Film events the admin log keeps (oldest dropped first) |
+
+**Admin area** (`/admin`, when `ADMIN_PASSWORD` is set):
+- **Films**: every film made on the site (new films, remakes, alternative takes) and every export, newest first, with thumbnails, the prompt or website, the director, format, length and slides. Search, filter by event or by visitor, preview a film playing, open it in the studio, delete one or all. An overview shows totals, films per day, visitors, the most used slides and directors, and today's server-paid AI generations against the budget.
+- **AI settings**: choose the AI the server's director uses for visitors who bring no key (any provider in the registry: Anthropic, OpenAI, Gemini, OpenRouter, Groq…), its model, quality mode and whether it sees website screenshots; test the connection; set the daily and per-visitor AI budgets. It overrides `ANTHROPIC_API_KEY`. The key is stored on the data volume (`/data/admin/settings.json`, mode 600) and only ever shown back masked.
+- **Security**: a signed, HttpOnly, SameSite=Strict session cookie (12 hours; changing the password signs everyone out), same-origin checks on every write, and sign-in attempts limited to 6 per 15 minutes. Visitors appear only as a salted hash of their address. The privacy page says whether the log is on.
 
 **What protects a public deploy**:
 - **Rate limits** per visitor on import (8 per 10 min), the image proxy, generation, voice and key checks. Over the limit you get a `429` with `Retry-After`. Generation that the server's own AI key pays for also has a per-visitor and a shared daily budget, and degrades to the built-in director rather than failing.
@@ -242,6 +249,8 @@ src/lib/ai.ts                   AI director over 3 protocols (Anthropic SDK, Ope
 src/lib/localai.ts              browser-side local AI (scan, test, director) for online deployments
 src/lib/thumbs.ts               slide and slide-style thumbnails for the studio (cached stills)
 src/app/audit/                  layout audit of every skill against the design system
+src/lib/admin.ts                admin area: password sessions, film log, server AI settings
+src/app/admin/                  admin dashboard (films, AI settings)
 src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/capture.ts              live browser capture: hero/full/section screenshots + the page's UI components cut out one by one
 src/lib/tts.ts                  voice generation: Kokoro in the browser, cloud voices via /api/tts, uploads

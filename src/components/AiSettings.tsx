@@ -272,7 +272,7 @@ export default function AiSettings({
             {draft.apiKey && <p className="hint warn">Key not recognised: pick its provider above (or “Any OpenAI-compatible API”).</p>}
             <p className="hint">
               {serverClaude
-                ? "This server has its own Claude key: storyboards use Claude automatically."
+                ? "This site provides its own AI: storyboards use it automatically, within a daily limit."
                 : "Rule-based director: fast, free and offline. Add a key for AI-written storyboards that read your website."}
             </p>
           </>
