@@ -1,4 +1,4 @@
-import { deleteUser, publicUser, resetPassword, updateUser } from "@/lib/accounts";
+import { adminUser, deleteUser, resetPassword, updateUser } from "@/lib/accounts";
 import { noStore, requireAdmin } from "@/lib/admin";
 
 export const runtime = "nodejs";
@@ -14,6 +14,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const u = await updateUser((await params).id, (x) => {
     if (body?.plan === "free" || body?.plan === "pro") {
       x.plan = body.plan;
+      // A plan set by hand stays until changed by hand (Stripe events won't take it back).
+      x.planSource = "admin";
       if (body.plan === "pro") x.upgradeRequestedAt = undefined;
     }
     if (typeof body?.disabled === "boolean") {
@@ -23,7 +25,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (body?.clearRequest) x.upgradeRequestedAt = undefined;
   });
   if (!u) return Response.json({ error: "Not found" }, { status: 404 });
-  return Response.json({ user: { ...publicUser(u), disabled: !!u.disabled } }, { headers: noStore });
+  return Response.json({ user: { ...adminUser(u), disabled: !!u.disabled } }, { headers: noStore });
 }
 
 /** Reset the password: returns a one-time password to hand over (the user must pick a new one). */

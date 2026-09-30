@@ -46,6 +46,11 @@ export default function Privacy() {
           thumbnail). Signing in sets one cookie, which keeps you signed in for 30 days; there are no tracking cookies. You can delete your account and every
           saved intro at any time from your account page.
         </p>
+        <p>
+          If you pay for Pro, payment happens on Stripe&apos;s own pages: your card details go to Stripe, never to this server. Stripe tells the server that you
+          paid, and the server keeps your Stripe customer and subscription ids and the subscription&apos;s status, so your plan follows your subscription.
+          Stripe&apos;s own privacy policy covers what it keeps.
+        </p>
 
         <h2>Websites you import</h2>
         <p>

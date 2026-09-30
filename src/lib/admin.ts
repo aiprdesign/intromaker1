@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { VideoPlan } from "@/engine/types";
 import { readAiConfig, type AiConfig } from "./ai";
 import { cookieOf, isHttps, noStore, sameOrigin } from "./http";
+import { stripeLink, type BillingLinks } from "./stripe-links";
 import { DEFAULT_LIMITS, readLimits, type PlanId, type PlanLimits } from "./plans";
 import { clientKey } from "./ratelimit";
 
@@ -288,6 +289,8 @@ export interface AdminSettings {
   proPrice?: string;
   /** Where visitors reach the owner (upgrades, password resets). */
   contactEmail?: string;
+  /** Stripe Payment Links and customer portal (see billing.ts). */
+  billing?: BillingLinks;
   updatedAt?: number;
 }
 
@@ -305,6 +308,14 @@ export async function readSettings(): Promise<AdminSettings> {
       plans: raw.plans ? readLimits(raw.plans) : undefined,
       proPrice: typeof raw.proPrice === "string" ? raw.proPrice.slice(0, 40) : undefined,
       contactEmail: typeof raw.contactEmail === "string" ? raw.contactEmail.slice(0, 120) : undefined,
+      billing: raw.billing
+        ? {
+            monthlyLink: stripeLink(raw.billing.monthlyLink, "pay"),
+            yearlyLink: stripeLink(raw.billing.yearlyLink, "pay"),
+            portalLink: stripeLink(raw.billing.portalLink, "portal"),
+            yearlyPrice: typeof raw.billing.yearlyPrice === "string" ? raw.billing.yearlyPrice.slice(0, 40) : undefined,
+          }
+        : undefined,
       updatedAt: raw.updatedAt,
     };
   } catch {

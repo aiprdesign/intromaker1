@@ -1,9 +1,26 @@
 import { AccountError, createUser, currentUser, deleteUser, limitsFor, login, publicUser, requireUser, sessionFor, usageOf, userCookie } from "@/lib/accounts";
 import { planLimits, readSettings } from "@/lib/admin";
 import { noStore, sameOrigin } from "@/lib/http";
+import { checkoutUrl, portalUrl, type BillingLinks } from "@/lib/stripe-links";
 import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
+
+/**
+ * Stripe checkout for this account (links carry its id, so the payment finds it), and the billing
+ * portal for subscribers. Without an account only whether paying online is possible.
+ */
+function billingFor(u: Awaited<ReturnType<typeof currentUser>>, b: BillingLinks | undefined) {
+  const online = !!(b?.monthlyLink || b?.yearlyLink);
+  if (!u) return { online };
+  return {
+    online,
+    monthly: b?.monthlyLink ? checkoutUrl(b.monthlyLink, u) : null,
+    yearly: b?.yearlyLink ? checkoutUrl(b.yearlyLink, u) : null,
+    yearlyPrice: b?.yearlyPrice ?? null,
+    portal: b?.portalLink && (u.stripeCustomerId || u.planSource === "stripe") ? portalUrl(b.portalLink, u.email) : null,
+  };
+}
 export const dynamic = "force-dynamic";
 
 /** Who's signed in (or null), their plan, limits and usage, and every plan's limits for the pricing UI. */
@@ -18,6 +35,7 @@ export async function GET(req: Request) {
       plans: await planLimits(),
       proPrice: settings.proPrice ?? null,
       contactEmail: settings.contactEmail ?? null,
+      billing: billingFor(u, settings.billing),
     },
     { headers: noStore },
   );

@@ -191,6 +191,40 @@ async function main() {
   for (let i = 0; i < rl.RULES.accountLogin.limit + 1; i++) guesses.push((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "guess" + i }) }))).status);
   check(guesses.at(-1) === 429, `account password guessing is limited (${rl.RULES.accountLogin.limit} tries, then 429)`);
 
+  console.log("Stripe");
+  const billing = await import("../src/lib/billing");
+  const webhook = await import("../src/app/api/stripe/webhook/route");
+  const { createHmac } = await import("node:crypto");
+  const secret = "whsec_hostingcheck";
+  const sign = (body: string, t = Math.floor(Date.now() / 1000), key = secret) => `t=${t},v1=${createHmac("sha256", key).update(`${t}.${body}`).digest("hex")}`;
+  const hook = (ev: object, sig?: (body: string) => string) => {
+    const body = JSON.stringify(ev);
+    return webhook.POST(new Request(A + "/api/stripe/webhook", { method: "POST", headers: { "stripe-signature": (sig ?? sign)(body) }, body }));
+  };
+  const boId = (await acc.findUserByEmail("bo@example.com"))!.id;
+  const paid = { id: "evt_paid", type: "checkout.session.completed", data: { object: { client_reference_id: boId, customer: "cus_bo", subscription: "sub_bo", payment_status: "paid" } } };
+  delete env.STRIPE_WEBHOOK_SECRET;
+  check((await hook(paid)).status === 503, "the webhook is off (503) until STRIPE_WEBHOOK_SECRET is set");
+  env.STRIPE_WEBHOOK_SECRET = secret;
+  check((await hook(paid, () => "t=1,v1=00")).status === 400, "a forged signature is refused");
+  check((await hook(paid, (b) => sign(b, Math.floor(Date.now() / 1000) - 600))).status === 400, "a replayed (stale) signature is refused");
+  check((await hook(paid, (b) => sign(b, undefined, "whsec_other"))).status === 400, "a signature from another secret is refused");
+  const done = await hook(paid);
+  const bo = (await acc.getUser(boId))!;
+  check(done.status === 200 && bo.plan === "pro" && bo.planSource === "stripe" && bo.stripeCustomerId === "cus_bo", "a paid checkout switches the account to Pro");
+  check(/duplicate/.test((await (await hook(paid)).json()).result), "a repeated event is applied once");
+  await hook({ id: "evt_fail", type: "invoice.payment_failed", data: { object: { customer: "cus_bo" } } });
+  check((await acc.getUser(boId))!.billingStatus === "past_due" && (await acc.getUser(boId))!.plan === "pro", "a failed payment marks past due and keeps Pro during Stripe's retries");
+  await hook({ id: "evt_cancel", type: "customer.subscription.deleted", data: { object: { id: "sub_bo", customer: "cus_bo", status: "canceled" } } });
+  check((await acc.getUser(boId))!.plan === "free", "a cancelled subscription goes back to Free");
+  await acc.updateUser(anaId, (x) => void (x.stripeCustomerId = "cus_ana"));
+  await hook({ id: "evt_ana", type: "customer.subscription.deleted", data: { object: { id: "sub_ana", customer: "cus_ana", status: "canceled" } } });
+  check((await acc.getUser(anaId))!.plan === "pro", "Stripe never takes back a plan the owner set by hand");
+  check(!billing.stripeLink("https://evil.example/pay", "pay") && !billing.stripeLink("http://buy.stripe.com/x", "pay") && !billing.stripeLink("https://buy.stripe.com/x", "portal"), "only Stripe-hosted https links are accepted");
+  const link = billing.checkoutUrl(billing.stripeLink("https://buy.stripe.com/test_abc", "pay")!, { id: boId, email: "bo@example.com" });
+  check(new URL(link).searchParams.get("client_reference_id") === boId && billing.isTestLink(link), "payment links carry the account id and are recognised as test links");
+  delete env.STRIPE_WEBHOOK_SECRET;
+
   await rm(dataDir, { recursive: true, force: true });
 
   console.log("SSRF guard");

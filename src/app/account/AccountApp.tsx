@@ -3,8 +3,27 @@
 import { useCallback, useEffect, useState } from "react";
 import { describeLimits, PLAN_NAMES, type PlanId, type PlanLimits } from "@/lib/plans";
 
-type User = { id: string; email: string; plan: PlanId; createdAt: number; upgradeRequestedAt?: number; mustChangePassword: boolean };
-type Me = { user: User | null; limits: PlanLimits; usage: { ai: number; imports: number }; plans: Record<PlanId, PlanLimits>; proPrice: string | null; contactEmail: string | null };
+type User = {
+  id: string;
+  email: string;
+  plan: PlanId;
+  createdAt: number;
+  upgradeRequestedAt?: number;
+  mustChangePassword: boolean;
+  planSource?: "admin" | "stripe";
+  billingStatus?: "active" | "past_due" | "canceling" | "canceled";
+  periodEnd?: number;
+};
+type Billing = { online: boolean; monthly?: string | null; yearly?: string | null; yearlyPrice?: string | null; portal?: string | null };
+type Me = {
+  user: User | null;
+  limits: PlanLimits;
+  usage: { ai: number; imports: number };
+  plans: Record<PlanId, PlanLimits>;
+  proPrice: string | null;
+  contactEmail: string | null;
+  billing: Billing;
+};
 type Film = { id: string; title: string; thumb?: string; aspect: string; scenes: number; seconds: number; updatedAt: number };
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -120,11 +139,27 @@ function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: Pl
             ))}
           </ul>
           {current === id && <span className="plan-badge current">Your plan</span>}
-          {id === "pro" && current === "free" && onRequest && (
+          {id === "pro" && current === "free" && (me.billing.monthly || me.billing.yearly) && (
+            <div className="plan-buy">
+              {me.billing.monthly && (
+                <a className="btn btn-primary" href={me.billing.monthly}>
+                  Upgrade{me.proPrice ? ` · ${me.proPrice}` : ""}
+                </a>
+              )}
+              {me.billing.yearly && (
+                <a className="btn btn-ghost" href={me.billing.yearly}>
+                  Yearly{me.billing.yearlyPrice ? ` · ${me.billing.yearlyPrice}` : ""}
+                </a>
+              )}
+              <span className="hint">Secure checkout by Stripe. Cancel any time.</span>
+            </div>
+          )}
+          {id === "pro" && current === "free" && !me.billing.monthly && !me.billing.yearly && onRequest && (
             <button className="btn btn-primary" onClick={onRequest} disabled={requested}>
               {requested ? "Requested ✓" : "Request Pro"}
             </button>
           )}
+          {id === "pro" && !current && me.billing.online && <span className="hint">Sign in to upgrade with Stripe.</span>}
         </div>
       ))}
     </div>
@@ -141,10 +176,35 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
     setFilms(r.films);
     setLimit(r.limit);
   }, []);
+  // Reload when the plan changes (after an upgrade the saved-intro limit grows).
   useEffect(() => {
     void loadFilms();
-  }, [loadFilms]);
+  }, [loadFilms, me.limits.savedFilms]);
   const u = me.user;
+
+  // Back from Stripe checkout (?upgraded=1): the webhook switches the plan within seconds.
+  const [activating, setActivating] = useState<"" | "waiting" | "done" | "slow">("");
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).get("upgraded")) return;
+    history.replaceState(null, "", "/account");
+    if (me.user.plan === "pro") return setActivating("done");
+    setActivating("waiting");
+    let tries = 0;
+    const timer = window.setInterval(async () => {
+      tries++;
+      const fresh = await api<Me>("/api/account").catch(() => null);
+      if (fresh?.user?.plan === "pro") {
+        window.clearInterval(timer);
+        setActivating("done");
+        void reload();
+      } else if (tries >= 20) {
+        window.clearInterval(timer);
+        setActivating("slow");
+      }
+    }, 2000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const rename = async (id: string, title: string) => {
     setEditing(null);
@@ -186,6 +246,22 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
         </div>
       </header>
 
+      {activating === "waiting" && (
+        <div className="account-card info-card">
+          <span className="spinner sm" /> Payment received. Activating Pro…
+        </div>
+      )}
+      {activating === "done" && <div className="account-card ok-card">You&apos;re on Pro. Thank you!</div>}
+      {activating === "slow" && (
+        <div className="account-card warn-card">
+          Your payment is being confirmed. Pro switches on as soon as Stripe tells us; refresh in a minute{me.contactEmail ? `, or write to ${me.contactEmail}` : ""}.
+        </div>
+      )}
+      {u.billingStatus === "past_due" && (
+        <div className="account-card warn-card">
+          Your last payment didn&apos;t go through. Stripe will retry; {me.billing.portal ? "update your card in Manage billing" : "please update your card"} to keep Pro.
+        </div>
+      )}
       {u.mustChangePassword && (
         <div className="account-card warn-card">
           <strong>Choose a new password.</strong> The site owner reset your password; pick your own below.
@@ -260,6 +336,22 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
             Website imports today: <strong>{me.usage.imports}</strong> / {me.limits.importsPerDay}
           </span>
         </div>
+        {u.plan === "pro" && (u.billingStatus || me.billing.portal) && (
+          <div className="account-card billing-row">
+            <span>
+              {u.billingStatus === "canceling" && u.periodEnd
+                ? `Pro until ${new Date(u.periodEnd).toLocaleDateString()} (cancelled; renew any time).`
+                : u.periodEnd
+                  ? `Pro subscription · renews ${new Date(u.periodEnd).toLocaleDateString()}`
+                  : "Pro subscription"}
+            </span>
+            {me.billing.portal && (
+              <a className="btn btn-ghost sm" href={me.billing.portal}>
+                Manage billing
+              </a>
+            )}
+          </div>
+        )}
         <PlanCards me={me} current={u.plan} onRequest={requestPro} requested={!!u.upgradeRequestedAt} />
         {u.plan === "free" && u.upgradeRequestedAt && <p className="hint">You asked for Pro on {new Date(u.upgradeRequestedAt).toLocaleDateString()}. The site owner will switch your plan.</p>}
       </section>

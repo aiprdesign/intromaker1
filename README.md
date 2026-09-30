@@ -207,10 +207,12 @@ Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instan
 | `INTROMAKER_AI_DAILY_BUDGET` | 200 | Generations per day, all visitors combined, paid by the server's key; after it, the built-in director is used |
 | `ADMIN_PASSWORD` | none | Turns on the admin area at `/admin` (see below). Unset: no admin, and nothing is logged |
 | `INTROMAKER_FILMS_MAX` | 3000 | Film events the admin log keeps (oldest dropped first) |
+| `STRIPE_WEBHOOK_SECRET` | none | The Stripe webhook's signing secret (`whsec_…`). Unset: the webhook answers 503 and Pro is switched by hand (see Payments) |
 
 **Admin area** (`/admin`, when `ADMIN_PASSWORD` is set):
+- **Layout**: tabs for Films, Users, Plans, Billing and AI, linkable as `/admin#users` and so on, with arrow-key navigation, a badge for open Pro requests, toasts for every save, confirmations (typing the email or `DELETE` for anything permanent) and a save bar for unsaved changes. An expired session goes back to sign-in with a message.
 - **Films**: every film made on the site (new films, remakes, alternative takes) and every export, newest first, with thumbnails, the prompt or website, the director, format, length and slides. Search, filter by event or by visitor, preview a film playing, open it in the studio, delete one or all. An overview shows totals, films per day, visitors, the most used slides and directors, and today's server-paid AI generations against the budget.
-- **AI settings**: choose the AI the server's director uses for visitors who bring no key (any provider in the registry: Anthropic, OpenAI, Gemini, OpenRouter, Groq…), its model, quality mode and whether it sees website screenshots; test the connection; set the daily and per-visitor AI budgets. It overrides `ANTHROPIC_API_KEY`. The key is stored on the data volume (`/data/admin/settings.json`, mode 600) and only ever shown back masked.
+- **AI**: choose the AI the server's director uses for visitors who bring no key (any provider in the registry: Anthropic, OpenAI, Gemini, OpenRouter, Groq…), its model, quality mode and whether it sees website screenshots; test the connection; set the daily and per-visitor AI budgets. It overrides `ANTHROPIC_API_KEY`. The key is stored on the data volume (`/data/admin/settings.json`, mode 600) and only ever shown back masked.
 - **Security**: a signed, HttpOnly, SameSite=Strict session cookie (12 hours; changing the password signs everyone out), same-origin checks on every write, and sign-in attempts limited to 6 per 15 minutes. Visitors appear only as a salted hash of their address. The privacy page says whether the log is on.
 
 **Accounts and plans** (always on; accounts are optional for visitors):
@@ -224,7 +226,17 @@ Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instan
   | Website imports | 3 a day | 50 a day |
   | Export | up to 1080p, 30 fps, small watermark | up to 4K, 60 fps, no watermark |
 
-- **No payment provider yet**: visitors press *Request Pro* on their account page; the owner sees requests in **Admin → Users** and switches the plan. Users also has password resets (a one-time password to hand over, which must be changed on sign-in), disable and delete. The Pro price text and a contact email are set in **Admin → Plans** and shown on the pricing page. A provider such as Stripe can later set the same `plan` field from its webhook.
+- **Without payments**, visitors press *Request Pro* on their account page; the owner sees requests in **Admin → Users** and switches the plan. Users also has sorting, filters (requests, Pro, Stripe), password resets (a one-time password with a copy button, which must be changed on sign-in), disable and delete. The Pro price text and a contact email are set in **Admin → Plans** and shown on the pricing page.
+
+**Payments with Stripe (plug and play)**. No Stripe SDK and no secret API key on the server: Stripe-hosted Payment Links, one signed webhook and the customer portal. **Admin → Billing** shows the exact URLs to paste into Stripe, a checklist that ticks itself off, the mode (test or live) and the last event received.
+
+1. In Stripe, create the product "IntroMaker Pro" with a recurring price (monthly, and optionally yearly).
+2. Create a **Payment Link** for each price. Under *After payment*, redirect to `https://<your-domain>/account?upgraded=1`. Paste the links into Admin → Billing. Each visitor is sent to the link with their account id (`client_reference_id`) and email prefilled.
+3. **Developers → Webhooks → Add endpoint** `https://<your-domain>/api/stripe/webhook` with the events `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted` and `invoice.payment_failed`. Copy its signing secret into the `STRIPE_WEBHOOK_SECRET` variable (Railway → Variables) and redeploy.
+4. Optional but recommended: **Settings → Billing → Customer portal**, activate it and paste its login link into Admin → Billing. Subscribers then get *Manage billing* to change cards, get invoices or cancel.
+5. Test with test-mode links and card `4242 4242 4242 4242`, then swap in the live links and the live signing secret.
+
+What happens: a paid checkout makes the account Pro; after the redirect the account page waits for the webhook and shows *Pro is on*. A failed renewal marks the account past due and keeps Pro while Stripe retries; a cancelled or unpaid subscription returns it to Free. A plan the owner set by hand is never taken back by Stripe. Every event is verified (HMAC-SHA256 over the raw body, 5-minute tolerance), applied once, and a failure answers 500 so Stripe retries. Only `buy.stripe.com`, `checkout.stripe.com` and `billing.stripe.com` links are accepted.
 
 **What protects a public deploy**:
 - **Rate limits** per visitor on import (8 per 10 min), the image proxy, generation, voice and key checks. Over the limit you get a `429` with `Retry-After`. Generation that the server's own AI key pays for also has a per-visitor and a shared daily budget, and degrades to the built-in director rather than failing.
@@ -234,7 +246,7 @@ Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instan
 - **Headers**: `nosniff`, `X-Frame-Options: DENY`, a strict referrer policy, a permissions policy and HSTS; captured SVGs are served with a sandboxing CSP.
 - **Keys** stay in the visitor's browser and are removed from error messages.
 
-`npm run check:hosting` verifies all of this in production mode (rate limits, spoofing, the AI budget, storage clean-up, around 30 SSRF cases including DNS rebinding, local AI).
+`npm run check:hosting` verifies all of this in production mode (rate limits, spoofing, the AI budget, storage clean-up, the admin area, accounts and plans, the Stripe webhook (forged, stale and repeated events, upgrades, cancellations), around 30 SSRF cases including DNS rebinding, local AI).
 
 Known limits:
 - Rate limits and the AI budget are in memory, which suits a single instance. Several instances would share them through Redis behind the same `rateLimit()` interface.
@@ -271,7 +283,9 @@ src/lib/admin.ts                admin area: password sessions, film log, server 
 src/lib/accounts.ts             visitor accounts: scrypt passwords, sessions, saved films, plan usage
 src/lib/plans.ts                Free / Pro limits (shared by server and studio)
 src/app/account/                sign in / sign up, my intros, plan, security
-src/app/admin/                  admin dashboard (films, AI settings)
+src/app/admin/                  admin dashboard (films, users, plans, billing, AI)
+src/lib/billing.ts              Stripe webhook: signature check, events → plans (no SDK)
+src/lib/stripe-links.ts         Payment Link and customer portal URL helpers
 src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/capture.ts              live browser capture: hero/full/section screenshots + the page's UI components cut out one by one
 src/lib/tts.ts                  voice generation: Kokoro in the browser, cloud voices via /api/tts, uploads

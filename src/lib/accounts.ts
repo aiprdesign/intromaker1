@@ -49,6 +49,13 @@ export interface User {
   /** Must choose a new password (after a reset by the owner). */
   mustChangePassword?: boolean;
   usage?: { aiMonth?: string; ai?: number; importDay?: string; imports?: number };
+  /** Who set the plan: the owner by hand, or Stripe (only a Stripe plan is taken back by Stripe). */
+  planSource?: "admin" | "stripe";
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  billingStatus?: "active" | "past_due" | "canceling" | "canceled";
+  /** When the paid period ends (ms). */
+  periodEnd?: number;
 }
 
 export interface SavedFilm {
@@ -230,11 +237,48 @@ export async function listUsers() {
   }
   const users = (await Promise.all(names.filter((n) => n.endsWith(".json")).map((n) => readJson<User>(join(USERS, n))))).filter((u): u is User => !!u);
   const films = await Promise.all(users.map((u) => countFilms(u.id)));
-  return users.map((u, i) => ({ ...publicUser(u), films: films[i], disabled: !!u.disabled })).sort((a, b) => b.createdAt - a.createdAt);
+  return users.map((u, i) => ({ ...adminUser(u), films: films[i], disabled: !!u.disabled })).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export function publicUser(u: User) {
-  return { id: u.id, email: u.email, plan: u.plan, createdAt: u.createdAt, lastLoginAt: u.lastLoginAt, upgradeRequestedAt: u.upgradeRequestedAt, mustChangePassword: !!u.mustChangePassword, usage: u.usage ?? {} };
+  return {
+    id: u.id,
+    email: u.email,
+    plan: u.plan,
+    createdAt: u.createdAt,
+    lastLoginAt: u.lastLoginAt,
+    upgradeRequestedAt: u.upgradeRequestedAt,
+    mustChangePassword: !!u.mustChangePassword,
+    usage: u.usage ?? {},
+    planSource: u.planSource,
+    billingStatus: u.billingStatus,
+    periodEnd: u.periodEnd,
+  };
+}
+
+/** For the owner's view: also the Stripe customer, to open it in the Stripe dashboard. */
+export function adminUser(u: User) {
+  return { ...publicUser(u), stripeCustomerId: u.stripeCustomerId };
+}
+
+export async function findUserByEmail(email: string) {
+  const id = (await emailIndex())[normEmail(email)];
+  return id ? getUser(id) : null;
+}
+
+export async function findUserByStripeCustomer(customer: string) {
+  let names: string[] = [];
+  try {
+    names = await readdir(USERS);
+  } catch {
+    return null;
+  }
+  for (const n of names) {
+    if (!n.endsWith(".json")) continue;
+    const u = await readJson<User>(join(USERS, n));
+    if (u?.stripeCustomerId === customer) return u;
+  }
+  return null;
 }
 
 // ───────────────────────── Sessions ─────────────────────────
