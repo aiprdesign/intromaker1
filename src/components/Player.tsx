@@ -186,6 +186,28 @@ export default function Player({
     requestAnimationFrame(() => setPlaying(true));
   };
 
+  // Leaving mid-export loses the render: ask first.
+  useEffect(() => {
+    if (exporting === null) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [exporting]);
+
+  const toggleRef = useRef(toggle);
+  toggleRef.current = toggle;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== " " || e.repeat || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.closest("input, textarea, select, button, [role=option], [contenteditable=true], .skill-menu") || el.isContentEditable)) return;
+      e.preventDefault();
+      toggleRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const toggleMute = () => {
     if (!soundRef.current) {
       // First audio interaction while already playing: create the synth and reschedule.
@@ -237,9 +259,10 @@ export default function Player({
     <div className="player">
       <div className={`stage stage-${plan.aspect.replace(":", "x")}`}>
         <canvas ref={canvasRef} width={w} height={h} onClick={toggle} />
+        {/* Paused mid-film (editing a slide), the play button moves to the corner so the frame stays visible. */}
         {!playing && exporting === null && (
-          <button className="stage-play" onClick={toggle} aria-label="Play">
-            <svg viewBox="0 0 24 24" width="34" height="34"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
+          <button className={`stage-play${time > 0.05 ? " mini" : ""}`} onClick={toggle} aria-label="Play">
+            <svg viewBox="0 0 24 24" width={time > 0.05 ? 20 : 34} height={time > 0.05 ? 20 : 34}><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
           </button>
         )}
         {exporting !== null && (
@@ -275,15 +298,17 @@ export default function Player({
             return (
               <div
                 key={i}
-                className="seg"
+                className={`seg${i === sceneAt ? " now" : ""}`}
                 style={{
                   left: `${left}%`,
                   width: `${(s.duration / duration) * 100}%`,
-                  background: i % 2 ? palette.secondary : palette.primary,
+                  ["--seg" as string]: i % 2 ? palette.secondary : palette.primary,
                 }}
-                title={`${SKILL_MAP[s.skill].name}: ${s.text}`}
+                title={`${i + 1}. ${SKILL_MAP[s.skill].name}: ${s.text.replace(/\*/g, "")}`}
               >
-                <span>{SKILL_MAP[s.skill].name}</span>
+                <span>
+                  {i + 1} {SKILL_MAP[s.skill].name}
+                </span>
               </div>
             );
           })}

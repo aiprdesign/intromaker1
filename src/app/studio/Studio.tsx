@@ -27,12 +27,30 @@ import { SKILL_MAP } from "@/engine/skills";
 import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
+const FILM_KEY = "intromaker.film";
+const TRANSITION_NAMES: Record<string, string> = {
+  cut: "Cut",
+  flash: "Flash",
+  zoom: "Zoom through",
+  glitch: "Glitch",
+  wipe: "Wipe",
+  whip: "Whip pan",
+  dolly: "Dolly",
+  leak: "Light leak",
+  shutter: "Shutter",
+  push: "Push",
+  dissolve: "Dissolve",
+  liquid: "Liquid",
+  cube: "3D cube",
+};
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
 
 export default function Studio() {
   const params = useSearchParams();
   // Seeded from ?prompt= so the box shows what the first film was made from.
   const [prompt, setPrompt] = useState(() => params.get("prompt") ?? "");
+  /** The prompt the film on screen was made from (the box may already hold the next one). */
+  const promptRef = useRef(prompt);
   const [aspect, setAspect] = useState<Aspect>("16:9");
   const [length, setLength] = useState<Length>("standard");
   const [palette, setPalette] = useState<PaletteId | "auto">("auto");
@@ -48,7 +66,7 @@ export default function Studio() {
   const [selected, setSelected] = useState<number | null>(null);
   const [activeScene, setActiveScene] = useState(0);
   const [seek, setSeek] = useState<{ t: number; key: number } | undefined>(undefined);
-  const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
+  const [toast, setToast] = useState<{ text: string; key: number; undo: () => void } | null>(null);
   const [engine, setEngine] = useState<Engine>("manual");
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   /** Whether the server can reach this computer's local AI (else local models run from the browser). */
@@ -353,10 +371,28 @@ export default function Studio() {
   const generate = async (opts: GenOpts = {}) => {
     setLoading(true);
     setNote(null);
+    // The film on screen and its versions, so making a new one can be undone.
+    const before = { plan: planRef.current, takes, current, engine, engineLabel, prompt: promptRef.current };
     try {
       const take = await direct(opts);
       show(take, 0);
+      promptRef.current = (opts.prompt ?? prompt).trim();
       setTakes([{ ...take, label: "Original" }]);
+      if (before.plan !== HERO_PLAN && booted.current && !bootingRef.current)
+        setToast({
+          text: "Made a new film",
+          key: Date.now(),
+          undo: () => {
+            setPlan(before.plan);
+            setPrompt(before.prompt);
+            setTakes(before.takes);
+            setCurrent(before.current);
+            setEngine(before.engine);
+            setEngineLabel(before.engineLabel);
+            setVersion((v) => v + 1);
+          },
+        });
+      bootingRef.current = false;
       if (take.note || take.plan.notes?.length) setNote([take.note, ...(take.plan.notes ?? [])].filter(Boolean).join(" "));
     } finally {
       setLoading(false);
@@ -457,13 +493,70 @@ export default function Studio() {
     setImportError(null);
   };
 
-  // Boot from URL: #plan=… (shared link), ?url=… (website), ?prompt=…, or ?skill=… from the showcase.
+  // Autosave: the film, its versions and the prompt are kept in this browser, so a reload or a
+  // closed tab picks up where you left off. (A one-skill preview is only kept once it's edited.)
+  const saving = useRef(false);
+  useEffect(() => {
+    if (!saving.current || plan === HERO_PLAN) return;
+    const timer = window.setTimeout(() => {
+      const film = { v: 1, plan, prompt, current, takes: takes.map(({ plan: tp, engine: te, engineLabel: tl, label }) => ({ plan: tp, engine: te, engineLabel: tl, label })) };
+      try {
+        localStorage.setItem(FILM_KEY, JSON.stringify(film));
+      } catch {
+        try {
+          localStorage.setItem(FILM_KEY, JSON.stringify({ ...film, takes: [], current: 0 }));
+        } catch {
+          /* storage full or blocked: nothing to do */
+        }
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [plan, prompt, takes, current]);
+  // The address shows the studio, not the prompt it booted from (a reload restores the saved film).
+  const bootingRef = useRef(true);
+  const cleanUrl = () => {
+    try {
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Boot from URL: #plan=… (shared link), ?url=… (website), ?prompt=…, or ?skill=… from the showcase;
+  // otherwise the film saved in this browser.
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const hasBootParams = hash.startsWith("#plan=") || ["skill", "url", "prompt"].some((k) => params.get(k));
+    if (!hasBootParams) {
+      bootingRef.current = false;
+      saving.current = true;
+      try {
+        const saved = JSON.parse(localStorage.getItem(FILM_KEY) ?? "null");
+        if (saved?.v === 1 && saved.plan?.scenes?.length) {
+          const restored = sanitizePlan(saved.plan);
+          setPlan(restored);
+          setAspect(restored.aspect);
+          if (restored.template) setTemplate(restored.template);
+          setPrompt(saved.prompt ?? "");
+          promptRef.current = saved.prompt ?? "";
+          const savedTakes = Array.isArray(saved.takes) ? (saved.takes as Take[]).map((t) => ({ ...t, plan: sanitizePlan(t.plan) })) : [];
+          setTakes(savedTakes);
+          setCurrent(Math.min(Math.max(0, saved.current ?? 0), Math.max(0, savedTakes.length - 1)));
+          setEngine("manual");
+          setNote("Restored your last film from this browser. Generate or Import starts a new one.");
+        }
+      } catch {
+        /* nothing saved, or unreadable */
+      }
+      return;
+    }
+    if (!params.get("skill")) saving.current = true;
+    cleanUrl();
     const shared = hash.startsWith("#plan=") ? decodePlan(hash.slice(6)) : null;
     if (shared) {
+      bootingRef.current = false;
       setPlan(shared);
       setAspect(shared.aspect);
       setEngine("manual");
@@ -511,6 +604,7 @@ export default function Studio() {
       lastEdit.current.at = now;
       return;
     }
+    saving.current = true;
     past.current.push(planRef.current);
     if (past.current.length > 100) past.current.shift();
     future.current = [];
@@ -535,29 +629,50 @@ export default function Studio() {
     setSelected((sel) => (sel !== null && sel >= next.scenes.length ? null : sel));
     setHistoryTick((n) => n + 1);
   }, []);
-  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y). Text fields keep their own undo.
+  // Shortcuts (outside text fields, which keep their own keys): Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z
+  // or Ctrl+Y redo, ←/→ previous/next slide, Delete remove, D duplicate, Esc done. Space (play) is
+  // the player's.
+  const keys = useRef({ selectScene: (_i: number) => {}, removeScene: (_i: number) => {}, duplicateScene: (_i: number) => {}, selected: null as number | null, count: 0 });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
-      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.defaultPrevented || (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable))) return;
+      if (document.querySelector(".skill-menu, .modal")) return;
       const k = e.key.toLowerCase();
-      if (k === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undoEdit();
-      } else if ((k === "z" && e.shiftKey) || k === "y") {
-        e.preventDefault();
-        redoEdit();
+      const { selected: sel, count } = keys.current;
+      if (e.metaKey || e.ctrlKey) {
+        if (k === "z" && !e.shiftKey) {
+          e.preventDefault();
+          undoEdit();
+        } else if ((k === "z" && e.shiftKey) || k === "y") {
+          e.preventDefault();
+          redoEdit();
+        }
+        return;
       }
+      if (e.altKey) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        const next = sel === null ? (e.key === "ArrowRight" ? 0 : count - 1) : Math.max(0, Math.min(count - 1, sel + (e.key === "ArrowRight" ? 1 : -1)));
+        keys.current.selectScene(next);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && sel !== null) {
+        e.preventDefault();
+        keys.current.removeScene(sel);
+      } else if (k === "d" && sel !== null) {
+        e.preventDefault();
+        keys.current.duplicateScene(sel);
+      } else if (e.key === "Escape" && sel !== null) setSelected(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [undoEdit, redoEdit]);
+  // The undo toast stays while the pointer is on it, then fades after 8 s.
+  const [toastHover, setToastHover] = useState(false);
   useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 6000);
+    if (!toast || toastHover) return;
+    const timer = window.setTimeout(() => setToast(null), 8000);
     return () => clearTimeout(timer);
-  }, [toast]);
+  }, [toast, toastHover]);
 
   const startOf = (p: VideoPlan, i: number) => p.scenes.slice(0, i).reduce((a, s) => a + s.duration, 0);
   /** Pick a slide: edit it under the player, and show its settled frame. */
@@ -596,7 +711,7 @@ export default function Studio() {
     setPlan((p) => (p.scenes.length > 1 ? { ...p, scenes: p.scenes.filter((_, j) => j !== i) } : p));
     setEngine("manual");
     setSelected((sel) => (sel === null ? null : sel === i ? null : sel > i ? sel - 1 : sel));
-    setToast({ text: `Removed slide ${i + 1} (${name})`, key: Date.now() });
+    setToast({ text: `Removed slide ${i + 1} (${name})`, key: Date.now(), undo: undoEdit });
   };
   const duplicateScene = (i: number) => {
     record();
@@ -617,101 +732,89 @@ export default function Studio() {
     selectScene(at, next);
   };
 
+  keys.current = { selectScene: (i) => selectScene(i), removeScene, duplicateScene, selected, count: plan.scenes.length };
+
   /** One slide's editor: in the storyboard grid, and under the player when picked on the timeline. */
-  const sceneCard = (s: Scene, i: number, where: "grid" | "inspector") => (
-    <div className={`scene-card${selected === i ? " selected" : ""}`} key={`${where}-${i}`} id={where === "grid" ? `scene-${i}` : undefined}>
-      {plan.style === "saas" && (
-        <input
-          className="input eyebrow-input"
-          value={s.eyebrow ?? ""}
-          placeholder="Chapter label (optional)"
-          onChange={(e) => updateScene(i, { eyebrow: e.target.value || undefined })}
-          aria-label="Chapter label"
-        />
-      )}
-      <div className="scene-top">
-        <span className="scene-n">{String(i + 1).padStart(2, "0")}</span>
-        <SkillPicker plan={plan} value={s.skill} onPick={(skill) => skill !== s.skill && updateScene(i, { skill })} />
-      </div>
-      <input
-        className={`input headline ${plan.style === "saas" ? "natural" : ""}`}
-        value={s.text}
-        maxLength={200}
-        onChange={(e) => updateScene(i, { text: e.target.value })}
-        aria-label="Headline"
-        title="Wrap a word in *asterisks* for the gradient accent"
-      />
-      {SKILL_MAP[s.skill].itemsHint !== undefined && (
-        <input
-          className="input"
-          value={(s.items ?? []).join(", ")}
-          placeholder={SKILL_MAP[s.skill].itemsHint}
-          onChange={(e) =>
-            updateScene(i, {
-              items: e.target.value
-                .split(",")
-                .map((x) => x.trimStart())
-                .filter((x, j, arr) => x || j === arr.length - 1),
-            })
-          }
-          aria-label="List items"
-        />
-      )}
-      <input
-        className="input"
-        value={s.subtext ?? ""}
-        maxLength={60}
-        placeholder="Subtext (optional)"
-        onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })}
-        aria-label="Subtext"
-      />
-      {narrating && (
-        <div className="vo-line">
-          <textarea
-            className="input"
-            rows={2}
-            value={s.vo ?? ""}
-            maxLength={240}
-            placeholder="Narration (leave empty for no voice here)"
-            onChange={(e) => updateScene(i, { vo: e.target.value || undefined })}
-            aria-label="Narration"
-          />
-          {(() => {
-            const n = s.vo ? speakable(s.vo).split(/\s+/).filter(Boolean).length : 0;
-            const max = wordBudget(Math.min(8, s.duration + 1));
-            return <span className={`vo-count ${n > max ? "over" : ""}`}>🎙 {n}/{wordBudget(s.duration)} words{n > max ? " · too long for this scene" : ""}</span>;
-          })()}
+  const sceneCard = (s: Scene, i: number, where: "grid" | "inspector") => {
+    const skill = SKILL_MAP[s.skill];
+    // Blur Reveal's list is only a fallback eyebrow; SaaS films have the chapter label for that.
+    const showItems = skill.itemsHint !== undefined && !(plan.style === "saas" && s.skill === "blur-reveal");
+    return (
+      <div className={`scene-card${selected === i ? " selected" : ""}`} key={`${where}-${i}`} id={where === "grid" ? `scene-${i}` : undefined}>
+        <div className="scene-top">
+          <span className="scene-n">{String(i + 1).padStart(2, "0")}</span>
+          <SkillPicker plan={plan} value={s.skill} onPick={(id) => id !== s.skill && updateScene(i, { skill: id })} />
         </div>
-      )}
-      <div className="scene-row">
-        <label>
-          <input
-            className="input sm"
-            type="number"
-            step={0.1}
-            min={1.6}
-            max={8}
-            value={Number(s.duration.toFixed(2))}
-            onChange={(e) => updateScene(i, { duration: Number(e.target.value) })}
-          />
-          s
+        {plan.style === "saas" && (
+          <label className="fld">
+            <span className="fld-cap">Chapter label</span>
+            <input className="input eyebrow-input" value={s.eyebrow ?? ""} placeholder="Optional, e.g. How it works" onChange={(e) => updateScene(i, { eyebrow: e.target.value || undefined })} />
+          </label>
+        )}
+        <label className="fld">
+          <span className="fld-cap">
+            Headline <em>*word* = accent colour</em>
+          </span>
+          <input className={`input headline ${plan.style === "saas" ? "natural" : ""}`} value={s.text} maxLength={200} onChange={(e) => updateScene(i, { text: e.target.value })} />
         </label>
-        <select className="select sm" value={s.transition} onChange={(e) => updateScene(i, { transition: e.target.value as Scene["transition"] })}>
-          {TRANSITIONS.map((tr) => (
-            <option key={tr} value={tr}>
-              {tr}
-            </option>
-          ))}
-        </select>
-        <div className="scene-actions">
-          <button className="icon-btn sm" onClick={() => moveScene(i, i - 1)} disabled={i === 0} aria-label="Move earlier" title="Move earlier">←</button>
-          <button className="icon-btn sm" onClick={() => moveScene(i, i + 1)} disabled={i === plan.scenes.length - 1} aria-label="Move later" title="Move later">→</button>
-          <button className="icon-btn sm" onClick={() => duplicateScene(i)} aria-label="Duplicate slide" title="Duplicate">⧉</button>
-          <button className="icon-btn sm" onClick={() => removeScene(i)} disabled={plan.scenes.length <= 1} aria-label="Remove slide" title="Remove from the film">✕</button>
+        {showItems && (
+          <label className="fld">
+            <span className="fld-cap" title={skill.itemsHint}>
+              List <em>{skill.itemsHint}</em>
+            </span>
+            <input
+              className="input"
+              value={(s.items ?? []).join(", ")}
+              placeholder={skill.itemsHint}
+              onChange={(e) =>
+                updateScene(i, {
+                  items: e.target.value
+                    .split(",")
+                    .map((x) => x.trimStart())
+                    .filter((x, j, arr) => x || j === arr.length - 1),
+                })
+              }
+            />
+          </label>
+        )}
+        <label className="fld">
+          <span className="fld-cap">Subtext</span>
+          <input className="input" value={s.subtext ?? ""} maxLength={60} placeholder="Optional" onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })} />
+        </label>
+        {narrating && (
+          <div className="vo-line">
+            <label className="fld">
+              <span className="fld-cap">Narration</span>
+              <textarea className="input" rows={2} value={s.vo ?? ""} maxLength={240} placeholder="Leave empty for no voice here" onChange={(e) => updateScene(i, { vo: e.target.value || undefined })} />
+            </label>
+            {(() => {
+              const n = s.vo ? speakable(s.vo).split(/\s+/).filter(Boolean).length : 0;
+              const max = wordBudget(Math.min(8, s.duration + 1));
+              return <span className={`vo-count ${n > max ? "over" : ""}`}>🎙 {n}/{wordBudget(s.duration)} words{n > max ? " · too long for this scene" : ""}</span>;
+            })()}
+          </div>
+        )}
+        <div className="scene-row">
+          <label title="Length in seconds">
+            <input className="input sm" type="number" step={0.1} min={1.6} max={8} value={Number(s.duration.toFixed(1))} onChange={(e) => updateScene(i, { duration: Number(e.target.value) })} aria-label="Length in seconds" />s
+          </label>
+          <select className="select sm" value={s.transition} onChange={(e) => updateScene(i, { transition: e.target.value as Scene["transition"] })} aria-label="Transition in" title="Transition into this slide">
+            {TRANSITIONS.map((tr) => (
+              <option key={tr} value={tr}>
+                {TRANSITION_NAMES[tr] ?? tr}
+              </option>
+            ))}
+          </select>
+          <div className="scene-actions">
+            <button className="icon-btn sm" onClick={() => moveScene(i, i - 1)} disabled={i === 0} aria-label="Move earlier" title="Move earlier">←</button>
+            <button className="icon-btn sm" onClick={() => moveScene(i, i + 1)} disabled={i === plan.scenes.length - 1} aria-label="Move later" title="Move later">→</button>
+            <button className="icon-btn sm" onClick={() => duplicateScene(i)} aria-label="Duplicate slide" title="Duplicate (D)">⧉</button>
+            <button className="icon-btn sm" onClick={() => removeScene(i)} disabled={plan.scenes.length <= 1} aria-label="Remove slide" title="Remove from the film (Delete)">✕</button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const share = async () => {
     const url = `${window.location.origin}/studio#plan=${encodePlan(plan)}`;
@@ -737,8 +840,8 @@ export default function Studio() {
         <span className={`engine-badge ${engine}`}>
           {engine === "ai" ? `✦ ${engineLabel || "AI director"}` : engine === "builtin" ? "Built-in director" : "Manual edit"}
         </span>
-        <button className="btn btn-ghost" onClick={() => setAiOpen(true)} title="Choose AI provider, key, model and mode">
-          ⚙ {aiLabel(ai)}
+        <button className="btn btn-ghost" onClick={() => setAiOpen(true)} title={`AI director: ${aiLabel(ai)}. Choose provider, key, model and mode.`}>
+          ⚙ AI settings
         </button>
         <button className="btn btn-ghost" onClick={share}>
           {copied ? "Link copied ✓" : "Share link"}
@@ -1131,7 +1234,14 @@ export default function Studio() {
 
           <div className="edit-bar">
             <span className="hint">
-              {selected === null ? "Click a slide to edit it · drag to reorder · × removes it" : `Editing slide ${selected + 1} of ${plan.scenes.length}`}
+              <strong>
+                {plan.scenes.length} slides · {plan.scenes.reduce((a, x) => a + x.duration, 0).toFixed(1)}s
+              </strong>{" "}
+              · {selected === null ? "Click a slide to edit it, drag to reorder" : `Editing slide ${selected + 1}`}
+              <span className="kbd-hint" title="Space play/pause · ← → previous/next slide · Delete remove · D duplicate · Esc done · Ctrl+Z undo · Ctrl+Shift+Z redo">
+                {" "}
+                · Shortcuts
+              </span>
             </span>
             <div className="edit-bar-actions">
               <button className="link-btn" onClick={undoEdit} disabled={!past.current.length} title="Undo edit (Ctrl+Z)">
@@ -1211,13 +1321,14 @@ export default function Studio() {
         </section>
       </div>
       {toast && (
-        <div className="toast" role="status" key={toast.key}>
+        <div className="toast" role="status" key={toast.key} onMouseEnter={() => setToastHover(true)} onMouseLeave={() => setToastHover(false)}>
           <span>{toast.text}</span>
           <button
             className="link-btn"
             onClick={() => {
-              undoEdit();
+              toast.undo();
               setToast(null);
+              setToastHover(false);
             }}
           >
             Undo
