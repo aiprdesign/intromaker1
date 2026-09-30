@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import SkillPicker from "@/components/SkillPicker";
+import type { PlanLimits } from "@/lib/plans";
+import { sceneThumb, thumbsReady } from "@/lib/thumbs";
 import SlideTimeline from "@/components/SlideTimeline";
 import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
@@ -57,6 +59,10 @@ export default function Studio() {
   const [plan, setPlan] = useState<VideoPlan>(HERO_PLAN);
   const planRef = useRef(plan);
   planRef.current = plan;
+  /** The saved film this one is, in the visitor's account (so Save updates it rather than copying). */
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const savedIdRef = useRef(savedId);
+  savedIdRef.current = savedId;
   /** Edit history for the film on screen (slides, text, look): undo / redo, Ctrl+Z / Ctrl+Shift+Z. */
   const past = useRef<VideoPlan[]>([]);
   const future = useRef<VideoPlan[]>([]);
@@ -66,7 +72,7 @@ export default function Studio() {
   const [selected, setSelected] = useState<number | null>(null);
   const [activeScene, setActiveScene] = useState(0);
   const [seek, setSeek] = useState<{ t: number; key: number } | undefined>(undefined);
-  const [toast, setToast] = useState<{ text: string; key: number; undo: () => void } | null>(null);
+  const [toast, setToast] = useState<{ text: string; key: number; undo?: () => void; link?: { label: string; href: string } } | null>(null);
   const [engine, setEngine] = useState<Engine>("manual");
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   /** Whether the server can reach this computer's local AI (else local models run from the browser). */
@@ -376,6 +382,7 @@ export default function Studio() {
     try {
       const take = await direct(opts);
       show(take, 0);
+      setSavedId(null);
       promptRef.current = (opts.prompt ?? prompt).trim();
       setTakes([{ ...take, label: "Original" }]);
       if (before.plan !== HERO_PLAN && booted.current && !bootingRef.current)
@@ -499,7 +506,7 @@ export default function Studio() {
   useEffect(() => {
     if (!saving.current || plan === HERO_PLAN) return;
     const timer = window.setTimeout(() => {
-      const film = { v: 1, plan, prompt, current, takes: takes.map(({ plan: tp, engine: te, engineLabel: tl, label }) => ({ plan: tp, engine: te, engineLabel: tl, label })) };
+      const film = { v: 1, plan, prompt, current, savedId: savedIdRef.current, takes: takes.map(({ plan: tp, engine: te, engineLabel: tl, label }) => ({ plan: tp, engine: te, engineLabel: tl, label })) };
       try {
         localStorage.setItem(FILM_KEY, JSON.stringify(film));
       } catch {
@@ -511,7 +518,7 @@ export default function Studio() {
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [plan, prompt, takes, current]);
+  }, [plan, prompt, takes, current, savedId]);
   // The address shows the studio, not the prompt it booted from (a reload restores the saved film).
   const bootingRef = useRef(true);
   const cleanUrl = () => {
@@ -528,6 +535,27 @@ export default function Studio() {
     if (booted.current) return;
     booted.current = true;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const filmId = params.get("film");
+    if (filmId) {
+      bootingRef.current = false;
+      saving.current = true;
+      cleanUrl();
+      fetch(`/api/account/films/${encodeURIComponent(filmId)}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((f: { id: string; plan: VideoPlan }) => {
+          const p = sanitizePlan(f.plan);
+          setPlan(p);
+          setAspect(p.aspect);
+          if (p.template) setTemplate(p.template);
+          setTakes([]);
+          setCurrent(0);
+          setSavedId(f.id);
+          setEngine("manual");
+          setVersion((v) => v + 1);
+        })
+        .catch((status) => setNote(status === 401 ? "Sign in to open your saved intros." : "That saved intro wasn't found."));
+      return;
+    }
     const hasBootParams = hash.startsWith("#plan=") || ["skill", "url", "prompt"].some((k) => params.get(k));
     if (!hasBootParams) {
       bootingRef.current = false;
@@ -541,6 +569,7 @@ export default function Studio() {
           if (restored.template) setTemplate(restored.template);
           setPrompt(saved.prompt ?? "");
           promptRef.current = saved.prompt ?? "";
+          if (typeof saved.savedId === "string") setSavedId(saved.savedId);
           const savedTakes = Array.isArray(saved.takes) ? (saved.takes as Take[]).map((t) => ({ ...t, plan: sanitizePlan(t.plan) })) : [];
           setTakes(savedTakes);
           setCurrent(Math.min(Math.max(0, saved.current ?? 0), Math.max(0, savedTakes.length - 1)));
@@ -816,6 +845,63 @@ export default function Studio() {
     );
   };
 
+  // ── Account: who's signed in, their plan's limits, and saving films to it.
+  type Account = { user: { email: string; plan: "free" | "pro" } | null; limits: PlanLimits };
+  const [account, setAccount] = useState<Account | null>(null);
+  useEffect(() => {
+    fetch("/api/account")
+      .then((r) => r.json())
+      .then((a) => setAccount({ user: a.user, limits: a.limits }))
+      .catch(() => setAccount(null));
+  }, []);
+  const [saveState, setSavingState] = useState<"" | "saving" | "saved">("");
+  const saveFilm = async () => {
+    if (!account?.user) {
+      setToast({ text: "Create a free account to keep your intros.", key: Date.now(), link: { label: "Sign in or sign up", href: "/account?next=/studio" } });
+      return;
+    }
+    setSavingState("saving");
+    const p = planRef.current;
+    let thumb: string | undefined;
+    try {
+      await thumbsReady();
+      thumb = sceneThumb(p.scenes[Math.floor(p.scenes.length / 2)] ?? p.scenes[0], p);
+    } catch {
+      /* saved without a thumbnail */
+    }
+    try {
+      const res = await fetch("/api/account/films", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: savedIdRef.current ?? undefined, plan: p, thumb }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSavingState("");
+        setToast({ text: data.error ?? "Couldn't save.", key: Date.now(), link: res.status === 402 ? { label: "My intros", href: "/account" } : undefined });
+        return;
+      }
+      setSavedId(data.id);
+      setSavingState("saved");
+      setTimeout(() => setSavingState(""), 2000);
+    } catch {
+      setSavingState("");
+      setToast({ text: "Couldn't reach the server to save.", key: Date.now() });
+    }
+  };
+  const saveRef = useRef(saveFilm);
+  saveRef.current = saveFilm;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void saveRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const share = async () => {
     const url = `${window.location.origin}/studio#plan=${encodePlan(plan)}`;
     try {
@@ -846,6 +932,19 @@ export default function Studio() {
         <button className="btn btn-ghost" onClick={share}>
           {copied ? "Link copied ✓" : "Share link"}
         </button>
+        <button className="btn btn-primary" onClick={saveFilm} disabled={saveState === "saving"} title={account?.user ? "Save to your intros (Ctrl+S)" : "Sign in to save your intros"}>
+          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : savedId ? "Save" : "Save intro"}
+        </button>
+        <a className="btn btn-ghost account-btn" href={account?.user ? "/account" : "/account?next=/studio"} title={account?.user ? `${account.user.email} · My intros` : "Sign in to save intros"}>
+          {account?.user ? (
+            <>
+              <span className="avatar">{account.user.email[0]?.toUpperCase()}</span>
+              <span className={`plan-badge ${account.user.plan}`}>{account.user.plan === "pro" ? "Pro" : "Free"}</span>
+            </>
+          ) : (
+            "Sign in"
+          )}
+        </a>
       </header>
 
       {aiOpen && <AiSettings value={ai} onChange={setAi} onClose={() => setAiOpen(false)} serverClaude={!!aiAvailable} localViaServer={localViaServer} />}
@@ -1234,6 +1333,7 @@ export default function Studio() {
               resetKey={version}
               seek={seek}
               onScene={setActiveScene}
+              limits={account?.limits}
               onExported={(p, preset) => {
                 // Tell the owner's admin area what was made (ignored when it's off).
                 void fetch("/api/films", {
@@ -1336,16 +1436,23 @@ export default function Studio() {
       {toast && (
         <div className="toast" role="status" key={toast.key} onMouseEnter={() => setToastHover(true)} onMouseLeave={() => setToastHover(false)}>
           <span>{toast.text}</span>
-          <button
-            className="link-btn"
-            onClick={() => {
-              toast.undo();
-              setToast(null);
-              setToastHover(false);
-            }}
-          >
-            Undo
-          </button>
+          {toast.undo && (
+            <button
+              className="link-btn"
+              onClick={() => {
+                toast.undo?.();
+                setToast(null);
+                setToastHover(false);
+              }}
+            >
+              Undo
+            </button>
+          )}
+          {toast.link && (
+            <a className="link-btn" href={toast.link.href}>
+              {toast.link.label}
+            </a>
+          )}
         </div>
       )}
     </div>

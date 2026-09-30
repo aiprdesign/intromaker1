@@ -208,6 +208,19 @@ Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instan
 - **AI settings**: choose the AI the server's director uses for visitors who bring no key (any provider in the registry: Anthropic, OpenAI, Gemini, OpenRouter, Groq…), its model, quality mode and whether it sees website screenshots; test the connection; set the daily and per-visitor AI budgets. It overrides `ANTHROPIC_API_KEY`. The key is stored on the data volume (`/data/admin/settings.json`, mode 600) and only ever shown back masked.
 - **Security**: a signed, HttpOnly, SameSite=Strict session cookie (12 hours; changing the password signs everyone out), same-origin checks on every write, and sign-in attempts limited to 6 per 15 minutes. Visitors appear only as a salted hash of their address. The privacy page says whether the log is on.
 
+**Accounts and plans** (always on; accounts are optional for visitors):
+- **Accounts**: email + password (scrypt hashes, 30-day signed HttpOnly session cookies; a password change, an owner reset or "sign out everywhere" ends every session). The account page (`/account`) lists saved intros with thumbnails: open, rename, delete. It also shows the plan, this month's usage, a password change and account deletion. In the studio, **Save intro** (Ctrl+S) saves to the account, and later saves update the same intro; `/studio?film=<id>` opens one.
+- **Free and Pro**, with limits the owner sets in **Admin → Plans** (defaults below). Saved intros, the AI allowance and website imports are enforced by the server; the watermark and export size are applied in the browser, where videos render.
+
+  | | Free | Pro |
+  |---|---|---|
+  | Saved intros | 3 | 200 |
+  | AI director on the site's AI | none (built-in director, or the visitor's own key) | 100 films a month |
+  | Website imports | 3 a day | 50 a day |
+  | Export | up to 1080p, 30 fps, small watermark | up to 4K, 60 fps, no watermark |
+
+- **No payment provider yet**: visitors press *Request Pro* on their account page; the owner sees requests in **Admin → Users** and switches the plan. Users also has password resets (a one-time password to hand over, which must be changed on sign-in), disable and delete. The Pro price text and a contact email are set in **Admin → Plans** and shown on the pricing page. A provider such as Stripe can later set the same `plan` field from its webhook.
+
 **What protects a public deploy**:
 - **Rate limits** per visitor on import (8 per 10 min), the image proxy, generation, voice and key checks. Over the limit you get a `429` with `Retry-After`. Generation that the server's own AI key pays for also has a per-visitor and a shared daily budget, and degrades to the built-in director rather than failing.
 - **Capture queue**: live captures run a bounded number of browser sessions, with a wait list and a hard timeout.
@@ -250,6 +263,9 @@ src/lib/localai.ts              browser-side local AI (scan, test, director) for
 src/lib/thumbs.ts               slide and slide-style thumbnails for the studio (cached stills)
 src/app/audit/                  layout audit of every skill against the design system
 src/lib/admin.ts                admin area: password sessions, film log, server AI settings
+src/lib/accounts.ts             visitor accounts: scrypt passwords, sessions, saved films, plan usage
+src/lib/plans.ts                Free / Pro limits (shared by server and studio)
+src/app/account/                sign in / sign up, my intros, plan, security
 src/app/admin/                  admin dashboard (films, AI settings)
 src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/capture.ts              live browser capture: hero/full/section screenshots + the page's UI components cut out one by one

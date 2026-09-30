@@ -10,6 +10,7 @@ import { PALETTES } from "@/engine/palettes";
 import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
 import { SKILL_MAP } from "@/engine/skills";
 import type { VideoPlan } from "@/engine/types";
+import { WATERMARK, type PlanLimits } from "@/lib/plans";
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
 
@@ -20,6 +21,7 @@ export default function Player({
   seek: seekTo,
   onScene,
   onExported,
+  limits,
 }: {
   plan: VideoPlan;
   autoPlay?: boolean;
@@ -31,6 +33,8 @@ export default function Player({
   onScene?: (index: number) => void;
   /** Called after a video export finishes, with the film as exported and the preset's name. */
   onExported?: (plan: VideoPlan, preset: string) => void;
+  /** The viewer's plan: largest export, frame rate and watermark. */
+  limits?: PlanLimits;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playing, setPlaying] = useState(autoPlay);
@@ -48,7 +52,8 @@ export default function Player({
       /* ignore */
     }
   }, []);
-  const preset = EXPORT_PRESETS.find((p) => p.id === presetId) ?? EXPORT_PRESETS[0];
+  const chosen = EXPORT_PRESETS.find((p) => p.id === presetId) ?? EXPORT_PRESETS[0];
+  const preset = limits && chosen.long > limits.maxLong ? EXPORT_PRESETS[0] : chosen;
   const choosePreset = (id: string) => {
     setPresetId(id);
     try {
@@ -241,7 +246,8 @@ export default function Player({
       const out = planForPreset(plan, preset);
       const { blob, ext } = await exportVideo(out, {
         long: preset.long,
-        fps: preset.fps,
+        fps: Math.min(preset.fps, limits?.maxFps ?? preset.fps),
+        watermark: limits?.watermark ? WATERMARK : undefined,
         audio: !muted,
         onProgress: setExporting,
         signal: ac.signal,
@@ -334,19 +340,23 @@ export default function Player({
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="M9.5 3.5v17M14.5 3.5v17M3.5 9.5h17M3.5 14.5h17" /></svg>
         </button>
-        <select value={presetId} onChange={(e) => choosePreset(e.target.value)} className="select sm" disabled={exporting !== null} title="Export preset: the film re-frames itself for each platform">
-          {EXPORT_PRESETS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
+        <select value={preset.id} onChange={(e) => choosePreset(e.target.value)} className="select sm" disabled={exporting !== null} title="Export preset: the film re-frames itself for each platform">
+          {EXPORT_PRESETS.map((p) => {
+            const locked = !!limits && p.long > limits.maxLong;
+            return (
+              <option key={p.id} value={p.id} disabled={locked}>
+                {p.name}
+                {locked ? " · Pro" : limits && p.fps > limits.maxFps ? ` · ${limits.maxFps} fps` : ""}
+              </option>
+            );
+          })}
         </select>
         <button
           className="btn btn-ghost"
           onClick={async () => {
             try {
               const out = planForPreset(plan, preset);
-              download(await exportThumbnail(out, preset.long), `${fileBase(out)}-thumbnail.png`);
+              download(await exportThumbnail(out, Math.min(preset.long, limits?.maxLong ?? preset.long), limits?.watermark ? WATERMARK : undefined), `${fileBase(out)}-thumbnail.png`);
             } catch (e) {
               setError((e as Error).message);
             }

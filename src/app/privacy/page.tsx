@@ -20,7 +20,7 @@ export default function Privacy() {
       <article className="legal">
         <h1>Privacy</h1>
         <p className="lead">
-          IntroMaker is a portfolio project. There are no accounts, no tracking cookies and no analytics. Here is exactly what happens to what you give it.
+          IntroMaker is a portfolio project. Accounts are optional, and there are no tracking cookies and no analytics. Here is exactly what happens to what you give it.
         </p>
 
         <h2>Your videos</h2>
@@ -37,6 +37,14 @@ export default function Privacy() {
         ) : (
           <p>This site doesn&apos;t keep a log of the films made on it: storyboards and edits stay in your browser.</p>
         )}
+
+        <h2>Accounts</h2>
+        <p>
+          An account is optional. If you create one, the server keeps your email address, your password as a salted scrypt hash (never the password itself),
+          your plan, how many AI films and website imports you&apos;ve used this month and today, and the intros you save (their storyboards and a small
+          thumbnail). Signing in sets one cookie, which keeps you signed in for 30 days; there are no tracking cookies. You can delete your account and every
+          saved intro at any time from your account page.
+        </p>
 
         <h2>Websites you import</h2>
         <p>
@@ -65,6 +73,7 @@ export default function Privacy() {
           <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits. It is never written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>
           {logging && <li>The film log described above, up to the most recent few thousand films, until the owner deletes it.</li>}
+          <li>If you have an account: your email, password hash, plan, usage counts and saved intros, until you delete the account.</li>
         </ul>
 
         <h2>Claims in generated copy</h2>

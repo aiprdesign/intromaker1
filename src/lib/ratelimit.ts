@@ -39,6 +39,14 @@ export const RULES = {
   adminLogin: { limit: 6, windowMs: 15 * MIN },
   /** Film events the studio reports (exports). */
   filmEvent: { limit: 60, windowMs: 10 * MIN },
+  /** Account sign-in attempts. */
+  accountLogin: { limit: 10, windowMs: 15 * MIN },
+  /** New accounts from one address. */
+  signup: { limit: 5, windowMs: 60 * MIN },
+  /** Saving films / account changes. */
+  account: { limit: 120, windowMs: 10 * MIN },
+  /** Website imports per day without an account (the Free plan's number is passed in). */
+  importDay: { limit: 3, windowMs: 24 * 60 * MIN },
 } satisfies Record<string, Rule>;
 export type RuleName = keyof typeof RULES;
 

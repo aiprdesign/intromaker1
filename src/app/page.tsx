@@ -1,6 +1,7 @@
 import Link from "next/link";
 import HeroPrompt from "@/components/HeroPrompt";
 import LoopCanvas from "@/components/LoopCanvas";
+import PricingCards from "@/components/PricingCards";
 import Nav, { Logo } from "@/components/Nav";
 import SkillGrid from "@/components/SkillGrid";
 import { HOME_BACKDROP } from "@/engine/demos";
@@ -23,30 +24,6 @@ const STEPS = [
   },
 ];
 
-const PLANS = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    features: ["All 57 motion skills", "Built-in director", "720p & 1080p export", "Generated soundtrack"],
-    cta: "Start creating",
-  },
-  {
-    name: "Pro",
-    price: "$19",
-    period: "/ month",
-    featured: true,
-    features: ["Everything in Free", "Claude AI Director", "Unlimited remixes", "Vertical & square formats", "Priority new skills"],
-    cta: "Go Pro",
-  },
-  {
-    name: "Studio",
-    price: "$49",
-    period: "/ month",
-    features: ["Everything in Pro", "Brand kits & custom palettes", "Team workspaces", "Commercial license"],
-    cta: "Contact sales",
-  },
-];
 
 export default function Home() {
   return (
@@ -107,26 +84,7 @@ export default function Home() {
           <span className="eyebrow">Pricing</span>
           <h2>Start free. Go epic.</h2>
         </div>
-        <div className="pricing">
-          {PLANS.map((p) => (
-            <div className={`price-card ${p.featured ? "featured" : ""}`} key={p.name}>
-              {p.featured && <span className="badge">Most popular</span>}
-              <h3>{p.name}</h3>
-              <div className="price">
-                {p.price}
-                <small>{p.period}</small>
-              </div>
-              <ul>
-                {p.features.map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-              <Link href="/studio" className={`btn ${p.featured ? "btn-primary" : "btn-ghost"}`}>
-                {p.cta}
-              </Link>
-            </div>
-          ))}
-        </div>
+        <PricingCards />
       </section>
 
       <section className="section cta-band">

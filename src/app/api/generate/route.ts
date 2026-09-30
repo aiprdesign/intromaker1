@@ -8,6 +8,7 @@ import { lintStoryboard, repairStoryboard, reviewBrief } from "@/lib/review";
 import { PALETTES } from "@/engine/palettes";
 import { rateLimit, spendServerAi } from "@/lib/ratelimit";
 import { readSettings, recordFilm, serverAi } from "@/lib/admin";
+import { currentUser, limitsFor, spendAi, usageOf } from "@/lib/accounts";
 import {
   beatSync,
   brandFromSite,
@@ -386,11 +387,21 @@ export async function POST(req: Request) {
   if (!ai || (!c.prompt.trim() && !c.site)) {
     return film({ plan: c.builtin(), engine: "builtin" });
   }
-  // The server's own key is a shared budget: per visitor and per day. Visitors' own keys aren't counted.
+  // The site's own AI is a plan feature (Pro by default) with a monthly allowance per account,
+  // inside a shared daily budget. Visitors' own keys aren't counted or limited.
   if (!userAi) {
+    const who = await currentUser(req);
+    const limits = await limitsFor(who);
+    if (limits.aiPerMonth <= 0) {
+      return film({ plan: c.builtin(), engine: "builtin", note: "The AI director is part of Pro; this film was made by the built-in director. Upgrade, or add your own AI key in AI settings." });
+    }
+    if (who && usageOf(who).ai >= limits.aiPerMonth) {
+      return film({ plan: c.builtin(), engine: "builtin", note: `You've used this month's ${limits.aiPerMonth} AI films; used the built-in director.` });
+    }
     const settings = await readSettings();
-    const spend = spendServerAi(req, { daily: settings.dailyBudget, perVisitor: settings.perVisitor });
+    const spend = spendServerAi(req, { daily: settings.dailyBudget, perVisitor: who ? Number.MAX_SAFE_INTEGER : settings.perVisitor });
     if (!spend.ok) return film({ plan: c.builtin(), engine: "builtin", note: `${spend.reason}; used the built-in director. Add your own AI key for more.` });
+    if (who && !(await spendAi(who))) return film({ plan: c.builtin(), engine: "builtin", note: "You've used this month's AI films; used the built-in director." });
   }
 
   try {

@@ -1044,13 +1044,25 @@ function post(
     ctx.restore();
   }
   if (opts.watermark) {
+    // A small frosted tag in the bottom-right corner of the title-safe area.
+    const g = tokens(w, h);
     ctx.save();
-    ctx.globalAlpha = 0.55;
+    ctx.font = `600 ${Math.round(17 * u)}px Inter, sans-serif`;
+    const tw = ctx.measureText(opts.watermark).width;
+    const padX = g.space(1.5);
+    const bh = Math.round(34 * u);
+    const bx = Math.round(g.safe.right - tw - padX * 2);
+    const by = Math.round(h - g.safe.bottom - bh);
+    ctx.globalAlpha = 0.72;
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.beginPath();
+    ctx.roundRect(bx, by, tw + padX * 2, bh, bh / 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.9;
     ctx.fillStyle = "#fff";
-    ctx.font = `600 ${Math.round(20 * u)}px Inter, sans-serif`;
-    ctx.textAlign = "right";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(opts.watermark, w - 24 * u, h - 20 * u);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(opts.watermark, bx + padX, by + bh / 2 + u);
     ctx.restore();
   }
 }

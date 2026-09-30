@@ -28,6 +28,7 @@ export default function Nav({ cta = true }: { cta?: boolean }) {
         <Link href="/skills">Skills</Link>
         <Link href="/#how">How it works</Link>
         <Link href="/#pricing">Pricing</Link>
+        <Link href="/account">My intros</Link>
       </nav>
       {cta && (
         <Link href="/studio" className="btn btn-primary">

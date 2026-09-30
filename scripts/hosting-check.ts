@@ -6,7 +6,7 @@
  * rate limits (windows, 429s, spoofed X-Forwarded-For, the shared AI budget), capture storage
  * clean-up (age and size caps), the SSRF guard (localhost, private ranges, cloud metadata,
  * credentials, odd schemes), the local-AI restriction and the admin area (sign-in, sessions, the
- * film log, the server AI key). Exits non-zero on any failure.
+ * film log, the server AI key) and accounts (passwords, sessions, saved intros, plan limits). Exits non-zero on any failure.
  */
 import { mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -129,6 +129,67 @@ async function main() {
   check(tries.slice(0, -1).every((c) => c === 401) && tries.at(-1) === 429, `password guessing is limited (${rl.RULES.adminLogin.limit} tries, then 429)`);
   env.ADMIN_PASSWORD = "a new password";
   check(!admin.validSession(token), "changing ADMIN_PASSWORD signs everyone out");
+
+  console.log("Accounts and plans");
+  rl.resetLimits();
+  const acc = await import("../src/lib/accounts");
+  const accountRoute = await import("../src/app/api/account/route");
+  const accSession = await import("../src/app/api/account/session/route");
+  const accFilms = await import("../src/app/api/account/films/route");
+  const accFilm = await import("../src/app/api/account/films/[id]/route");
+  const accPassword = await import("../src/app/api/account/password/route");
+  const adminUsers = await import("../src/app/api/admin/users/[id]/route");
+  const scrapeRoute = await import("../src/app/api/scrape/route");
+  const ureq = (path: string, init: RequestInit & { cookie?: string; origin?: string | null; ip?: string } = {}) => {
+    const headers: Record<string, string> = { "x-forwarded-for": init.ip ?? "203.0.113.60", host: "demo.example", "content-type": "application/json" };
+    if (init.cookie) headers.cookie = init.cookie;
+    if (init.origin !== null && (init.method ?? "GET") !== "GET") headers.origin = init.origin ?? A;
+    return new Request(A + path, { ...init, headers });
+  };
+  const signup = await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "Ana@Example.com ", password: "pass-word-1" }) }));
+  const ucookie = (signup.headers.get("set-cookie") ?? "").split(";")[0];
+  check(signup.status === 200 && /HttpOnly/.test(signup.headers.get("set-cookie") ?? "") && ucookie.startsWith("im_user="), "sign-up creates the account and signs in (HttpOnly cookie)");
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "another-pass" }) }))).status === 409, "one account per email (case-insensitive)");
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "bo@example.com", password: "short" }) }))).status === 400, "short passwords are refused");
+  const stored = await read(join(dataDir, "accounts", "users", (await acc.currentUser(ureq("/", { cookie: ucookie })))!.id + ".json"), "utf8");
+  check(!stored.includes("pass-word-1") && stored.includes("scrypt$"), "the password is stored only as an scrypt hash");
+  check((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "nope-nope" }) }))).status === 401, "a wrong password is refused");
+  check((await accSession.POST(ureq("/api/account/session", { method: "POST", origin: "https://evil.example", body: JSON.stringify({ email: "ana@example.com", password: "pass-word-1" }) }))).status === 403, "sign-in from another site is refused");
+  const save = (cookie: string, body: object) => accFilms.POST(ureq("/api/account/films", { method: "POST", cookie, body: JSON.stringify({ plan, ...body }) }));
+  const saved = await Promise.all([1, 2, 3].map(() => save(ucookie, {})));
+  check(saved.every((r) => r.status === 200), "Free keeps 3 saved intros");
+  const fourth = await save(ucookie, {});
+  check(fourth.status === 402, "a 4th saved intro on Free is refused with an upgrade message");
+  const firstId = (await saved[0].json()).id;
+  check((await save(ucookie, { id: firstId, title: "Renamed by save" })).status === 200, "updating a saved intro doesn't count against the limit");
+  const other = await accountRoute.POST(ureq("/api/account", { method: "POST", ip: "203.0.113.61", body: JSON.stringify({ email: "bo@example.com", password: "bo-password" }) }));
+  const ocookie = (other.headers.get("set-cookie") ?? "").split(";")[0];
+  check((await accFilm.GET(ureq(`/api/account/films/${firstId}`, { cookie: ocookie }), { params: Promise.resolve({ id: firstId }) })).status === 404, "another account can't open someone's intro");
+  check((await accFilms.GET(ureq("/api/account/films"))).status === 401, "saved intros need a signed-in account");
+
+  // Plans: Free has no AI allowance and 3 imports a day; the owner grants Pro.
+  const anaId = (await acc.currentUser(ureq("/", { cookie: ucookie })))!.id;
+  check((await acc.limitsFor(await acc.getUser(anaId))).aiPerMonth === 0, "Free has no AI allowance by default");
+  const imports: number[] = [];
+  for (let i = 0; i < 4; i++) imports.push((await scrapeRoute.POST(ureq("/api/scrape", { method: "POST", ip: "198.51.100.77", body: JSON.stringify({ url: "http://127.0.0.1/" }) }))).status);
+  check(imports.slice(0, 3).every((c) => c !== 429) && imports[3] === 429, `a visitor without an account gets 3 imports a day (${imports.join(",")})`);
+  const promote = await adminUsers.PATCH(areq(`/api/admin/users/${anaId}`, { method: "PATCH", cookie: (await login(env.ADMIN_PASSWORD!)).headers.get("set-cookie")!.split(";")[0], body: JSON.stringify({ plan: "pro" }) }), { params: Promise.resolve({ id: anaId }) });
+  check(promote.status === 200 && (await acc.getUser(anaId))!.plan === "pro", "the owner switches an account to Pro");
+  check((await save(ucookie, {})).status === 200, "Pro keeps more saved intros");
+  const proUser = (await acc.getUser(anaId))!;
+  check((await acc.limitsFor(proUser)).aiPerMonth === 100 && (await acc.spendAi(proUser)) && acc.usageOf((await acc.getUser(anaId))!).ai === 1, "Pro's AI allowance is counted per month");
+
+  // Sessions end on a password change, and tampering is rejected.
+  const tamperedU = ucookie.slice(0, -2) + (ucookie.endsWith("A") ? "B" : "A") + ucookie.slice(-1);
+  check(!(await acc.currentUser(ureq("/", { cookie: tamperedU }))), "a tampered account session is rejected");
+  const changed = await accPassword.POST(ureq("/api/account/password", { method: "POST", cookie: ucookie, body: JSON.stringify({ current: "pass-word-1", next: "new-pass-word" }) }));
+  check(changed.status === 200 && !(await acc.currentUser(ureq("/", { cookie: ucookie }))), "changing the password signs out the old sessions");
+  const temp = await acc.resetPassword(anaId);
+  check(!!temp && (await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: temp }) }))).status === 200 && (await acc.getUser(anaId))!.mustChangePassword === true, "an owner reset gives a one-time password that must be changed");
+  rl.resetLimits();
+  const guesses: number[] = [];
+  for (let i = 0; i < rl.RULES.accountLogin.limit + 1; i++) guesses.push((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "guess" + i }) }))).status);
+  check(guesses.at(-1) === 429, `account password guessing is limited (${rl.RULES.accountLogin.limit} tries, then 429)`);
 
   await rm(dataDir, { recursive: true, force: true });
 

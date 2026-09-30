@@ -1,0 +1,333 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { describeLimits, PLAN_NAMES, type PlanId, type PlanLimits } from "@/lib/plans";
+
+type User = { id: string; email: string; plan: PlanId; createdAt: number; upgradeRequestedAt?: number; mustChangePassword: boolean };
+type Me = { user: User | null; limits: PlanLimits; usage: { ai: number; imports: number }; plans: Record<PlanId, PlanLimits>; proPrice: string | null; contactEmail: string | null };
+type Film = { id: string; title: string; thumb?: string; aspect: string; scenes: number; seconds: number; updatedAt: number };
+
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
+  if (res.status === 204) return {} as T;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error((data as { error?: string }).error ?? `HTTP ${res.status}`), { status: res.status });
+  return data as T;
+}
+
+/** Only same-site paths are followed after signing in. */
+const safeNext = (n: string | null) => (n && n.startsWith("/") && !n.startsWith("//") ? n : null);
+
+export default function AccountApp() {
+  const [me, setMe] = useState<Me | null>(null);
+  const load = useCallback(() => api<Me>("/api/account").then(setMe), []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  if (!me) return <main className="account"><p className="hint">Loading…</p></main>;
+  return me.user ? <Dashboard me={me as Me & { user: User }} reload={load} /> : <SignIn me={me} onIn={load} />;
+}
+
+function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
+  const [mode, setMode] = useState<"in" | "up">("up");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("mode") === "in") setMode("in");
+  }, []);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api(mode === "up" ? "/api/account" : "/api/account/session", { method: "POST", body: JSON.stringify({ email, password }) });
+      const next = safeNext(new URLSearchParams(location.search).get("next"));
+      if (next) location.href = next;
+      else onIn();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="account">
+      <div className="account-split">
+        <form className="account-card auth" onSubmit={submit}>
+          <div className="seg-control">
+            <button type="button" className={mode === "up" ? "active" : ""} onClick={() => setMode("up")}>
+              Create account
+            </button>
+            <button type="button" className={mode === "in" ? "active" : ""} onClick={() => setMode("in")}>
+              Sign in
+            </button>
+          </div>
+          <h1>{mode === "up" ? "Save your intros" : "Welcome back"}</h1>
+          <label className="fld">
+            <span className="fld-cap">Email</span>
+            <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label className="fld">
+            <span className="fld-cap">
+              Password {mode === "up" && <em>at least 8 characters</em>}
+            </span>
+            <span className="pw-row">
+              <input
+                className="input"
+                type={show ? "text" : "password"}
+                autoComplete={mode === "up" ? "new-password" : "current-password"}
+                required
+                minLength={mode === "up" ? 8 : undefined}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button type="button" className="link-btn" onClick={() => setShow((v) => !v)}>
+                {show ? "Hide" : "Show"}
+              </button>
+            </span>
+          </label>
+          {error && <p className="error">{error}</p>}
+          <button className="btn btn-primary" disabled={busy}>
+            {busy ? "One moment…" : mode === "up" ? "Create free account" : "Sign in"}
+          </button>
+          {mode === "in" && (
+            <p className="hint">
+              Forgot your password? {me.contactEmail ? <a href={`mailto:${me.contactEmail}?subject=Password%20reset`}>Ask the site owner</a> : "Ask the site owner"} to reset it.
+            </p>
+          )}
+        </form>
+        <PlanCards me={me} />
+      </div>
+    </main>
+  );
+}
+
+function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: PlanId; onRequest?: () => void; requested?: boolean }) {
+  return (
+    <div className="plan-cards">
+      {(["free", "pro"] as PlanId[]).map((id) => (
+        <div key={id} className={`account-card plan-card ${id}${current === id ? " current" : ""}`}>
+          <header>
+            <h2>{PLAN_NAMES[id]}</h2>
+            <span className="price">{id === "free" ? "$0" : me.proPrice || "Ask us"}</span>
+          </header>
+          <ul>
+            {describeLimits(me.plans[id]).map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+          {current === id && <span className="plan-badge current">Your plan</span>}
+          {id === "pro" && current === "free" && onRequest && (
+            <button className="btn btn-primary" onClick={onRequest} disabled={requested}>
+              {requested ? "Requested ✓" : "Request Pro"}
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Promise<void> }) {
+  const [films, setFilms] = useState<Film[] | null>(null);
+  const [limit, setLimit] = useState(me.limits.savedFilms);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const loadFilms = useCallback(async () => {
+    const r = await api<{ films: Film[]; limit: number }>("/api/account/films");
+    setFilms(r.films);
+    setLimit(r.limit);
+  }, []);
+  useEffect(() => {
+    void loadFilms();
+  }, [loadFilms]);
+  const u = me.user;
+
+  const rename = async (id: string, title: string) => {
+    setEditing(null);
+    if (!title.trim()) return;
+    await api(`/api/account/films/${id}`, { method: "PATCH", body: JSON.stringify({ title }) });
+    void loadFilms();
+  };
+  const remove = async (f: Film) => {
+    if (!confirm(`Delete “${f.title}”? This can't be undone.`)) return;
+    await api(`/api/account/films/${f.id}`, { method: "DELETE" });
+    void loadFilms();
+  };
+  const requestPro = async () => {
+    await api("/api/account/upgrade", { method: "POST" });
+    await reload();
+    setMsg({ ok: true, text: `Thanks! The site owner will switch your account to Pro${me.contactEmail ? ` (questions: ${me.contactEmail})` : ""}.` });
+  };
+  const signOut = async (everywhere = false) => {
+    await api(`/api/account/session${everywhere ? "?everywhere=1" : ""}`, { method: "DELETE" });
+    location.href = "/account?mode=in";
+  };
+
+  return (
+    <main className="account">
+      <header className="account-head">
+        <div>
+          <h1>My intros</h1>
+          <p className="hint">
+            {u.email} · <span className={`plan-badge ${u.plan}`}>{PLAN_NAMES[u.plan]}</span>
+          </p>
+        </div>
+        <div className="account-head-actions">
+          <a className="btn btn-primary" href="/studio">
+            + New intro
+          </a>
+          <button className="btn btn-ghost" onClick={() => signOut()}>
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      {u.mustChangePassword && (
+        <div className="account-card warn-card">
+          <strong>Choose a new password.</strong> The site owner reset your password; pick your own below.
+        </div>
+      )}
+      {msg && <p className={msg.ok ? "ok-msg" : "error"}>{msg.text}</p>}
+
+      <section>
+        <p className="hint">
+          {films ? `${films.length} of ${limit >= 100_000 ? "unlimited" : limit} saved` : "Loading…"}
+          {films && films.length >= limit && u.plan === "free" ? " · Your Free plan is full: delete one or request Pro to keep more." : ""}
+        </p>
+        {films && !films.length && (
+          <div className="account-card empty">
+            <p>No saved intros yet. Make one in the studio and press Save intro (Ctrl+S).</p>
+            <a className="btn btn-primary" href="/studio">
+              Open the studio
+            </a>
+          </div>
+        )}
+        <div className="saved-grid">
+          {films?.map((f) => (
+            <div key={f.id} className="saved-card">
+              <a className={`film-thumb${f.aspect === "9:16" ? " tall" : ""}`} href={`/studio?film=${f.id}`} title="Open in the studio">
+                {f.thumb ? <img src={f.thumb} alt="" /> : null}
+              </a>
+              <div className="film-meta">
+                {editing === f.id ? (
+                  <input
+                    className="input sm"
+                    autoFocus
+                    defaultValue={f.title}
+                    maxLength={120}
+                    onBlur={(e) => rename(f.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      if (e.key === "Escape") setEditing(null);
+                    }}
+                  />
+                ) : (
+                  <strong title="Rename" onClick={() => setEditing(f.id)} className="renamable">
+                    {f.title}
+                  </strong>
+                )}
+                <span className="film-when">
+                  {f.aspect} · {f.seconds}s · {f.scenes} slides · saved {new Date(f.updatedAt).toLocaleDateString()}
+                </span>
+                <span className="saved-actions">
+                  <a className="btn btn-ghost sm" href={`/studio?film=${f.id}`}>
+                    Open
+                  </a>
+                  <button className="link-btn" onClick={() => setEditing(f.id)}>
+                    Rename
+                  </button>
+                  <button className="link-btn danger" onClick={() => remove(f)}>
+                    Delete
+                  </button>
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="account-plan">
+        <h2>Plan</h2>
+        <div className="account-card usage">
+          <span>
+            AI films this month: <strong>{me.usage.ai}</strong> / {me.limits.aiPerMonth}
+          </span>
+          <span>
+            Website imports today: <strong>{me.usage.imports}</strong> / {me.limits.importsPerDay}
+          </span>
+        </div>
+        <PlanCards me={me} current={u.plan} onRequest={requestPro} requested={!!u.upgradeRequestedAt} />
+        {u.plan === "free" && u.upgradeRequestedAt && <p className="hint">You asked for Pro on {new Date(u.upgradeRequestedAt).toLocaleDateString()}. The site owner will switch your plan.</p>}
+      </section>
+
+      <Security mustChange={u.mustChangePassword} onChanged={() => (setMsg({ ok: true, text: "Password changed. Other devices were signed out." }), reload())} onSignOutAll={() => signOut(true)} />
+    </main>
+  );
+}
+
+function Security({ mustChange, onChanged, onSignOutAll }: { mustChange: boolean; onChanged: () => void; onSignOutAll: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [delPw, setDelPw] = useState("");
+  const change = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api("/api/account/password", { method: "POST", body: JSON.stringify({ current, next }) });
+      setCurrent("");
+      setNext("");
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+  const del = async () => {
+    if (!confirm("Delete your account and every saved intro? This can't be undone.")) return;
+    try {
+      await api("/api/account", { method: "DELETE", body: JSON.stringify({ password: delPw }) });
+      location.href = "/";
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+  return (
+    <section className="account-security">
+      <h2>Security</h2>
+      <form className="account-card" onSubmit={change}>
+        <strong>Change password</strong>
+        {!mustChange && (
+          <label className="fld">
+            <span className="fld-cap">Current password</span>
+            <input className="input" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          </label>
+        )}
+        <label className="fld">
+          <span className="fld-cap">
+            New password <em>at least 8 characters</em>
+          </span>
+          <input className="input" type="password" autoComplete="new-password" minLength={8} required value={next} onChange={(e) => setNext(e.target.value)} />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <div className="admin-row actions">
+          <button type="button" className="btn btn-ghost" onClick={onSignOutAll}>
+            Sign out everywhere
+          </button>
+          <button className="btn btn-primary">Change password</button>
+        </div>
+      </form>
+      <details className="account-card danger-zone">
+        <summary>Delete account</summary>
+        <p className="hint">Deletes your account and all saved intros. Enter your password to confirm.</p>
+        <input className="input" type="password" autoComplete="current-password" value={delPw} onChange={(e) => setDelPw(e.target.value)} placeholder="Password" />
+        <button className="btn btn-ghost danger" onClick={del} disabled={!delPw}>
+          Delete my account
+        </button>
+      </details>
+    </section>
+  );
+}

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { VideoPlan } from "@/engine/types";
 import { readAiConfig, type AiConfig } from "./ai";
+import { cookieOf, isHttps, noStore, sameOrigin } from "./http";
+import { DEFAULT_LIMITS, readLimits, type PlanId, type PlanLimits } from "./plans";
 import { clientKey } from "./ratelimit";
 
 /**
@@ -64,26 +66,6 @@ export function validSession(token: string | undefined, now = Date.now()): boole
   return got.length === expected.length && timingSafeEqual(got, expected);
 }
 
-function cookieOf(req: Request, name: string) {
-  for (const part of (req.headers.get("cookie") ?? "").split(";")) {
-    const i = part.indexOf("=");
-    if (i > 0 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
-  }
-  return undefined;
-}
-
-/** A browser on another site can't drive the admin API: its requests carry a foreign Origin. */
-export function sameOrigin(req: Request) {
-  const origin = req.headers.get("origin");
-  if (!origin) return req.method === "GET" || req.method === "HEAD";
-  try {
-    const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Guard an admin API route: null when the request is signed in (and same-origin for writes),
  * otherwise the response to send. 404 while the admin area is off, so it isn't advertised.
@@ -96,11 +78,10 @@ export function requireAdmin(req: Request): Response | null {
 }
 
 export function sessionCookie(req: Request, token: string, maxAge: number) {
-  const secure = req.headers.get("x-forwarded-proto") === "https" || new URL(req.url).protocol === "https:";
-  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${isHttps(req) ? "; Secure" : ""}`;
 }
 
-export const noStore = { "Cache-Control": "no-store" };
+export { noStore, sameOrigin };
 
 // ───────────────────────── Film log ─────────────────────────
 
@@ -301,6 +282,12 @@ export interface AdminSettings {
   dailyBudget?: number;
   /** Per visitor per day. */
   perVisitor?: number;
+  /** Plan limits (overrides of DEFAULT_LIMITS). */
+  plans?: Record<PlanId, PlanLimits>;
+  /** How the Pro price reads on the pricing page, e.g. "$9 / month". */
+  proPrice?: string;
+  /** Where visitors reach the owner (upgrades, password resets). */
+  contactEmail?: string;
   updatedAt?: number;
 }
 
@@ -315,6 +302,9 @@ export async function readSettings(): Promise<AdminSettings> {
       ai: readAiConfig(raw.ai) ?? undefined,
       dailyBudget: Number.isFinite(raw.dailyBudget) ? raw.dailyBudget : undefined,
       perVisitor: Number.isFinite(raw.perVisitor) ? raw.perVisitor : undefined,
+      plans: raw.plans ? readLimits(raw.plans) : undefined,
+      proPrice: typeof raw.proPrice === "string" ? raw.proPrice.slice(0, 40) : undefined,
+      contactEmail: typeof raw.contactEmail === "string" ? raw.contactEmail.slice(0, 120) : undefined,
       updatedAt: raw.updatedAt,
     };
   } catch {
@@ -324,7 +314,10 @@ export async function readSettings(): Promise<AdminSettings> {
   return value;
 }
 
-export async function writeSettings(next: AdminSettings) {
+/** Save settings: the given fields replace the saved ones, the rest are kept. */
+export async function writeSettings(patch: AdminSettings) {
+  settingsCache = null;
+  const next = { ...(await readSettings()), ...patch };
   await ensureDir();
   const tmp = `${SETTINGS}.tmp`;
   await writeFile(tmp, JSON.stringify({ ...next, updatedAt: Date.now() }, null, 2), { mode: 0o600 });
@@ -342,6 +335,11 @@ export async function serverAi(): Promise<{ ai: AiConfig; source: "admin" | "env
   if (s.ai && s.ai.provider !== "builtin") return { ai: s.ai, source: "admin" };
   if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) return { ai: { provider: "anthropic", mode: "balanced", images: true }, source: "env" };
   return null;
+}
+
+/** The limits in force for each plan (the owner's, else the defaults). */
+export async function planLimits(): Promise<Record<PlanId, PlanLimits>> {
+  return (await readSettings()).plans ?? DEFAULT_LIMITS;
 }
 
 /** A key shown back to the admin: enough to recognise it, never the whole thing. */

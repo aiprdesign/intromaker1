@@ -5,6 +5,7 @@ import LoopCanvas from "@/components/LoopCanvas";
 import { encodePlan, sanitizePlan } from "@/engine/planner";
 import { SKILL_MAP } from "@/engine/skills";
 import type { SkillId, VideoPlan } from "@/engine/types";
+import { PLAN_NAMES, type PlanId, type PlanLimits } from "@/lib/plans";
 import { PROVIDER_GROUPS, PROVIDER_PRESETS, PRESET_MAP } from "@/lib/providers";
 import { sceneThumb, thumbsReady } from "@/lib/thumbs";
 
@@ -74,7 +75,7 @@ const when = (t: number) => {
 /** The owner's admin area: films visitors made, and the server's AI settings. */
 export default function AdminApp() {
   const [state, setState] = useState<"loading" | "off" | "login" | "in">("loading");
-  const [tab, setTab] = useState<"films" | "ai">("films");
+  const [tab, setTab] = useState<"films" | "users" | "plans" | "ai">("films");
   useEffect(() => {
     api<{ enabled: boolean; authed: boolean }>("/api/admin/session")
       .then((s) => setState(!s.enabled ? "off" : s.authed ? "in" : "login"))
@@ -107,6 +108,12 @@ export default function AdminApp() {
           <button role="tab" aria-selected={tab === "films"} className={tab === "films" ? "active" : ""} onClick={() => setTab("films")}>
             Films
           </button>
+          <button role="tab" aria-selected={tab === "users"} className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>
+            Users
+          </button>
+          <button role="tab" aria-selected={tab === "plans"} className={tab === "plans" ? "active" : ""} onClick={() => setTab("plans")}>
+            Plans
+          </button>
           <button role="tab" aria-selected={tab === "ai"} className={tab === "ai" ? "active" : ""} onClick={() => setTab("ai")}>
             AI settings
           </button>
@@ -120,7 +127,10 @@ export default function AdminApp() {
           </button>
         </div>
       </header>
-      {tab === "films" ? <Films onSignedOut={() => setState("login")} /> : <AiSettingsPanel onSignedOut={() => setState("login")} />}
+      {tab === "films" && <Films onSignedOut={() => setState("login")} />}
+      {tab === "users" && <Users onSignedOut={() => setState("login")} />}
+      {tab === "plans" && <Plans onSignedOut={() => setState("login")} />}
+      {tab === "ai" && <AiSettingsPanel onSignedOut={() => setState("login")} />}
     </main>
   );
 }
@@ -589,6 +599,222 @@ function AiSettingsPanel({ onSignedOut }: { onSignedOut: () => void }) {
         </button>
         <button className="btn btn-primary" onClick={save} disabled={!!busy}>
           {busy === "save" ? "Saving…" : "Save settings"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+type AdminUser = {
+  id: string;
+  email: string;
+  plan: PlanId;
+  createdAt: number;
+  lastLoginAt?: number;
+  upgradeRequestedAt?: number;
+  mustChangePassword: boolean;
+  disabled: boolean;
+  films: number;
+  usage: { aiMonth?: string; ai?: number };
+};
+
+function Users({ onSignedOut }: { onSignedOut: () => void }) {
+  const [data, setData] = useState<{ users: AdminUser[]; counts: { total: number; pro: number; requests: number } } | null>(null);
+  const [q, setQ] = useState("");
+  const [only, setOnly] = useState<"" | "requests" | "pro">("");
+  const [temp, setTemp] = useState<{ email: string; pw: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      setData(await api("/api/admin/users"));
+    } catch (e) {
+      if ((e as { status?: number }).status === 401) onSignedOut();
+      else setError((e as Error).message);
+    }
+  }, [onSignedOut]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const patch = async (u: AdminUser, body: object) => {
+    await api(`/api/admin/users/${u.id}`, { method: "PATCH", body: JSON.stringify(body) });
+    void load();
+  };
+  const reset = async (u: AdminUser) => {
+    if (!confirm(`Reset the password of ${u.email}? They'll be signed out and must choose a new one.`)) return;
+    const r = await api<{ tempPassword: string }>(`/api/admin/users/${u.id}`, { method: "POST" });
+    setTemp({ email: u.email, pw: r.tempPassword });
+    void load();
+  };
+  const remove = async (u: AdminUser) => {
+    if (!confirm(`Delete ${u.email} and their ${u.films} saved intro(s)? This can't be undone.`)) return;
+    await api(`/api/admin/users/${u.id}`, { method: "DELETE" });
+    void load();
+  };
+  if (!data) return <p className="hint">{error ?? "Loading…"}</p>;
+  const shown = data.users.filter(
+    (u) => (!q.trim() || u.email.includes(q.trim().toLowerCase())) && (only === "" || (only === "pro" ? u.plan === "pro" : !!u.upgradeRequestedAt && u.plan !== "pro")),
+  );
+  return (
+    <>
+      <section className="admin-stats">
+        <Stat label="Accounts" value={data.counts.total} />
+        <Stat label="Pro" value={data.counts.pro} />
+        <Stat label="Asking for Pro" value={data.counts.requests} />
+      </section>
+      {temp && (
+        <div className="admin-card warn-card">
+          <strong>One-time password for {temp.email}:</strong> <code>{temp.pw}</code>
+          <span className="hint">Send it to them privately. They sign in with it and must choose a new password. It isn&apos;t shown again.</span>
+          <button className="link-btn" onClick={() => setTemp(null)}>
+            Done
+          </button>
+        </div>
+      )}
+      <section className="admin-filters">
+        <input className="input" placeholder="Search by email…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="seg-control">
+          {(
+            [
+              ["", "All"],
+              ["requests", "Asking for Pro"],
+              ["pro", "Pro"],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} className={only === k ? "active" : ""} onClick={() => setOnly(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+      {!shown.length && (
+        <div className="admin-card">
+          <p className="hint">{data.users.length ? "No accounts match." : "No accounts yet. Visitors create one at /account to save their intros."}</p>
+        </div>
+      )}
+      <div className="admin-table">
+        {shown.map((u) => (
+          <div key={u.id} className={`admin-user${u.disabled ? " disabled" : ""}`}>
+            <div className="who">
+              <strong>{u.email}</strong>
+              <span className="hint">
+                joined {new Date(u.createdAt).toLocaleDateString()} · last in {u.lastLoginAt ? when(u.lastLoginAt) : "never"} · {u.films} saved
+                {u.usage?.aiMonth === new Date().toISOString().slice(0, 7) ? ` · ${u.usage.ai ?? 0} AI films this month` : ""}
+              </span>
+              <span className="film-tags">
+                {u.upgradeRequestedAt && u.plan !== "pro" && <span className="tag remake">Asked for Pro {when(u.upgradeRequestedAt)}</span>}
+                {u.mustChangePassword && <span className="tag">Password reset pending</span>}
+                {u.disabled && <span className="tag">Disabled</span>}
+              </span>
+            </div>
+            <div className="seg-control plan-switch">
+              {(["free", "pro"] as PlanId[]).map((id) => (
+                <button key={id} className={u.plan === id ? "active" : ""} onClick={() => u.plan !== id && patch(u, { plan: id })}>
+                  {PLAN_NAMES[id]}
+                </button>
+              ))}
+            </div>
+            <div className="user-actions">
+              <button className="link-btn" onClick={() => reset(u)}>
+                Reset password
+              </button>
+              <button className="link-btn" onClick={() => patch(u, { disabled: !u.disabled })}>
+                {u.disabled ? "Enable" : "Disable"}
+              </button>
+              <button className="link-btn danger" onClick={() => remove(u)}>
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function Plans({ onSignedOut }: { onSignedOut: () => void }) {
+  const [plans, setPlans] = useState<Record<PlanId, PlanLimits> | null>(null);
+  const [proPrice, setProPrice] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    api<{ plans: Record<PlanId, PlanLimits>; proPrice: string; contactEmail: string }>("/api/admin/plans")
+      .then((r) => {
+        setPlans(r.plans);
+        setProPrice(r.proPrice);
+        setContactEmail(r.contactEmail);
+      })
+      .catch((e) => ((e as { status?: number }).status === 401 ? onSignedOut() : setMsg({ ok: false, text: (e as Error).message })));
+  }, [onSignedOut]);
+  if (!plans) return <p className="hint">{msg?.text ?? "Loading…"}</p>;
+  const set = (id: PlanId, patch: Partial<PlanLimits>) => setPlans((p) => (p ? { ...p, [id]: { ...p[id], ...patch } } : p));
+  const save = async () => {
+    try {
+      const r = await api<{ plans: Record<PlanId, PlanLimits> }>("/api/admin/plans", { method: "PUT", body: JSON.stringify({ plans, proPrice, contactEmail }) });
+      setPlans(r.plans);
+      setMsg({ ok: true, text: "Saved. The pricing page and every account use these limits now." });
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    }
+  };
+  const num = (id: PlanId, key: "savedFilms" | "aiPerMonth" | "importsPerDay", label: string, hint?: string) => (
+    <label className="fld">
+      <span className="fld-cap">
+        {label} {hint && <em>{hint}</em>}
+      </span>
+      <input className="input" type="number" min={0} value={plans[id][key]} onChange={(e) => set(id, { [key]: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} />
+    </label>
+  );
+  return (
+    <section className="admin-plans">
+      <p className="hint">
+        No payment provider is connected yet: visitors ask for Pro from their account page, and you switch them in <strong>Users</strong>. Saved intros, the AI
+        allowance and website imports are enforced by the server. The watermark and export size are applied in the browser, where videos are rendered.
+      </p>
+      <div className="admin-row">
+        {(["free", "pro"] as PlanId[]).map((id) => (
+          <div key={id} className="admin-card">
+            <h2>{PLAN_NAMES[id]}</h2>
+            {num(id, "savedFilms", "Saved intros")}
+            {num(id, "aiPerMonth", "AI films a month", "on the site's AI; 0 = built-in director only")}
+            {num(id, "importsPerDay", "Website imports a day")}
+            <label className="fld">
+              <span className="fld-cap">Largest export</span>
+              <select className="select" value={plans[id].maxLong} onChange={(e) => set(id, { maxLong: Number(e.target.value) })}>
+                <option value={1280}>720p</option>
+                <option value={1920}>1080p</option>
+                <option value={2560}>1440p</option>
+                <option value={3840}>4K</option>
+              </select>
+            </label>
+            <label className="fld">
+              <span className="fld-cap">Frame rate</span>
+              <select className="select" value={plans[id].maxFps} onChange={(e) => set(id, { maxFps: Number(e.target.value) })}>
+                <option value={30}>30 fps</option>
+                <option value={60}>60 fps</option>
+              </select>
+            </label>
+            <label className="check-row">
+              <input type="checkbox" checked={plans[id].watermark} onChange={(e) => set(id, { watermark: e.target.checked })} /> Watermark on exports
+            </label>
+          </div>
+        ))}
+      </div>
+      <div className="admin-card">
+        <div className="admin-row">
+          <label className="fld">
+            <span className="fld-cap">Pro price shown on the pricing page</span>
+            <input className="input" value={proPrice} maxLength={40} placeholder="e.g. $9 / month (empty shows “Ask us”)" onChange={(e) => setProPrice(e.target.value)} />
+          </label>
+          <label className="fld">
+            <span className="fld-cap">Contact email</span>
+            <input className="input" type="email" value={contactEmail} maxLength={120} placeholder="for upgrades and password resets" onChange={(e) => setContactEmail(e.target.value)} />
+          </label>
+        </div>
+      </div>
+      {msg && <p className={msg.ok ? "ok-msg" : "error"}>{msg.text}</p>}
+      <div className="admin-row actions">
+        <button className="btn btn-primary" onClick={save}>
+          Save plans
         </button>
       </div>
     </section>

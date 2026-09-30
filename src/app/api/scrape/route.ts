@@ -1,6 +1,7 @@
 import { UrlError } from "@/lib/netguard";
 import { scrapeSite } from "@/lib/scrape";
-import { rateLimit } from "@/lib/ratelimit";
+import { clientKey, enabled, rateLimit, take } from "@/lib/ratelimit";
+import { currentUser, limitsFor, spendImport, usageOf } from "@/lib/accounts";
 
 export const runtime = "nodejs";
 
@@ -14,8 +15,19 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   if (!url.trim()) return Response.json({ error: "Enter a website URL." }, { status: 400 });
+  // Website imports per day come with the plan: per account when signed in, per address otherwise.
+  const who = await currentUser(req);
+  const limits = await limitsFor(who);
+  if (who ? usageOf(who).imports >= limits.importsPerDay : enabled() && !take("importDay", clientKey(req), Date.now(), limits.importsPerDay).ok) {
+    const n = limits.importsPerDay;
+    return Response.json(
+      { error: `You've used today's ${n} website import${n === 1 ? "" : "s"}${who ? ` on the ${who.plan === "pro" ? "Pro" : "Free"} plan` : ""}. ${who?.plan === "pro" ? "Try again tomorrow." : "Upgrade to Pro for more, or try again tomorrow."}` },
+      { status: 429 },
+    );
+  }
   try {
     const site = await scrapeSite(url);
+    if (who) await spendImport(who);
     return Response.json({ site });
   } catch (e) {
     const message =

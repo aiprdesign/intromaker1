@@ -37,6 +37,8 @@ export interface ExportOptions {
   audio: boolean;
   onProgress: (p: number) => void;
   signal?: AbortSignal;
+  /** Small mark in the corner of every frame (the Free plan's). */
+  watermark?: string;
 }
 
 export interface ExportResult {
@@ -95,7 +97,7 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
       if (opts.signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
       const at = sceneAt(plan, i * dt);
       if (at) await syncVideos(plan, at.index, at.local);
-      renderFrame(ctx, plan, i * dt, w, h);
+      renderFrame(ctx, plan, i * dt, w, h, { watermark: opts.watermark });
       await video.add(i * dt, dt);
       opts.onProgress((i + 1) / frames);
       // Let the page repaint the progress UI now and then.
@@ -127,7 +129,7 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
   Object.assign(canvas.style, { position: "fixed", left: "-100000px", top: "0", pointerEvents: "none" });
   document.body.appendChild(canvas);
   const ctx = canvas.getContext("2d")!;
-  renderFrame(ctx, plan, 0, w, h);
+  renderFrame(ctx, plan, 0, w, h, { watermark: opts.watermark });
 
   const stream = canvas.captureStream(opts.fps);
   let sound: Soundtrack | null = null;
@@ -157,7 +159,7 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
         return;
       }
       const t = (performance.now() - t0) / 1000;
-      renderFrame(ctx, plan, Math.min(t, duration), w, h);
+      renderFrame(ctx, plan, Math.min(t, duration), w, h, { watermark: opts.watermark });
       opts.onProgress(Math.min(1, t / duration));
       if (t >= duration + 0.15) resolve();
       else requestAnimationFrame(tick);
@@ -177,6 +179,7 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
 /** Export presets: one storyboard, re-framed for each platform. */
 export const EXPORT_PRESETS = [
   { id: "youtube", name: "YouTube · 1080p", aspect: "16:9", long: 1920, fps: 60 },
+  { id: "youtube4k", name: "YouTube · 4K", aspect: "16:9", long: 3840, fps: 60 },
   { id: "reels", name: "Reels / TikTok / Shorts · 9:16", aspect: "9:16", long: 1920, fps: 30 },
   { id: "square", name: "LinkedIn / Instagram · 1:1", aspect: "1:1", long: 1080, fps: 30 },
   { id: "web", name: "Website / X · 720p", aspect: "16:9", long: 1280, fps: 30 },
@@ -190,7 +193,7 @@ export function planForPreset(plan: VideoPlan, preset: ExportPreset): VideoPlan 
 }
 
 /** PNG thumbnail/poster: the held end card (logo, closing line and button). */
-export async function exportThumbnail(plan: VideoPlan, long: number): Promise<Blob> {
+export async function exportThumbnail(plan: VideoPlan, long: number, watermark?: string): Promise<Blob> {
   await Promise.all([ensureFonts(), preloadPlanMedia(plan)]);
   const { w, h } = aspectSize(plan.aspect, long);
   const canvas = document.createElement("canvas");
@@ -199,6 +202,6 @@ export async function exportThumbnail(plan: VideoPlan, long: number): Promise<Bl
   const t = Math.max(0, totalDuration(plan) - 0.05);
   const at = sceneAt(plan, t);
   if (at) await syncVideos(plan, at.index, at.local);
-  renderFrame(canvas.getContext("2d")!, plan, t, w, h);
+  renderFrame(canvas.getContext("2d")!, plan, t, w, h, { watermark });
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Thumbnail failed"))), "image/png"));
 }
