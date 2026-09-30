@@ -133,6 +133,8 @@ export interface Brand {
   logo?: string;
   /** App icon: shown with the name beneath it when the logo is a wide wordmark. */
   icon?: string;
+  /** The full-page screenshot and its real sections ([top, bottom] fractions), shown section by section. */
+  page?: { src: string; bands: [number, number][] };
   images: string[];
   videos: string[];
   /** Customer / partner logos for "Trusted by" scenes. */
@@ -169,7 +171,8 @@ export interface SiteData {
   /** The site's headline font family (e.g. from Google Fonts). */
   font: string | null;
   /** Screenshots from the live browser capture (same-origin /api/shot URLs). */
-  shots: { hero: string | null; full: string | null; sections: string[]; parts?: SitePart[] };
+  /** bands: the page's real sections on `full`, as [top, bottom] fractions of its height. */
+  shots: { hero: string | null; full: string | null; sections: string[]; parts?: SitePart[]; bands?: [number, number][] };
   cta: string | null;
   logo: string | null;
   /** The site's app icon (apple-touch / SVG icon), used where a wide wordmark won't fit. */

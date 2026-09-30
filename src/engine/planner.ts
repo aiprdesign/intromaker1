@@ -643,6 +643,7 @@ export function brandFromSite(site: SiteData, colors?: Brand["colors"]): Brand {
     domain: site.domain,
     logo: site.logo ? assetUrl(site.logo) : undefined,
     icon: site.icon ? assetUrl(site.icon) : undefined,
+    page: site.shots?.full && site.shots.bands?.length ? { src: site.shots.full, bands: site.shots.bands } : undefined,
     images: site.images.map(assetUrl),
     videos: site.videos.map(assetUrl),
     clientLogos: site.clientLogos.map(assetUrl),
@@ -688,6 +689,7 @@ export function readSite(raw: unknown): SiteData | null {
         full: isShot(sh.full) ? sh.full : null,
         sections: (Array.isArray(sh.sections) ? sh.sections : []).filter(isShot).slice(0, 6),
         parts: sanitizeParts(sh.parts),
+        bands: sanitizeBands(sh.bands),
       };
     })(),
     cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
@@ -1146,15 +1148,18 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const usedByTour = new Set(tourMedia ? [tourHead, ...tourCallouts].map(norm) : []);
   const freshItems = bentoItems.filter((it) => !usedByTour.has(norm(it.split(/\s+[—–]\s+/)[0])));
   const featureItems = freshItems.length >= 2 ? freshItems : bentoItems.filter((it) => norm(it.split(/\s+[—–]\s+/)[0]) !== norm(tourHead));
+  // With no real product footage or images, zooming into one section's screenshot shows little:
+  // the tour becomes the website itself, split into its real sections, visited one by one.
+  const sectionTour = !video && !images[0] && !!brand.page && brand.page.bands.length >= 3 && !!shots.full && tourMedia?.src !== shots.full;
   if (tourMedia) {
     add(angle === "product" ? 1 : target >= 20 ? 2 : 4, {
-      role: "tour", skill: "ui-tour",
+      role: "tour", skill: sectionTour ? "site-scroll" : "ui-tour",
       text: tourHead,
-      items: tourCallouts,
+      items: sectionTour ? undefined : tourCallouts,
       eyebrow: "Features",
       duration: Math.max(5.6, beats(12)),
       transition: "whip",
-      media: tourMedia,
+      media: sectionTour ? img(shots.full) : tourMedia,
     });
   }
   // Key features as icon tiles (the classic SaaS feature row); a bento when there are many.
@@ -1649,6 +1654,18 @@ const isAsset = (s: unknown): s is string =>
   (typeof s === "string" && s.startsWith("/api/asset?url=") && s.length < 2100) || isShot(s);
 const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0-9a-f]{6}$/i.test(s);
 
+/** Page sections as ordered [top, bottom] fractions (0..1), at most 24. */
+function sanitizeBands(v: unknown): [number, number][] {
+  if (!Array.isArray(v)) return [];
+  const out: [number, number][] = [];
+  for (const b of v.slice(0, 24)) {
+    if (!Array.isArray(b) || b.length !== 2) continue;
+    const [t, e] = b.map(Number);
+    if (Number.isFinite(t) && Number.isFinite(e) && t >= 0 && e <= 1.0001 && e - t > 0.002 && t >= (out[out.length - 1]?.[1] ?? 0) - 0.002) out.push([t, Math.min(1, e)]);
+  }
+  return out;
+}
+
 function sanitizeMedia(m: unknown): Media | undefined {
   const media = m as Partial<Media> | undefined;
   if (!media || !isAsset(media.src)) return undefined;
@@ -1663,6 +1680,7 @@ function sanitizeBrand(b: unknown): Brand | undefined {
     domain: typeof brand.domain === "string" ? brand.domain.slice(0, 80) : undefined,
     logo: isAsset(brand.logo) ? brand.logo : undefined,
     icon: isAsset(brand.icon) ? brand.icon : undefined,
+    page: brand.page && isAsset(brand.page.src) && sanitizeBands(brand.page.bands).length ? { src: brand.page.src, bands: sanitizeBands(brand.page.bands) } : undefined,
     images: (brand.images ?? []).filter(isAsset).slice(0, 14),
     videos: (brand.videos ?? []).filter(isAsset).slice(0, 4),
     clientLogos: (brand.clientLogos ?? []).filter(isAsset).slice(0, 16),

@@ -8,7 +8,7 @@
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
-import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, segmentShot } from "../media";
+import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, pageBands, segmentShot } from "../media";
 import {
   blurInLayout,
   borderBeam,
@@ -301,10 +301,17 @@ function uiTour(sc: SkillContext) {
   const kA = ease.inOutCubic(range(t, T.zoomA, T.zoomA + 0.85));
   const kB = ease.inOutCubic(range(t, T.zoomB, T.zoomB + 0.85));
   const kOut = ease.inOutCubic(range(t, T.out, T.out + 0.75));
-  let focus = { x: lerp(center.x, hot[0].x, kA), y: lerp(center.y, hot[0].y, kA) };
-  focus = { x: lerp(focus.x, hot[1].x, kB), y: lerp(focus.y, hot[1].y, kB) };
+  // Each stop frames a whole component (never cutting through it): zoomed until the component
+  // fills about three quarters of the window, gentler when no clear component was found.
+  const stops = hot.map((p, i) => {
+    const c = comps[i];
+    if (!c) return { x: p.x, y: p.y, z: 1.5 };
+    return { x: c.x + c.w / 2, y: c.y + c.h / 2, z: clamp(Math.min((ww * 0.75) / c.w, ((wh - bar) * 0.75) / c.h), 1.15, Z + 0.35) };
+  });
+  let focus = { x: lerp(center.x, stops[0].x, kA), y: lerp(center.y, stops[0].y, kA) };
+  focus = { x: lerp(focus.x, stops[1].x, kB), y: lerp(focus.y, stops[1].y, kB) };
   focus = { x: lerp(focus.x, center.x, kOut), y: lerp(focus.y, center.y, kOut) };
-  const z = 1 + (Z - 1) * kA * (1 - kOut);
+  const z = lerp(lerp(lerp(1, stops[0].z, kA), stops[1].z, kB), 1, kOut);
   const toScreen = (p: { x: number; y: number }) => ({ x: (p.x - focus.x) * z + fcx, y: (p.y - focus.y) * z + fcy });
 
   const intro = clamp(spring(t - 0.1, 10, 7));
@@ -420,7 +427,7 @@ function uiTour(sc: SkillContext) {
 
   // Pinned headline on a shade band.
   // Deepens while zoomed so the headline stays legible over bright screenshots.
-  const zk = (z - 1) / (Z - 1);
+  const zk = clamp((z - 1) / (Z - 1));
   const bandH = h * lerp(0.26, 0.34, zk);
   const band = ctx.createLinearGradient(0, 0, 0, bandH);
   band.addColorStop(0, rgba(palette.bg0, 0.95));
@@ -724,10 +731,12 @@ function iconFeatureItems(scene: Scene) {
   return items.length >= 2 ? items : ["Quick setup", "Access controls", "Built for teams", "Real-time insights"];
 }
 
+/** One card per beat (clearly one after another), fitted to the scene's length. */
 function iconFeaturesTiming(scene: Scene, beat: number) {
   const n = iconFeatureItems(scene).length;
-  const st = Math.max(0.18, Math.min(0.3, beat / 1.6));
-  return Array.from({ length: n }, (_, i) => 0.55 + i * st);
+  const room = Math.max(0.2, (scene.duration - 1.9) / Math.max(1, n - 1));
+  const st = Math.min(Math.max(0.34, Math.min(0.6, beat)), room);
+  return Array.from({ length: n }, (_, i) => 0.5 + i * st);
 }
 
 /**
@@ -763,16 +772,39 @@ function iconFeatures(sc: SkillContext) {
     const y = gy0 + r * (ch + gap);
     const lt = t - times[i];
     if (lt <= 0) return;
-    const k = clamp(spring(lt, 11, 7), 0, 1.08);
+    // Each card rises in on its own beat with a small tilt that settles, then stays lifted and
+    // outlined ("in the spotlight") until the next card arrives.
+    const k = clamp(spring(lt, 10, 6.5), 0, 1.1);
+    const settleK = Math.min(1, k);
+    const next = times[i + 1] ?? sc.d - 0.5;
+    const spot = ease.outCubic(range(lt, 0.15, 0.4)) * (1 - ease.inOutCubic(range(t, next, next + 0.35))) * (1 - ex);
     const float = Math.sin((sc.globalT ?? t) * 1.3 + i) * 4 * u;
+    const tilt = (1 - settleK) * (i % 2 ? 0.09 : -0.09);
     ctx.save();
-    ctx.globalAlpha = clamp(lt / 0.25) * (1 - ex);
-    ctx.translate(x + cw / 2, y + ch / 2 + (1 - Math.min(1, k)) * 40 * u + float);
-    ctx.scale(0.88 + 0.12 * k, 0.88 + 0.12 * k);
+    ctx.globalAlpha = clamp(lt / 0.2) * (1 - ex);
+    ctx.translate(x + cw / 2, y + ch / 2 + (1 - settleK) * 90 * u + float - spot * 8 * u);
+    ctx.rotate(tilt);
+    const sk = (0.8 + 0.2 * k) * (1 + 0.035 * spot);
+    ctx.scale(sk, sk);
     ctx.translate(-(x + cw / 2), -(y + ch / 2));
     glassCard(sc, x, y, cw, ch, { r: 22 * u });
+    if (spot > 0.01) borderBeam(sc, x, y, cw, ch, (sc.globalT ?? t) * 0.6 + i * 0.25, { r: 22 * u, alpha: spot });
+    // Arrival ring: a soft outline expands off the card as it lands.
+    const ring = range(lt, 0.12, 0.7);
+    if (ring > 0 && ring < 1) {
+      const g = 18 * u * ease.outCubic(ring);
+      ctx.save();
+      ctx.strokeStyle = rgba(palette.primary, 0.55 * (1 - ring));
+      ctx.lineWidth = 2 * u;
+      ctx.beginPath();
+      ctx.roundRect(x - g, y - g, cw + g * 2, ch + g * 2, 22 * u + g);
+      ctx.stroke();
+      ctx.restore();
+    }
     // Icon tile with an accent glow; the icon draws itself on.
-    const ts = Math.min(cw * 0.36, 104 * u * S);
+    // The icon pops in just after its card lands.
+    const pop = clamp(spring(lt - 0.12, 12, 6), 0, 1.15);
+    const ts = Math.min(cw * 0.36, 104 * u * S) * (0.6 + 0.4 * pop);
     const tx = x + cw / 2;
     const ty = y + ch * 0.36;
     const glow = ctx.createRadialGradient(tx, ty, 0, tx, ty, ts * 1.2);
@@ -1417,7 +1449,108 @@ function scrollTiming(d: number) {
   return { first: 0.9, second: Math.max(2.2, d * 0.5) };
 }
 
+/**
+ * The real website, section by section: the full-page screenshot starts as one page, splits along
+ * its own section boundaries into separate bordered cards, and the camera moves from one whole
+ * section to the next, zoomed to fit it (never cut mid-section). Without section data or a
+ * full-page image it falls back to a scrolling browser window.
+ */
 function siteScroll(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
+  const img = getImage(scene.media?.kind === "image" ? scene.media.src : undefined);
+  const bands = img && img.naturalWidth ? (brand?.page?.src === scene.media?.src ? brand!.page!.bands : pageBands(img)) : [];
+  if (!img || bands.length < 2) return browserScroll(sc);
+  saasBackground(sc, { beams: 2 });
+  const portrait = h > w;
+  topHeadline(sc);
+  const ex = ease.inCubic(exitT(sc, 0.4));
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const secs = bands.map(([a, b]) => ({ y: a * ih, h: (b - a) * ih })).filter((x) => x.h > 8);
+  // Stage under the headline.
+  const top = h * (scene.eyebrow ? 0.28 : 0.25);
+  const bottom = h - 36 * u;
+  const vx = w * (portrait ? 0.05 : 0.08);
+  const vw = w - vx * 2;
+  const vh = bottom - top;
+  const stageCy = top + vh / 2;
+  // The page separates into its sections, with gaps and border lines between them.
+  const sep = ease.outCubic(range(t, 0.35, 1.0));
+  const gap = sep * iw * 0.035;
+  const cardY = (i: number) => secs[i].y + i * gap;
+  const total = cardY(secs.length - 1) + secs[secs.length - 1].h;
+  // Sections worth a close look (the header strip isn't), in page order.
+  const K = Math.max(1, Math.min(3, Math.floor((d - 1.3) / 1.25)));
+  const pickable = secs.map((x, i) => ({ i, h: x.h })).filter((x) => x.h >= iw * 0.12);
+  const focus = (pickable.length ? pickable : secs.map((x, i) => ({ i, h: x.h }))).slice(0, K).map((x) => x.i);
+  // Camera keyframes: the page overview, then each chosen section fitted whole.
+  const overview = { cy: Math.min(total, vh / (vw * 0.6 / iw)) / 2, s: (vw * 0.6) / iw };
+  const fit = (i: number) => ({ cy: cardY(i) + secs[i].h / 2, s: Math.min((vw * 0.94) / iw, (vh * 0.9) / secs[i].h) });
+  const keys = [overview, ...focus.map(fit)];
+  const start = 1.05;
+  const step = (d - start - 0.3) / Math.max(1, focus.length);
+  const seg = clamp((t - start) / step, 0, focus.length - 0.0001);
+  const ki = Math.floor(seg);
+  const kk = t < start ? 0 : ease.inOutCubic(clamp((seg - ki) / 0.45));
+  const from = t < start ? keys[0] : keys[ki];
+  const to = t < start ? keys[0] : keys[ki + 1];
+  const cam = { cy: lerp(from.cy, to.cy, kk), s: lerp(from.s, to.s, kk) };
+  const active = t < start ? -1 : focus[kk > 0.5 ? ki : ki - 1] ?? -1;
+  const settle = t < start ? 0 : kk > 0.5 ? (kk - 0.5) * 2 : 0;
+  const intro = clamp(spring(t - 0.05, 8, 6), 0, 1.04);
+
+  ctx.save();
+  ctx.globalAlpha = clamp(t / 0.3) * (1 - ex);
+  ctx.beginPath();
+  ctx.rect(0, top - 12 * u, w, vh + 24 * u);
+  ctx.clip();
+  ctx.translate(0, (1 - Math.min(1, intro)) * h * 0.12);
+  const x = w / 2 - (iw * cam.s) / 2;
+  const r = 12 * u * sep;
+  secs.forEach((sec, i) => {
+    const y = stageCy + (cardY(i) - cam.cy) * cam.s;
+    const hh = sec.h * cam.s;
+    if (y > bottom + 20 * u || y + hh < top - 20 * u) return;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 30 * u * sep;
+    ctx.shadowOffsetY = 10 * u * sep;
+    ctx.fillStyle = palette.bg0;
+    ctx.beginPath();
+    ctx.roundRect(x, y, iw * cam.s, hh, r);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, iw * cam.s, hh, r);
+    ctx.clip();
+    ctx.drawImage(img, 0, sec.y, iw, sec.h, x, y, iw * cam.s, hh);
+    // Other sections step back while one is in focus.
+    const dim = active >= 0 && i !== active ? 0.5 * settle : 0;
+    if (dim > 0) {
+      ctx.fillStyle = rgba(palette.bg0, dim);
+      ctx.fillRect(x, y, iw * cam.s, hh);
+    }
+    ctx.restore();
+    // Border lines between the parts; the focused one glows in the brand colour.
+    ctx.save();
+    const on = i === active ? settle : 0;
+    ctx.strokeStyle = on > 0 ? rgba(palette.primary, 0.35 + 0.55 * on) : rgba(palette.text, 0.2 * sep);
+    ctx.lineWidth = (1.5 + 1.5 * on) * u;
+    if (on > 0) {
+      ctx.shadowColor = palette.primary;
+      ctx.shadowBlur = 18 * u * on;
+    }
+    ctx.beginPath();
+    ctx.roundRect(x, y, iw * cam.s, hh, r);
+    ctx.stroke();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+/** Scrolling browser window: the fallback when the page's sections aren't known. */
+function browserScroll(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 2 });
   const portrait = h > w;

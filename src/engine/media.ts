@@ -837,6 +837,75 @@ export function findHotspots(d: Drawable, frameW: number, frameH: number, fx = 0
   return out;
 }
 
+const bandCache = new Map<string, [number, number][]>();
+
+/**
+ * A full-page screenshot's sections when the page's own layout wasn't recorded: full-width quiet
+ * gutters and background changes mark where one section ends and the next begins. Returns
+ * [top, bottom] fractions of the image height; sections shorter than about a quarter screen merge
+ * into their neighbour.
+ */
+export function pageBands(img: HTMLImageElement): [number, number][] {
+  if (!img.naturalWidth) return [];
+  const hit = bandCache.get(img.src);
+  if (hit) return hit;
+  let out: [number, number][] = [];
+  try {
+    const W = 96;
+    const H = Math.max(40, Math.round((W * img.naturalHeight) / img.naturalWidth));
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0, W, H);
+    const px = g.getImageData(0, 0, W, H).data;
+    const mean: number[][] = [];
+    const quiet: boolean[] = [];
+    for (let y = 0; y < H; y++) {
+      let r = 0, gg = 0, b = 0, busy = 0;
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        r += px[i];
+        gg += px[i + 1];
+        b += px[i + 2];
+        if (x > 0 && Math.abs(px[i] - px[i - 4]) + Math.abs(px[i + 1] - px[i - 3]) + Math.abs(px[i + 2] - px[i - 2]) > 40) busy++;
+      }
+      mean.push([r / W, gg / W, b / W]);
+      quiet.push(busy <= 1);
+    }
+    // Cuts: the middle of each quiet run, and rows where the background colour changes.
+    const cuts = new Set<number>([0, H]);
+    for (let y = 0; y < H; ) {
+      if (!quiet[y]) {
+        y++;
+        continue;
+      }
+      let e = y;
+      while (e < H && quiet[e]) e++;
+      if (e - y >= 2) cuts.add(Math.round((y + e) / 2));
+      y = e;
+    }
+    for (let y = 1; y < H; y++) {
+      const [a, b] = [mean[y - 1], mean[y]];
+      if (quiet[y - 1] && quiet[y] && Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) > 24) cuts.add(y);
+    }
+    const ys = [...cuts].sort((a, b) => a - b);
+    const minH = Math.max(3, Math.round((W * 0.17)));
+    const merged: [number, number][] = [];
+    for (let i = 0; i < ys.length - 1; i++) {
+      const [a, b] = [ys[i], ys[i + 1]];
+      const last = merged[merged.length - 1];
+      if (last && (b - a < minH || last[1] - last[0] < minH)) last[1] = b;
+      else merged.push([a, b]);
+    }
+    out = merged.length >= 2 ? merged.map(([a, b]) => [a / H, b / H] as [number, number]) : [];
+  } catch {
+    out = [];
+  }
+  bandCache.set(img.src, out);
+  return out;
+}
+
 export interface Region {
   x: number;
   y: number;

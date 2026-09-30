@@ -20,6 +20,11 @@ export interface Capture {
   hero: string | null;
   full: string | null;
   sections: string[];
+  /**
+   * The page's real sections on the full-page screenshot, top to bottom, as [top, bottom]
+   * fractions of its height (header, hero, each section, footer).
+   */
+  bands: [number, number][];
   parts: SitePart[];
   /** The header logo: an image URL from the page, or a saved SVG/PNG (/api/shot URL). */
   logo: string | null;
@@ -383,6 +388,72 @@ async function slot(): Promise<(() => void) | null> {
   };
 }
 
+/**
+ * The page's top-level blocks in page pixels, top to bottom: the layout's own sections, found by
+ * descending through single wrappers (#root, main…) to the element whose children stack the page,
+ * then splitting any block taller than two screens into its own children. Tiny strips merge into
+ * their neighbour; gaps between blocks are kept out.
+ */
+async function pageBlocks(page: Page, maxH: number): Promise<{ y: number; h: number }[]> {
+  return page
+    .evaluate((maxH) => {
+      const vw = document.documentElement.clientWidth;
+      const box = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { y: r.top + window.scrollY, h: r.height, w: r.width };
+      };
+      const shown = (el: Element) => {
+        const cs = getComputedStyle(el);
+        const b = box(el);
+        return cs.display !== "none" && cs.visibility !== "hidden" && b.h >= 24 && b.w >= vw * 0.5;
+      };
+      const kids = (el: Element) => Array.from(el.children).filter(shown);
+      let root: Element = document.body;
+      for (let i = 0; i < 8; i++) {
+        const k = kids(root);
+        const main = k.filter((c) => box(c).h >= maxH * 0.6);
+        if (k.length === 1) root = k[0];
+        else if (main.length === 1 && k.length <= 3 && kids(main[0]).length >= 2) root = main[0];
+        else break;
+      }
+      const out: { y: number; h: number }[] = [];
+      const add = (el: Element, depth: number) => {
+        const b = box(el);
+        if (b.y >= maxH) return;
+        const inner = kids(el);
+        // A block taller than two screens is really a wrapper around several sections.
+        if (b.h > 1800 && depth < 3 && inner.length >= 2) return inner.forEach((c) => add(c, depth + 1));
+        out.push({ y: Math.max(0, b.y), h: Math.min(b.h, maxH - Math.max(0, b.y)) });
+      };
+      kids(root).forEach((c) => add(c, 0));
+      out.sort((a, b) => a.y - b.y);
+      // Drop overlaps (fixed headers, absolutely placed layers). Thin strips (a nav bar, a section
+      // heading) belong with the block that follows them.
+      const clean: { y: number; h: number }[] = [];
+      let carry: number | null = null;
+      for (const b of out) {
+        const last = clean[clean.length - 1];
+        if (last && b.y < last.y + last.h - 8) {
+          if (b.y + b.h > last.y + last.h) last.h = b.y + b.h - last.y;
+          continue;
+        }
+        if (b.h < 120) {
+          carry ??= b.y;
+          continue;
+        }
+        const y = carry ?? b.y;
+        carry = null;
+        clean.push({ y, h: b.y + b.h - y });
+      }
+      if (carry !== null && clean.length) {
+        const last = clean[clean.length - 1];
+        last.h = Math.max(last.h, out[out.length - 1].y + out[out.length - 1].h - last.y);
+      }
+      return clean.length >= 2 ? clean.map((b) => ({ y: Math.round(b.y), h: Math.round(b.h) })) : [];
+    }, maxH)
+    .catch(() => []);
+}
+
 /** Live capture through the queue; null means "use the static import instead". */
 export async function captureSite(url: string): Promise<Capture | null> {
   const release = await slot();
@@ -447,22 +518,13 @@ async function captureSiteNow(url: string): Promise<Capture | null> {
       await page.screenshot({ type: "jpeg", quality: 72, scale: "css", fullPage: true, clip: { x: 0, y: 0, width: 1440, height: Math.min(pageHeight, 7200) } }),
     );
 
-    // Distinct, reasonably sized sections below the hero.
-    const boxes = await page.evaluate(() => {
-      const out: { y: number; h: number }[] = [];
-      const els = Array.from(document.querySelectorAll("section, main > div, [class*=feature], [class*=Feature]"));
-      for (const el of els) {
-        const r = el.getBoundingClientRect();
-        const y = r.top + window.scrollY;
-        if (r.height < 320 || r.height > 1400 || r.width < 900 || y < 700) continue;
-        if (out.some((o) => Math.abs(o.y - y) < 250)) continue;
-        out.push({ y, h: r.height });
-      }
-      return out.sort((a, b) => a.y - b.y).slice(0, 6);
-    });
+    // The page's own sections (header, hero, each section, footer), from its layout: the full-page
+    // screenshot is shown section by section, and section shots are cut on real boundaries.
+    const fullH = Math.min(pageHeight, 7200);
+    const blocks = await pageBlocks(page, fullH);
+    const bands = blocks.map((b) => [b.y / fullH, (b.y + b.h) / fullH] as [number, number]);
     const sections: string[] = [];
-    for (const [i, b] of boxes.entries()) {
-      if (b.y + b.h > Math.min(pageHeight, 7200)) break;
+    for (const [i, b] of blocks.filter((b) => b.y >= 600 && b.h >= 320 && b.h <= 1400).slice(0, 6).entries()) {
       const shot = await page.screenshot({ type: "jpeg", quality: 78, scale: "css", fullPage: true, clip: { x: 0, y: b.y, width: 1440, height: b.h } }).catch(() => null);
       if (shot) sections.push(await save(`${key}-s${i}`, shot));
     }
@@ -470,7 +532,7 @@ async function captureSiteNow(url: string): Promise<Capture | null> {
     const html = await page.content();
     // Last: the logo capture may clear page backgrounds for a transparent screenshot.
     const logo = await captureLogo(page, key).catch(() => null);
-    return { html, finalUrl: page.url(), hero, full, sections, parts, logo };
+    return { html, finalUrl: page.url(), hero, full, sections, bands, parts, logo };
   } catch (e) {
     console.warn("[capture] live capture failed, using static fetch:", (e as Error).message);
     return null;

@@ -725,6 +725,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (role === "demo" && DEMO_SKILLS.has(scene.skill)) skill = scene.skill;
     // The product assembled from its own components beats a flat page scroll whenever it's available.
     if (role === "meet" && scene.skill === "ui-assemble") skill = scene.skill;
+    // A tour of the website's own sections (no product footage to zoom into) stays one.
+    if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
     if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "qr-end", "liquid-logo"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
