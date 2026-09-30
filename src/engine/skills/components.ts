@@ -337,6 +337,42 @@ function uiAssemble(sc: SkillContext) {
     ctx.restore();
     rounded(ctx, p, x, y, pw, ph, r);
   });
+  // Once the page is whole, the focus keeps moving: each component in turn lifts a touch with a
+  // glowing outline, on the beat, so the shot stays alive until it leaves.
+  const since = t - (T.sharp + 0.3);
+  if (shown.length && since > 0) {
+    const period = Math.max(0.7, beat * 2);
+    const i = Math.floor(since / period) % shown.length;
+    const ph = since % period;
+    const k = ease.outCubic(range(ph, 0, 0.25)) * (1 - ease.inCubic(range(ph, period - 0.25, period))) * (1 - ex);
+    if (k > 0.01) {
+      const r = slot(shown[i]);
+      const g = 1 + 0.035 * k;
+      const lx = r.x + r.w / 2;
+      const ly = r.y + r.h / 2 - 4 * u * k;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.scale(g, g);
+      ctx.translate(-r.w / 2, -r.h / 2);
+      ctx.shadowColor = palette.light ? `rgba(15,20,40,${0.25 * k})` : `rgba(0,0,0,${0.55 * k})`;
+      ctx.shadowBlur = 36 * u * k;
+      ctx.shadowOffsetY = 12 * u * k;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, r.w, r.h, r.r);
+      ctx.fillStyle = palette.bg1;
+      ctx.fill();
+      ctx.shadowColor = "transparent";
+      rounded(ctx, shown[i], 0, 0, r.w, r.h, r.r);
+      ctx.strokeStyle = rgba(palette.primary, 0.85 * k);
+      ctx.lineWidth = 2 * u;
+      ctx.shadowColor = palette.primary;
+      ctx.shadowBlur = 16 * u * k;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, r.w, r.h, r.r);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
   ctx.restore();
 }
 

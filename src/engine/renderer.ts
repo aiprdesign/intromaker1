@@ -95,19 +95,25 @@ function drawScene(
   music?: MusicPulse,
 ) {
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  const beat = 60 / (plan.bpm ?? 120);
+  const saas = plan.style === "saas";
+  // Beat-locked motion: within each beat, animation is front-loaded so moves hit on the beat and
+  // ease before the next. Exact on every beat (so beat-timed moments and sound cues don't move).
+  // Video scenes keep real time (their footage would stutter).
+  const tl = saas && scene.media?.kind !== "video" ? beatLock(t, beat) : t;
   const sc: SkillContext = {
     ctx: target,
     w,
     h,
-    t,
+    t: tl,
     d,
-    p: clamp(t / d),
+    p: clamp(tl / d),
     u: Math.min(w, h) / 1080,
     scene,
     palette,
     font: plan.font,
     seed: (plan.seed + index * 7919) >>> 0,
-    beat: 60 / (plan.bpm ?? 120),
+    beat,
     brand: plan.brand,
     style: plan.style,
     // The studio's text effect overrides the template's. (A plan without a look renders like
@@ -126,6 +132,13 @@ function drawScene(
   const level = !styleDepth;
   const turn = plan.style === "saas" ? plan.look?.turn ?? 0 : 0;
   const slab = plan.style === "saas" && !!plan.look?.slab;
+  // Exit: when the next shot simply cuts in, this shot's content leaves on its last beat (lifts,
+  // softens and fades) while the background stays; the cut lands mid-exit, so there's no dead air. Overlapping transitions are their own exit
+  // (they extend d); the last shot and end cards always hold.
+  const scenes = (plan as { scenes?: Scene[] }).scenes;
+  const last = !scenes || index >= scenes.length - 1;
+  const exitLen = Math.min(0.42, beat * 0.85);
+  const exit = saas && d === scene.duration && !last && scene.role !== "cta" && !/^(cta|qr-end)$/.test(scene.skill) ? ease.inCubic(clamp((t - (d - exitLen)) / exitLen)) * 0.8 : 0;
   if (turn > 0 || slab) {
     // 3D stages: the shot is drawn flat, then shown turned on a panel (turntable) or as a thick
     // floating slab, over the style's own background.
@@ -138,8 +151,9 @@ function drawScene(
     if (transitionIn) applyTransitionIn(csc);
     SKILL_MAP[scene.skill].render(csc);
     layer.ctx.restore();
-    if (slab) projectSlab(target, layer.canvas, w, h, globalT, sc);
-    else projectTurn(target, layer.canvas, w, h, turn, globalT, sc);
+    const shot = exitLayer(layer.canvas, w, h, exit, sc.u);
+    if (slab) projectSlab(target, shot, w, h, globalT, sc);
+    else projectTurn(target, shot, w, h, turn, globalT, sc);
     resetCtx(target);
     return sc;
   }
@@ -153,7 +167,20 @@ function drawScene(
     if (transitionIn) applyTransitionIn(csc);
     SKILL_MAP[scene.skill].render(csc);
     layer.ctx.restore();
-    projectPlane(target, layer.canvas, w, h, depth, globalT, level);
+    projectPlane(target, exitLayer(layer.canvas, w, h, exit, sc.u), w, h, depth, globalT, level);
+    resetCtx(target);
+    return sc;
+  }
+  if (exit > 0) {
+    // Leaving: the background stays put while the content (drawn on its own layer) exits.
+    saasBackground(sc);
+    const layer = scratch("exit-content", w, h);
+    const csc: SkillContext = { ...sc, ctx: layer.ctx, noStage: true };
+    layer.ctx.save();
+    if (opts.camera !== false) applyCamera(csc, globalT);
+    SKILL_MAP[scene.skill].render(csc);
+    layer.ctx.restore();
+    target.drawImage(exitLayer(layer.canvas, w, h, exit, sc.u), 0, 0);
     resetCtx(target);
     return sc;
   }
@@ -164,6 +191,31 @@ function drawScene(
   target.restore();
   resetCtx(target);
   return sc;
+}
+
+/** Beat-locked time: exact on every beat, front-loaded within it (monotonic, so nothing reverses). */
+function beatLock(t: number, beat: number) {
+  if (t <= 0 || beat <= 0) return t;
+  const n = Math.floor(t / beat);
+  const f = t / beat - n;
+  return (n + f + (ease.outCubic(f) - f) * 0.3) * beat;
+}
+
+/** The content layer on its way out: lifted, slightly smaller, softened and faded (level). */
+function exitLayer(src: HTMLCanvasElement, w: number, h: number, k: number, u: number): HTMLCanvasElement {
+  if (k <= 0) return src;
+  const out = scratch("exit-out", w, h);
+  const c = out.ctx;
+  c.save();
+  c.globalAlpha = 1 - k;
+  const s = 1 - 0.05 * k;
+  c.translate(w / 2, h / 2 - 46 * u * k);
+  c.scale(s, s);
+  c.translate(-w / 2, -h / 2);
+  if (k > 0.05) c.filter = `blur(${(8 * u * k).toFixed(1)}px)`;
+  c.drawImage(src, 0, 0);
+  c.restore();
+  return out.canvas;
 }
 
 /** Skills that show the product itself (screens, boards, flows): these get the 3D product stage. */

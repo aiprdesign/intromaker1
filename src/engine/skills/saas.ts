@@ -776,8 +776,14 @@ function iconFeatures(sc: SkillContext) {
     // ("in the spotlight") until the next card arrives.
     const k = clamp(spring(lt, 10, 6.5), 0, 1.1);
     const settleK = Math.min(1, k);
-    const next = times[i + 1] ?? sc.d - 0.5;
-    const spot = ease.outCubic(range(lt, 0.15, 0.4)) * (1 - ease.inOutCubic(range(t, next, next + 0.35))) * (1 - ex);
+    const next = times[i + 1] ?? times[n - 1] + 0.7;
+    // While cards arrive, the newest is in the spotlight; once all have landed the spotlight keeps
+    // moving through them on the beat, so the slide stays alive until it leaves.
+    const cycle = times[n - 1] + 0.7;
+    const period = Math.max(0.6, sc.beat * 2);
+    const since = t - cycle;
+    const onCycle = since >= 0 && Math.floor(since / period) % n === i ? ease.outCubic(range(since % period, 0, 0.25)) * (1 - ease.inCubic(range(since % period, period - 0.2, period))) : 0;
+    const spot = Math.max(ease.outCubic(range(lt, 0.15, 0.4)) * (1 - ease.inOutCubic(range(t, next, next + 0.35))), onCycle) * (1 - ex);
     const float = Math.sin((sc.globalT ?? t) * 1.3 + i) * 4 * u;
     ctx.save();
     ctx.globalAlpha = clamp(lt / 0.2) * (1 - ex);
