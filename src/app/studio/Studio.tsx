@@ -8,6 +8,8 @@ import SkillPicker from "@/components/SkillPicker";
 import type { PlanLimits } from "@/lib/plans";
 import { sceneThumb, thumbsReady } from "@/lib/thumbs";
 import SlideTimeline from "@/components/SlideTimeline";
+import Icon from "@/components/Icon";
+import { useReorder } from "@/components/useReorder";
 import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
 import BackgroundPicker, { applyBackground, type BgChoice, BG_OPTIONS } from "@/components/BackgroundPicker";
@@ -733,6 +735,8 @@ export default function Studio() {
     else if (selected !== null && from < selected && to >= selected) setSelected(selected - 1);
     else if (selected !== null && from > selected && to <= selected) setSelected(selected + 1);
   };
+  // Storyboard cards reorder by dragging their grip (mouse, touch or pen).
+  const cardReorder = useReorder("cards", (from, to) => moveScene(from, to));
   const removeScene = (i: number) => {
     if (plan.scenes.length <= 1) return;
     record();
@@ -769,8 +773,18 @@ export default function Studio() {
     // Blur Reveal's list is only a fallback eyebrow; SaaS films have the chapter label for that.
     const showItems = skill.itemsHint !== undefined && !(plan.style === "saas" && s.skill === "blur-reveal");
     return (
-      <div className={`scene-card${selected === i ? " selected" : ""}`} key={`${where}-${i}`} id={where === "grid" ? `scene-${i}` : undefined}>
+      <div
+        className={`scene-card${selected === i ? " selected" : ""}${where === "grid" ? cardReorder.classOf(i) : ""}`}
+        key={`${where}-${i}`}
+        id={where === "grid" ? `scene-${i}` : undefined}
+        {...(where === "grid" ? { "data-reorder": "cards", "data-index": i } : {})}
+      >
         <div className="scene-top">
+          {where === "grid" && (
+            <button type="button" className="drag-handle" data-drag-handle onPointerDown={cardReorder.start(i)} aria-label={`Drag slide ${i + 1} to reorder`} title="Drag to reorder">
+              <Icon name="GripVertical" size={14} />
+            </button>
+          )}
           <span className="scene-n">{String(i + 1).padStart(2, "0")}</span>
           <SkillPicker plan={plan} value={s.skill} onPick={(id) => id !== s.skill && updateScene(i, { skill: id })} />
         </div>
