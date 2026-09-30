@@ -21,6 +21,7 @@ export default function Player({
   seek: seekTo,
   onScene,
   onExported,
+  beforeExport,
   limits,
 }: {
   plan: VideoPlan;
@@ -33,6 +34,8 @@ export default function Player({
   onScene?: (index: number) => void;
   /** Called after a video export finishes, with the film as exported and the preset's name. */
   onExported?: (plan: VideoPlan, preset: string) => void;
+  /** Asked before an export starts; returning false cancels it (e.g. an unconfirmed offer). */
+  beforeExport?: () => boolean;
   /** The viewer's plan: largest export, frame rate and watermark. */
   limits?: PlanLimits;
 }) {
@@ -237,6 +240,7 @@ export default function Player({
   };
 
   const onExport = async () => {
+    if (beforeExport && !beforeExport()) return;
     setError(null);
     setPlaying(false);
     const ac = new AbortController();

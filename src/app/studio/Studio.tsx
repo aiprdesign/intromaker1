@@ -27,6 +27,7 @@ import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
 import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
+import { offerKey, offersIn } from "@/engine/claims";
 import { SKILL_MAP } from "@/engine/skills";
 import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
@@ -714,6 +715,13 @@ export default function Studio() {
     if (s) setSeek({ t: startOf(p, i) + Math.min(s.duration * 0.6, s.duration - 0.3), key: Date.now() });
   };
 
+  // Offers on screen (free, trials, discounts) the maker hasn't confirmed are real yet.
+  const pendingOffers = offersIn(plan).filter((o) => !(plan.offersOk ?? []).includes(offerKey(o.text)));
+  const confirmOffers = () => {
+    record("offers");
+    setPlan((p) => ({ ...p, offersOk: [...new Set([...(p.offersOk ?? []), ...offersIn(p).map((o) => offerKey(o.text))])].slice(-12) }));
+  };
+
   const updateScene = (i: number, patch: Partial<Scene>) => {
     record(`scene:${i}:${Object.keys(patch).join(",")}`);
     // Not sanitised: an empty headline mid-typing must stay empty.
@@ -1388,6 +1396,30 @@ export default function Studio() {
             </a>
           </p>
           {note && <p className="hint warn">{note}</p>}
+          {pendingOffers.length > 0 && (
+            <div className="offer-warn" role="alert">
+              <strong>Confirm {pendingOffers.length === 1 ? "this offer is" : "these offers are"} real</strong>
+              <ul>
+                {pendingOffers.map((o) => (
+                  <li key={o.text}>
+                    “{o.text}” <span className="hint sm">slide {o.scene + 1}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="hint sm">
+                Only publish an offer viewers can really get, exactly as worded (a free plan or trial, a discount). If it isn&apos;t available, change the wording on
+                the slide.
+              </p>
+              <div className="import-error-actions">
+                <button className="btn btn-primary sm" onClick={confirmOffers}>
+                  It&apos;s a real offer
+                </button>
+                <button className="btn btn-ghost sm" onClick={() => selectScene(pendingOffers[0].scene)}>
+                  Edit slide {pendingOffers[0].scene + 1}
+                </button>
+              </div>
+            </div>
+          )}
 
           </div>
         </aside>
@@ -1400,6 +1432,14 @@ export default function Studio() {
               seek={seek}
               onScene={setActiveScene}
               limits={account?.limits}
+              beforeExport={() => {
+                if (!pendingOffers.length) return true;
+                const ok = window.confirm(
+                  `This intro makes an offer: ${pendingOffers.map((o) => `“${o.text}”`).join(", ")}.\n\nExport only if viewers can really get it, exactly as worded. Is it a real offer?`,
+                );
+                if (ok) confirmOffers();
+                return ok;
+              }}
               onExported={(p, preset) => {
                 // Tell the owner's admin area what was made (ignored when it's off).
                 void fetch("/api/films", {

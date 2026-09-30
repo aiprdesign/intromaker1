@@ -146,3 +146,29 @@ export function hasClaim(text: string | undefined) {
   if (!text) return false;
   return safeCopy(text) !== tidy(text) || isNumericClaim(text) || isUnsafe(text);
 }
+
+/** "Free" that isn't an offer: compounds and verbs ("hassle-free", "free up", "feel free"). */
+const NOT_OFFER = /\b[\w]+-free\b|\bfree (up|of|from|yourself|your time|time|to (use|explore|ask))\b|\b(feel|set|break) free\b|\btoll[- ]free\b|\bfreedom\b/g;
+
+/**
+ * Whether copy makes an offer viewers could act on: something free, a trial, a discount or
+ * coupon, "no credit card", a money-back guarantee. Offers must be real and available (FTC), so
+ * the studio asks the maker to confirm each one before exporting.
+ */
+export function mentionsOffer(text: string | undefined): boolean {
+  if (!text) return false;
+  const t = ` ${text.toLowerCase().replace(/\*/g, "").replace(/\s+/g, " ")} `.replace(NOT_OFFER, " ");
+  return /\bfree\b|\btrials?\b|\d+\s?% off\b|\b(discount|coupon|promo code|voucher|money[- ]back|guarantee[ds]?)\b|\bno credit card\b|\bsave (\$|€|£)?\d/.test(t);
+}
+
+/** Every offer in a storyboard: the slide, and the words as they appear on screen. */
+export function offersIn(plan: { scenes: { text: string; subtext?: string; items?: string[] }[] }): { scene: number; text: string }[] {
+  const out: { scene: number; text: string }[] = [];
+  plan.scenes.forEach((s, i) => {
+    for (const t of [s.subtext, s.text.replace(/\*/g, ""), ...(s.items ?? [])]) if (t && mentionsOffer(t) && !out.some((o) => o.text === t)) out.push({ scene: i, text: t });
+  });
+  return out;
+}
+
+/** The key a confirmation is stored under (so an edited offer asks again). */
+export const offerKey = (text: string) => text.toLowerCase().replace(/[^a-z0-9%$€£]+/g, " ").trim();

@@ -249,6 +249,8 @@ export interface VideoPlan {
   target?: number;
   /** Director's notes for the user (e.g. "only enough material for a 20s cut"). */
   notes?: string[];
+  /** Offers the maker confirmed are real (keys from offerKey), so the studio stops asking. */
+  offersOk?: string[];
   /** Product concept (devtools, ai, fintech…): picks icon families and story vocabulary. */
   concept?: string;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */

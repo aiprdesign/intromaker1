@@ -741,19 +741,20 @@ export function offersFree(text: string): boolean {
   return /\b(free (plan|trial|tier|account|version|forever|to start|for (ever|everyone|individuals|teams|students|life))|(try|start|use|get started|sign up|join|download)( it| now)? (for )?free|for free|is free|always free|100% free|free\b[^.]{0,20}\bno (credit )?card)\b/.test(cleaned);
 }
 
-/** A site's own button text, cleaned: arrows, emoji and shouting removed; null when unusable. */
+/**
+ * A site's own button text, as the site wrote it: only decoration (arrows, emoji, stray
+ * punctuation around it) is trimmed. Null when there's no usable label (empty, or a sentence).
+ */
 export function cleanCta(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  let v = raw
+  const v = raw
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
     .replace(/[→›»>←‹«<↗➜➔➝⟶]+/g, " ")
     .replace(/\s+/g, " ")
     .replace(/^[\s\-–—:·•|]+|[\s\-–—:·•|.,;]+$/g, "")
     .trim();
-  if (!v || v.length > 28 || v.split(" ").length > 5 || !/[a-z]/i.test(v)) return null;
-  // SHOUTED LABELS read as sentence case ("START FREE TRIAL" → "Start free trial"); acronyms stay.
-  if (v === v.toUpperCase() && /[A-Z]{3}/.test(v)) v = v.charAt(0) + v.slice(1).toLowerCase();
-  return v.charAt(0).toUpperCase() + v.slice(1);
+  if (!v || v.length > 40 || v.split(" ").length > 7 || !/[a-z]/i.test(v)) return null;
+  return v;
 }
 
 /** "Book a demo" → "book a demo" for "Scan to …"; acronyms and names keep their capitals. */
@@ -770,8 +771,9 @@ export function lowerFirst(label: string): string {
  * never read as a signal. "Free" is only offered when the copy really offers something free.
  */
 export function contextCta(site: Pick<SiteData, "cta" | "name" | "tagline" | "description" | "headlines" | "features">, concept?: string): string {
+  // The site's own button, exactly as it says it (an offer in it is confirmed by the maker in the studio).
   const own = cleanCta(site.cta);
-  if (own && (!/\bfree\b/i.test(own) || offersFree([own, site.tagline, site.description, ...site.headlines, ...site.features].join(" ")) || /free trial/i.test(own))) return own;
+  if (own) return own;
   const name = site.name.trim().toLowerCase();
   const text = ` ${[site.tagline, site.description, ...site.headlines, ...site.features].join(" . ").toLowerCase()} `
     .split(name && name.length > 2 ? name : "\u0000")
@@ -1831,6 +1833,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     concept: typeof raw.concept === "string" && CONCEPT_MAP[raw.concept] ? raw.concept : undefined,
     voiceover: sanitizeVoice(raw.voiceover),
     target: Number(raw.target) > 0 ? Math.min(120, Math.max(6, Number(raw.target))) : undefined,
+    offersOk: Array.isArray(raw.offersOk) ? raw.offersOk.filter((o): o is string => typeof o === "string").slice(0, 12).map((o) => o.slice(0, 120)) : undefined,
     notes: Array.isArray(raw.notes) ? raw.notes.filter((n): n is string => typeof n === "string").slice(0, 3).map((n) => n.slice(0, 300)) : undefined,
     look:
       raw.look && typeof raw.look === "object"

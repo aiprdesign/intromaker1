@@ -253,6 +253,8 @@ What happens: a paid checkout makes the account Pro; after the redirect the acco
 - **Headers**: `nosniff`, `X-Frame-Options: DENY`, a strict referrer policy, a permissions policy and HSTS; captured SVGs are served with a sandboxing CSP.
 - **Keys** stay in the visitor's browser and are removed from error messages.
 
+**Offers are confirmed by the maker.** An intro uses the website's own button text exactly as the site words it ("Try for Free!"). Whenever a slide makes an offer (something free, a trial, a discount or coupon, "no credit card", a money-back guarantee), the studio shows a warning naming the words and the slide. Confirm with *It's a real offer*, or edit the slide. Exporting with an unconfirmed offer asks first. The confirmation is saved with the film, and edited wording asks again.
+
 `npm run check:copy` checks the copy rules: end-card buttons worded for the intro's content, "free" only when the copy really offers something free ("hassle-free", "free up your time" and "error-free" don't count), and site buttons cleaned of arrows, emoji and shouting.
 
 `npm run check:hosting` verifies all of this in production mode (rate limits, spoofing, the AI budget, storage clean-up, the admin area, accounts and plans, the Stripe webhook (forged, stale and repeated events, upgrades, cancellations), website-import error messages, around 30 SSRF cases including DNS rebinding, local AI).
