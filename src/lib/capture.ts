@@ -418,14 +418,9 @@ async function captureSiteNow(url: string): Promise<Capture | null> {
     } catch {
       await page.goto(url, { waitUntil: "load", timeout: 20_000 }).catch(() => {});
     }
-    // Dismiss cookie / consent banners so they don't ruin the screenshots.
-    for (const label of [/accept all/i, /accept/i, /agree/i, /allow all/i, /got it/i, /^ok$/i]) {
-      const btn = page.getByRole("button", { name: label }).first();
-      if (await btn.isVisible({ timeout: 300 }).catch(() => false)) {
-        await btn.click({ timeout: 1000 }).catch(() => {});
-        break;
-      }
-    }
+    // Cookie / consent banners, chat bubbles and pop-ups would ruin every screenshot: clear them
+    // now, again after scrolling (many appear late), and just before the shots.
+    await cleanPage(page);
     // Scroll through to trigger lazy-loaded images and scroll animations, then return to top.
     await page.evaluate(async () => {
       const h = Math.min(document.documentElement.scrollHeight, 12000);
@@ -436,6 +431,7 @@ async function captureSiteNow(url: string): Promise<Capture | null> {
       window.scrollTo(0, 0);
     });
     await page.waitForTimeout(900);
+    await cleanPage(page);
 
     const hero = await save(`${key}-hero`, await page.screenshot({ type: "jpeg", quality: 82, scale: "css" }));
     const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
@@ -475,3 +471,97 @@ async function captureSiteNow(url: string): Promise<Capture | null> {
     await browser.close().catch(() => {});
   }
 }
+
+/* ───────── Clean screenshots ───────── */
+
+/** Consent platforms, cookie bars, chat widgets and pop-up containers hidden before any screenshot. */
+const CLUTTER = [
+  // Consent platforms.
+  "#onetrust-banner-sdk", "#onetrust-consent-sdk", ".onetrust-pc-dark-filter", "#CybotCookiebotDialog", "#CybotCookiebotDialogBodyUnderlay",
+  "#usercentrics-root", "#usercentrics-cmp-ui", "#didomi-host", ".didomi-popup-backdrop", "#qc-cmp2-container", ".qc-cmp2-container",
+  "[id^='sp_message_container']", ".sp_veil", "#truste-consent-track", ".truste_box_overlay", ".truste_overlay", ".osano-cm-window",
+  ".osano-cm-dialog", ".fc-consent-root", "#iubenda-cs-banner", "#hs-eu-cookie-confirmation", "#cookie-law-info-bar", ".cky-consent-container",
+  ".cky-overlay", ".cc-window", ".cc-banner", ".cmplz-cookiebanner", "#cmplz-cookiebanner-container", "#moove_gdpr_cookie_info_bar", ".termly-styles-root",
+  "#termly-code-snippet-support", "#axeptio_overlay", ".klaro", "#klaro", ".cookiefirst-root", "#ccc", "#ccc-overlay", ".tarteaucitronRoot",
+  "#tarteaucitronRoot", "[data-nosnippet][class*='cookie' i]", "[aria-label*='cookie' i]", "[aria-label*='consent' i]", "[aria-describedby*='cookie' i]",
+  "[id*='cookie-banner' i]", "[class*='cookie-banner' i]", "[id*='cookie-consent' i]", "[class*='cookie-consent' i]", "[class*='cookieConsent']",
+  "[id*='cookieConsent']", "[class*='CookieBanner']", "[class*='cookie-notice' i]", "[id*='cookie-notice' i]", "[class*='consent-banner' i]", "[id*='gdpr' i]",
+  // Chat and support widgets.
+  "#intercom-container", ".intercom-lightweight-app", ".intercom-launcher", "#hubspot-messages-iframe-container", "#drift-widget", "#drift-frame-controller",
+  "#drift-frame-chat", ".crisp-client", "#crisp-chatbox", "#tidio-chat", "#tidio-chat-iframe", "#fc_frame", ".zsiq_floatmain", "#launcher[title]",
+  "iframe[title*='chat' i]", "iframe[title*='messaging' i]", "iframe[src*='intercom']", "iframe[id*='chat' i]", "#chat-widget-container", "[class*='livechat' i]",
+];
+/** Exact accept wording (never a partial match: "Accept payments" is a product feature, not a banner). */
+const ACCEPT = /^\s*(accept( all)?( cookies)?|allow( all)?( cookies)?|i accept|i agree|agree( (and|&) (continue|close))?|got it|ok(ay)?|understood|accept & close|accept and close|consent)\s*[.!]?\s*$/i;
+
+/**
+ * Leave the page as a visitor sees it after dismissing the noise: accept consent banners through
+ * their own buttons (in the page and in consent iframes, only inside a consent container), then
+ * hide known consent and chat elements, remove any other fixed or sticky element that talks about
+ * cookies or consent, remove full-screen pop-up overlays, and unlock scrolling.
+ */
+export async function cleanPage(page: Page) {
+  const accept = ACCEPT.source;
+  for (const frame of page.frames()) {
+    await frame
+      .evaluate((src) => {
+        const re = new RegExp(src, "i");
+        const consent = /cookie|consent|gdpr|privacy (settings|preferences|choices)|we use cookies|tracking technologies/i;
+        const buttons = Array.from(document.querySelectorAll<HTMLElement>("button, [role=button], a, input[type=button], input[type=submit]"));
+        for (const b of buttons) {
+          const label = (b.innerText || (b as HTMLInputElement).value || b.getAttribute("aria-label") || "").trim();
+          if (!re.test(label)) continue;
+          // Only inside something that is about cookies / consent (or a consent iframe).
+          let el: HTMLElement | null = b;
+          let ok = window.top !== window && consent.test(document.body?.innerText ?? "");
+          for (let i = 0; i < 8 && el && !ok; i++, el = el.parentElement) {
+            const text = el.innerText ?? "";
+            ok = consent.test(`${el.id} ${el.className} ${el.getAttribute("aria-label") ?? ""}`) || (i >= 1 && text.length < 1500 && consent.test(text));
+          }
+          if (ok) {
+            b.click();
+            return true;
+          }
+        }
+        return false;
+      }, accept)
+      .catch(() => false);
+  }
+  await page.waitForTimeout(250);
+  await page
+    .evaluate((selectors) => {
+      const style = document.createElement("style");
+      style.setAttribute("data-intromaker", "clean");
+      style.textContent = `${selectors.join(",")}{display:none!important;visibility:hidden!important}`;
+      document.head.appendChild(style);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const talk = /cookie|consent|gdpr|we use cookies|privacy (settings|preferences|choices)|tracking technologies/i;
+      const promo = /subscribe|newsletter|sign up for|join our|get \d+% off|discount|download (the|our) (guide|ebook)/i;
+      for (const el of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
+        const cs = getComputedStyle(el);
+        if (cs.position !== "fixed" && cs.position !== "sticky") continue;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        const text = (el.innerText || "").slice(0, 2000);
+        const ids = `${el.id} ${el.className} ${el.getAttribute("aria-label") ?? ""}`;
+        const cover = (r.width * r.height) / (vw * vh);
+        const modal = el.getAttribute("aria-modal") === "true" || el.getAttribute("role") === "dialog" || el.getAttribute("role") === "alertdialog";
+        // A cookie / consent bar or card, wherever it sits.
+        if ((talk.test(text) || talk.test(ids)) && cover < 0.85) el.style.setProperty("display", "none", "important");
+        // A pop-up covering most of the page (modal, newsletter, promo) and its dimmed backdrop.
+        else if (cover > 0.55 && (modal || promo.test(text) || (!text.trim() && parseFloat(cs.opacity) < 1) || /overlay|backdrop|modal|popup/i.test(ids)))
+          el.style.setProperty("display", "none", "important");
+        // A floating pop-up card (not a header or nav bar at the top edge).
+        else if ((modal || promo.test(text)) && r.top > 60) el.style.setProperty("display", "none", "important");
+      }
+      // Modals often lock scrolling; screenshots need the page as it scrolls.
+      for (const el of [document.documentElement, document.body]) {
+        if (!el) continue;
+        if (getComputedStyle(el).overflow === "hidden") el.style.setProperty("overflow", "visible", "important");
+        el.style.removeProperty("filter");
+      }
+    }, CLUTTER)
+    .catch(() => {});
+}
+
