@@ -120,7 +120,10 @@ function drawScene(
   resetCtx(target);
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
   // set their own depth); headline, logo and closing shots stay flat so their type reads cleanly.
-  const depth = plan.style === "saas" ? plan.look?.depth ?? (PRODUCT_SHOTS.has(scene.skill) ? 12 : 0) : 0;
+  const styleDepth = plan.style === "saas" ? plan.look?.depth ?? 0 : 0;
+  const depth = styleDepth || (plan.style === "saas" && PRODUCT_SHOTS.has(scene.skill) ? 10 : 0);
+  // The default product stage only leans back: rows and cards stay perfectly level.
+  const level = !styleDepth;
   const turn = plan.style === "saas" ? plan.look?.turn ?? 0 : 0;
   const slab = plan.style === "saas" && !!plan.look?.slab;
   if (turn > 0 || slab) {
@@ -150,7 +153,7 @@ function drawScene(
     if (transitionIn) applyTransitionIn(csc);
     SKILL_MAP[scene.skill].render(csc);
     layer.ctx.restore();
-    projectPlane(target, layer.canvas, w, h, depth, globalT);
+    projectPlane(target, layer.canvas, w, h, depth, globalT, level);
     resetCtx(target);
     return sc;
   }
@@ -173,9 +176,10 @@ const PRODUCT_SHOTS = new Set<string>([
  * Draw `src` as a plane tilted back by ~`depth` degrees (true perspective, via thin horizontal
  * strips), with a slow orbit: the tilt breathes and the plane yaws gently from side to side.
  */
-function projectPlane(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, w: number, h: number, depth: number, t: number) {
+function projectPlane(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, w: number, h: number, depth: number, t: number, level = false) {
   const ax = ((depth * (0.8 + 0.2 * Math.sin(t * 0.33))) * Math.PI) / 180;
-  const yaw = ((depth * 0.35 * Math.sin(t * 0.21)) * Math.PI) / 180;
+  // Level: no side-to-side swing, so every horizontal line stays horizontal.
+  const yaw = level ? 0 : ((depth * 0.35 * Math.sin(t * 0.21)) * Math.PI) / 180;
   const f = h * 2.4;
   const strip = Math.max(2, Math.round(h / 300));
   const project = (y: number) => {
@@ -766,11 +770,10 @@ function applyCamera(sc: SkillContext, globalT: number) {
   const s = 1.035 + push + pulse + 0.05 * arrive;
   const dx = noise1(globalT * 0.45, 11) * 9 * u + side * p * 14 * u + side * arrive * 26 * u;
   const dy = noise1(globalT * 0.37, 23) * 7 * u - p * 6 * u;
-  const rot = noise1(globalT * 0.23, 37) * 0.007 - side * arrive * 0.012;
+  // SaaS shots never roll or skew: text, cards and UI rows stay perfectly level.
+  const rot = saas ? 0 : noise1(globalT * 0.23, 37) * 0.007;
   ctx.translate(w / 2 + dx, h / 2 + dy);
   ctx.rotate(rot);
-  // A slight perspective sway (a filmed product shot, not a flat slide).
-  if (saas) ctx.transform(1, noise1(globalT * 0.19, 41) * 0.006, noise1(globalT * 0.17, 43) * 0.005, 1, 0, 0);
   ctx.scale(s, s);
   ctx.translate(-w / 2, -h / 2);
 }

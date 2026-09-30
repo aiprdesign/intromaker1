@@ -772,18 +772,16 @@ function iconFeatures(sc: SkillContext) {
     const y = gy0 + r * (ch + gap);
     const lt = t - times[i];
     if (lt <= 0) return;
-    // Each card rises in on its own beat with a small tilt that settles, then stays lifted and
-    // outlined ("in the spotlight") until the next card arrives.
+    // Each card rises in on its own beat (staying level), then stays lifted and outlined
+    // ("in the spotlight") until the next card arrives.
     const k = clamp(spring(lt, 10, 6.5), 0, 1.1);
     const settleK = Math.min(1, k);
     const next = times[i + 1] ?? sc.d - 0.5;
     const spot = ease.outCubic(range(lt, 0.15, 0.4)) * (1 - ease.inOutCubic(range(t, next, next + 0.35))) * (1 - ex);
     const float = Math.sin((sc.globalT ?? t) * 1.3 + i) * 4 * u;
-    const tilt = (1 - settleK) * (i % 2 ? 0.09 : -0.09);
     ctx.save();
     ctx.globalAlpha = clamp(lt / 0.2) * (1 - ex);
     ctx.translate(x + cw / 2, y + ch / 2 + (1 - settleK) * 90 * u + float - spot * 8 * u);
-    ctx.rotate(tilt);
     const sk = (0.8 + 0.2 * k) * (1 + 0.035 * spot);
     ctx.scale(sk, sk);
     ctx.translate(-(x + cw / 2), -(y + ch / 2));
