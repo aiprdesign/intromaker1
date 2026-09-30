@@ -14,6 +14,7 @@ import {
   subline,
 } from "../fx";
 import { clamp, ease, lerp, mix, range, rgba, rng, TAU } from "../math";
+import { tokens } from "../grid";
 import { textPoints } from "../text";
 import type { Skill, SkillContext } from "../types";
 
@@ -148,7 +149,8 @@ function hyperspace(sc: SkillContext) {
   const k = ease.outExpo(range(t, tp - 0.05, tp + 0.5));
   if (k > 0) {
     const ex = exitT(sc, 0.35);
-    const layout = headline(sc, { sizeFrac: 0.3 });
+    // Fits the title-safe width with headroom for the 10% post-impact drift and chromatic split.
+    const layout = headline(sc, { sizeFrac: 0.3, widthFrac: tokens(w, h).safe.width / w / 1.1 });
     const sh = shake(sc, tp, 16, 0.4);
     ctx.save();
     ctx.translate(cx + sh.x, cy + sh.y);
@@ -258,7 +260,8 @@ function shockwave(sc: SkillContext) {
 
   if (after >= 0) {
     const ex = exitT(sc, 0.35);
-    const layout = headline(sc, { sizeFrac: 0.3 });
+    // Fits the title-safe width with headroom for the 10% post-impact drift and chromatic split.
+    const layout = headline(sc, { sizeFrac: 0.3, widthFrac: tokens(w, h).safe.width / w / 1.1 });
     const k = ease.outExpo(range(after, 0, 0.35));
     const ab = (1 - range(after, 0, 0.6)) * 22 * u + 2 * u;
     ctx.save();

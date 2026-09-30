@@ -2,6 +2,7 @@ import { revealHit } from "../arrange";
 import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
 import { saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
+import { fitSafeTop, tokens } from "../grid";
 import { drawLogo, logoMaxWidth, getImage, getMedia, mediaSize, type Drawable } from "../media";
 import { scratch } from "../scratch";
 import { subFont } from "../text";
@@ -209,7 +210,7 @@ function productShowcase(sc: SkillContext) {
   const ex = ease.inCubic(exitT(sc, 0.45));
 
   // Headline above the device.
-  const layout = headline(sc, { cy: h * (portrait ? 0.16 : 0.13), sizeFrac: portrait ? 0.1 : 0.085, widthFrac: 0.86, maxLines: 2 });
+  const layout = fitSafeTop(headline(sc, { cy: h * (portrait ? 0.16 : 0.13), sizeFrac: portrait ? 0.1 : 0.085, widthFrac: 0.86, maxLines: 2 }), w, h);
   const hk = ease.outExpo(range(t, 0.1, 0.7));
   ctx.save();
   ctx.globalAlpha = hk * (1 - ex);
@@ -219,9 +220,12 @@ function productShowcase(sc: SkillContext) {
   ctx.restore();
 
   // Browser window with the site's media, swinging in from a steep 3D angle.
-  const ww = portrait ? w * 0.86 : w * 0.58;
-  const wh = ww * (portrait ? 1.25 : 0.6);
+  // The supporting line sits on the grid just inside the title-safe bottom; the window fits above it.
+  const g = tokens(w, h);
+  const subY = h - g.safe.bottom - g.space(2);
   const top = portrait ? h * 0.3 : h * 0.25;
+  const ww = portrait ? w * 0.86 : w * 0.58;
+  const wh = Math.min(ww * (portrait ? 1.25 : 0.6), scene.subtext ? subY - g.space(5) - top : Infinity);
   const cx = w / 2;
   const cyW = top + wh / 2;
   const k = ease.outExpo(range(t, 0.15, 1.4));
@@ -284,7 +288,7 @@ function productShowcase(sc: SkillContext) {
   ctx.stroke();
   ctx.restore();
 
-  const sub = portrait ? top + wh + 70 * u : Math.min(h - 50 * u, top + wh + 56 * u);
+  const sub = Math.min(subY, top + wh + g.space(portrait ? 9 : 7));
   subline(sc, sub, range(t, 0.9, 1.5), { alpha: 1 - ex });
 }
 

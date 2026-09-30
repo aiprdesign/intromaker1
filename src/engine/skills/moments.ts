@@ -19,8 +19,9 @@
  */
 import { exitT } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, noise1, range, rgba, rng, TAU } from "../math";
+import { tokens } from "../grid";
 import { getImage, getMedia } from "../media";
-import { borderBeam, clickRipple, drawCursor, drawIcon, glassCard, iconsFor, pill, saasBackground, spring } from "../saasfx";
+import { borderBeam, clickRipple, drawCursor, drawIcon, glassCard, iconsFor, pill, pillWidth, saasBackground, spring } from "../saasfx";
 import { subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { coverDraw, fitted, mockShot } from "./gallery";
@@ -53,9 +54,11 @@ export function doneBadge(sc: SkillContext, label: string, cx: number, cy: numbe
   if (lt <= 0) return;
   const { ctx, u, palette } = sc;
   const k = clamp(spring(lt, 13, 7), 0, 1.1);
+  // Keep the badge (a 44pt·S tall pill) above the title-safe bottom.
+  const y = Math.min(cy, sc.h - tokens(sc.w, sc.h).safe.bottom - 22 * u * S);
   ctx.save();
   ctx.globalAlpha *= clamp(lt / 0.15);
-  ctx.translate(cx, cy);
+  ctx.translate(cx, y);
   ctx.scale(0.7 + 0.3 * k, 0.7 + 0.3 * k);
   pill(sc, label, 0, 0, {
     size: 22 * u * S,
@@ -146,7 +149,7 @@ function codeDeploy(sc: SkillContext) {
   const { ctx, w, h, t, u, palette, scene, beat, brand } = sc;
   saasBackground(sc, { beams: 2 });
   const portrait = h > w;
-  const S = portrait ? 1.55 : 1.25;
+  const S = portrait ? 1.42 : 1.25;
   const steps = codeSteps(scene);
   const T = codeTiming(scene, beat);
   const ex = ease.inCubic(exitT(sc, 0.4));
@@ -155,7 +158,7 @@ function codeDeploy(sc: SkillContext) {
   const codeH = CODE.length * lineH + 36 * u * S;
   const rowH = 38 * u * S;
   const termH = (steps.length + 1) * rowH + 34 * u * S;
-  const ww = portrait ? w * 0.92 : Math.min(w * 0.62, 1180 * u);
+  const ww = portrait ? tokens(w, h).safe.width : Math.min(w * 0.62, 1180 * u);
   const wh = 46 * u + codeH + termH;
   const wx = (w - ww) / 2;
   const wy = portrait ? Math.max(h * 0.27, h * 0.55 - wh / 2) : Math.max(h * 0.27, h * 0.6 - wh / 2);
@@ -270,7 +273,7 @@ function codeDeploy(sc: SkillContext) {
   ctx.restore();
   ctx.save();
   ctx.globalAlpha = 1 - ex;
-  doneBadge(sc, "●  Live", w / 2, Math.min(h - 50 * u, wy + wh + (portrait ? 70 : 50) * u), t - T.live, S);
+  doneBadge(sc, "●  Live", w / 2, wy + wh + (portrait ? 70 : 50) * u, t - T.live, S);
   ctx.restore();
 }
 
@@ -556,10 +559,14 @@ function collabCursor(sc: SkillContext, x: number, y: number, color: string, nam
   ctx.restore();
   ctx.font = subFont(15 * u * S, 600);
   const tw = ctx.measureText(name).width;
-  const bx = 16 * u * S;
+  const tagW = tw + 18 * u * S;
+  // Near the safe edge the tag slides round to the cursor's left, as in Figma.
+  const g = tokens(sc.w, sc.h);
+  const flip = clamp((x + 16 * u * S + tagW - (g.safe.right - g.space(4))) / g.space(4));
+  const bx = lerp(16 * u * S, -tagW - 6 * u * S, ease.inOutCubic(flip));
   const by = 26 * u * S;
   ctx.beginPath();
-  ctx.roundRect(bx, by, tw + 18 * u * S, 26 * u * S, 8 * u * S);
+  ctx.roundRect(bx, by, tagW, 26 * u * S, 8 * u * S);
   ctx.fillStyle = color;
   ctx.fill();
   ctx.fillStyle = "#ffffff";
@@ -598,7 +605,7 @@ function liveCursors(sc: SkillContext) {
   const items = (scene.items ?? []).map(titleOf).filter(Boolean).slice(0, 4);
   const cards = items.length >= 3 ? items : ["Launch plan", "Homepage design", "Customer research", "Release notes"];
   const icons = iconsFor(cards, sc);
-  const ww = portrait ? w * 0.92 : Math.min(w * 0.68, 1280 * u);
+  const ww = portrait ? tokens(w, h).safe.width : Math.min(w * 0.68, 1280 * u);
   const wh = portrait ? Math.min(h * 0.58, ww * 1.15) : Math.min(h * 0.62, ww * 0.58);
   const wx = (w - ww) / 2;
   const wy = portrait ? h * 0.3 : Math.max(h * 0.28, h * 0.6 - wh / 2);
@@ -850,7 +857,7 @@ function kanban(sc: SkillContext) {
   const cardH = (portrait ? 84 : 58) * u * S;
   const cardGap = 11 * u * S;
   const headH = 50 * u * S;
-  const ww = portrait ? w * 0.94 : Math.min(w * 0.72, 1320 * u);
+  const ww = portrait ? tokens(w, h).safe.width : Math.min(w * 0.72, 1320 * u);
   const wh = 46 * u + headH + n * (cardH + cardGap) + pad * 1.4;
   const wx = (w - ww) / 2;
   const wy = portrait ? Math.max(h * 0.28, h * 0.56 - wh / 2) : Math.max(h * 0.27, h * 0.6 - wh / 2);
@@ -999,7 +1006,7 @@ function kanban(sc: SkillContext) {
   ctx.restore();
   ctx.save();
   ctx.globalAlpha = 1 - ex;
-  doneBadge(sc, "✓  All done", w / 2, Math.min(h - 50 * u, wy + wh + (portrait ? 70 : 48) * u), t - end, S);
+  doneBadge(sc, "✓  All done", w / 2, wy + wh + (portrait ? 70 : 48) * u, t - end, S);
   ctx.restore();
 }
 
@@ -1194,7 +1201,7 @@ function chatThread(sc: SkillContext) {
   const T = chatTiming(scene);
   const [cardTitle, cardDetail] = (scene.subtext ?? "Update — All tasks complete").split(/\s+[—–]\s+/);
   const name = brand?.name ?? "App";
-  const ww = portrait ? w * 0.92 : Math.min(w * 0.66, 1240 * u);
+  const ww = portrait ? tokens(w, h).safe.width : Math.min(w * 0.66, 1240 * u);
   const side = portrait ? 0 : ww * 0.24;
   const mainW = ww - side;
   const lineH = 27 * u * S;
@@ -1343,7 +1350,7 @@ function chatThread(sc: SkillContext) {
     ctx.restore();
     ctx.save();
     ctx.globalAlpha *= clamp((t - T.app - 0.25) / 0.2);
-    const bw = pill(sc, "Open", -1000, -1000, { size: 15 * u * S });
+    const bw = pillWidth(sc, "Open", { size: 15 * u * S });
     pill(sc, "Open", tx + cw - bw / 2 - 16 * u * S, cy + 30 * u * S, { size: 15 * u * S, fill: palette.primary, border: "none", color: palette.light ? "#ffffff" : palette.bg0 });
     ctx.restore();
   }

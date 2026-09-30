@@ -11,6 +11,7 @@ import {
   subline,
 } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
+import { tokens } from "../grid";
 import { displayFont, layoutChars, subFont } from "../text";
 import type { Skill, SkillContext } from "../types";
 
@@ -476,7 +477,10 @@ function hudScan(sc: SkillContext) {
 
   // Corner brackets snap in.
   const k = ease.outExpo(range(t, 0, 0.6));
-  const m = lerp(0, 60 * u, k);
+  // Brackets frame the title-safe area; readouts sit on its inside edge.
+  const g = tokens(w, h);
+  const mx = lerp(0, g.safe.left - g.space(3), k);
+  const my = lerp(0, g.safe.top - g.space(3), k);
   const L = 70 * u;
   ctx.strokeStyle = ui;
   ctx.lineWidth = 3 * u;
@@ -487,10 +491,10 @@ function hudScan(sc: SkillContext) {
     ctx.lineTo(x + sx * L, y);
     ctx.stroke();
   };
-  corner(m, m, 1, 1);
-  corner(w - m, m, -1, 1);
-  corner(m, h - m, 1, -1);
-  corner(w - m, h - m, -1, -1);
+  corner(mx, my, 1, 1);
+  corner(w - mx, my, -1, 1);
+  corner(mx, h - my, 1, -1);
+  corner(w - mx, h - my, -1, -1);
 
   // Readouts.
   const r = rng(seed + Math.floor(t * 10));
@@ -501,18 +505,18 @@ function hudScan(sc: SkillContext) {
   const hex = () => Math.floor(r() * 0xffffff).toString(16).toUpperCase().padStart(6, "0");
   const lines = [`SYS.STATUS // ONLINE`, `NODE 0x${hex()}`, `SIGNAL ${(80 + r() * 20).toFixed(1)}%`, `T+${t.toFixed(2)}s`];
   lines.forEach((l, i) => {
-    if (t > 0.3 + i * 0.12) ctx.fillText(l, m + 24 * u, m + 24 * u + i * 24 * u);
+    if (t > 0.3 + i * 0.12) ctx.fillText(l, g.safe.left, g.safe.top + i * g.space(3));
   });
   ctx.textAlign = "right";
   ctx.textBaseline = "bottom";
   for (let i = 0; i < 4; i++) {
     const bw = 180 * u;
     const fill = clamp(range(t, 0.4 + i * 0.2, 1.4 + i * 0.25) * (0.5 + 0.5 * rng(seed + i)()));
-    const y = h - m - 24 * u - i * 22 * u;
+    const y = h - g.safe.bottom - i * g.space(3);
     ctx.fillStyle = rgba(palette.primary, 0.2 * (1 - ex));
-    ctx.fillRect(w - m - 24 * u - bw, y - 8 * u, bw, 8 * u);
+    ctx.fillRect(g.safe.right - bw, y - g.space(1), bw, g.space(1));
     ctx.fillStyle = ui;
-    ctx.fillRect(w - m - 24 * u - bw, y - 8 * u, bw * fill, 8 * u);
+    ctx.fillRect(g.safe.right - bw, y - g.space(1), Math.round(bw * fill), g.space(1));
   }
 
   // Target reticle.

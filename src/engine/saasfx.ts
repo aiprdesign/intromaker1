@@ -503,6 +503,17 @@ export function clickRipple(sc: SkillContext, x: number, y: number, k: number, c
   ctx.restore();
 }
 
+/** Width of a pill() without drawing it. */
+export function pillWidth(sc: SkillContext, text: string, opts: { size?: number; weight?: number; padX?: number } = {}) {
+  const { ctx, u } = sc;
+  const size = opts.size ?? 22 * u;
+  ctx.save();
+  ctx.font = subFont(size, opts.weight ?? 600);
+  const tw = ctx.measureText(text).width;
+  ctx.restore();
+  return tw + (opts.padX ?? size * 0.9) * 2;
+}
+
 /** Pill label (callouts, badges, CTA text). Returns its width. */
 export function pill(
   sc: SkillContext,

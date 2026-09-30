@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Soundtrack } from "@/engine/audio";
 import { canExport, EXPORT_PRESETS, exportThumbnail, exportVideo, planForPreset } from "@/engine/export";
 import { ensureFonts } from "@/engine/fonts";
+import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
 import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
@@ -28,6 +29,8 @@ export default function Player({
   const [muted, setMuted] = useState(false);
   const [exporting, setExporting] = useState<number | null>(null);
   const [presetId, setPresetId] = useState<string>("current");
+  // Designer's grid overlay: preview only, never part of an export.
+  const [grid, setGrid] = useState(false);
   useEffect(() => {
     try {
       const saved = localStorage.getItem("intromaker.preset");
@@ -67,9 +70,11 @@ export default function Player({
     (t: number) => {
       const c = canvasRef.current;
       if (!c) return;
-      renderFrame(c.getContext("2d")!, plan, t, c.width, c.height);
+      const ctx = c.getContext("2d")!;
+      renderFrame(ctx, plan, t, c.width, c.height);
+      if (grid) drawGridOverlay(ctx, c.width, c.height);
     },
-    [plan],
+    [plan, grid],
   );
 
   // Rewind and play when a fresh plan is generated.
@@ -261,6 +266,15 @@ export default function Player({
           ) : (
             <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 9v6h4l5 4V5L8 9H4zm11.5 3A4.5 4.5 0 0 0 13 8v8a4.5 4.5 0 0 0 2.5-4zM13 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" fill="currentColor" /></svg>
           )}
+        </button>
+        <button
+          className={`icon-btn grid-toggle${grid ? " active" : ""}`}
+          onClick={() => setGrid((g) => !g)}
+          aria-pressed={grid}
+          aria-label="Design grid"
+          title="Design grid: title-safe area, layout columns and the 8pt rhythm (preview only)"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="M9.5 3.5v17M14.5 3.5v17M3.5 9.5h17M3.5 14.5h17" /></svg>
         </button>
         <select value={presetId} onChange={(e) => choosePreset(e.target.value)} className="select sm" disabled={exporting !== null} title="Export preset: the film re-frames itself for each platform">
           {EXPORT_PRESETS.map((p) => (

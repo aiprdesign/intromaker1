@@ -15,6 +15,7 @@ import { Camera, Mesh, Plane, Program, Transform, type Renderer } from "ogl";
 import { exitT } from "../fx";
 import { coverUv, GALLERY_TRANSITIONS, glRenderer, loadTransitions, renderTransition, sizeOf, textureOf, transitionsReady } from "../gl";
 import { clamp, hashString, lerp, mixHex, range, rgba, rng } from "../math";
+import { tokens } from "../grid";
 import { getImage, getMedia, type Drawable } from "../media";
 import { glassCard, pill, saasBackground, sentence, blurInLayout } from "../saasfx";
 import { scratch } from "../scratch";
@@ -225,10 +226,20 @@ function galleryFlow(sc: SkillContext) {
   const T = flowTiming(scene, d, n);
   const ex = exitT(sc, 0.4);
   // The frame.
-  const fw = portrait ? w * 0.86 : Math.min(w * 0.66, (h * 0.62 * 16) / 10);
-  const fh = fw * (portrait ? 0.72 : 10 / 16);
+  // The frame plus its caption pill (52pt, 3 grid steps below) fit above the title-safe bottom.
+  const g = tokens(w, h);
+  const capGap = g.space(3);
+  const capH = 52 * u;
+  const top0 = h * (portrait ? 0.32 : 0.3);
+  let fw = portrait ? w * 0.86 : Math.min(w * 0.66, (h * 0.62 * 16) / 10);
+  let fh = fw * (portrait ? 0.72 : 10 / 16);
+  const room = h - g.safe.bottom - capH - capGap - (scene.text ? top0 : (h - fh) / 2);
+  if (fh > room) {
+    fw *= room / fh;
+    fh = room;
+  }
   const fx = (w - fw) / 2;
-  const fy = scene.text ? h * (portrait ? 0.32 : 0.3) : (h - fh) / 2;
+  const fy = scene.text ? top0 : (h - fh) / 2;
   const intro = 1 - Math.pow(1 - clamp(range(t, 0.05, T.intro + 0.35)), 3);
   ctx.save();
   ctx.globalAlpha = intro * (1 - ex);
@@ -270,7 +281,7 @@ function galleryFlow(sc: SkillContext) {
   if (cap) {
     const ck = clamp(range(inSlot, 0, 0.35)) * (tp > 0 ? Math.abs(tp - 0.5) * 2 : 1);
     ctx.globalAlpha *= ck;
-    pill(sc, cap, w / 2, fy + fh + 44 * u, { size: 26 * u, fill: rgba(palette.primary, 0.14), border: rgba(palette.primary, 0.45), color: palette.text });
+    pill(sc, cap, w / 2, fy + fh + capGap + capH / 2, { size: 26 * u, fill: rgba(palette.primary, 0.14), border: rgba(palette.primary, 0.45), color: palette.text });
   }
   ctx.restore();
   // Progress dots.

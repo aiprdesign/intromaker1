@@ -13,6 +13,7 @@
  */
 import { exitT } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
+import { tokens } from "../grid";
 import { drawIcon, glassCard, iconsFor, pill, saasBackground, spring } from "../saasfx";
 import { subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -407,7 +408,8 @@ function worldMap(sc: SkillContext) {
     const text = ellipsize(ctx, items[c.i], 320 * u * S);
     const cw = ctx.measureText(text).width + 78 * u * S;
     const ch = 50 * u * S;
-    const bx = clamp(c.x - cw / 2, 16 * u, w - cw - 16 * u);
+    const safe = tokens(w, h).safe;
+    const bx = clamp(c.x - cw / 2, safe.left, safe.right - cw);
     const by = Math.max(my - 20 * u, c.y - ch - 20 * u * S);
     ctx.globalAlpha *= life * clamp(c.k / 0.12);
     ctx.translate(c.x, by + ch);

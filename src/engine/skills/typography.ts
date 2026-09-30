@@ -14,6 +14,7 @@ import {
   subline,
 } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng } from "../math";
+import { tokens } from "../grid";
 import { scratch } from "../scratch";
 import { displayFont, drawTracked, layoutChars } from "../text";
 import type { Skill, SkillContext } from "../types";
@@ -48,13 +49,15 @@ function kineticSlam(sc: SkillContext) {
   ctx.save();
   ctx.translate(w / 2 + sh.x, h / 2 + sh.y);
   const slam = ease.outExpo(range(local, 0, 0.22));
-  const s = lerp(2.6, 1, slam) * (1 + ex * 0.5) * (1 + Math.max(0, local) * 0.03);
+  // After the slam, a slow drift that eases toward +8% (inside the layout's 10% headroom).
+  const s = lerp(2.6, 1, slam) * (1 + ex * 0.5) * (1 + 0.08 * (1 - Math.exp(-Math.max(0, local) * 0.4)));
   ctx.scale(s, s);
   ctx.translate(-w / 2, -h / 2);
   ctx.globalAlpha = clamp(slam * 1.5) * (1 - ex);
 
   if (!inFinal && idx >= 0) {
-    const layout = headline(sc, { text: words[idx], widthFrac: 0.88, sizeFrac: 0.55, maxLines: 1 });
+    // Settled words fit the title-safe width, with headroom for the slow drift after each slam.
+    const layout = headline(sc, { text: words[idx], widthFrac: tokens(w, h).safe.width / w / 1.1, sizeFrac: 0.55, maxLines: 1 });
     // Motion-blur ghosts while slamming in.
     if (slam < 1) {
       ctx.save();
@@ -76,7 +79,7 @@ function kineticSlam(sc: SkillContext) {
     drawLayout(sc, layout);
     bevel(sc, layout);
   } else {
-    const layout = headline(sc, { cy: h * 0.47, sizeFrac: 0.3 });
+    const layout = headline(sc, { cy: h * 0.47, sizeFrac: 0.3, widthFrac: tokens(w, h).safe.width / w / 1.1 });
     extrude(sc, layout);
     ctx.fillStyle = headlineGradient(sc, layout, palette.text, palette.primary);
     glow(ctx, rgba(palette.primary, 0.6), 30 * u);

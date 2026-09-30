@@ -10,6 +10,7 @@
  */
 import { exitT } from "../fx";
 import { clamp, lerp, mixHex, range, rgba, TAU } from "../math";
+import { tokens } from "../grid";
 import { drawLogo, getImage, getMedia, logoMaxWidth, mediaSize, type Drawable } from "../media";
 import { glassCard, saasBackground, sentence, spring } from "../saasfx";
 import { scratch } from "../scratch";
@@ -108,11 +109,22 @@ function typeMask(sc: SkillContext) {
   // The letters: huge, two lines at most, each rising out of a mask.
   const text = scene.text.replace(/\*/g, "");
   const sizeFrac = portrait ? 0.24 : 0.36;
-  let layout = sentence(sc, { text, cy: h * (portrait ? 0.44 : 0.46), sizeFrac, widthFrac: 0.9, maxLines: 2 });
-  // Giant type must still fit: shrink a long word until every line is within 88% of the frame.
-  // (Measured as drawn: the mask draws each line with fillText, without the layout's tracking.)
-  const widest = Math.max(...layout.lines.map((l) => ctx.measureText(l.replace(/\*/g, "")).width));
-  if (widest > w * 0.88) layout = sentence(sc, { text, cy: h * (portrait ? 0.44 : 0.46), sizeFrac: sizeFrac * ((w * 0.88) / widest), widthFrac: 0.9, maxLines: 2 });
+  const fit = tokens(w, h).safe.width / 1.07;
+  let layout = sentence(sc, { text, cy: h * (portrait ? 0.44 : 0.46), sizeFrac, widthFrac: fit / w, maxLines: 2 });
+  // Giant type must still fit: shrink a long word until every line, after the slow 6% push-in, stays
+  // inside the title-safe width. (Measured as drawn: glyph bounds, without the layout's tracking.)
+  const widestLine = () =>
+    Math.max(
+      ...layout.lines.map((l) => {
+        const m = ctx.measureText(l.replace(/\*/g, ""));
+        return Math.max(m.width, m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+      }),
+    );
+  let frac = sizeFrac;
+  for (let i = 0, widest = widestLine(); i < 4 && widest > fit; i++, widest = widestLine()) {
+    frac *= (fit / widest) * 0.99;
+    layout = sentence(sc, { text, cy: h * (portrait ? 0.44 : 0.46), sizeFrac: frac, widthFrac: fit / w, maxLines: 2 });
+  }
   const font = ctx.font;
   const m = scratch("typemask", w, h);
   const mc = m.ctx;

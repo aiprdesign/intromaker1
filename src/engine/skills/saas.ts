@@ -7,6 +7,7 @@
  */
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
+import { tokens } from "../grid";
 import { drawLogo, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, segmentShot } from "../media";
 import {
   blurInLayout,
@@ -76,7 +77,15 @@ export function topHeadline(sc: SkillContext) {
   const hasEb = !!scene.eyebrow;
   const cy = h * (portrait ? 0.12 : 0.12) + (hasEb ? h * 0.04 : 0);
   const layout = sentence(sc, { text: accented(scene.text), cy, sizeFrac: portrait ? 0.075 : 0.068, widthFrac: 0.84, maxLines: 2 });
-  if (hasEb) eyebrow(sc, scene.eyebrow!, layout.ys[0] - layout.size * 0.62 - 26 * u, range(t, 0.05, 0.45) * (1 - range(t, d - 0.4, d)));
+  // Design grid: the eyebrow pill (27pt type, 54pt tall) sits 2 grid steps above the headline's cap
+  // line, and the whole block never rises above the title-safe top.
+  const g = tokens(w, h);
+  const ebH = 27 * u;
+  const capTop = layout.ys[0] - layout.size * 0.4;
+  const blockTop = hasEb ? capTop - g.space(2) - ebH * 2 : capTop;
+  const shift = Math.max(0, g.safe.top - blockTop);
+  if (shift) layout.ys = layout.ys.map((y) => y + shift);
+  if (hasEb) eyebrow(sc, scene.eyebrow!, capTop + shift - g.space(2) - ebH, range(t, 0.05, 0.45) * (1 - range(t, d - 0.4, d)));
   blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
   return layout;
 }
@@ -589,7 +598,7 @@ function bento(sc: SkillContext) {
   const gx0 = w * 0.07;
   const gy0 = h * (portrait ? 0.2 : 0.25);
   const gw = w * 0.86;
-  const gh = h * (portrait ? 0.74 : 0.68);
+  const gh = Math.min(h * (portrait ? 0.74 : 0.68), h - tokens(w, h).safe.bottom - gy0);
   const gap = 16 * u;
   const cw = (gw - gap * (cols - 1)) / cols;
   const rh = (gh - gap * (rows - 1)) / rows;
@@ -878,10 +887,13 @@ function uiCards(sc: SkillContext) {
   ];
   const WS = portrait ? 1.25 : 1.4;
   if (portrait) {
-    widgets[0].x = w * 0.06;
-    widgets[1].x = w * 0.94 - widgets[1].w;
-    widgets[2].x = w * 0.06;
-    widgets[3].x = w * 0.94 - widgets[3].w;
+    // Scaled widgets' outer edges sit on the title-safe margins.
+    const g = tokens(w, h);
+    const grow = (wd: { w: number }) => (wd.w * (WS - 1)) / 2;
+    widgets[0].x = g.safe.left + grow(widgets[0]);
+    widgets[1].x = g.safe.right - widgets[1].w - grow(widgets[1]);
+    widgets[2].x = g.safe.left + grow(widgets[2]);
+    widgets[3].x = g.safe.right - widgets[3].w - grow(widgets[3]);
   }
   widgets.forEach((wd, i) => {
     const lt = t - times[i];
