@@ -1449,103 +1449,153 @@ function scrollTiming(d: number) {
   return { first: 0.9, second: Math.max(2.2, d * 0.5) };
 }
 
+/** When the page scrolls to each section and lifts it out (seconds into the scene). */
+function sectionStops(d: number, n: number) {
+  const start = 0.9;
+  const each = (d - start - 0.35) / Math.max(1, n);
+  return Array.from({ length: n }, (_, k) => {
+    const s0 = start + k * each;
+    return { scroll: s0, arrive: s0 + Math.min(0.75, each * 0.4), drop: s0 + each - Math.min(0.3, each * 0.18) };
+  });
+}
+
+/** The page's sections worth stopping at (below the hero, tall enough to read), in page order. */
+function stopSections(secs: { y: number; h: number }[], iw: number, d: number) {
+  const K = Math.max(1, Math.min(3, Math.floor((d - 1.4) / 1.5)));
+  const below = secs.map((x, i) => ({ ...x, i })).filter((x, i) => i > 0 && x.h >= iw * 0.12);
+  return below.slice(0, K);
+}
+
 /**
- * The real website, section by section: the full-page screenshot starts as one page, splits along
- * its own section boundaries into separate bordered cards, and the camera moves from one whole
- * section to the next, zoomed to fit it (never cut mid-section). Without section data or a
- * full-page image it falls back to a scrolling browser window.
+ * The real website in a browser window: it opens on the top of the hero as a visitor sees it,
+ * then scrolls the full-page screenshot down, stopping exactly at the top of the page's own
+ * sections. At each stop that section is taken out of the screenshot and lifts forward out of the
+ * window (bordered, glowing, the page dimmed behind it), then drops back as the scroll moves on.
+ * Without known sections (or a still image) it falls back to a plain scroll.
  */
 function siteScroll(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   const img = getImage(scene.media?.kind === "image" ? scene.media.src : undefined);
   const bands = img && img.naturalWidth ? (brand?.page?.src === scene.media?.src ? brand!.page!.bands : pageBands(img)) : [];
-  if (!img || bands.length < 2) return browserScroll(sc);
+  const iw = img?.naturalWidth ?? 0;
+  const ih = img?.naturalHeight ?? 0;
+  const secs = bands.map(([a, b]) => ({ y: a * ih, h: (b - a) * ih })).filter((x) => x.h > 8);
+  const stops = img ? stopSections(secs, iw, d) : [];
+  if (!img || !stops.length) return browserScroll(sc);
   saasBackground(sc, { beams: 2 });
   const portrait = h > w;
   topHeadline(sc);
   const ex = ease.inCubic(exitT(sc, 0.4));
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  const secs = bands.map(([a, b]) => ({ y: a * ih, h: (b - a) * ih })).filter((x) => x.h > 8);
-  // Stage under the headline.
+  // The browser window.
+  const ww = portrait ? w * 0.88 : w * 0.7;
   const top = h * (scene.eyebrow ? 0.28 : 0.25);
-  const bottom = h - 36 * u;
-  const vx = w * (portrait ? 0.05 : 0.08);
-  const vw = w - vx * 2;
-  const vh = bottom - top;
-  const stageCy = top + vh / 2;
-  // The page separates into its sections, with gaps and border lines between them.
-  const sep = ease.outCubic(range(t, 0.35, 1.0));
-  const gap = sep * iw * 0.035;
-  const cardY = (i: number) => secs[i].y + i * gap;
-  const total = cardY(secs.length - 1) + secs[secs.length - 1].h;
-  // Sections worth a close look (the header strip isn't), in page order.
-  const K = Math.max(1, Math.min(3, Math.floor((d - 1.3) / 1.25)));
-  const pickable = secs.map((x, i) => ({ i, h: x.h })).filter((x) => x.h >= iw * 0.12);
-  const focus = (pickable.length ? pickable : secs.map((x, i) => ({ i, h: x.h }))).slice(0, K).map((x) => x.i);
-  // Camera keyframes: the page overview, then each chosen section fitted whole.
-  const overview = { cy: Math.min(total, vh / (vw * 0.6 / iw)) / 2, s: (vw * 0.6) / iw };
-  const fit = (i: number) => ({ cy: cardY(i) + secs[i].h / 2, s: Math.min((vw * 0.94) / iw, (vh * 0.9) / secs[i].h) });
-  const keys = [overview, ...focus.map(fit)];
-  const start = 1.05;
-  const step = (d - start - 0.3) / Math.max(1, focus.length);
-  const seg = clamp((t - start) / step, 0, focus.length - 0.0001);
-  const ki = Math.floor(seg);
-  const kk = t < start ? 0 : ease.inOutCubic(clamp((seg - ki) / 0.45));
-  const from = t < start ? keys[0] : keys[ki];
-  const to = t < start ? keys[0] : keys[ki + 1];
-  const cam = { cy: lerp(from.cy, to.cy, kk), s: lerp(from.s, to.s, kk) };
-  const active = t < start ? -1 : focus[kk > 0.5 ? ki : ki - 1] ?? -1;
-  const settle = t < start ? 0 : kk > 0.5 ? (kk - 0.5) * 2 : 0;
-  const intro = clamp(spring(t - 0.05, 8, 6), 0, 1.04);
+  const wh = Math.min(h * 0.7, h - top - 24 * u);
+  const x0 = w / 2 - ww / 2;
+  const bar = 34 * u;
+  const vx = x0;
+  const vy = top + bar;
+  const vw = ww;
+  const vh = wh - bar;
+  const k = clamp(spring(t - 0.05, 8, 6), 0, 1.04);
+  const tilt = (1 - Math.min(1, k)) * 0.35;
+  const s = vw / iw; // image px → screen px
+  const viewH = vh / s; // how much of the page the window shows
+  const maxY = Math.max(0, ih - viewH);
+  // Scroll: from the top of the page to each stop's section top, in turn.
+  const T = sectionStops(d, stops.length);
+  const stopY = (i: number) => (i < 0 ? 0 : Math.min(maxY, Math.max(0, stops[i].y - 4)));
+  let sy = 0;
+  T.forEach((st, i) => {
+    if (t >= st.scroll) sy = lerp(stopY(i - 1), stopY(i), ease.inOutCubic(range(t, st.scroll, st.arrive)));
+  });
+  // The lifted section: out after the scroll arrives, back just before the next scroll.
+  const cur = T.reduce((a, st, i) => (t >= st.scroll ? i : a), -1);
+  const lift = cur >= 0 ? ease.outBack(range(t, T[cur].arrive, T[cur].arrive + 0.4), 1.4) * (1 - ease.inCubic(range(t, T[cur].drop, T[cur].drop + 0.3))) : 0;
 
   ctx.save();
   ctx.globalAlpha = clamp(t / 0.3) * (1 - ex);
+  ctx.translate(w / 2, top + wh / 2 + (1 - Math.min(1, k)) * h * 0.2 + Math.sin(t * 1.1) * 3 * u);
+  ctx.transform(1, 0, 0, 1 - tilt * 0.5, 0, 0);
+  ctx.scale(0.92 + 0.08 * Math.min(1, k), 0.92 + 0.08 * Math.min(1, k));
+  ctx.translate(-w / 2, -(top + wh / 2));
+  glassCard(sc, x0 - 1, top - 1, ww + 2, wh + 2, { r: 16 * u });
+  ctx.save();
   ctx.beginPath();
-  ctx.rect(0, top - 12 * u, w, vh + 24 * u);
+  ctx.roundRect(x0, top, ww, wh, 16 * u);
   ctx.clip();
-  ctx.translate(0, (1 - Math.min(1, intro)) * h * 0.12);
-  const x = w / 2 - (iw * cam.s) / 2;
-  const r = 12 * u * sep;
-  secs.forEach((sec, i) => {
-    const y = stageCy + (cardY(i) - cam.cy) * cam.s;
-    const hh = sec.h * cam.s;
-    if (y > bottom + 20 * u || y + hh < top - 20 * u) return;
+  ctx.fillStyle = palette.light ? "#e8e8ef" : "#121019";
+  ctx.fillRect(x0, top, ww, bar);
+  ["#ff5f57", "#febc2e", "#28c840"].forEach((c, i) => {
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(x0 + 20 * u + i * 18 * u, top + bar / 2, 5.5 * u, 0, TAU);
+    ctx.fill();
+  });
+  ctx.fillStyle = palette.light ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)";
+  ctx.beginPath();
+  ctx.roundRect(w / 2 - ww * 0.2, top + bar * 0.2, ww * 0.4, bar * 0.6, bar * 0.3);
+  ctx.fill();
+  ctx.fillStyle = palette.light ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.65)";
+  ctx.font = subFont(13 * u, 500);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(brand?.domain ?? "yourproduct.com", w / 2, top + bar / 2);
+  // The page, at the current scroll.
+  const shown = Math.min(viewH, ih - sy);
+  ctx.drawImage(img, 0, sy, iw, shown, vx, vy, vw, shown * s);
+  // Scrollbar.
+  const thumbH = Math.max(40 * u, (vh * vh) / (ih * s));
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.beginPath();
+  ctx.roundRect(vx + vw - 10 * u, vy + 6 * u + (vh - thumbH - 12 * u) * (maxY ? sy / maxY : 0), 5 * u, thumbH, 3 * u);
+  ctx.fill();
+  // The page dims while a section is lifted out of it.
+  if (lift > 0) {
+    ctx.fillStyle = rgba(palette.bg0, 0.55 * clamp(lift));
+    ctx.fillRect(vx, vy, vw, vh);
+  }
+  ctx.restore();
+  borderBeam(sc, x0, top, ww, wh, t * 0.3, { r: 16 * u, alpha: 0.7 * (1 - clamp(lift)) });
+  // The lifted section: its own crop of the screenshot (the part in view), as a bordered card.
+  if (cur >= 0 && lift > 0.001) {
+    const sec = stops[cur];
+    const cropY = Math.max(sec.y, sy);
+    const cropH = Math.max(1, Math.min(sec.y + sec.h, sy + viewH) - cropY);
+    const rx = vx;
+    const ry = vy + (cropY - sy) * s;
+    const rw = vw;
+    const rh = cropH * s;
+    // Lifted forward, but always inside the frame (between the headline and the bottom edge).
+    const room = h - 18 * u - (top - 8 * u);
+    // Short sections grow a little; one that fills the window eases back so its border shows.
+    const grow = lerp(1, Math.min(1.1, (room * 0.84) / rh), clamp(lift));
+    const cx = rx + rw / 2;
+    let cy = lerp(ry + rh / 2, vy + vh / 2, 0.35 * clamp(lift)) - 10 * u * lift;
+    cy = Math.min(cy, h - 18 * u - (rh * grow) / 2);
+    cy = Math.max(cy, top - 8 * u + (rh * grow) / 2);
+    const r = 14 * u;
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = 30 * u * sep;
-    ctx.shadowOffsetY = 10 * u * sep;
+    ctx.translate(cx, cy);
+    ctx.scale(grow, grow);
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 50 * u * clamp(lift);
+    ctx.shadowOffsetY = 18 * u * clamp(lift);
     ctx.fillStyle = palette.bg0;
     ctx.beginPath();
-    ctx.roundRect(x, y, iw * cam.s, hh, r);
+    ctx.roundRect(-rw / 2, -rh / 2, rw, rh, r);
     ctx.fill();
-    ctx.restore();
+    ctx.shadowColor = "transparent";
     ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(x, y, iw * cam.s, hh, r);
     ctx.clip();
-    ctx.drawImage(img, 0, sec.y, iw, sec.h, x, y, iw * cam.s, hh);
-    // Other sections step back while one is in focus.
-    const dim = active >= 0 && i !== active ? 0.5 * settle : 0;
-    if (dim > 0) {
-      ctx.fillStyle = rgba(palette.bg0, dim);
-      ctx.fillRect(x, y, iw * cam.s, hh);
-    }
+    ctx.drawImage(img, 0, cropY, iw, cropH, -rw / 2, -rh / 2, rw, rh);
     ctx.restore();
-    // Border lines between the parts; the focused one glows in the brand colour.
-    ctx.save();
-    const on = i === active ? settle : 0;
-    ctx.strokeStyle = on > 0 ? rgba(palette.primary, 0.35 + 0.55 * on) : rgba(palette.text, 0.2 * sep);
-    ctx.lineWidth = (1.5 + 1.5 * on) * u;
-    if (on > 0) {
-      ctx.shadowColor = palette.primary;
-      ctx.shadowBlur = 18 * u * on;
-    }
-    ctx.beginPath();
-    ctx.roundRect(x, y, iw * cam.s, hh, r);
+    ctx.strokeStyle = rgba(palette.primary, 0.9 * clamp(lift));
+    ctx.lineWidth = 2.5 * u;
+    ctx.shadowColor = palette.primary;
+    ctx.shadowBlur = 20 * u * clamp(lift);
     ctx.stroke();
     ctx.restore();
-  });
+  }
   ctx.restore();
 }
 
@@ -1864,13 +1914,13 @@ export const saasSkills: Skill[] = [
   {
     id: "site-scroll",
     name: "Website Scroll",
-    tagline: "Your real website scrolls smoothly inside a floating browser while a cursor explores.",
-    bestFor: "Showing the actual site right after the brand reveal. Uses the full-page screenshot from live capture.",
+    tagline: "Your real website opens on its hero, scrolls to each section and lifts that section out of the page.",
+    bestFor: "Showing the actual site right after the brand reveal. Uses the full-page screenshot from live capture and the page's own sections.",
     sample: { text: "Meet your new *workspace*" },
     render: siteScroll,
     sfx: (scene) => {
-      const T = scrollTiming(scene.duration);
-      return [at(0.05, "swoosh"), at(T.first, "swoosh"), at(T.second, "swoosh")];
+      const n = Math.max(1, Math.min(3, Math.floor((scene.duration - 1.4) / 1.5)));
+      return [at(0.05, "swoosh"), ...sectionStops(scene.duration, n).flatMap((st) => [at(st.scroll, "swoosh"), at(st.arrive, "pop")])];
     },
   },
   {
