@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadAiSettings } from "@/components/AiSettings";
 import type { VideoPlan, VoiceSettings } from "@/engine/types";
 import { getClip, onClips, UPLOAD_KEY, VOICE_SOURCES, VOICES } from "@/engine/voice";
@@ -88,6 +88,27 @@ export default function VoicePanel({
       setError(e instanceof Error ? e.message : "Voice generation failed.");
     }
   };
+  // Narration records itself: when switched on, when the voice changes, for a new film or remake,
+  // and (after a short pause) for a line you've edited. Only lines without a clip are recorded.
+  // It stops on an error (e.g. a missing key) until something changes.
+  const recordRef = useRef(record);
+  recordRef.current = record;
+  const errorRef = useRef(error);
+  errorRef.current = error;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const auto = voice.enabled && voice.source !== "upload" && missing > 0 && lines > 0;
+  const lineKey = plan.scenes.map((s) => s.vo ?? "").join("|");
+  useEffect(() => {
+    setError(null);
+  }, [voice.enabled, voice.source, voice.voice, voice.model]);
+  useEffect(() => {
+    if (!auto) return;
+    const id = setTimeout(() => {
+      if (!busyRef.current && !errorRef.current) void recordRef.current();
+    }, 1200);
+    return () => clearTimeout(id);
+  }, [auto, lineKey, voice.source, voice.voice, voice.model]);
 
   return (
     <div className="voice-panel">
@@ -194,6 +215,22 @@ export default function VoicePanel({
             <input type="checkbox" checked={voice.captions} onChange={(e) => set({ captions: e.target.checked })} disabled={voice.source === "upload"} />
             Word-by-word captions
           </label>
+          {voice.captions && voice.source !== "upload" && (
+            <div className="seg-control" role="radiogroup" aria-label="Caption style">
+              {(
+                [
+                  ["frosted", "Frosted"],
+                  ["pop", "Pop"],
+                  ["box", "Box"],
+                  ["karaoke", "Karaoke"],
+                ] as const
+              ).map(([id, label]) => (
+                <button key={id} role="radio" aria-checked={(voice.captionStyle ?? "frosted") === id} className={(voice.captionStyle ?? "frosted") === id ? "active" : ""} onClick={() => set({ captionStyle: id })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {busy && <p className="hint">{busy}</p>}
           {error && <p className="hint warn">{error}</p>}
           {!busy && !error && voice.source !== "upload" && (

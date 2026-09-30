@@ -166,9 +166,37 @@ export default function Studio() {
       /* ignore */
     }
   }, []);
+  // Auto style (default): each new film takes the style suggested for its kind of product. Picking
+  // a style by hand turns it off; the Auto chip turns it back on.
+  const [autoStyle, setAutoStyle] = useState(true);
+  const autoStyleRef = useRef(true);
+  autoStyleRef.current = autoStyle;
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.style.auto") === "off") setAutoStyle(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const setAuto = (on: boolean) => {
+    setAutoStyle(on);
+    autoStyleRef.current = on;
+    try {
+      localStorage.setItem("intromaker.style.auto", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  /** The style suggested for a plan's kind of product (when auto is on and it differs). */
+  const suggestedFor = (p: VideoPlan) => {
+    const id = p.style === "saas" && p.concept ? CONCEPT_MAP[p.concept]?.template : undefined;
+    return id && TEMPLATE_MAP[id] ? id : undefined;
+  };
   /** Switch template: restyles the current SaaS storyboard instantly (no regeneration). */
-  const chooseTemplate = (id: string) => {
+  const chooseTemplate = (id: string, auto = false) => {
+    if (!auto) setAuto(false);
     setTemplate(id);
+    templateRef.current = id;
     try {
       localStorage.setItem("intromaker.template", id);
     } catch {
@@ -234,6 +262,8 @@ export default function Studio() {
     colors?: Brand["colors"];
     length?: Length;
     angle?: Angle;
+    /** Remake number: other slides for each section (0 = the director's best fit). */
+    variant?: number;
   };
 
   /** One storyboard from the director (server AI or built-in; falls back to in-browser). */
@@ -248,7 +278,7 @@ export default function Studio() {
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     const aiCfg = aiForRequest(loadAiSettings());
     const safeCopy = safeRef.current;
-    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiCfg, template, angle: opts.angle, safe: safeCopy };
+    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiCfg, template, angle: opts.angle, safe: safeCopy, variant: opts.variant };
     // Local AI runs where the model is: from this browser when the server is online.
     if (isLocalProvider(aiCfg.provider) && !localViaServerRef.current) {
       try {
@@ -276,14 +306,24 @@ export default function Studio() {
     } catch {
       // Offline or API unavailable: the director also runs in the browser.
       const plan = s
-        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle, safe: safeCopy })
-        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template, safe: safeCopy });
+        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle, safe: safeCopy, variant: opts.variant })
+        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template, safe: safeCopy, variant: opts.variant });
       return { plan, engine: "builtin", engineLabel: "", label };
     }
   };
 
-  const show = (take: Take) => {
-    setPlan({ ...applyBackground(take.plan, bgRef.current), scheme: schemeRef.current });
+  /** Which version (take) is on screen, by its place in the list. */
+  const [current, setCurrent] = useState(0);
+  const show = (take: Take, index?: number) => {
+    if (index !== undefined) setCurrent(index);
+    let p = take.plan;
+    const suggested = autoStyleRef.current ? suggestedFor(p) : undefined;
+    if (suggested && suggested !== p.template) {
+      p = applyTemplate(p, suggested, { palette: palette !== "auto" ? palette : undefined });
+      setTemplate(suggested);
+      templateRef.current = suggested;
+    }
+    setPlan({ ...applyBackground(p, bgRef.current), scheme: schemeRef.current });
     setVersion((v) => v + 1);
     setEngine(take.engine);
     setEngineLabel(take.engineLabel);
@@ -294,12 +334,40 @@ export default function Studio() {
     setNote(null);
     try {
       const take = await direct(opts);
-      show(take);
-      setTakes([{ ...take, label: "Take 1" }]);
+      show(take, 0);
+      setTakes([{ ...take, label: "Original" }]);
       if (take.note || take.plan.notes?.length) setNote([take.note, ...(take.plan.notes ?? [])].filter(Boolean).join(" "));
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Remake: a new version of the film with other slides for its sections (another story angle,
+   * feature layout, interaction moment, opener…). Every version is kept, so Undo steps back and
+   * Original returns to the first.
+   */
+  const [remaking, setRemaking] = useState(false);
+  const remake = async () => {
+    setRemaking(true);
+    setNote(null);
+    try {
+      const n = takes.filter((t) => t.label.startsWith("Remake")).length + 1;
+      const take = await direct({ seed: Math.floor(Math.random() * 1e9), variant: n });
+      const base = takes.length ? takes : [{ plan, engine, engineLabel, label: "Original" }];
+      const next = [...base, { ...take, label: `Remake ${n}` }];
+      setTakes(next);
+      show(take, next.length - 1);
+      if (take.note) setNote(take.note);
+    } finally {
+      setRemaking(false);
+    }
+  };
+  const undo = () => {
+    if (current > 0 && takes[current - 1]) show(takes[current - 1], current - 1);
+  };
+  const original = () => {
+    if (takes[0]) show(takes[0], 0);
   };
 
   /** Three alternative cuts (different story angles / creative seeds) to choose from. */
@@ -309,7 +377,7 @@ export default function Studio() {
       const angles: (Angle | undefined)[] = site ? ["product", "proof", "story"] : [undefined, undefined, undefined];
       const results = await Promise.all(angles.map((angle) => direct({ angle, seed: Math.floor(Math.random() * 1e9) })));
       setTakes((prev) => {
-        const base = prev.length ? prev : [{ plan, engine, engineLabel, label: "Take 1" }];
+        const base = prev.length ? prev : [{ plan, engine, engineLabel, label: "Original" }];
         return [...base, ...results.map((r, i) => ({ ...r, label: `Take ${base.length + i + 1}${r.label !== "Take" ? ` · ${r.label}` : ""}` }))].slice(-8);
       });
     } finally {
@@ -700,14 +768,27 @@ export default function Studio() {
                   <span>
                     Detected: <strong>{CONCEPT_MAP[plan.concept].name}</strong>. The story arc, chapters, CTA and icons are adapted.
                   </span>
-                  {TEMPLATE_MAP[CONCEPT_MAP[plan.concept].template] && template !== CONCEPT_MAP[plan.concept].template && (
+                  {!autoStyle && TEMPLATE_MAP[CONCEPT_MAP[plan.concept].template] && template !== CONCEPT_MAP[plan.concept].template && (
                     <button className="btn btn-ghost sm" onClick={() => chooseTemplate(CONCEPT_MAP[plan.concept!].template)}>
                       Use suggested style: {TEMPLATE_MAP[CONCEPT_MAP[plan.concept].template].name}
                     </button>
                   )}
                 </div>
               )}
-              <TemplatePicker value={template} onChange={chooseTemplate} />
+              <button
+                className={`chip auto-style ${autoStyle ? "active" : ""}`}
+                aria-pressed={autoStyle}
+                onClick={() => {
+                  setAuto(true);
+                  const id = suggestedFor(plan);
+                  if (id) chooseTemplate(id, true);
+                }}
+                title="Each new film takes the style suggested for its kind of product"
+              >
+                ✦ Auto: best style for your product
+                {autoStyle && suggestedFor(plan) ? ` (${TEMPLATE_MAP[suggestedFor(plan)!].name})` : ""}
+              </button>
+              <TemplatePicker value={template} onChange={(id) => chooseTemplate(id)} />
               <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
               <details className="fold">
                 <summary>
@@ -794,15 +875,23 @@ export default function Studio() {
             <button className="btn btn-primary btn-lg grow" onClick={() => generate()} disabled={loading}>
               {loading ? "Directing…" : "Generate ✦"}
             </button>
-            <button
-              className="btn btn-ghost btn-lg"
-              onClick={() => generate({ seed: Math.floor(Math.random() * 1e9) })}
-              disabled={loading}
-              title="Same prompt, new creative take"
-            >
-              Remix
+            <button className="btn btn-ghost btn-lg" onClick={remake} disabled={loading || remaking} title="A new version with different slides for each section. Undo or Original brings back earlier versions.">
+              {remaking ? "Remaking…" : "Remake ↻"}
             </button>
           </div>
+          {takes.length > 1 && (
+            <div className="version-row">
+              <span className="hint">
+                Showing <strong>{takes[current]?.label ?? "Original"}</strong> of {takes.length}
+              </span>
+              <button className="link-btn" onClick={undo} disabled={current === 0}>
+                ↶ Undo
+              </button>
+              <button className="link-btn" onClick={original} disabled={current === 0}>
+                ⟲ Original
+              </button>
+            </div>
+          )}
           <p className="hint">
             {ai.provider !== "builtin"
               ? `AI director: ${aiLabel(ai)}.`
@@ -838,12 +927,12 @@ export default function Studio() {
 
           <div className="takes">
             <div className="takes-head">
-              <h2>Takes</h2>
-              <span className="hint">{site ? "Alternative cuts: product-first, proof-first and a fresh story." : "Alternative creative takes on the same brief."}</span>
+              <h2>Versions</h2>
+              <span className="hint">Your original, every remake and alternative cuts. Click one to go back to it.</span>
             </div>
             <div className="takes-row">
               {takes.map((t, i) => (
-                <button key={i} className={`take-card ${t.plan === plan ? "active" : ""}`} onClick={() => show(t)} title="Use this take">
+                <button key={i} className={`take-card ${i === current ? "active" : ""}`} onClick={() => show(t, i)} title="Use this version">
                   <LoopCanvas plan={t.plan} long={300} fps={15} />
                   <span className="take-name">{t.label}</span>
                 </button>

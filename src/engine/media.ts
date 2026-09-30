@@ -125,7 +125,7 @@ function planAssets(plan: VideoPlan) {
 export async function preloadPlanMedia(plan: VideoPlan) {
   const { imgs, vids } = planAssets(plan);
   // GPU transitions are a separate chunk, fetched only when the film uses them.
-  const transitions = plan.scenes.some((s) => s.skill === "gallery-flow")
+  const transitions = plan.scenes.some((s) => s.skill === "gallery-flow" || s.transition === "cube")
     ? import("./gl").then((m) => m.loadTransitions()).then(() => notifyReady())
     : Promise.resolve();
   await Promise.all([...imgs.map(loadImage), ...vids.map(loadVideo), loadBrandFont(plan.brand?.font), transitions]);

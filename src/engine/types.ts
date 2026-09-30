@@ -92,7 +92,7 @@ export const PALETTE_IDS = [
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
 
-export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid"] as const;
+export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid", "cube"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
 export const FONTS = ["anton", "grotesk", "inter", "serif", "mono"] as const;
@@ -210,6 +210,8 @@ export interface VoiceSettings {
   model?: string;
   /** Uploaded narration: where it starts in the film (seconds). */
   offset?: number;
+  /** Caption look: frosted pill (default), pop (bold outlined words springing in), box (highlight box on the spoken word) or karaoke (the line fills as it's said). */
+  captionStyle?: "frosted" | "pop" | "box" | "karaoke";
 }
 
 /** Headline text effects: the five originals plus the modern AI-video set (decode, roll, letters,
@@ -294,6 +296,10 @@ export interface Look {
   shaderSpeed?: number;
   /** 3D stage: scene content floats on a tilted plane (degrees) that slowly orbits. */
   depth?: number;
+  /** 3D turntable: the shot on a panel turned this many degrees about the vertical axis, swinging slowly. */
+  turn?: number;
+  /** 3D slab: the shot as a thick floating glass slab tilted in 3D. */
+  slab?: boolean;
   /** Frame overlay drawn over the film: sci-fi HUD or a Swiss-style layout frame. */
   overlay?: "hud" | "frame";
 }

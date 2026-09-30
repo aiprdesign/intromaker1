@@ -80,6 +80,7 @@ IntroMaker is built on open-source software. Every component below is open sourc
 | [picocolors](alexeyraspopov/picocolors) | 1.1.1 | ISC |
 | [playwright-core](https://playwright.dev) | 1.56.1 | Apache-2.0 |
 | [postcss](https://postcss.org/) | 8.5.23 | MIT |
+| [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) | 2.0.4 | MIT |
 | [react](https://react.dev/) | 19.3.0 | MIT |
 | [react-dom](https://react.dev/) | 19.3.0 | MIT |
 | [scheduler](https://react.dev/) | 0.28.0 | MIT |

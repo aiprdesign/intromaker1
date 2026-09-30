@@ -1883,3 +1883,27 @@ button.brand-colors.on {
   padding: 12px;
   border-radius: 8px;
 }
+
+.chip.auto-style {
+  margin: 4px 0 10px;
+}
+.chip.auto-style.active {
+  color: var(--text);
+  border-color: rgba(0, 240, 255, 0.55);
+  background: rgba(0, 240, 255, 0.08);
+}
+
+.version-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.version-row .hint {
+  margin: 0;
+}
+.link-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

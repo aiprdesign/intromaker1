@@ -117,7 +117,7 @@ export const CONCEPTS: Concept[] = [
     eyebrows: { cards: "Insights", features: "What's inside", integrations: "Connect your sources" },
     featuresTitle: "Answers, *not spreadsheets*",
     cta: ["See your *data*", "Start *free*", "Get insights with *{name}*"],
-    template: "midnight",
+    template: "turntable",
     swap: "Your data, explored|measured|shared",
   },
   {
@@ -249,7 +249,7 @@ export const GENERAL: Concept = {
   eyebrows: {},
   featuresTitle: "What's *inside*",
   cta: ["Try *{name}* today", "Get started with *{name}*", "Start building with *{name}*"],
-  template: "midnight",
+  template: "epic",
   swap: "Your work, planned|built|shared",
 };
 

@@ -10,13 +10,13 @@ import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
 import { setCrispText } from "./fx";
-import { liquidWipe } from "./gl";
+import { liquidWipe, loadTransitions, renderTransition, transitionsReady } from "./gl";
 import type { Aspect, MusicPulse, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
 export const TRANSITION_LEN = 0.45;
 
 /** Transitions where outgoing and incoming shots overlap on screen. */
-export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak", "liquid"]);
+export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak", "liquid", "cube"]);
 /** How long past its end an overlapped scene keeps rendering (exit suppressed). */
 const OVERLAP_EXTEND = TRANSITION_LEN + 0.25;
 
@@ -118,6 +118,25 @@ function drawScene(
   };
   resetCtx(target);
   const depth = plan.style === "saas" ? plan.look?.depth ?? 0 : 0;
+  const turn = plan.style === "saas" ? plan.look?.turn ?? 0 : 0;
+  const slab = plan.style === "saas" && !!plan.look?.slab;
+  if (turn > 0 || slab) {
+    // 3D stages: the shot is drawn flat, then shown turned on a panel (turntable) or as a thick
+    // floating slab, over the style's own background.
+    saasBackground(sc);
+    const layer = scratch("depth-content", w, h);
+    const csc: SkillContext = { ...sc, ctx: layer.ctx, noStage: true };
+    layer.ctx.save();
+    glassFace(csc);
+    if (opts.camera !== false) applyCamera(csc, globalT);
+    if (transitionIn) applyTransitionIn(csc);
+    SKILL_MAP[scene.skill].render(csc);
+    layer.ctx.restore();
+    if (slab) projectSlab(target, layer.canvas, w, h, globalT, sc);
+    else projectTurn(target, layer.canvas, w, h, turn, globalT, sc);
+    resetCtx(target);
+    return sc;
+  }
   if (depth > 0) {
     // 3D stage: flat shader background, content projected onto a tilted, orbiting plane.
     saasBackground(sc);
@@ -170,6 +189,113 @@ function projectPlane(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, w: 
     const dw = w * k;
     ctx.drawImage(src, 0, y, w, Math.min(strip, h - y), w / 2 - dw / 2, a.y, dw, Math.max(0.5, b.y - a.y) + 0.6);
   }
+  ctx.restore();
+}
+
+/**
+ * Turntable: the shot on a panel turned `turn` degrees about the vertical axis (true perspective,
+ * via thin vertical strips), swinging slowly from side to side like a product on a turntable,
+ * with a soft reflection on the floor.
+ */
+function projectTurn(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, w: number, h: number, turn: number, t: number, sc: SkillContext) {
+  // Always visibly turned (never straight-on), swinging between ~75% and 125% of the angle.
+  const ay = ((turn * (1 + 0.25 * Math.sin(t * 0.28 + 0.6))) * Math.PI) / 180;
+  const f = w * 1.6;
+  const strip = Math.max(2, Math.round(w / 480));
+  const scale = 0.86;
+  const place = (x: number) => {
+    const xc = (x - w / 2) * scale;
+    const z = xc * Math.sin(ay);
+    const k = f / (f + z);
+    return { x: w / 2 + xc * Math.cos(ay) * k, k };
+  };
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  // Floor reflection first, then the panel.
+  for (const refl of [true, false]) {
+    ctx.globalAlpha = refl ? 0.14 : 1;
+    for (let x = 0; x < w; x += strip) {
+      const a = place(x);
+      const b = place(Math.min(w, x + strip));
+      const k = (a.k + b.k) / 2;
+      const dh = h * scale * k;
+      const top = h / 2 - dh / 2;
+      if (refl) {
+        ctx.save();
+        ctx.translate(0, top + dh * 2 + 6 * sc.u);
+        ctx.scale(1, -1);
+        ctx.drawImage(src, x, 0, Math.min(strip, w - x), h, a.x, 0, Math.max(0.5, b.x - a.x) + 0.6, dh);
+        ctx.restore();
+      } else ctx.drawImage(src, x, 0, Math.min(strip, w - x), h, a.x, top, Math.max(0.5, b.x - a.x) + 0.6, dh);
+    }
+  }
+  ctx.restore();
+  // Floor fade over the reflection.
+  const g = ctx.createLinearGradient(0, h * 0.93, 0, h);
+  g.addColorStop(0, rgba(sc.palette.bg0, 0));
+  g.addColorStop(1, rgba(sc.palette.bg0, 0.9));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, h * 0.93, w, h * 0.07);
+}
+
+/** The slab's glass face, drawn under the shot's content. */
+function glassFace(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 40 * u);
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, rgba(mixHex(palette.bg1, "#ffffff", palette.light ? 0.5 : 0.1), 0.92));
+  g.addColorStop(1, rgba(palette.bg0, 0.9));
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Slab: the shot as a thick, floating glass slab tilted in 3D (an oblique projection with a
+ * visible edge), bobbing gently, with a soft shadow on the floor below.
+ */
+function projectSlab(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, w: number, h: number, t: number, sc: SkillContext) {
+  const { u, palette } = sc;
+  const sw = w * 0.8;
+  const sh = h * 0.8;
+  const bob = Math.sin(t * 0.8) * 8 * u;
+  const tilt = -0.05 + Math.sin(t * 0.25) * 0.015;
+  const skew = -0.14 + Math.sin(t * 0.21) * 0.03;
+  const thick = 26 * u;
+  ctx.save();
+  // Floor shadow.
+  const sg = ctx.createRadialGradient(w / 2, h * 0.93, 10 * u, w / 2, h * 0.93, sw * 0.55);
+  sg.addColorStop(0, "rgba(0,0,0,0.45)");
+  sg.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = sg;
+  ctx.save();
+  ctx.translate(w / 2, h * 0.93);
+  ctx.scale(1, 0.12);
+  ctx.beginPath();
+  ctx.arc(0, 0, sw * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.translate(w / 2, h / 2 - 10 * u + bob);
+  ctx.rotate(tilt);
+  ctx.transform(1, 0, skew, 0.9, 0, 0);
+  // The slab's edge: the face's outline extruded downward, shaded.
+  for (let i = thick; i > 0; i -= 2 * u) {
+    ctx.beginPath();
+    ctx.roundRect(-sw / 2, -sh / 2 + i, sw, sh, 32 * u);
+    ctx.fillStyle = mixHex(palette.bg1, "#000000", 0.35 + (i / thick) * 0.25);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.roundRect(-sw / 2, -sh / 2, sw, sh, 32 * u);
+  ctx.save();
+  ctx.clip();
+  ctx.drawImage(src, -sw / 2, -sh / 2, sw, sh);
+  ctx.restore();
+  ctx.strokeStyle = rgba("#ffffff", palette.light ? 0.5 : 0.18);
+  ctx.lineWidth = 2 * u;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -347,62 +473,120 @@ export function renderFrame(
 function drawCaptions(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, w: number, h: number) {
   const cap = captionAt(plan, time);
   if (!cap || !cap.words.length) return;
+  const style = plan.voiceover?.captionStyle ?? "frosted";
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   const u = Math.min(w, h) / 1080;
   const portrait = h > w;
-  const size = (portrait ? 46 : 38) * u;
+  const bold = style === "pop" || style === "box";
+  const size = (portrait ? 46 : 38) * u * (bold ? 1.3 : 1);
   resetCtx(ctx);
   ctx.save();
-  ctx.font = `800 ${Math.round(size)}px Inter, sans-serif`;
+  ctx.font = `${bold ? 900 : 800} ${Math.round(size)}px Inter, sans-serif`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
-  const space = ctx.measureText(" ").width * 1.2;
-  const widths = cap.words.map((wd) => ctx.measureText(wd).width);
-  const total = widths.reduce((a, b) => a + b, 0) + space * (cap.words.length - 1);
+  const words = style === "pop" || style === "box" ? cap.words.map((wd) => wd.toUpperCase()) : cap.words;
+  const space = ctx.measureText(" ").width * (style === "box" ? 1.7 : 1.2);
+  const widths = words.map((wd) => ctx.measureText(wd).width);
+  const total = widths.reduce((a, b) => a + b, 0) + space * (words.length - 1);
   const padX = size * 0.7;
   const pw = Math.min(w * 0.92, total + padX * 2);
   const ph = size * 1.75;
   const cx = w / 2;
-  const cy = h * (portrait ? 0.855 : 0.9);
+  const cy = h * (portrait ? 0.855 : bold ? 0.86 : 0.9);
   const k = ease.outCubic(clamp(cap.since / 0.18 + 0.01));
-  // Frosted pill: whatever is behind it (cards, screenshots, headlines) is blurred and dimmed,
-  // so the caption reads on any layout.
-  const px = Math.max(0, Math.round(cx - pw / 2));
-  const py = Math.max(0, Math.round(cy - ph / 2));
-  const bw = Math.min(w - px, Math.round(pw));
-  const bh = Math.min(h - py, Math.round(ph));
-  const frost = scratch("caption-frost", Math.max(1, bw), Math.max(1, bh));
-  frost.ctx.setTransform(1, 0, 0, 1, 0, 0);
-  frost.ctx.filter = `blur(${Math.round(14 * u)}px)`;
-  frost.ctx.drawImage(ctx.canvas, px - 20, py - 20, bw + 40, bh + 40, -20, -20, bw + 40, bh + 40);
-  frost.ctx.filter = "none";
-  ctx.globalAlpha = k;
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 24 * u;
-  ctx.fillStyle = palette.light ? "rgba(255,255,255,0.72)" : "rgba(6,6,12,0.55)";
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.clip();
-  ctx.drawImage(frost.canvas, px, py);
-  ctx.fillStyle = palette.light ? "rgba(255,255,255,0.72)" : "rgba(6,6,12,0.62)";
-  ctx.fillRect(px, py, bw, bh);
-  ctx.restore();
-  ctx.beginPath();
-  ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
-  ctx.strokeStyle = palette.light ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.14)";
-  ctx.lineWidth = Math.max(1, 1.2 * u);
-  ctx.stroke();
+  if (style === "frosted") {
+    // Frosted pill: whatever is behind it (cards, screenshots, headlines) is blurred and dimmed,
+    // so the caption reads on any layout.
+    const px = Math.max(0, Math.round(cx - pw / 2));
+    const py = Math.max(0, Math.round(cy - ph / 2));
+    const bw = Math.min(w - px, Math.round(pw));
+    const bh = Math.min(h - py, Math.round(ph));
+    const frost = scratch("caption-frost", Math.max(1, bw), Math.max(1, bh));
+    frost.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    frost.ctx.filter = `blur(${Math.round(14 * u)}px)`;
+    frost.ctx.drawImage(ctx.canvas, px - 20, py - 20, bw + 40, bh + 40, -20, -20, bw + 40, bh + 40);
+    frost.ctx.filter = "none";
+    ctx.globalAlpha = k;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 24 * u;
+    ctx.fillStyle = palette.light ? "rgba(255,255,255,0.72)" : "rgba(6,6,12,0.55)";
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.clip();
+    ctx.drawImage(frost.canvas, px, py);
+    ctx.fillStyle = palette.light ? "rgba(255,255,255,0.72)" : "rgba(6,6,12,0.62)";
+    ctx.fillRect(px, py, bw, bh);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
+    ctx.strokeStyle = palette.light ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.14)";
+    ctx.lineWidth = Math.max(1, 1.2 * u);
+    ctx.stroke();
+  } else ctx.globalAlpha = k;
   ctx.translate(cx, cy + (1 - k) * 10 * u);
-  const fit = total > pw - padX * 2 ? (pw - padX * 2) / total : 1;
+  const fit = total > w * 0.92 - padX * 2 ? (w * 0.92 - padX * 2) / total : 1;
   ctx.scale(fit, fit);
   let x = -total / 2;
-  cap.words.forEach((wd, i) => {
+  words.forEach((wd, i) => {
     const on = i === cap.active;
-    ctx.fillStyle = on ? palette.primary : i < cap.active || cap.active < 0 ? palette.text : rgba(palette.text, 0.55);
-    ctx.fillText(wd, x, size * 0.04 - (on ? 2 * u : 0));
+    const said = i < cap.active || cap.active < 0;
+    const tm = cap.times[i];
+    ctx.save();
+    if (style === "frosted") {
+      ctx.fillStyle = on ? palette.primary : said ? palette.text : rgba(palette.text, 0.55);
+      ctx.fillText(wd, x, size * 0.04 - (on ? 2 * u : 0));
+    } else if (style === "pop") {
+      // Bold outlined words that spring in as they're said; the current one pops bigger in colour.
+      const since = cap.lt - tm.t0;
+      if (since < -0.02) {
+        ctx.restore();
+        x += widths[i] + space;
+        return;
+      }
+      const sp = clamp(0.4 + 0.6 * (1 - Math.exp(-since * 14) * Math.cos(since * 22)), 0, 1.25);
+      const sc = (on ? 1.14 : 1) * sp;
+      ctx.translate(x + widths[i] / 2, 0);
+      ctx.scale(sc, sc);
+      ctx.lineJoin = "round";
+      ctx.lineWidth = size * 0.16;
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeText(wd, -widths[i] / 2, size * 0.04);
+      ctx.fillStyle = on ? palette.accent : "#ffffff";
+      ctx.fillText(wd, -widths[i] / 2, size * 0.04);
+    } else if (style === "box") {
+      // A colour box slides onto the word being said.
+      if (on) {
+        const pad = size * 0.22;
+        ctx.beginPath();
+        ctx.roundRect(x - pad, -size * 0.62, widths[i] + pad * 2, size * 1.24, size * 0.2);
+        ctx.fillStyle = palette.primary;
+        ctx.fill();
+      }
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = on ? 0 : 10 * u;
+      ctx.fillStyle = on ? (palette.light ? "#ffffff" : palette.bg0) : "#ffffff";
+      ctx.fillText(wd, x, size * 0.04);
+    } else {
+      // Karaoke: each word fills with colour as it's said.
+      ctx.shadowColor = "rgba(0,0,0,0.55)";
+      ctx.shadowBlur = 10 * u;
+      ctx.fillStyle = rgba("#ffffff", 0.55);
+      ctx.fillText(wd, x, size * 0.04);
+      ctx.shadowBlur = 0;
+      const f = clamp((cap.lt - tm.t0) / Math.max(0.05, tm.t1 - tm.t0));
+      if (f > 0) {
+        ctx.beginPath();
+        ctx.rect(x - 2, -size, (widths[i] + 4) * f, size * 2);
+        ctx.clip();
+        ctx.fillStyle = palette.accent;
+        ctx.fillText(wd, x, size * 0.04);
+        ctx.fillRect(x, size * 0.62, widths[i], 4 * u);
+      }
+    }
+    ctx.restore();
     x += widths[i] + space;
   });
   ctx.restore();
@@ -559,9 +743,14 @@ function applyCamera(sc: SkillContext, globalT: number) {
     const bar = Math.floor(globalT / beat) % 4 === 0 ? 1.6 : 1;
     pulse = Math.exp(-phase * 7) * 0.012 * bar;
   }
-  const s = 1.035 + pulse;
-  const dx = noise1(globalT * 0.45, 11) * 9 * u;
-  const dy = noise1(globalT * 0.37, 23) * 7 * u;
+  // Cinematic dolly: every shot keeps pushing in slowly (about 4% over the shot, easing in from
+  // rest), drifting a touch to one side, so no frame is ever static. Cuts hide the reset.
+  const p = clamp(sc.t / Math.max(0.5, sc.d));
+  const push = 0.04 * (p * p * (3 - 2 * p) * 0.35 + p * 0.65);
+  const side = sc.seed % 2 ? 1 : -1;
+  const s = 1.035 + push + pulse;
+  const dx = noise1(globalT * 0.45, 11) * 9 * u + side * p * 14 * u;
+  const dy = noise1(globalT * 0.37, 23) * 7 * u - p * 6 * u;
   const rot = noise1(globalT * 0.23, 37) * 0.007;
   ctx.translate(w / 2 + dx, h / 2 + dy);
   ctx.rotate(rot);
@@ -581,8 +770,11 @@ function compositeOverlap(sc: SkillContext, a: HTMLCanvasElement, b: HTMLCanvasE
   const kind = sc.scene.transition;
   // Liquid: the next shot rises in behind a wavy, blobby liquid front (GPU; dissolves without WebGL).
   const liquid = kind === "liquid" ? liquidWipe(a, b, ease.inOutCubic(k), seed) : null;
-  if (liquid) {
-    ctx.drawImage(liquid, 0, 0, w, h);
+  // Cube: the two shots as faces of a turning 3D cube (gl-transitions "cube", on the GPU).
+  if (kind === "cube" && !transitionsReady()) void loadTransitions();
+  const cube = kind === "cube" ? renderTransition("cube", a, b, ease.inOutCubic(k), w, h, { bg: [0, 0, 0, 1] }) : null;
+  if (liquid || cube) {
+    ctx.drawImage((liquid ?? cube)!, 0, 0, w, h);
   } else if (kind === "whip" || kind === "push") {
     const e = kind === "whip" ? ease.inOutExpo(k) : ease.inOutCubic(k);
     const dir = seed % 2 ? 1 : -1;

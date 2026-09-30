@@ -239,13 +239,14 @@ function readBody(body: Body) {
   const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
   const template = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
   const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
+  const variant = Math.min(50, Math.max(0, Math.floor(Number(body.variant) || 0)));
   const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
-  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template, safe };
+  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template, safe, variant };
   const concept = rawSite
     ? detectConcept(`${rawSite.name} ${rawSite.tagline} ${rawSite.description}`, [...rawSite.headlines, ...rawSite.features, ...rawSite.steps, ...rawSite.pains].join(" "))
     : detectConcept(prompt);
-  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle, safe }) : planFromPrompt(request));
-  return { prompt, aspect, length, palette, seed, site, colors, style, template, angle, wantSaas, builtin, concept, safe };
+  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle, safe, variant }) : planFromPrompt(request));
+  return { prompt, aspect, length, palette, seed, site, colors, style, template, angle, wantSaas, builtin, concept, safe, variant };
 }
 type Ctx = ReturnType<typeof readBody>;
 
@@ -279,7 +280,11 @@ async function directorRequest(c: Ctx) {
       : "") +
     (c.palette !== "auto" ? ` Use the "${c.palette}" palette.` : "") +
     (c.angle ? `\nCREATIVE ANGLE "${ANGLES.find((a) => a.id === c.angle)!.name}": ${ANGLES.find((a) => a.id === c.angle)!.brief}` : "") +
-    (c.seed ? ` Variation #${c.seed % 1000}: take a fresh creative angle.` : "");
+    (c.variant
+      ? `\nREMAKE #${c.variant}: make a clearly different film from the obvious one. Use different slides for its sections (e.g. feature-slides or bento instead of icon-features, a different interaction moment, node-graph vs steps, carousel-3d vs gallery-flow, world-map vs globe, problem-solution vs before-after) and a different opening line, keeping every rule above.`
+      : c.seed
+        ? ` Variation #${c.seed % 1000}: take a fresh creative angle.`
+        : "");
   const system = (c.site ? SYSTEM + "\n" + SITE_RULES : SYSTEM) + "\n" + (c.safe ? CLAIM_RULES : HEALTH_RULES);
   return { schema, images, text, system };
 }

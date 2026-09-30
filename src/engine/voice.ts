@@ -272,7 +272,7 @@ export function captionAt(plan: Pick<VideoPlan, "scenes" | "bpm" | "voiceover">,
     const phrase = list.find((p, i) => lt <= p[p.length - 1].t1 + (i === list.length - 1 ? 0.35 : 0.08)) ?? list[list.length - 1];
     const active = phrase.findIndex((w) => lt >= w.t0 && lt < w.t1 + 0.04);
     const first = phrase[0].t0;
-    return { words: phrase.map((w) => w.w), active, since: lt - first };
+    return { words: phrase.map((w) => w.w), active, since: lt - first, lt, times: phrase.map((w) => ({ t0: w.t0, t1: w.t1 })) };
   }
   return null;
 }

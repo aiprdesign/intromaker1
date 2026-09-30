@@ -28,6 +28,65 @@ export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20,
 
 /** The site talks about being used across countries (the globe beat's evidence). */
 const GLOBAL = /\b(global(ly)?|worldwide|international(ly)?|countries|currencies|cross-border|around the world|multi-region|edge network|borders)\b/i;
+const HOOK_VERBS = /^(ship|build|know|see|get|make|run|turn|meet|grow|close|sell|plan|track|find|launch|create|design|write|automate|stop|start|bring|keep|move|work|scale|save|spend|manage|connect|send|share|say|go|do|take|put|power|own|win)\b/i;
+const BOILERPLATE = /\b(welcome to|introducing|the (best|leading|ultimate|only)|all[- ]in[- ]one|platform for|solution for|powered by|next[- ]gen(eration)?|revolutionary|world[- ]class)\b/i;
+
+/** A question hook from a pain: "Chasing receipts" → "Still chasing receipts?". */
+function painQuestion(pain: string) {
+  const p = pain.replace(/[.!?]+$/, "").trim();
+  if (!p || p.split(/\s+/).length > 6) return "";
+  const lower = p.charAt(0).toLowerCase() + p.slice(1);
+  const first = lower.split(/\s+/)[0];
+  if (/ing$/.test(first)) return `Still ${lower}?`;
+  if (/^(too|so|endless|hours|days|weeks)\b/.test(lower)) return `Tired of ${lower}?`;
+  return `Still stuck with ${lower}?`;
+}
+
+/**
+ * Pick the opening line an editor would: short (4–7 words), speaking to the viewer, leading with
+ * a verb, specific rather than boilerplate, and never a claim. Story-led films can open on a
+ * question made from one of the site's pains ("Still chasing receipts?").
+ */
+function bestHook(c: { tagline: string; descClause: string; headlines: string[]; pains: string[]; name: string; taken: string[]; pick?: number }): { text: string; why: string } | null {
+  const cands: { text: string; kind: string }[] = [];
+  // Lines the tour or feature tiles will use are theirs (the film never says a line twice).
+  const used = c.taken.map(norm).filter(Boolean);
+  const clash = (t: string) => used.some((u) => u === norm(t) || u.startsWith(norm(t)) || norm(t).startsWith(u));
+  const pushLine = (text: string | undefined, kind: string) => {
+    const t = (text ?? "").trim();
+    if (!t || cands.some((x) => norm(x.text) === norm(t))) return;
+    if (kind === "headline" && clash(t)) return;
+    cands.push({ text: t, kind });
+  };
+  pushLine(c.tagline, "tagline");
+  pushLine(c.descClause, "description");
+  for (const hd of c.headlines.slice(0, 3)) pushLine(sentenceCopy(hd, 9) || shortenCopy(hd, 8), "headline");
+  for (const pn of c.pains.slice(0, 2)) pushLine(painQuestion(pn), "question");
+  const scored = cands
+    .filter((x) => !isUnsafe(x.text) && !isNumericClaim(x.text))
+    .map((x) => {
+      const words = x.text.replace(/\*/g, "").split(/\s+/).length;
+      let score = words >= 4 && words <= 7 ? 3 : words === 3 || words === 8 || words === 9 ? 1 : -2;
+      if (/\b(you|your)\b/i.test(x.text)) score += 1;
+      if (HOOK_VERBS.test(x.text.replace(/^\W+/, ""))) score += 1;
+      if (BOILERPLATE.test(x.text)) score -= 3;
+      if (new RegExp(`\\b${c.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(x.text)) score -= 1;
+      if (x.kind === "question") score += 2;
+      if (x.kind === "tagline") score += 0.5;
+      return { ...x, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  // Remakes try the runner-up opener when it's nearly as strong.
+  const close = scored.filter((x) => x.score >= (scored[0]?.score ?? 0) - 1.5);
+  const best = close.length ? close[(c.pick ?? 0) % close.length] : undefined;
+  if (!best) return null;
+  const why =
+    best.kind === "question" ? "Opens on a question from the site's own pain point"
+    : best.kind === "tagline" ? "The site's tagline makes the strongest opener"
+    : `A sharper opener than the tagline: the site's ${best.kind}`;
+  return { text: best.text, why };
+}
+
 /** The site talks about places: a flat world map suits it better than a globe. */
 const MAP_WORDS = /\b(countries|country|regions?|currencies|languages|markets|offices|cities|locations)\b/i;
 /** The site talks about helping its customers. */
@@ -90,6 +149,8 @@ export interface PlanRequest {
   template?: string;
   /** Claim-safe copy (default on): generic wording, no superlatives, guarantees or numbers. */
   safe?: boolean;
+  /** Remake number (see SiteRequest.variant). */
+  variant?: number;
 }
 
 interface Mood {
@@ -347,11 +408,12 @@ function stats(prompt: string): string[] {
 export function isSaasPrompt(prompt: string) {
   const l = prompt.toLowerCase();
   // Any recognisable product category (an AI assistant, a CRM, a payments tool…) is a SaaS film too.
-  return (
-    (/\b(saas|app|platform|software|startup|product|dashboard|b2b|api|crm|tool|workspace|launch video|explainer|demo|system|teams|assistant|automation|analytics)\b/.test(l) ||
-      Math.max(...CONCEPTS.map((c) => (l.match(c.keywords) ?? []).length)) >= 2) &&
-    !/\b(epic|trailer|cinematic|game|gaming|movie|film|hype|festival|documentary)\b/.test(l)
-  );
+  // (Plurals count: "deploy your apps" is a product. Saying "SaaS" or "product launch" outright
+  // wins over trailer words, so "an epic SaaS launch" is an epic SaaS film, not a movie trailer.)
+  const product = /\b(saas|apps?|platforms?|software|startups?|products?|dashboards?|b2b|apis?|crm|tools?|workspaces?|launch video|explainer|demo|systems?|teams|assistants?|automations?|analytics)\b/.test(l) ||
+    Math.max(...CONCEPTS.map((c) => (l.match(c.keywords) ?? []).length)) >= 2;
+  const outright = /\b(saas|product launch|launch video|explainer|b2b)\b/.test(l);
+  return product && (outright || !/\b(epic|trailer|cinematic|game|gaming|movie|film|hype|festival|documentary)\b/.test(l));
 }
 
 /** Recover a phrase's original casing from the prompt ("AI insights", not "Ai insights"). */
@@ -434,7 +496,7 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     videos: [],
     themeColor: null,
   };
-  const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas" });
+  const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas", variant: req.variant });
   return { ...plan, title: brand };
 }
 
@@ -658,6 +720,8 @@ export interface SiteRequest {
   angle?: Angle;
   /** Claim-safe copy (default on): generic wording, no superlatives, guarantees or numbers. */
   safe?: boolean;
+  /** Remake number: 0 is the director's best fit; each remake picks other slides for its sections. */
+  variant?: number;
 }
 
 export type Angle = "story" | "product" | "proof";
@@ -960,7 +1024,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const candidates: Beat[] = [];
   const add = (priority: number, scene: Scene) => candidates.push({ priority, scene });
 
-  const angle: Angle = req.angle ?? "story";
+  // A remake tells the story from another angle (unless one was asked for) and swaps each section's
+  // slide for its alternative (alt); remake 0 is the director's best fit.
+  const variant = Math.max(0, Math.floor(req.variant ?? 0));
+  const alt = variant % 2 === 1;
+  const angle: Angle = req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
   // What kind of product this is decides the arc, chapter labels, CTA voice and icons.
   // (From the site as captured: screening a claim out mustn't change what kind of product it is.)
   const whole = ORIGINAL.get(site) ?? site;
@@ -988,8 +1056,13 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Value-first opens on what the product does for you: a feature benefit the tour doesn't use.
   // (Never the line product-first opens on, so the two takes differ.)
   const valueHook = valueFirst ? [longFeatures[2], longFeatures[3], longFeatures[1], descClause].find((x) => usable(x) && norm(x) !== norm(productLine)) ?? "" : "";
+  // The opening line, when no angle dictates it: the strongest of the site's own lines (or a
+  // question made from one of its pains), scored like an editor would (see bestHook).
+  const openHook = !proofHook && !painHook && !(valueFirst && valueHook) && !productHook
+    ? bestHook({ tagline, descClause, headlines: site.headlines, pains: angle === "story" && target >= 20 ? pains : [], name: site.name, taken: [...longFeatures.slice(0, 4), ...shortFeatures.slice(0, 6)], pick: variant })
+    : null;
   // The tagline is used once: in the hook, or (if the hook is pains/proof/value) under the logo.
-  const taglineFree = painHook || proofHook || !!valueHook || !!productHook;
+  const taglineFree = painHook || proofHook || !!valueHook || !!productHook || (!!openHook && norm(openHook.text) !== norm(tagline));
   // Whether the film opens on the wall of product images (then the gallery beat is optional).
   let wall = false;
   if (proofHook) {
@@ -1008,8 +1081,10 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   } else {
     // Story-led films with plenty of product imagery open on the whole product: a tilted wall of
     // its screenshots drifting behind the promise (Linear / Vercel hero look).
-    wall = angle === "story" && !productHook && target >= 20 && visuals >= 4;
-    add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: productHook || tagline, eyebrow: wall ? undefined : `Introducing ${site.name}`, duration: beats(wall ? 9 : 7), transition: "cut", why: wall ? `${visuals} product images and UI components: a wall of the product behind the promise` : undefined });
+    wall = angle === "story" && !productHook && target >= 20 && visuals >= 4 && !alt;
+    const hookText = productHook || openHook?.text || tagline;
+    const hookWhy = [openHook?.why, wall ? `${visuals} product images and UI components: a wall of the product behind it` : ""].filter(Boolean).join("; ");
+    add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: hookText, eyebrow: wall ? undefined : `Introducing ${site.name}`, duration: beats(wall ? 9 : 7), transition: "cut", why: hookWhy || undefined });
   }
   // 2. Reveal.
   // Product-first with real product footage: the name as giant type filled with the product,
@@ -1026,7 +1101,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       });
   // 3. Meet: the real product, rebuilt from its own UI components (or the page scrolling by).
   if (shots.hero || shots.full) {
-    const assemble = !!shots.hero;
+    const assemble = !!shots.hero && !(alt && shots.full);
     add(!(video ?? images[0] ?? shots.sections[0] ?? shots.hero) && target >= 20 ? 2 : assemble && target >= 20 ? 2 : 3, {
       role: "meet", skill: assemble ? "ui-assemble" : "site-scroll",
       text: taglineFree && !(valueHook && descClause && norm(valueHook) !== norm(descClause)) ? tagline : descClause || `Say hello to *${site.name}*`,
@@ -1041,7 +1116,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     add(target >= 30 ? 3 : 5, {
       // AI and creative tools show their steps as a node workflow (ComfyUI-style).
       // (Or any product whose steps read as a pipeline: connect, trigger, transform, publish.)
-      role: "how", skill: site.steps.length >= 3 && (concept.id === "ai" || concept.id === "creative" || /\b(workflows?|pipelines?|automat\w*|nodes?|connect\w*|triggers?|integrat\w*)\b/i.test(site.steps.join(" "))) ? "node-graph" : "steps",
+      role: "how", skill: site.steps.length >= 3 && alt !== (concept.id === "ai" || concept.id === "creative" || /\b(workflows?|pipelines?|automat\w*|nodes?|connect\w*|triggers?|integrat\w*)\b/i.test(site.steps.join(" "))) ? "node-graph" : "steps",
       text: `Get started in *${site.steps.length} steps*`,
       items: site.steps.slice(0, 4),
       eyebrow: "How it works",
@@ -1082,7 +1157,15 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Long films with real feature descriptions and product UI to show give each feature its own
   // slide; otherwise a bento for a rich set, or the classic icon row.
   const withBenefit = featureItems.filter((it) => (it.split(/\s+[—–]\s+/)[1] ?? "").split(/\s+/).length >= 4);
-  const featureSlides = target >= 30 && withBenefit.length >= 3 && visuals >= 2;
+  // Remakes rotate through the other feature layouts the material allows.
+  const featureKinds = [
+    ...(target >= 30 && withBenefit.length >= 3 && visuals >= 2 ? ["slides"] : []),
+    ...(featureItems.length >= 5 ? ["bento"] : []),
+    ...(featureItems.length >= 2 ? ["icons"] : []),
+    ...(featureItems.length === 4 ? ["bento"] : []),
+  ];
+  const featureKind = featureKinds.length ? featureKinds[variant % featureKinds.length] : null;
+  const featureSlides = featureKind === "slides";
   if (featureSlides) {
     add(valuePriority, {
       role: "features", skill: "feature-slides",
@@ -1093,7 +1176,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: beats(15.5),
       transition: "dolly",
     });
-  } else if (featureItems.length >= 5) {
+  } else if (featureKind === "bento") {
     add(valuePriority, {
       role: "bento", skill: "bento",
       text: `Inside *${site.name}*`,
@@ -1102,7 +1185,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: Math.max(4.4, beats(10)),
       transition: "dolly",
     });
-  } else if (featureItems.length >= 2) {
+  } else if (featureKind === "icons") {
     add(valuePriority, {
       role: "features", skill: "icon-features",
       text: concept.featuresTitle,
@@ -1116,14 +1199,17 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
   // Products that lead with AI get the AI moment whatever their category.
   const aiLed = concept.id !== "ai" && [site.tagline, ...site.headlines.slice(0, 4)].some((x) => /\b(ai|assistant|copilot|gpt)\b/i.test(x ?? ""));
-  const shownTitles = new Set([...(featureSlides ? withBenefit.slice(0, 3) : featureItems.slice(0, featureItems.length >= 5 ? 6 : 4)), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
+  const shownTitles = new Set([...(featureSlides ? withBenefit.slice(0, 3) : featureItems.slice(0, featureKind === "bento" ? 6 : 4)), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
   const spareFeatures = shortFeatures.filter((f) => !shownTitles.has(norm(f)));
   // The moment that suits this product best, scored on the site's own words, its category and its
   // material (see rankMoments): a dev platform that talks about deploys gets code → deploy, a
   // whiteboard gets live cursors, a hiring tool its candidate board.
   const leadCopy = [whole.tagline, whole.description].join(" ");
   const bodyCopy = [...whole.headlines, ...whole.features, ...(whole.steps ?? [])].join(" ");
-  const fit = rankMoments(leadCopy, bodyCopy, concept.id, { aiLed, spareFeatures: spareFeatures.length })[0];
+  const moments = rankMoments(leadCopy, bodyCopy, concept.id, { aiLed, spareFeatures: spareFeatures.length });
+  // Remakes try the runner-up moments that still suit the product (at least 60% of the best fit).
+  const fitting = moments.filter((m) => m.score >= moments[0].score * 0.6);
+  const fit = fitting[variant % fitting.length];
   const demo = fit.spec;
   const demoWhy = fit.because.length ? `Best fit: the site talks about ${fit.because.slice(0, 3).join(", ")}` : `Typical of ${concept.name.toLowerCase()} launch films`;
   let demoScene: Scene | null = null;
@@ -1171,7 +1257,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (target >= 20 && visuals >= 3) {
     // Visual products (stores, templates, creative work) turn on a 3D carousel; product UI flows
     // through the framed gallery.
-    const carousel = concept.id === "creative" || concept.id === "ecommerce";
+    const carousel = (concept.id === "creative" || concept.id === "ecommerce") !== alt;
     add(target >= 30 ? (wall ? 4.5 : 3) : 5, {
       role: "gallery",
       skill: carousel ? "carousel-3d" : "gallery-flow",
@@ -1192,7 +1278,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     const n = own.split(/\s+/).length;
     // A flat map when the site talks about places (countries, regions, currencies, languages);
     // the turning globe when it talks about a global network or reach.
-    const flatMap = MAP_WORDS.test([whole.tagline, whole.description, ...whole.headlines, ...whole.features].join(" "));
+    const flatMap = MAP_WORDS.test([whole.tagline, whole.description, ...whole.headlines, ...whole.features].join(" ")) !== alt;
     add(target >= 30 ? 4 : 6, {
       role: "reach", skill: flatMap ? "world-map" : "globe",
       text: own && !/\d/.test(own) && n >= 3 && n <= 8 ? own : REACH[concept.id]?.title ?? REACH.general.title,
@@ -1208,7 +1294,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const compareMedia = images[0] ?? img(shots.hero) ?? img(shots.sections[0]);
   const pairs = target >= 20 && pains.length >= 2 && !painHook ? pairPains(pains, [...spareFeatures, ...shortFeatures]) : [];
   const matched = pairs.filter((p) => p.score > 0).length;
-  if (pairs.length >= 2 && (matched >= 2 || !compareMedia)) {
+  if (pairs.length >= 2 && ((matched >= 2) !== (alt && !!compareMedia) || !compareMedia)) {
     add(target >= 30 ? 4 : 6, {
       role: "solve", skill: "problem-solution",
       text: "From problem to *solution*",
@@ -1645,6 +1731,8 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
             shaderSpeed: raw.look.shaderSpeed !== undefined ? Math.min(3, Math.max(0, Number(raw.look.shaderSpeed) || 0)) : undefined,
             bokeh: raw.look.bokeh === true ? true : raw.look.bokeh === false ? false : undefined,
             depth: raw.look.depth !== undefined ? Math.min(30, Math.max(0, Number(raw.look.depth) || 0)) : undefined,
+            turn: raw.look.turn !== undefined ? Math.min(40, Math.max(0, Number(raw.look.turn) || 0)) : undefined,
+            slab: raw.look.slab === true ? true : undefined,
             overlay: raw.look.overlay === "hud" || raw.look.overlay === "frame" ? raw.look.overlay : undefined,
             textScale: raw.look.textScale !== undefined ? Math.min(1.6, Math.max(0.7, Number(raw.look.textScale) || 1)) : undefined,
             grain: raw.look.grain !== undefined ? Math.min(2, Math.max(0, Number(raw.look.grain) || 0)) : undefined,

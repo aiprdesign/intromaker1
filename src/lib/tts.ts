@@ -60,13 +60,17 @@ type KokoroModel = { generate: (text: string, opts: { voice: string; speed?: num
 let kokoro: Promise<KokoroModel> | null = null;
 // Loaded at runtime (not bundled): the model runtime is large and only needed when chosen.
 const importUrl = new Function("u", "return import(u)") as (u: string) => Promise<{ KokoroTTS: { from_pretrained: (id: string, o: object) => Promise<KokoroModel> } }>;
-const KOKORO_URL = process.env.NEXT_PUBLIC_KOKORO_URL || "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm";
+// The library's own browser bundle (transformers.js included). jsDelivr's auto-converted "+esm"
+// build breaks the model runtime's WebAssembly loading, so the voice never loaded.
+const KOKORO_URL = process.env.NEXT_PUBLIC_KOKORO_URL || "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js";
 const KOKORO_MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
 
 function loadKokoro(onProgress?: (msg: string) => void) {
   kokoro ??= (async () => {
     onProgress?.("Loading the voice model (first time only)…");
-    const { KokoroTTS } = await importUrl(KOKORO_URL);
+    const { KokoroTTS } = await importUrl(KOKORO_URL).catch(() => {
+      throw new Error("Couldn't download the voice model. Check your internet connection (it loads from cdn.jsdelivr.net and huggingface.co), or pick another voice source.");
+    });
     const progress_callback = (p: { status?: string; progress?: number; file?: string }) => {
       if (p.status === "progress" && typeof p.progress === "number" && /onnx/.test(p.file ?? "")) onProgress?.(`Downloading the voice model… ${Math.round(p.progress)}%`);
     };
