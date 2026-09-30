@@ -988,3 +988,112 @@ export function eyebrow(sc: SkillContext, text: string, y: number, k: number) {
   ctx.restore();
 }
 
+
+/* ───────────────────────── Concept visuals (films without website imagery) ───────────────────────── */
+
+/**
+ * A film made from a text concept has no screenshots, product images or logo to show. These give
+ * it visuals of its own: icons from the product's concept (developer tool, AI, fintech…), matched
+ * to its words.
+ */
+export function imageless(sc: SkillContext) {
+  const b = sc.brand;
+  return !sc.scene.media && !b?.logo && !b?.images?.length && !b?.parts?.length;
+}
+
+/** The product's mark: its concept's lead icon (the same on every slide, like a logo). */
+export function brandIcon(sc: SkillContext): IconKind {
+  return (CONCEPT_MAP[sc.concept ?? "general"] ?? CONCEPT_MAP.general).icons[0] as IconKind;
+}
+
+/** The concept's icon family, with the brand's own icon first. */
+export function conceptIcons(sc: SkillContext): IconKind[] {
+  const set = (CONCEPT_MAP[sc.concept ?? "general"]?.icons ?? CONCEPT_MAP.general.icons) as IconKind[];
+  const first = brandIcon(sc);
+  return [first, ...set.filter((i) => i !== first)];
+}
+
+/**
+ * A generated brand mark: a gradient tile with the product's icon in white (in place of a logo).
+ * `k` scales it in; `glowAmt` 0..1.
+ */
+export function brandGlyph(sc: SkillContext, cx: number, cy: number, size: number, k = 1, glowAmt = 1) {
+  if (k <= 0) return;
+  const { ctx, u, palette } = sc;
+  const s = size * k;
+  ctx.save();
+  ctx.translate(cx, cy);
+  const g = ctx.createLinearGradient(-s / 2, -s / 2, s / 2, s / 2);
+  g.addColorStop(0, palette.primary);
+  g.addColorStop(1, palette.secondary);
+  ctx.shadowColor = rgba(palette.primary, 0.75 * glowAmt);
+  ctx.shadowBlur = 40 * u * glowAmt;
+  ctx.beginPath();
+  ctx.roundRect(-s / 2, -s / 2, s, s, s * 0.28);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  // Glassy top highlight and a hairline rim.
+  const hl = ctx.createLinearGradient(0, -s / 2, 0, s * 0.1);
+  hl.addColorStop(0, "rgba(255,255,255,0.35)");
+  hl.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = hl;
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = Math.max(1, 1.2 * u);
+  ctx.stroke();
+  drawIcon(ctx, brandIcon(sc), 0, 0, s * 0.52, "#ffffff", clamp(k * 1.3));
+  ctx.restore();
+}
+
+/**
+ * A constellation of the concept's icons in glass tiles, floating at different depths around the
+ * edges of the frame (the middle stays clear for the headline). Near tiles are larger, brighter and
+ * drift more; far ones are small and dim. Tiles arrive on a stagger and leave with `fade`.
+ */
+export function iconConstellation(sc: SkillContext, opts: { count?: number; start?: number; fade?: number; clear?: number } = {}) {
+  const { ctx, w, h, t, u, palette, seed } = sc;
+  const icons = conceptIcons(sc);
+  const n = opts.count ?? (h > w ? 7 : 9);
+  const fade = 1 - (opts.fade ?? 0);
+  if (fade <= 0) return;
+  const r = rng(seed * 7 + 311);
+  const portrait = h > w;
+  // Keep a clear ellipse in the middle for the words.
+  const clear = opts.clear ?? 1;
+  // Landscape: an ellipse around the words. Portrait: the words fill the width, so the tiles sit in
+  // bands above and below them instead.
+  const tiles = Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * TAU + r() * 0.5 - 0.25 + 0.4;
+    const z = 0.45 + r() * 0.55;
+    let x: number;
+    let y: number;
+    if (portrait) {
+      const top = i % 2 === 0;
+      const slot = Math.floor(i / 2);
+      const per = Math.ceil(n / 2);
+      x = w * (0.14 + (0.72 * (slot + 0.5 + (r() - 0.5) * 0.5)) / per);
+      y = top ? h * (0.1 + r() * 0.14) * (2 - clear) : h * (1 - (0.1 + r() * 0.15) * (2 - clear));
+    } else {
+      x = w / 2 + Math.cos(a) * w * 0.4 * (0.92 + r() * 0.16) * clear;
+      y = h / 2 + Math.sin(a) * h * 0.36 * (0.9 + r() * 0.2) * clear;
+    }
+    return { x, y, z, icon: icons[i % icons.length], hue: [palette.primary, palette.secondary, palette.accent][i % 3], ph: r() * TAU, tilt: (r() - 0.5) * 0.3 };
+  }).sort((p, q) => p.z - q.z);
+  for (const [i, p] of tiles.entries()) {
+    const k = clamp(spring(t - (opts.start ?? 0.1) - i * 0.07, 9, 7), 0, 1.08);
+    if (k <= 0) continue;
+    const drift = (6 + 14 * p.z) * u;
+    const x = p.x + Math.sin(t * 0.45 + p.ph) * drift;
+    const y = p.y + Math.cos(t * 0.38 + p.ph) * drift * 0.8 - t * 4 * u * p.z;
+    const size = (54 + 58 * p.z) * u * (portrait ? 1.15 : 1);
+    ctx.save();
+    ctx.globalAlpha = clamp(k) * fade * (0.28 + 0.62 * p.z);
+    ctx.translate(x, y);
+    ctx.rotate(p.tilt + Math.sin(t * 0.3 + p.ph) * 0.04);
+    ctx.scale(0.8 + 0.2 * k, 0.8 + 0.2 * k);
+    glassCard(sc, -size / 2, -size / 2, size, size, { r: size * 0.26 });
+    drawIcon(ctx, p.icon, 0, 0, size * 0.46, p.hue, clamp(k));
+    ctx.restore();
+  }
+}

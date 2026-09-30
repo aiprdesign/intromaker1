@@ -16,6 +16,9 @@ import {
   drawCursor,
   drawIcon,
   eyebrow,
+  brandGlyph,
+  iconConstellation,
+  imageless,
   glassCard,
   iconFor,
   iconsFor,
@@ -126,6 +129,8 @@ function blurReveal(sc: SkillContext) {
   const { w, h, t, d, u, scene } = sc;
   saasBackground(sc);
   const exitAt = d - 0.45;
+  // A film made from a concept (no website imagery): its icons float around the words.
+  if (imageless(sc)) iconConstellation(sc, { fade: range(t, exitAt, exitAt + 0.4) });
   const layout = sentence(sc, { text: accented(scene.text), cy: h * 0.47, sizeFrac: 0.115, widthFrac: 0.8, maxLines: h > w ? 4 : 3 });
   const top = layout.ys[0] - layout.size * 0.62;
   eyebrow(sc, scene.eyebrow ?? scene.items?.[0] ?? "", top - 44 * u, range(t, 0.05, 0.5) * (1 - range(t, exitAt, exitAt + 0.3)));
@@ -161,6 +166,7 @@ function swapTiming(scene: Scene, beat: number) {
 function wordSwap(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene } = sc;
   saasBackground(sc);
+  if (imageless(sc)) iconConstellation(sc, { fade: range(t, d - 0.45, d - 0.05), clear: 1.08 });
   const { prefix, alts } = parseSwap(scene);
   const { swaps } = swapTiming(scene, sc.beat);
   const font = saasFont(sc);
@@ -1274,6 +1280,7 @@ function ctaLockup(sc: SkillContext) {
   ctx.scale(push, push);
   ctx.translate(-w / 2, -h / 2);
   const hasLogo = !!brand?.logo;
+  if (imageless(sc)) iconConstellation(sc, { count: h > w ? 6 : 8, clear: 1.12, start: 0.2 });
   // Logo mark.
   const lk = clamp(spring(t - 0.05, 9, 7), 0, 1.05);
   if (hasLogo) {
@@ -1296,16 +1303,9 @@ function ctaLockup(sc: SkillContext) {
     ctx.translate(w / 2, h * 0.25);
     ctx.scale(0.85 + 0.15 * lk, 0.85 + 0.15 * lk);
     const mx = -gw / 2;
-    ctx.beginPath();
-    ctx.roundRect(mx, -size / 2, size, size, size * 0.3);
-    const g = ctx.createLinearGradient(mx, -size / 2, mx + size, size / 2);
-    g.addColorStop(0, palette.primary);
-    g.addColorStop(1, palette.secondary);
-    ctx.fillStyle = g;
-    ctx.shadowColor = rgba(palette.primary, 0.7);
-    ctx.shadowBlur = 30 * u;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    // The generated mark: a gradient tile with the product's icon.
+    brandGlyph(sc, mx + size / 2, 0, size, 1, 0.8);
+    ctx.font = `800 ${Math.round(size * 1.05)}px Inter, sans-serif`;
     ctx.fillStyle = palette.text;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";

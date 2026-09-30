@@ -1,6 +1,6 @@
 import { revealHit } from "../arrange";
 import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
-import { saasBackground, saasFont } from "../saasfx";
+import { brandGlyph, iconConstellation, imageless, saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { fitSafeTop, tokens } from "../grid";
 import { drawLogo, logoMaxWidth, getImage, getMedia, mediaSize, type Drawable } from "../media";
@@ -140,6 +140,16 @@ function logoReveal(sc: SkillContext) {
 
   let nameY = h * 0.47;
   const logoY = wordmark ? h * 0.46 : cy;
+  // No logo (a film made from a concept): the product's icons gather, and a generated mark lands
+  // on the drop with the name beneath it.
+  const glyph = saas && !logo;
+  if (glyph) {
+    if (imageless(sc)) iconConstellation(sc, { start: hit - 0.35, fade: ex, clear: 1.05 });
+    const gk = ease.outBack(range(t, hit - 0.2, hit + 0.35), 1.8);
+    const gs = short * (h > w ? 0.2 : 0.17);
+    brandGlyph(sc, cx, h * 0.4, gs * (1 + ex * 0.3), clamp(gk, 0, 1.1) * (1 - ex), 1);
+    nameY = h * 0.4 + gs / 2 + short * 0.13;
+  }
   if (logo && logo.naturalWidth) {
     const box = short * (h > w ? 0.34 : 0.3) * (wordmark ? 1.25 : 1);
     const ar = logo.naturalWidth / logo.naturalHeight;
@@ -185,12 +195,12 @@ function logoReveal(sc: SkillContext) {
     return;
   }
   // Brand name + tagline.
-  const layout = headline(sc, { cy: nameY, sizeFrac: logo ? 0.13 : 0.26, maxLines: 1, natural: saas, font: saas ? saasFont(sc) : undefined });
-  const nk = ease.outExpo(range(t, hit + (logo ? 0.35 : 0), hit + (logo ? 1.1 : 0.7)));
+  const layout = headline(sc, { cy: nameY, sizeFrac: logo ? 0.13 : glyph ? 0.15 : 0.26, maxLines: 1, natural: saas, font: saas ? saasFont(sc) : undefined });
+  const nk = ease.outExpo(range(t, hit + (logo || glyph ? 0.35 : 0), hit + (logo || glyph ? 1.1 : 0.7)));
   ctx.save();
   ctx.globalAlpha = nk * (1 - ex);
   ctx.translate(0, (1 - nk) * 30 * u);
-  if (!logo) extrude(sc, layout);
+  if (!logo && !glyph) extrude(sc, layout);
   ctx.fillStyle = headlineGradient(sc, layout, palette.text, logo ? palette.text : palette.primary);
   glow(ctx, rgba(palette.primary, 0.6), 20 * u);
   drawLayout(sc, layout);
