@@ -730,6 +730,45 @@ export interface SiteRequest {
   direction?: string;
 }
 
+/**
+ * The end card's button, worded for what the intro is about: the site's own button when it has
+ * one, else an action that matches the product (a waitlist, a demo, an app download, a shop,
+ * a course…), then the product category. "Free" is only offered when the material offers it.
+ */
+export function contextCta(site: Pick<SiteData, "cta" | "name" | "tagline" | "description" | "headlines" | "features">, concept?: string): string {
+  if (site.cta) return site.cta;
+  const text = [site.name, site.tagline, site.description, ...site.headlines, ...site.features].join(" ").toLowerCase();
+  const has = (re: RegExp) => re.test(text);
+  if (has(/\bfree trial\b/)) return "Start free trial";
+  if (has(/\b(waitlist|wait list|early access|coming soon|pre-?launch|private beta)\b/)) return "Join the waitlist";
+  if (has(/\b(book|schedule|request) (a )?(demo|call)\b|\benterprise\b/)) return "Book a demo";
+  if (has(/\b(download|ios|android|app store|google play|mobile app)\b/)) return "Download the app";
+  if (has(/\b(appointments?|reservations?|bookings?|salon|clinic|dentist)\b/)) return "Book now";
+  if (has(/\b(shop|store|collection|order online|add to cart|buy)\b/)) return "Shop now";
+  if (has(/\b(courses?|lessons?|learn|tutoring|classes|bootcamp)\b/)) return "Start learning";
+  if (has(/\b(api|sdk|developers?|deploy|cli|open source)\b/)) return "Start building";
+  if (has(/\b(newsletter|podcast|subscribe)\b/)) return "Subscribe";
+  if (has(/\b(agency|consulting|consultancy|our services|hire us)\b/)) return "Get in touch";
+  if (has(/\bfree\b/)) return "Try it free";
+  const byConcept: Record<string, string> = {
+    devtools: "Start building",
+    ai: "Try it now",
+    fintech: "Open an account",
+    security: "Get protected",
+    analytics: "See your data",
+    sales: "Book a demo",
+    marketing: "Start growing",
+    productivity: "Get organised",
+    hr: "Book a demo",
+    ecommerce: "Shop now",
+    health: "Get started",
+    education: "Start learning",
+    creative: "Start creating",
+    communication: "Start chatting",
+  };
+  return byConcept[concept ?? ""] ?? "Get started";
+}
+
 /** Films for a room (talks, booths, TV): the end card carries a QR code of the website. */
 export const BIG_SCREEN = /\b(event|conference|keynote|presentation|booth|trade ?show|expo|meetup|tv|big screen|signage|webinar|demo day|qr)\b/i;
 
@@ -884,7 +923,8 @@ export function safeSite(site: SiteData): SiteData {
     stats: [],
     testimonials: [],
     clientLogos: [],
-    cta: site.cta && !isNumericClaim(site.cta) && !isUnsafe(site.cta) ? safeCopy(site.cta) || "Get started" : site.cta && "Get started",
+    // An unsafe or claim-y button is dropped, so the end card words its own from the content.
+    cta: site.cta && !isNumericClaim(site.cta) && !isUnsafe(site.cta) ? safeCopy(site.cta) || null : null,
   };
   REWRITTEN.set(out, new Set(pairs.filter((p) => p.rewritten).map((p) => p.head)));
   ORIGINAL.set(out, site);
@@ -1417,11 +1457,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // 8. CTA (with a QR code when the film is for a room: "Scan to book a demo").
   const qr = BIG_SCREEN.test(req.direction ?? "") && !!brand.domain;
-  const ctaLabel = (site.cta ?? "Get started").replace(/[→›>»]+/g, "").trim();
+  const ctaLabel = contextCta(site, concept.id).replace(/[→›>»]+/g, "").trim();
   add(1, {
     role: "cta", skill: qr ? "qr-end" : "cta",
     text: `Try *${site.name}* today`,
-    subtext: qr ? `Scan to ${ctaLabel.charAt(0).toLowerCase()}${ctaLabel.slice(1)}` : site.cta ?? "Get started",
+    subtext: qr ? `Scan to ${ctaLabel.charAt(0).toLowerCase()}${ctaLabel.slice(1)}` : ctaLabel,
     duration: Math.max(3.6, beats(8)),
     transition: "dolly",
   });
@@ -1481,12 +1521,14 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (/free/i.test(site.cta ?? "")) lines.push("Start *free* today");
   if (cta?.role === "cta") {
     // The closing line mustn't just repeat the button under it ("Start free" / "Start free trial").
-    const button = norm(site.cta ?? "");
+    const button = norm(ctaLabel);
     const fresh = lines.filter((l) => {
       const n = norm(l);
       return !button || !(button.startsWith(n) || n.startsWith(button) || n.split(" ").filter((wd) => button.includes(wd)).length >= 2);
     });
     cta.text = teamStat && !usedStat ? `Join *${teamStat.toLowerCase()}*` : pick(fresh.length ? fresh : lines);
+    // Nothing to try yet: the line matches the waitlist button.
+    if (/waitlist/i.test(ctaLabel)) cta.text = `Be first to try *${site.name}*`;
   }
 
   // Thin material (a one-line prompt, a sparse page) makes a tight shorter cut rather than
@@ -1609,7 +1651,7 @@ function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
   scenes.push({
     skill: brand.logo ? "logo-reveal" : pick(["god-rays", "cinematic-title"] as const),
     text: name,
-    subtext: `${site.cta ?? "Get started"} · ${site.domain}`,
+    subtext: `${contextCta(site)} · ${site.domain}`,
     duration: outroLen,
     transition: tr(["leak", "shutter", "dolly"]),
   });

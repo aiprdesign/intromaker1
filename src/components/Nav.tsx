@@ -32,7 +32,7 @@ export default function Nav({ cta = true }: { cta?: boolean }) {
       </nav>
       {cta && (
         <Link href="/studio" className="btn btn-primary">
-          Open Studio
+          Try for Free!
         </Link>
       )}
     </header>

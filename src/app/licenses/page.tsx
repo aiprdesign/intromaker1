@@ -66,7 +66,7 @@ export default function Licenses() {
 
         <p className="back">
           <Link href="/studio" className="btn btn-primary">
-            Open the studio
+            Try for Free!
           </Link>
         </p>
       </article>

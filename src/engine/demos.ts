@@ -18,7 +18,7 @@ export const HERO_PLAN: VideoPlan = {
       duration: 5,
       transition: "whip",
     },
-    { skill: "cta", text: "Make yours *now*", subtext: "Open the studio", duration: 4, transition: "dolly" },
+    { skill: "cta", text: "Make yours *now*", subtext: "Try for Free!", duration: 4, transition: "dolly" },
   ],
 };
 

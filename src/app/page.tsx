@@ -90,7 +90,7 @@ export default function Home() {
       <section className="section cta-band">
         <h2>Your next intro is one prompt away.</h2>
         <Link href="/studio" className="btn btn-primary btn-lg">
-          Open the Studio ✦
+          Try for Free!
         </Link>
       </section>
 
