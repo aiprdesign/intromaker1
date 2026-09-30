@@ -56,6 +56,8 @@ export const SKILL_IDS = [
   "world-map",
   "feature-slides",
   "problem-solution",
+  "liquid-logo",
+  "qr-end",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];

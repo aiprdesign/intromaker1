@@ -171,8 +171,12 @@ async function main() {
   const anaId = (await acc.currentUser(ureq("/", { cookie: ucookie })))!.id;
   check((await acc.limitsFor(await acc.getUser(anaId))).aiPerMonth === 0, "Free has no AI allowance by default");
   const imports: number[] = [];
-  for (let i = 0; i < 4; i++) imports.push((await scrapeRoute.POST(ureq("/api/scrape", { method: "POST", ip: "198.51.100.77", body: JSON.stringify({ url: "http://127.0.0.1/" }) }))).status);
-  check(imports.slice(0, 3).every((c) => c !== 429) && imports[3] === 429, `a visitor without an account gets 3 imports a day (${imports.join(",")})`);
+  const importReq = () => ureq("/api/scrape", { method: "POST", ip: "198.51.100.77", body: JSON.stringify({ url: "http://127.0.0.1/" }) });
+  for (let i = 0; i < 4; i++) imports.push((await scrapeRoute.POST(importReq())).status);
+  check(imports.every((c) => c === 422), `imports that fail don't use up the daily allowance (${imports.join(",")})`);
+  // Three successful imports (counted as the route counts them), then the fourth is refused.
+  for (let i = 0; i < 3; i++) rl.take("importDay", rl.clientKey(importReq()), Date.now(), 3);
+  check((await scrapeRoute.POST(importReq())).status === 429, "a visitor without an account gets 3 imports a day");
   const promote = await adminUsers.PATCH(areq(`/api/admin/users/${anaId}`, { method: "PATCH", cookie: (await login(env.ADMIN_PASSWORD!)).headers.get("set-cookie")!.split(";")[0], body: JSON.stringify({ plan: "pro" }) }), { params: Promise.resolve({ id: anaId }) });
   check(promote.status === 200 && (await acc.getUser(anaId))!.plan === "pro", "the owner switches an account to Pro");
   check((await save(ucookie, {})).status === 200, "Pro keeps more saved intros");
@@ -279,6 +283,21 @@ async function main() {
     (e: Error & { cause?: Error }) => (/not reachable/.test(`${e.message} ${e.cause?.message}`) ? "refused" : `error: ${e.cause?.message ?? e.message}`),
   );
   check(rebound === "refused", `connect-time check refuses a name that resolves to a private address (${rebound})`);
+
+  console.log("Website import errors");
+  const { httpProblem, networkProblem } = await import("../src/lib/scrape");
+  const page = new URL("https://acme.example/pricing/old");
+  const nf = httpProblem(404, page);
+  check(nf.code === "notfound" && nf.suggestion === "https://acme.example/", "a missing page (404) suggests importing the home page");
+  check(httpProblem(503, page).code === "server" && httpProblem(403, page).code === "blocked" && httpProblem(429, page).code === "busy", "down, blocking and rate-limiting sites are told apart");
+  const cause = (code: string) => Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error(code), { code }) });
+  check(
+    networkProblem(cause("ENOTFOUND"), page).code === "dns" &&
+      networkProblem(cause("ECONNREFUSED"), page).code === "refused" &&
+      networkProblem(cause("CERT_HAS_EXPIRED"), page).code === "tls" &&
+      networkProblem(Object.assign(new Error("t"), { name: "TimeoutError" }), page).code === "timeout",
+    "unknown domains, refused connections, bad certificates and timeouts each get their own message",
+  );
 
   console.log("Local AI");
   check(!serverReachesLocal(), "hosted server never reaches model servers on its own machine");

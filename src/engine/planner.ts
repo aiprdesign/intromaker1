@@ -722,7 +722,12 @@ export interface SiteRequest {
   safe?: boolean;
   /** Remake number: 0 is the director's best fit; each remake picks other slides for its sections. */
   variant?: number;
+  /** The visitor's extra direction ("for our conference booth", "end with Book a demo"). */
+  direction?: string;
 }
+
+/** Films for a room (talks, booths, TV): the end card carries a QR code of the website. */
+export const BIG_SCREEN = /\b(event|conference|keynote|presentation|booth|trade ?show|expo|meetup|tv|big screen|signage|webinar|demo day|qr)\b/i;
 
 export type Angle = "story" | "product" | "proof";
 export const ANGLES: { id: Angle; name: string; brief: string }[] = [
@@ -1403,11 +1408,13 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       transition: "whip",
     });
   }
-  // 8. CTA.
+  // 8. CTA (with a QR code when the film is for a room: "Scan to book a demo").
+  const qr = BIG_SCREEN.test(req.direction ?? "") && !!brand.domain;
+  const ctaLabel = (site.cta ?? "Get started").replace(/[→›>»]+/g, "").trim();
   add(1, {
-    role: "cta", skill: "cta",
+    role: "cta", skill: qr ? "qr-end" : "cta",
     text: `Try *${site.name}* today`,
-    subtext: site.cta ?? "Get started",
+    subtext: qr ? `Scan to ${ctaLabel.charAt(0).toLowerCase()}${ctaLabel.slice(1)}` : site.cta ?? "Get started",
     duration: Math.max(3.6, beats(8)),
     transition: "dolly",
   });

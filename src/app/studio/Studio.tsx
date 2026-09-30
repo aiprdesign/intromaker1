@@ -280,7 +280,7 @@ export default function Studio() {
   };
   const [importing, setImporting] = useState(false);
   const [importStage, setImportStage] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<{ message: string; code?: string; suggestion?: string; url: string } | null>(null);
   const booted = useRef(false);
 
   useEffect(() => {
@@ -346,7 +346,7 @@ export default function Studio() {
     } catch {
       // Offline or API unavailable: the director also runs in the browser.
       const plan = s
-        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle, safe: safeCopy, variant: opts.variant })
+        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle, safe: safeCopy, variant: opts.variant, direction: p })
         : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template, safe: safeCopy, variant: opts.variant });
       return { plan, engine: "builtin", engineLabel: "", label };
     }
@@ -468,8 +468,8 @@ export default function Studio() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw Object.assign(new Error(data.error ?? `The import failed (${res.status}). Try again.`), { code: data.code, suggestion: data.suggestion });
       const s: SiteData = data.site;
       setSite(s);
       setSiteUrl(s.url);
@@ -489,7 +489,8 @@ export default function Studio() {
       await generate({ site: s, colors: chosen, length: len });
     } catch (e) {
       clearInterval(timer);
-      setImportError((e as Error).message);
+      const err = e as Error & { code?: string; suggestion?: string };
+      setImportError({ message: err.name === "TypeError" ? "Couldn't reach IntroMaker's server. Check your connection and try again." : err.message, code: err.code, suggestion: err.suggestion, url });
     } finally {
       setImporting(false);
       setImportStage(null);
@@ -758,7 +759,16 @@ export default function Studio() {
     record();
     const k = SKILL_MAP[skill];
     const at = selected !== null ? selected + 1 : plan.scenes.length;
-    const scene: Scene = { skill, text: k.sample.text, subtext: k.sample.subtext, items: k.sample.items, duration: 3.5, transition: plan.scenes[at - 1]?.transition ?? "cut" };
+    // Brand slides start from the film's own brand; the QR code uses the website unless a link is added.
+    const brandName = (skill === "liquid-logo" || skill === "logo-reveal") && plan.brand?.name;
+    const scene: Scene = {
+      skill,
+      text: brandName || k.sample.text,
+      subtext: k.sample.subtext,
+      items: skill === "qr-end" ? undefined : k.sample.items,
+      duration: skill === "qr-end" ? 4.5 : 3.5,
+      transition: plan.scenes[at - 1]?.transition ?? "cut",
+    };
     const next = sanitizePlan({ ...plan, scenes: [...plan.scenes.slice(0, at), scene, ...plan.scenes.slice(at)] });
     setPlan(next);
     setEngine("manual");
@@ -1007,7 +1017,44 @@ export default function Studio() {
               <span className="spinner sm" /> {importStage}
             </p>
           )}
-          {importError && <p className="hint warn">{importError}</p>}
+          {importError && (
+            <div className="import-error" role="alert">
+              <p>{importError.message}</p>
+              <div className="import-error-actions">
+                {importError.suggestion && (
+                  <button
+                    className="btn btn-ghost sm"
+                    onClick={() => {
+                      setSiteUrl(importError.suggestion!);
+                      void importSite(importError.suggestion);
+                    }}
+                  >
+                    Import {importError.suggestion.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  </button>
+                )}
+                {["timeout", "refused", "server", "busy", "failed", undefined].includes(importError.code) && (
+                  <button className="btn btn-ghost sm" onClick={() => void importSite(importError.url)}>
+                    Try again
+                  </button>
+                )}
+                <button
+                  className="btn btn-ghost sm"
+                  onClick={() => {
+                    const name = importError.url.replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];
+                    setImportError(null);
+                    if (!prompt.trim()) setPrompt(`An intro for ${name}: `);
+                    requestAnimationFrame(() => {
+                      const el = document.getElementById("studio-prompt") as HTMLTextAreaElement | null;
+                      el?.focus();
+                      el?.setSelectionRange(el.value.length, el.value.length);
+                    });
+                  }}
+                >
+                  Describe it instead
+                </button>
+              </div>
+            </div>
+          )}
           {site && (
             <div className="site-card">
               <div className="site-head">
@@ -1096,6 +1143,7 @@ export default function Studio() {
 
           <label className="field-label">{site ? "Extra direction (optional)" : "Or describe it"}</label>
           <textarea
+            id="studio-prompt"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={site ? "e.g. focus on the dashboard, end with 'Book a demo'" : "Describe your video: product, what it does, the vibe…"}

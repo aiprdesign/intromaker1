@@ -59,7 +59,19 @@ function isPrivateIp(ip: string) {
   );
 }
 
-export class UrlError extends Error {}
+/** Why a website couldn't be used. The message is written for the visitor. */
+export type SiteProblem = "invalid" | "unreachable" | "dns" | "refused" | "timeout" | "tls" | "notfound" | "blocked" | "busy" | "server" | "notpage" | "parked" | "empty" | "redirects";
+
+export class UrlError extends Error {
+  constructor(
+    message: string,
+    public code: SiteProblem = "invalid",
+    /** Another address worth trying (e.g. the site's home page after a 404). */
+    public suggestion?: string,
+  ) {
+    super(message);
+  }
+}
 
 export async function assertPublicUrl(raw: string): Promise<URL> {
   let url: URL;
@@ -73,11 +85,11 @@ export async function assertPublicUrl(raw: string): Promise<URL> {
   if (allowPrivate()) return url;
   const host = url.hostname.replace(/^\[|\]$/g, "");
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) {
-    throw new UrlError("That address is not reachable.");
+    throw new UrlError("That address is not reachable.", "unreachable");
   }
   const addrs = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
-  if (!addrs.length) throw new UrlError(`Couldn't resolve ${host}.`);
-  if (addrs.some((a) => isPrivateIp(a.address))) throw new UrlError("That address is not reachable.");
+  if (!addrs.length) throw new UrlError(`We couldn't find ${host}. Check the spelling of the address.`, "dns");
+  if (addrs.some((a) => isPrivateIp(a.address))) throw new UrlError("That address is not reachable.", "unreachable");
   return url;
 }
 
@@ -95,7 +107,7 @@ export const pinned = new Agent({
       lookupCb(hostname, { ...options, all: true }, (err, addrs: LookupAddress[]) => {
         if (err) return callback(err, "", 4);
         if (!allowPrivate() && (!addrs.length || addrs.some((a) => isPrivateIp(a.address)))) {
-          return callback(new UrlError("That address is not reachable."), "", 4);
+          return callback(new UrlError("That address is not reachable.", "unreachable"), "", 4);
         }
         if ((options as { all?: boolean }).all) return (callback as unknown as (e: null, a: LookupAddress[]) => void)(null, addrs);
         callback(null, addrs[0].address, addrs[0].family);
@@ -123,7 +135,7 @@ export async function safeFetch(raw: string, init: RequestInit = {}, maxRedirect
     }
     return res;
   }
-  throw new UrlError("Too many redirects.");
+  throw new UrlError("That address redirects too many times to open.", "redirects");
 }
 
 /**

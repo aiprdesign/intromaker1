@@ -1,5 +1,6 @@
 import type { Skill, SkillId } from "../types";
 import { componentSkills } from "./components";
+import { endingSkills } from "./endings";
 import { energySkills } from "./energy";
 import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
@@ -15,6 +16,7 @@ import { worldSkills } from "./worlds";
 export const SKILLS: Skill[] = [
   // Ordered for the showcase: SaaS launch toolkit first.
   ...saasSkills,
+  ...endingSkills,
   ...interactionSkills,
   ...momentSkills,
   ...slideSkills,
@@ -47,6 +49,7 @@ export const SKILL_MAP = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Rec
 /** Slide styles grouped for the studio's picker. */
 export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "SaaS essentials", skills: saasSkills },
+  { name: "Openers & end cards", skills: endingSkills },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills] },
   { name: "Slides", skills: slideSkills },
   { name: "Media & gallery", skills: [...gallerySkills, ...componentSkills, ...mediaSkills] },

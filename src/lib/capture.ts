@@ -413,10 +413,17 @@ async function captureSiteNow(url: string): Promise<Capture | null> {
       return route.continue();
     });
     const page = await context.newPage();
+    let res = null;
     try {
-      await page.goto(url, { waitUntil: "networkidle", timeout: 25_000 });
+      res = await page.goto(url, { waitUntil: "networkidle", timeout: 25_000 });
     } catch {
-      await page.goto(url, { waitUntil: "load", timeout: 20_000 }).catch(() => {});
+      res = await page.goto(url, { waitUntil: "load", timeout: 20_000 }).catch(() => null);
+    }
+    // An error page (404, 5xx, blocked) or a failed load isn't the product: give up, and the static
+    // fetch explains to the visitor what went wrong.
+    if (!res || res.status() >= 400 || page.url().startsWith("chrome-error:")) {
+      console.warn("[capture] no usable page:", res ? `HTTP ${res.status()}` : "navigation failed");
+      return null;
     }
     // Cookie / consent banners, chat bubbles and pop-ups would ruin every screenshot: clear them
     // now, again after scrolling (many appear late), and just before the shots.

@@ -562,8 +562,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.35, card: "frost", text: "liquid", grain: 0.5, shader: "metaballs", shaderStrength: 0.85, shaderSpeed: 1.3 },
     transitions: ["liquid"],
     pace: 0.92,
-    roles: {},
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "liquid-logo" },
+    revealNoLogo: "liquid-logo",
     sample: sample("Ideas that *flow*."),
   },
   {
@@ -696,7 +696,9 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   support: "support",
   "world-map": "reach",
   "feature-slides": "features",
+  "liquid-logo": "reveal",
   cta: "cta",
+  "qr-end": "cta",
 };
 
 /** Best-guess role for a scene the AI (or an old plan) created without one. */
@@ -724,7 +726,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // The product assembled from its own components beats a flat page scroll whenever it's available.
     if (role === "meet" && scene.skill === "ui-assemble") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "qr-end", "liquid-logo"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

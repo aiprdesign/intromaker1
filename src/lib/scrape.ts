@@ -176,26 +176,134 @@ function siteName(root: HTMLElement, host: string) {
   return short ?? nameFromDomain(host);
 }
 
+/** The visitor-facing reason an HTTP status stops the import. */
+export function httpProblem(status: number, url: URL): UrlError {
+  const host = url.hostname;
+  const home = `${url.protocol}//${url.host}/`;
+  const notHome = url.pathname !== "/" || !!url.search;
+  if (status === 404 || status === 410)
+    return new UrlError(
+      notHome ? `That page doesn't exist on ${host} (error ${status}). Check the address, or import the home page.` : `${host} answers "page not found" (error ${status}). Check the address.`,
+      "notfound",
+      notHome ? home : undefined,
+    );
+  if (status === 401 || status === 403 || status === 451)
+    return new UrlError(`${host} doesn't let automated visitors in (error ${status}), so it can't be imported. Describe your product in the prompt instead.`, "blocked");
+  if (status === 429) return new UrlError(`${host} is limiting visits right now (error 429). Try again in a minute.`, "busy");
+  if (status >= 500) return new UrlError(`${host} is having trouble right now (error ${status}). Try again in a few minutes.`, "server");
+  return new UrlError(`${host} answered with error ${status}, so there was nothing to import.`, "server");
+}
+
+/** The visitor-facing reason a connection failed (DNS, refused, timeout, certificate…). */
+export function networkProblem(e: unknown, url: URL): UrlError {
+  if (e instanceof UrlError) return e;
+  const err = e as Error & { cause?: Error & { code?: string } };
+  if (err?.cause instanceof UrlError) return err.cause;
+  const code = err?.cause?.code ?? (err as { code?: string })?.code ?? "";
+  const host = url.hostname;
+  if (err?.name === "TimeoutError" || err?.name === "AbortError" || /TIMEOUT|ETIMEDOUT/.test(code))
+    return new UrlError(`${host} took too long to respond. It may be down or very slow; try again in a few minutes.`, "timeout");
+  if (/ENOTFOUND|EAI_AGAIN/.test(code)) return new UrlError(`We couldn't find ${host}. Check the spelling of the address.`, "dns");
+  if (/ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ENETUNREACH|UND_ERR_SOCKET|EPIPE/.test(code))
+    return new UrlError(`${host} isn't accepting connections. The site may be down; try again later.`, "refused");
+  if (/CERT|SSL|TLS|SELF_SIGNED|UNABLE_TO_VERIFY/.test(code)) return new UrlError(`${host} has an invalid security certificate, so it wasn't opened.`, "tls");
+  return new UrlError(`Couldn't open ${host}. Check the address, or try again later.`, "refused");
+}
+
+/** A 200 page that is really an error, a parked domain or a server default page. */
+const PARKED =
+  /\b(this domain (is|may be) for sale|buy this domain|domain (is )?parked|parked (free|domain)|domain parking|this site can.t be reached|account (has been )?suspended|website (is )?(currently )?unavailable|default web ?page|welcome to nginx|apache2? (ubuntu |debian )?default page|it works!|index of \/|hosting (account|provider) default)\b/i;
+const SOFT_404 = /^(404|page not found|not found|error 404|oops[,!]? (that )?page)/i;
+
+function checkContent(root: HTMLElement, bodyText: string, url: URL) {
+  const title = clean(root.querySelector("title")?.text ?? "");
+  const h1 = clean(root.querySelector("h1")?.text ?? "");
+  if (SOFT_404.test(title) || SOFT_404.test(h1)) throw httpProblem(404, url);
+  if (PARKED.test(`${title} ${h1} ${bodyText.slice(0, 3000)}`))
+    throw new UrlError(`${url.hostname} looks like a parked domain or a placeholder page, with no product to show. Import the product's real site, or describe it in the prompt.`, "parked");
+  if (bodyText.length < 40 && !title && !h1)
+    throw new UrlError(`${url.hostname} has almost no text to read (it may need a browser feature that couldn't run). Describe your product in the prompt instead.`, "empty");
+}
+
+/**
+ * Addresses to try, most likely first: what was typed (https added), then — only when no scheme
+ * was typed — plain http, and the www. host when the bare domain doesn't resolve.
+ */
+function candidates(raw: string): string[] {
+  const typed = raw.trim();
+  const hasScheme = /^https?:\/\//i.test(typed);
+  const first = hasScheme ? typed : `https://${typed}`;
+  const out = [first];
+  try {
+    const u = new URL(first);
+    if (!hasScheme) out.push(first.replace(/^https:/i, "http:"));
+    if (!/^www\./i.test(u.hostname) && u.hostname.split(".").length === 2) {
+      const w = new URL(first);
+      w.hostname = `www.${u.hostname}`;
+      out.push(w.toString());
+    }
+  } catch {
+    /* invalid: assertPublicUrl explains */
+  }
+  return out;
+}
+
+/** Fetch the page statically, trying the fallbacks above. Throws the most useful problem. */
+async function fetchPage(raw: string): Promise<{ html: string; finalUrl: string }> {
+  let problem: UrlError | null = null;
+  for (const candidate of candidates(raw)) {
+    let url: URL;
+    try {
+      url = new URL(candidate);
+    } catch {
+      throw new UrlError("That doesn't look like a valid web address.", "invalid");
+    }
+    // The www. retry only helps when the bare domain didn't resolve; http only when https failed to connect.
+    if (problem && url.hostname.startsWith("www.") && problem.code !== "dns") continue;
+    if (problem && url.protocol === "http:" && !["refused", "tls", "timeout"].includes(problem.code)) continue;
+    try {
+      const res = await safeFetch(candidate, { headers: { Accept: "text/html,application/xhtml+xml" } });
+      const at = new URL(res.url || candidate);
+      if (!res.ok) throw httpProblem(res.status, at);
+      const type = res.headers.get("content-type") ?? "";
+      if (type && !type.includes("html")) throw new UrlError("That address is a file, not a web page. Enter the site's address instead.", "notpage");
+      return { html: (await res.text()).slice(0, MAX_HTML), finalUrl: res.url || candidate };
+    } catch (e) {
+      const p = networkProblem(e, url);
+      // An answer from the site (404, 5xx, blocked…) is final; connection problems try the next address.
+      if (!["dns", "refused", "tls", "timeout"].includes(p.code)) throw p;
+      // Keep the first problem (about what was typed) unless a later one is more specific.
+      problem = !problem || (problem.code === "dns" && p.code !== "dns") ? p : problem;
+    }
+  }
+  throw problem ?? new UrlError("Couldn't open that website.", "refused");
+}
+
 export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}): Promise<SiteData> {
   const withScheme = /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`;
-  // Prefer a live render in the user's browser (JS sites, lazy images, screenshots); else static fetch.
-  const live = opts.live !== false ? await (async () => {
-    const { assertPublicUrl } = await import("./netguard");
-    await assertPublicUrl(withScheme);
-    return captureSite(withScheme);
-  })() : null;
+  // Prefer a live render in a real browser (JS sites, lazy images, screenshots); else static fetch.
+  // The live capture gives up (null) on error pages, so the static fetch then explains what's wrong.
+  const live =
+    opts.live !== false
+      ? await (async () => {
+          const { assertPublicUrl } = await import("./netguard");
+          try {
+            await assertPublicUrl(withScheme);
+          } catch (e) {
+            // A bare domain that doesn't resolve may still work as www.; fetchPage tries that.
+            if (e instanceof UrlError && e.code === "dns" && !/^https?:\/\//i.test(rawUrl.trim())) return null;
+            throw e;
+          }
+          return captureSite(withScheme);
+        })()
+      : null;
   let html: string;
   let finalUrl: string;
   if (live) {
     html = live.html.slice(0, MAX_HTML);
     finalUrl = live.finalUrl;
   } else {
-    const res = await safeFetch(withScheme, { headers: { Accept: "text/html,application/xhtml+xml" } });
-    if (!res.ok) throw new UrlError(`The site responded with HTTP ${res.status}.`);
-    const type = res.headers.get("content-type") ?? "";
-    if (!type.includes("html")) throw new UrlError("That URL isn't a web page.");
-    html = (await res.text()).slice(0, MAX_HTML);
-    finalUrl = res.url || withScheme;
+    ({ html, finalUrl } = await fetchPage(rawUrl));
   }
   const base = new URL(finalUrl);
   const root = parse(html, { comment: false, blockTextElements: { script: false, style: false, noscript: false } });
@@ -237,6 +345,7 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
   // Stats: "10,000+ teams", "99.99% uptime", "$2B processed".
   // structuredText keeps block boundaries ("12,000+ teams" / "99.9% uptime" stay separate).
   const bodyText = clean((root.querySelector("body") ?? root).structuredText).slice(0, 200_000);
+  checkContent(root, bodyText, base);
   const stats: string[] = [];
   const statRe =
     /(?<![\w.])([$€£]?\d[\d,.]*(?:\s?(?:million|billion|thousand)\b|[kKmMbB](?![a-z])|%|x\b)?\+?)\s*([A-Za-z][A-Za-z]+(?:\s[a-z][a-z]+)?)/g;

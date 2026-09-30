@@ -38,12 +38,12 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ### What makes the SaaS films look pro
 
-- **25 style templates**, modelled on the most popular SaaS intro looks and grouped in the picker:
-  - **Modern**: Midnight Grid, Aurora Gradient, Mono Pro, AI Glow, Liquid Motion (headlines pour in as glossy liquid and every scene rises in on a liquid wave).
-  - **3D & Sci-Fi**: 3D Spatial (content on an orbiting 3D plane over glowing 3D panels), Sci-Fi HUD (brackets, timecode, readouts, scan lines), Synthwave 3D (neon grid floor to the horizon), Deep Space (parallax starfield and nebula), Holographic, Liquid Chrome, Neon Tech, Dev Terminal.
+- **28 style templates**, modelled on the most popular SaaS intro looks and grouped in the picker:
+  - **Modern**: Midnight Grid, Aurora Gradient, Mono Pro, AI Glow, Liquid Motion (the logo pours in as a Liquid Logo sting, headlines pour in as glossy liquid and every scene rises in on a liquid wave).
+  - **3D & Sci-Fi**: 3D Spatial (content on an orbiting 3D plane over glowing 3D panels), 3D Turntable, 3D Glass Slab, Sci-Fi HUD (brackets, timecode, readouts, scan lines), Synthwave 3D (neon grid floor to the horizon), Deep Space (parallax starfield and nebula), Holographic, Liquid Chrome, Neon Tech, Dev Terminal.
   - **Clean & Light**: Minimal Light, Swiss Clean (hairline layout frame), Enterprise Clean, Frosted Glass.
   - **Bold & Playful**: Bold Pop, Kinetic Type, Neo-Brutalist, Clay 3D (puffy claymorphism cards and gooey metaballs), Retro Dither.
-  - **Premium**: Cinematic Keynote, Editorial Serif, Luxe Noir.
+  - **Premium**: Cinematic Keynote, Editorial Serif, Epic Launch, Luxe Noir.
 
   Each style has its own palette, typeface, GPU background, card style (glass, frosted, flat, brutalist or clay), text motion (blur, mask, pop, glow or typewriter), optional 3D stage and HUD or frame overlay, transitions, music and pacing. Switching restyles the film instantly.
 - **Modern text effects**, inspired by AI-video launch films (Runway, Higgsfield, ComfyUI). Every SaaS headline can use:
@@ -63,7 +63,10 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
   - **Video in Text**: the product name as giant type filled with the product's own footage, with the real logo above it. The camera then dives through a letter into the footage. Used as the brand moment of product-first cuts of 20 seconds or more.
   - **Node Graph**: the steps as a ComfyUI-style workflow. Nodes pop in, wires draw between their ports and data pulses through to an output that completes. Used for how-it-works in AI and creative products.
 - **A studio that fits the screen**: settings sit in four tabs (*Create*, *Style*, *Colours*, *Voice*) with **Generate** and **Remix** pinned at the bottom. Create, Style and Voice fit a laptop screen without scrolling, and the preview stays in view. Templates show one category at a time, the background picker and example prompts fold away, and the last tab you used is remembered.
-- **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 20 dark and light palettes. A palette you pick survives template switches. After a website import, two buttons sit side by side on the site card: *Auto brand colours* (read from the whole page, the default) and *Logo colours* (read from the header logo alone; a one-colour logo gets a close analogous partner hue). A black-and-white logo has no colours to offer, so that option is greyed out.
+- **Choose your colours**: keep the template's colours, use the website's brand colours, or pick any of 27 dark and light palettes. A palette you pick survives template switches. After a website import, two buttons sit side by side on the site card: *Auto brand colours* (read from the whole page, the default) and *Logo colours* (read from the header logo alone; a one-colour logo gets a close analogous partner hue). A black-and-white logo has no colours to offer, so that option is greyed out.
+- **Brand bookends**:
+  - **Liquid Logo**: droplets fall and merge, the real logo (or a generated mark with the name) pours in as glossy liquid on the GPU, ripples spread out and a sheen slides across. The Liquid Motion style uses it as its brand reveal.
+  - **QR End Card**: the closing line beside a large, scannable QR code of the website (high error correction, with the brand mark in the middle), a scan beam on the final beat and viewfinder corners that lock on. It suits films shown at talks, booths, events and on TVs: ask for a film "for our conference booth" and the director ends on it. The code opens the website, or a link you add on the slide; without either it shows an "Add your link" placeholder, never a made-up address. It scans from the final frame in 16:9, 1:1 and 9:16, even at a third of the size.
 - **Edited like a real film**: whip pans, dolly zoom-throughs, pushes, dissolves and light leaks show the outgoing and incoming shots at the same time, and every cut lands on the beat.
 - **Real UI, animated piece by piece — not flat screenshots**:
   - When a site is imported, the real browser also cuts out the page's UI components (product shots, app panels, KPI cards, charts, feature cards, buttons) with their exact positions. On other screenshots, image segmentation finds the blocks instead.
@@ -136,7 +139,7 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 
 ## Quality: Kaizen scorecard
 
-`npm run kaizen` generates the storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 25 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+`npm run kaizen` generates the storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 9 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site and a wordy site) and 8 prompts, across 3 lengths, 3 story angles and all 28 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**; with every style and slide added since, the corpus (now 2,011 storyboards) averages **99.5**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
 
 The corpus now has 10 websites, including a hype-heavy site whose copy is almost all claims, and scores 1,586 storyboards. That covers both wording modes, vertical 9:16 cuts and take variety. When the scorecard saturated, its bar was raised with what a viewer notices:
 - **specificity**: headlines in the product's own words, not boilerplate;
@@ -238,6 +241,8 @@ Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instan
 
 What happens: a paid checkout makes the account Pro; after the redirect the account page waits for the webhook and shows *Pro is on*. A failed renewal marks the account past due and keeps Pro while Stripe retries; a cancelled or unpaid subscription returns it to Free. A plan the owner set by hand is never taken back by Stripe. Every event is verified (HMAC-SHA256 over the raw body, 5-minute tolerance), applied once, and a failure answers 500 so Stripe retries. Only `buy.stripe.com`, `checkout.stripe.com` and `billing.stripe.com` links are accepted.
 
+**When a website can't be imported**, the studio says why and offers the next step instead of making a film from an error page: an unknown domain, a site that is down or refuses connections, a timeout, a bad certificate, a missing page (with a button to import the home page instead), a site that blocks automated visitors, one that is rate-limiting, a server error, a file instead of a page, and parked or placeholder domains. Without a scheme typed, `https://` is tried first, then `http://`, then the `www.` host. Every message has *Try again* where it helps and *Describe it instead*, which moves you to the prompt. An import that fails doesn't use up one of the day's imports.
+
 **What protects a public deploy**:
 - **Rate limits** per visitor on import (8 per 10 min), the image proxy, generation, voice and key checks. Over the limit you get a `429` with `Retry-After`. Generation that the server's own AI key pays for also has a per-visitor and a shared daily budget, and degrades to the built-in director rather than failing.
 - **Capture queue**: live captures run a bounded number of browser sessions, with a wait list and a hard timeout.
@@ -246,7 +251,7 @@ What happens: a paid checkout makes the account Pro; after the redirect the acco
 - **Headers**: `nosniff`, `X-Frame-Options: DENY`, a strict referrer policy, a permissions policy and HSTS; captured SVGs are served with a sandboxing CSP.
 - **Keys** stay in the visitor's browser and are removed from error messages.
 
-`npm run check:hosting` verifies all of this in production mode (rate limits, spoofing, the AI budget, storage clean-up, the admin area, accounts and plans, the Stripe webhook (forged, stale and repeated events, upgrades, cancellations), around 30 SSRF cases including DNS rebinding, local AI).
+`npm run check:hosting` verifies all of this in production mode (rate limits, spoofing, the AI budget, storage clean-up, the admin area, accounts and plans, the Stripe webhook (forged, stale and repeated events, upgrades, cancellations), website-import error messages, around 30 SSRF cases including DNS rebinding, local AI).
 
 Known limits:
 - Rate limits and the AI budget are in memory, which suits a single instance. Several instances would share them through Redis behind the same `rateLimit()` interface.
@@ -257,7 +262,7 @@ Known limits:
 ```
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
-  skills/         the 57 skills (saas.ts, interactions.ts, moments.ts, slides.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  skills/         the 59 skills (saas.ts, endings.ts, interactions.ts, moments.ts, slides.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
   grid.ts         design system: 8pt grid, title-safe areas, columns, type scale, snapping, grid overlay
   saasfx.ts       SaaS design toolkit: springs, grid/beam backdrop, glass cards, border beams, cursor, icons, blur-in type
   media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
@@ -325,6 +330,10 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 
 - The pricing tiers on the landing page are marketing UI only. Auth and billing are not wired up.
 - Export renders every frame offline with WebCodecs (Chrome, Edge, Safari 17+), so videos come out smooth and exactly the right length on any machine. Other browsers fall back to real-time recording.
+
+## Licence
+
+IntroMaker's own code is released under the [MIT licence](LICENSE): use it, change it and ship it commercially, keeping the copyright notice. The third-party components below keep their own licences.
 
 ## Third-party and licences
 

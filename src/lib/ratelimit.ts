@@ -91,6 +91,12 @@ export function take(name: RuleName, key: string, now = Date.now(), limit?: numb
   return { ok: true, remaining: rule.limit - b.count, retryAfter: 0, limit: rule.limit };
 }
 
+/** Give back one request taken with take() (e.g. an import that failed on the site's side). */
+export function refund(name: RuleName, key: string) {
+  const b = buckets.get(`${name}:${key}`);
+  if (b && b.count > 0) b.count--;
+}
+
 /**
  * Guard a route: returns a 429 response when the client is over the limit, otherwise null.
  *
