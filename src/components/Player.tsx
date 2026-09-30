@@ -17,11 +17,17 @@ export default function Player({
   plan,
   autoPlay = true,
   resetKey = 0,
+  seek: seekTo,
+  onScene,
 }: {
   plan: VideoPlan;
   autoPlay?: boolean;
   /** Changing this rewinds to 0 and starts playing (e.g. after a new generation). */
   resetKey?: number;
+  /** Jump to `t` (paused) whenever `key` changes: the studio's slide timeline uses it. */
+  seek?: { t: number; key: number };
+  /** Called when the slide under the playhead changes. */
+  onScene?: (index: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playing, setPlaying] = useState(autoPlay);
@@ -71,11 +77,34 @@ export default function Player({
       const c = canvasRef.current;
       if (!c) return;
       const ctx = c.getContext("2d")!;
-      renderFrame(ctx, plan, t, c.width, c.height);
+      // Grid view shows the layout itself: the lens (push-in, drift, beat punches) holds still.
+      renderFrame(ctx, plan, t, c.width, c.height, grid ? { camera: false } : {});
       if (grid) drawGridOverlay(ctx, c.width, c.height);
     },
     [plan, grid],
   );
+
+  // Jump to a slide picked in the studio, paused on it.
+  useEffect(() => {
+    if (!seekTo) return;
+    const t = Math.max(0, Math.min(duration - 0.001, seekTo.t));
+    timeRef.current = t;
+    setTime(t);
+    setPlaying(false);
+    ensureFonts().then(() => draw(t));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekTo?.key]);
+
+  // Report the slide under the playhead.
+  const sceneAt = (() => {
+    let acc = 0;
+    for (let i = 0; i < plan.scenes.length; i++) {
+      acc += plan.scenes[i].duration;
+      if (time < acc) return i;
+    }
+    return plan.scenes.length - 1;
+  })();
+  useEffect(() => onScene?.(sceneAt), [sceneAt, onScene]);
 
   // Rewind and play when a fresh plan is generated.
   useEffect(() => {
@@ -272,7 +301,7 @@ export default function Player({
           onClick={() => setGrid((g) => !g)}
           aria-pressed={grid}
           aria-label="Design grid"
-          title="Design grid: title-safe area, layout columns and the 8pt rhythm (preview only)"
+          title="Design grid: title-safe area, layout columns and the 8pt rhythm, with the camera held still (preview only)"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="M9.5 3.5v17M14.5 3.5v17M3.5 9.5h17M3.5 14.5h17" /></svg>
         </button>

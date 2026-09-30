@@ -43,3 +43,13 @@ export const SKILLS: Skill[] = [
 ];
 
 export const SKILL_MAP = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Record<SkillId, Skill>;
+
+/** Slide styles grouped for the studio's picker. */
+export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
+  { name: "SaaS essentials", skills: saasSkills },
+  { name: "Product moments", skills: [...interactionSkills, ...momentSkills] },
+  { name: "Slides", skills: slideSkills },
+  { name: "Media & gallery", skills: [...gallerySkills, ...componentSkills, ...mediaSkills] },
+  { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
+  { name: "Cinematic", skills: [...signatureSkills, ...energySkills, ...worldSkills] },
+];

@@ -1162,7 +1162,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     ...(target >= 30 && withBenefit.length >= 3 && visuals >= 2 ? ["slides"] : []),
     ...(featureItems.length >= 5 ? ["bento"] : []),
     ...(featureItems.length >= 2 ? ["icons"] : []),
-    ...(featureItems.length === 4 ? ["bento"] : []),
+    ...(featureItems.length === 3 || featureItems.length === 4 ? ["bento"] : []),
   ];
   const featureKind = featureKinds.length ? featureKinds[variant % featureKinds.length] : null;
   const featureSlides = featureKind === "slides";
@@ -1208,8 +1208,10 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const bodyCopy = [...whole.headlines, ...whole.features, ...(whole.steps ?? [])].join(" ");
   const moments = rankMoments(leadCopy, bodyCopy, concept.id, { aiLed, spareFeatures: spareFeatures.length });
   // Remakes try the runner-up moments that still suit the product (at least 60% of the best fit).
-  const fitting = moments.filter((m) => m.score >= moments[0].score * 0.6);
-  const fit = fitting[variant % fitting.length];
+  // When only one moment clearly fits (a short prompt), remakes still get the runner-up to try.
+  const fitting = moments.filter((m, i) => m.score >= moments[0].score * 0.6 || (variant > 0 && i === 1 && m.score > 0));
+  // Offset from the feature-layout rotation, so consecutive remakes never repeat the original's pair.
+  const fit = fitting[(variant + Math.floor(variant / 2)) % fitting.length];
   const demo = fit.spec;
   const demoWhy = fit.because.length ? `Best fit: the site talks about ${fit.because.slice(0, 3).join(", ")}` : `Typical of ${concept.name.toLowerCase()} launch films`;
   let demoScene: Scene | null = null;

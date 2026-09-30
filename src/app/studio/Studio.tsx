@@ -1,10 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
-import ArcStrip from "@/components/ArcStrip";
+import SkillPicker from "@/components/SkillPicker";
+import SlideTimeline from "@/components/SlideTimeline";
 import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
 import BackgroundPicker, { applyBackground, type BgChoice, BG_OPTIONS } from "@/components/BackgroundPicker";
@@ -22,7 +23,7 @@ import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
 import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
-import { SKILL_MAP, SKILLS } from "@/engine/skills";
+import { SKILL_MAP } from "@/engine/skills";
 import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
@@ -30,11 +31,24 @@ type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: strin
 
 export default function Studio() {
   const params = useSearchParams();
-  const [prompt, setPrompt] = useState("");
+  // Seeded from ?prompt= so the box shows what the first film was made from.
+  const [prompt, setPrompt] = useState(() => params.get("prompt") ?? "");
   const [aspect, setAspect] = useState<Aspect>("16:9");
   const [length, setLength] = useState<Length>("standard");
   const [palette, setPalette] = useState<PaletteId | "auto">("auto");
   const [plan, setPlan] = useState<VideoPlan>(HERO_PLAN);
+  const planRef = useRef(plan);
+  planRef.current = plan;
+  /** Edit history for the film on screen (slides, text, look): undo / redo, Ctrl+Z / Ctrl+Shift+Z. */
+  const past = useRef<VideoPlan[]>([]);
+  const future = useRef<VideoPlan[]>([]);
+  const lastEdit = useRef({ key: "", at: 0 });
+  const [, setHistoryTick] = useState(0);
+  /** The slide picked on the timeline (edited right under the player), and the one playing. */
+  const [selected, setSelected] = useState<number | null>(null);
+  const [activeScene, setActiveScene] = useState(0);
+  const [seek, setSeek] = useState<{ t: number; key: number } | undefined>(undefined);
+  const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [engine, setEngine] = useState<Engine>("manual");
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   /** Whether the server can reach this computer's local AI (else local models run from the browser). */
@@ -315,6 +329,13 @@ export default function Studio() {
   /** Which version (take) is on screen, by its place in the list. */
   const [current, setCurrent] = useState(0);
   const show = (take: Take, index?: number) => {
+    // Keep edits made to the version on screen, so switching back finds them.
+    const leaving = current;
+    const edited = planRef.current;
+    setTakes((ts) => ts.map((t, j) => (j === leaving && t.plan !== take.plan ? { ...t, plan: edited } : t)));
+    past.current = [];
+    future.current = [];
+    setSelected(null);
     if (index !== undefined) setCurrent(index);
     let p = take.plan;
     const suggested = autoStyleRef.current ? suggestedFor(p) : undefined;
@@ -483,30 +504,214 @@ export default function Studio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Save the film as it is before an edit. Edits with the same key within a second (typing) merge. */
+  const record = (key = "") => {
+    const now = Date.now();
+    if (key && lastEdit.current.key === key && now - lastEdit.current.at < 1000) {
+      lastEdit.current.at = now;
+      return;
+    }
+    past.current.push(planRef.current);
+    if (past.current.length > 100) past.current.shift();
+    future.current = [];
+    lastEdit.current = { key, at: now };
+    setHistoryTick((n) => n + 1);
+  };
+  const undoEdit = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(planRef.current);
+    lastEdit.current = { key: "", at: 0 };
+    setPlan(prev);
+    setSelected((sel) => (sel !== null && sel >= prev.scenes.length ? null : sel));
+    setHistoryTick((n) => n + 1);
+  }, []);
+  const redoEdit = useCallback(() => {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(planRef.current);
+    lastEdit.current = { key: "", at: 0 };
+    setPlan(next);
+    setSelected((sel) => (sel !== null && sel >= next.scenes.length ? null : sel));
+    setHistoryTick((n) => n + 1);
+  }, []);
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y). Text fields keep their own undo.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undoEdit();
+      } else if ((k === "z" && e.shiftKey) || k === "y") {
+        e.preventDefault();
+        redoEdit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undoEdit, redoEdit]);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const startOf = (p: VideoPlan, i: number) => p.scenes.slice(0, i).reduce((a, s) => a + s.duration, 0);
+  /** Pick a slide: edit it under the player, and show its settled frame. */
+  const selectScene = (i: number, p: VideoPlan = plan) => {
+    setSelected(i);
+    const s = p.scenes[i];
+    if (s) setSeek({ t: startOf(p, i) + Math.min(s.duration * 0.6, s.duration - 0.3), key: Date.now() });
+  };
+
   const updateScene = (i: number, patch: Partial<Scene>) => {
+    record(`scene:${i}:${Object.keys(patch).join(",")}`);
     // Not sanitised: an empty headline mid-typing must stay empty.
     if (patch.duration !== undefined) patch.duration = Math.min(8, Math.max(1.6, patch.duration || 1.6));
     setPlan((p) => ({ ...p, scenes: p.scenes.map((s, j) => (j === i ? { ...s, ...patch } : s)) }));
     setEngine("manual");
   };
-  const moveScene = (i: number, dir: -1 | 1) => {
+  /** Move slide `from` to position `to` (drag on the timeline, or the arrows). */
+  const moveScene = (from: number, to: number) => {
+    if (to < 0 || to >= plan.scenes.length || to === from) return;
+    record();
     setPlan((p) => {
       const scenes = [...p.scenes];
-      const j = i + dir;
-      if (j < 0 || j >= scenes.length) return p;
-      [scenes[i], scenes[j]] = [scenes[j], scenes[i]];
+      const [s] = scenes.splice(from, 1);
+      scenes.splice(to, 0, s);
       return { ...p, scenes };
     });
+    setEngine("manual");
+    if (selected === from) setSelected(to);
+    else if (selected !== null && from < selected && to >= selected) setSelected(selected - 1);
+    else if (selected !== null && from > selected && to <= selected) setSelected(selected + 1);
   };
-  const removeScene = (i: number) =>
+  const removeScene = (i: number) => {
+    if (plan.scenes.length <= 1) return;
+    record();
+    const name = SKILL_MAP[plan.scenes[i].skill]?.name ?? "Slide";
     setPlan((p) => (p.scenes.length > 1 ? { ...p, scenes: p.scenes.filter((_, j) => j !== i) } : p));
-  const addScene = () =>
-    setPlan((p) =>
-      sanitizePlan({
-        ...p,
-        scenes: [...p.scenes, { skill: "kinetic-slam", text: "NEW SCENE", duration: 2.8, transition: "flash" }],
-      }),
-    );
+    setEngine("manual");
+    setSelected((sel) => (sel === null ? null : sel === i ? null : sel > i ? sel - 1 : sel));
+    setToast({ text: `Removed slide ${i + 1} (${name})`, key: Date.now() });
+  };
+  const duplicateScene = (i: number) => {
+    record();
+    const next = { ...plan, scenes: [...plan.scenes.slice(0, i + 1), { ...plan.scenes[i], why: undefined }, ...plan.scenes.slice(i + 1)] };
+    setPlan(next);
+    setEngine("manual");
+    selectScene(i + 1, next);
+  };
+  /** Add a slide of the chosen style (with its sample content) after the selected slide, or at the end. */
+  const addScene = (skill: SkillId) => {
+    record();
+    const k = SKILL_MAP[skill];
+    const at = selected !== null ? selected + 1 : plan.scenes.length;
+    const scene: Scene = { skill, text: k.sample.text, subtext: k.sample.subtext, items: k.sample.items, duration: 3.5, transition: plan.scenes[at - 1]?.transition ?? "cut" };
+    const next = sanitizePlan({ ...plan, scenes: [...plan.scenes.slice(0, at), scene, ...plan.scenes.slice(at)] });
+    setPlan(next);
+    setEngine("manual");
+    selectScene(at, next);
+  };
+
+  /** One slide's editor: in the storyboard grid, and under the player when picked on the timeline. */
+  const sceneCard = (s: Scene, i: number, where: "grid" | "inspector") => (
+    <div className={`scene-card${selected === i ? " selected" : ""}`} key={`${where}-${i}`} id={where === "grid" ? `scene-${i}` : undefined}>
+      {plan.style === "saas" && (
+        <input
+          className="input eyebrow-input"
+          value={s.eyebrow ?? ""}
+          placeholder="Chapter label (optional)"
+          onChange={(e) => updateScene(i, { eyebrow: e.target.value || undefined })}
+          aria-label="Chapter label"
+        />
+      )}
+      <div className="scene-top">
+        <span className="scene-n">{String(i + 1).padStart(2, "0")}</span>
+        <SkillPicker plan={plan} value={s.skill} onPick={(skill) => skill !== s.skill && updateScene(i, { skill })} />
+      </div>
+      <input
+        className={`input headline ${plan.style === "saas" ? "natural" : ""}`}
+        value={s.text}
+        maxLength={200}
+        onChange={(e) => updateScene(i, { text: e.target.value })}
+        aria-label="Headline"
+        title="Wrap a word in *asterisks* for the gradient accent"
+      />
+      {SKILL_MAP[s.skill].itemsHint !== undefined && (
+        <input
+          className="input"
+          value={(s.items ?? []).join(", ")}
+          placeholder={SKILL_MAP[s.skill].itemsHint}
+          onChange={(e) =>
+            updateScene(i, {
+              items: e.target.value
+                .split(",")
+                .map((x) => x.trimStart())
+                .filter((x, j, arr) => x || j === arr.length - 1),
+            })
+          }
+          aria-label="List items"
+        />
+      )}
+      <input
+        className="input"
+        value={s.subtext ?? ""}
+        maxLength={60}
+        placeholder="Subtext (optional)"
+        onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })}
+        aria-label="Subtext"
+      />
+      {narrating && (
+        <div className="vo-line">
+          <textarea
+            className="input"
+            rows={2}
+            value={s.vo ?? ""}
+            maxLength={240}
+            placeholder="Narration (leave empty for no voice here)"
+            onChange={(e) => updateScene(i, { vo: e.target.value || undefined })}
+            aria-label="Narration"
+          />
+          {(() => {
+            const n = s.vo ? speakable(s.vo).split(/\s+/).filter(Boolean).length : 0;
+            const max = wordBudget(Math.min(8, s.duration + 1));
+            return <span className={`vo-count ${n > max ? "over" : ""}`}>🎙 {n}/{wordBudget(s.duration)} words{n > max ? " · too long for this scene" : ""}</span>;
+          })()}
+        </div>
+      )}
+      <div className="scene-row">
+        <label>
+          <input
+            className="input sm"
+            type="number"
+            step={0.1}
+            min={1.6}
+            max={8}
+            value={Number(s.duration.toFixed(2))}
+            onChange={(e) => updateScene(i, { duration: Number(e.target.value) })}
+          />
+          s
+        </label>
+        <select className="select sm" value={s.transition} onChange={(e) => updateScene(i, { transition: e.target.value as Scene["transition"] })}>
+          {TRANSITIONS.map((tr) => (
+            <option key={tr} value={tr}>
+              {tr}
+            </option>
+          ))}
+        </select>
+        <div className="scene-actions">
+          <button className="icon-btn sm" onClick={() => moveScene(i, i - 1)} disabled={i === 0} aria-label="Move earlier" title="Move earlier">←</button>
+          <button className="icon-btn sm" onClick={() => moveScene(i, i + 1)} disabled={i === plan.scenes.length - 1} aria-label="Move later" title="Move later">→</button>
+          <button className="icon-btn sm" onClick={() => duplicateScene(i)} aria-label="Duplicate slide" title="Duplicate">⧉</button>
+          <button className="icon-btn sm" onClick={() => removeScene(i)} disabled={plan.scenes.length <= 1} aria-label="Remove slide" title="Remove from the film">✕</button>
+        </div>
+      </div>
+    </div>
+  );
 
   const share = async () => {
     const url = `${window.location.origin}/studio#plan=${encodePlan(plan)}`;
@@ -519,7 +724,10 @@ export default function Studio() {
     }
   };
 
-  const setGlobal = (patch: Partial<VideoPlan>) => setPlan((p) => sanitizePlan({ ...p, ...patch }));
+  const setGlobal = (patch: Partial<VideoPlan>) => {
+    record(`global:${Object.keys(patch).join(",")}`);
+    setPlan((p) => sanitizePlan({ ...p, ...patch }));
+  };
 
   return (
     <div className="studio">
@@ -918,12 +1126,38 @@ export default function Studio() {
 
         <section className="main">
           <div className={loading ? "dim" : ""}>
-            <Player plan={playPlan} resetKey={version} />
+            <Player plan={playPlan} resetKey={version} seek={seek} onScene={setActiveScene} />
           </div>
 
-          {plan.style === "saas" && (
-            <ArcStrip plan={plan} onPick={(i) => document.getElementById(`scene-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} />
-          )}
+          <div className="edit-bar">
+            <span className="hint">
+              {selected === null ? "Click a slide to edit it · drag to reorder · × removes it" : `Editing slide ${selected + 1} of ${plan.scenes.length}`}
+            </span>
+            <div className="edit-bar-actions">
+              <button className="link-btn" onClick={undoEdit} disabled={!past.current.length} title="Undo edit (Ctrl+Z)">
+                ↶ Undo edit
+              </button>
+              <button className="link-btn" onClick={redoEdit} disabled={!future.current.length} title="Redo edit (Ctrl+Shift+Z)">
+                ↷ Redo
+              </button>
+              {selected !== null && (
+                <button className="link-btn" onClick={() => setSelected(null)}>
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
+          <SlideTimeline
+            plan={plan}
+            selected={selected}
+            active={activeScene}
+            onSelect={(i) => (selected === i ? setSelected(null) : selectScene(i))}
+            onRemove={removeScene}
+            onDuplicate={duplicateScene}
+            onMove={moveScene}
+            onAdd={addScene}
+          />
+          {selected !== null && plan.scenes[selected] && <div className="inspector">{sceneCard(plan.scenes[selected], selected, "inspector")}</div>}
 
           <div className="takes">
             <div className="takes-head">
@@ -971,111 +1205,25 @@ export default function Studio() {
             </div>
           </div>
           <div className="storyboard">
-            {plan.scenes.map((s, i) => (
-              <div className="scene-card" key={i} id={`scene-${i}`}>
-                {plan.style === "saas" && (
-                  <input
-                    className="input eyebrow-input"
-                    value={s.eyebrow ?? ""}
-                    placeholder="Chapter label (optional)"
-                    onChange={(e) => updateScene(i, { eyebrow: e.target.value || undefined })}
-                    aria-label="Chapter label"
-                  />
-                )}
-                <div className="scene-top">
-                  <span className="scene-n">{String(i + 1).padStart(2, "0")}</span>
-                  <select className="select sm grow" value={s.skill} onChange={(e) => updateScene(i, { skill: e.target.value as SkillId })}>
-                    {SKILLS.map((k) => (
-                      <option key={k.id} value={k.id}>
-                        {k.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <input
-                  className={`input headline ${plan.style === "saas" ? "natural" : ""}`}
-                  value={s.text}
-                  maxLength={200}
-                  onChange={(e) => updateScene(i, { text: e.target.value })}
-                  aria-label="Headline"
-                  title="Wrap a word in *asterisks* for the gradient accent"
-                />
-                {SKILL_MAP[s.skill].itemsHint !== undefined && (
-                  <input
-                    className="input"
-                    value={(s.items ?? []).join(", ")}
-                    placeholder={SKILL_MAP[s.skill].itemsHint}
-                    onChange={(e) =>
-                      updateScene(i, {
-                        items: e.target.value
-                          .split(",")
-                          .map((x) => x.trimStart())
-                          .filter((x, j, arr) => x || j === arr.length - 1),
-                      })
-                    }
-                    aria-label="List items"
-                  />
-                )}
-                <input
-                  className="input"
-                  value={s.subtext ?? ""}
-                  maxLength={60}
-                  placeholder="Subtext (optional)"
-                  onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })}
-                  aria-label="Subtext"
-                />
-                {narrating && (
-                  <div className="vo-line">
-                    <textarea
-                      className="input"
-                      rows={2}
-                      value={s.vo ?? ""}
-                      maxLength={240}
-                      placeholder="Narration (leave empty for no voice here)"
-                      onChange={(e) => updateScene(i, { vo: e.target.value || undefined })}
-                      aria-label="Narration"
-                    />
-                    {(() => {
-                      const n = s.vo ? speakable(s.vo).split(/\s+/).filter(Boolean).length : 0;
-                      const max = wordBudget(Math.min(8, s.duration + 1));
-                      return <span className={`vo-count ${n > max ? "over" : ""}`}>🎙 {n}/{wordBudget(s.duration)} words{n > max ? " · too long for this scene" : ""}</span>;
-                    })()}
-                  </div>
-                )}
-                <div className="scene-row">
-                  <label>
-                    <input
-                      className="input sm"
-                      type="number"
-                      step={0.1}
-                      min={1.6}
-                      max={8}
-                      value={Number(s.duration.toFixed(2))}
-                      onChange={(e) => updateScene(i, { duration: Number(e.target.value) })}
-                    />
-                    s
-                  </label>
-                  <select className="select sm" value={s.transition} onChange={(e) => updateScene(i, { transition: e.target.value as Scene["transition"] })}>
-                    {TRANSITIONS.map((tr) => (
-                      <option key={tr} value={tr}>
-                        {tr}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="scene-actions">
-                    <button className="icon-btn sm" onClick={() => moveScene(i, -1)} aria-label="Move left">←</button>
-                    <button className="icon-btn sm" onClick={() => moveScene(i, 1)} aria-label="Move right">→</button>
-                    <button className="icon-btn sm" onClick={() => removeScene(i)} aria-label="Delete scene">✕</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button className="scene-add" onClick={addScene}>
-              + Add scene
-            </button>
+            {plan.scenes.map((sc, i) => sceneCard(sc, i, "grid"))}
+            <SkillPicker plan={plan} onPick={addScene} variant="add" label="+ Add slide" />
           </div>
         </section>
       </div>
+      {toast && (
+        <div className="toast" role="status" key={toast.key}>
+          <span>{toast.text}</span>
+          <button
+            className="link-btn"
+            onClick={() => {
+              undoEdit();
+              setToast(null);
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   );
 }

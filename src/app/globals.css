@@ -1643,50 +1643,6 @@ button.brand-colors.on {
   align-self: flex-start;
 }
 
-/* ───────── Story arc strip ───────── */
-
-.arc-strip {
-  display: flex;
-  gap: 4px;
-  margin-top: 12px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-.arc-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 64px;
-  overflow: hidden;
-  flex-basis: 0;
-  padding: 7px 9px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--text);
-  font-size: 11.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s;
-}
-.arc-chip svg {
-  color: var(--cyan);
-  flex: none;
-}
-.arc-chip span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.arc-chip small {
-  margin-left: auto;
-  color: var(--muted);
-  font-weight: 500;
-}
-.arc-chip:hover {
-  border-color: var(--cyan);
-  transform: translateY(-1px);
-}
 .import-stage {
   display: flex;
   align-items: center;
@@ -1911,4 +1867,368 @@ button.brand-colors.on {
 .link-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ───────── Slide timeline, slide-style picker, edit history ───────── */
+
+.edit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+.edit-bar-actions {
+  display: flex;
+  gap: 16px;
+}
+.edit-bar-actions .link-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.slide-timeline {
+  margin-top: 8px;
+}
+.slide-track {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+}
+.slide-chip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  width: 160px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, transform 0.15s, opacity 0.15s;
+}
+.slide-chip:hover {
+  border-color: var(--line-2);
+}
+.slide-chip:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.slide-chip.playing {
+  border-color: color-mix(in srgb, var(--cyan) 45%, var(--line));
+}
+.slide-chip.selected {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 8px 24px rgba(0, 240, 255, 0.12);
+}
+.slide-chip.dragging {
+  opacity: 0.4;
+}
+.slide-chip.drop-before::before,
+.slide-chip.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--cyan);
+}
+.slide-chip.drop-before::before {
+  left: -6px;
+}
+.slide-chip.drop-after::after {
+  right: -6px;
+}
+.slide-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.slide-thumb.tall {
+  aspect-ratio: 9 / 16;
+  width: 50%;
+  margin: 0 auto;
+}
+.slide-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.slide-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 2px 2px;
+}
+.slide-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 0;
+}
+.slide-name svg {
+  color: var(--cyan);
+  flex: none;
+}
+.slide-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slide-meta small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.slide-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.slide-chip:hover .slide-actions,
+.slide-chip:focus-within .slide-actions,
+.slide-chip.selected .slide-actions {
+  opacity: 1;
+}
+.slide-act {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(6, 5, 12, 0.78);
+  color: var(--text);
+  backdrop-filter: blur(6px);
+}
+.slide-act:hover {
+  border-color: var(--cyan);
+}
+.slide-act.danger:hover {
+  border-color: #ff5a7a;
+  color: #ff8aa0;
+}
+.slide-act:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.slide-track .scene-add {
+  min-height: 0;
+  width: 64px;
+  flex: none;
+  font-size: 22px;
+}
+@media (hover: none) {
+  .slide-actions {
+    opacity: 1;
+  }
+}
+.inspector {
+  margin-top: 12px;
+}
+.inspector .scene-card {
+  border-color: var(--cyan);
+}
+.scene-card.selected {
+  border-color: color-mix(in srgb, var(--cyan) 60%, var(--line));
+}
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Slide-style picker */
+.skill-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+.skill-field:hover,
+.skill-field.open {
+  border-color: var(--cyan);
+}
+.skill-field-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-thumb {
+  display: block;
+  flex: none;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.skill-thumb.tall {
+  aspect-ratio: 9 / 16;
+  width: 56%;
+  margin: 0 auto;
+}
+.skill-thumb.sm {
+  width: 56px;
+  border-radius: 6px;
+}
+.skill-thumb.sm.tall {
+  width: 20px;
+  margin: 0;
+}
+.skill-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.skill-thumb-wait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.05) 50%, transparent 70%) var(--bg-2);
+  background-size: 200% 100%;
+  animation: thumb-wait 1.2s linear infinite;
+}
+@keyframes thumb-wait {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.skill-menu {
+  position: fixed;
+  z-index: 60;
+  width: min(620px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: #0e0c1a;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.skill-menu-head {
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.skill-menu-head .input {
+  width: 100%;
+}
+.skill-menu-body {
+  overflow-y: auto;
+  padding: 4px 10px 12px;
+}
+.skill-menu-body h4 {
+  margin: 12px 2px 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 560px) {
+  .skill-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.skill-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+}
+.skill-tile.cursor {
+  border-color: var(--line-2);
+  background: var(--panel-2);
+}
+.skill-tile.current {
+  border-color: var(--cyan);
+}
+.skill-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 2px 2px;
+}
+.skill-tile-text strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.skill-tile-text small {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.skill-menu-empty {
+  padding: 16px 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Undo toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 70;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: #15122a;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  animation: toast-in 0.2s ease-out;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
 }

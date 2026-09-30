@@ -7,7 +7,11 @@ IntroMaker is a SaaS web app that turns a text prompt into a cinematic motion-gr
 - **Two styles**: *SaaS launch* (auto-selected for websites and product prompts) or *Epic trailer*.
 - **57 motion skills**: Support, World Map, Feature Slides, Problem → Solution, Code to Deploy, Dot Globe, Live Cursors, Kanban Board, Before / After, Chat Thread, Gallery Flow, 3D Carousel, Tilt Wall, UI Assemble, Video in Text, Node Graph, Website Scroll, How It Works, Command Palette, AI Prompt, One-Click Flow, Notification Stack, Growth Chart, Feature Icons, Blur Reveal, Word Swap, UI Zoom Tour, Bento Grid, Floating UI, Pain → Solution, Integration Orbit, Testimonial, Trusted By, CTA Lock-up, Logo Reveal, Product Showcase, Photo Montage, Screen Wall, God Rays, Glass Shatter, Warp Tunnel, 3D Flip, Particle Vortex, Hyperspace Punch, Kinetic Slam, Glitch Decode, Shockwave, Liquid Mesh, Retrowave, Neon Ignite, Orbital Core, Stat Counter, Cinematic Title, Block Cascade, Split Sweep, Shape Burst and HUD Interface.
 - **AI Director**: Claude storyboards the prompt into a hook, a title reveal, feature beats and an outro. It picks the skills, palette, typeface and tempo. When no API key is set, a built-in rule-based director does the same job offline.
-- **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remix, and share a link.
+- **Live studio**: preview, scrub, edit each scene's text, skill, timing and transition, switch palettes and formats (16:9, 9:16, 1:1), remake, and share a link.
+  - **Slide timeline** under the player: a live thumbnail per slide. Click a slide to pause on it and edit it right there, drag to reorder, and duplicate or remove it (× or Delete). *+* adds a slide after the selected one.
+  - **Slide-style picker**: every style shows a thumbnail rendered in the film's own colours, font and brand, grouped (SaaS essentials, product moments, slides, media, type, cinematic) and searchable, with keyboard navigation.
+  - **Undo / redo** for every edit (Ctrl+Z, Ctrl+Shift+Z); removing a slide shows an *Undo* toast. Edits stay with their version, so switching between the original and remakes never loses them.
+- **Pixel-perfect design system** (`src/engine/grid.ts`): an 8-point spacing grid, broadcast title-safe areas, 12/4 layout columns and a 1.25 type scale, all scaled to the frame. Headlines, eyebrows, badges, captions and the brand bug sit on the grid. The player's grid button overlays the safe area, columns and 8pt rhythm with the camera held still, so you see the layout itself (never exported). `/audit` renders every skill in 16:9, 9:16 and 1:1 and reports text outside the safe area, clipped by the frame or overlapping other text. It currently reports none; deliberate motion, such as the camera diving into a product, is listed as by design.
 - **A produced soundtrack, arranged to the film**: SaaS films get a modern cue synthesised in the browser, with no stock music and no licences. It's edited like a record:
   - filtered keys under the hook;
   - a snare-roll, riser and filter-sweep build that **drops exactly as the logo hits**;
@@ -210,6 +214,7 @@ Known limits:
 src/engine/
   types.ts        VideoPlan / Scene / Skill contracts
   skills/         the 57 skills (saas.ts, interactions.ts, moments.ts, slides.ts, typefx.ts, gallery.ts, components.ts, typography.ts, energy.ts, worlds.ts, signature.ts, media.ts); each is a pure render(ctx, t)
+  grid.ts         design system: 8pt grid, title-safe areas, columns, type scale, snapping, grid overlay
   saasfx.ts       SaaS design toolkit: springs, grid/beam backdrop, glass cards, border beams, cursor, icons, blur-in type
   media.ts        website image/video cache, frame-exact video sync for export, logo + brand-colour analysis
   renderer.ts     timeline, beat camera, transitions (cut/flash/zoom/glitch/wipe/whip/dolly/leak/shutter), finishing pass
@@ -228,6 +233,8 @@ src/app/api/generate/route.ts   Claude AI Director (structured output), falls ba
 src/lib/providers.ts            provider registry (endpoint, auth, key prefix, suggested models, vision)
 src/lib/ai.ts                   AI director over 3 protocols (Anthropic SDK, OpenAI-compatible, Gemini) + model listing
 src/lib/localai.ts              browser-side local AI (scan, test, director) for online deployments
+src/lib/thumbs.ts               slide and slide-style thumbnails for the studio (cached stills)
+src/app/audit/                  layout audit of every skill against the design system
 src/lib/review.ts               storyboard checklist, self-review brief and repair
 src/lib/capture.ts              live browser capture: hero/full/section screenshots + the page's UI components cut out one by one
 src/lib/tts.ts                  voice generation: Kokoro in the browser, cloud voices via /api/tts, uploads

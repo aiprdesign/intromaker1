@@ -1,5 +1,6 @@
 import { arrange, energyAt, sinceDrop, sinceKick, type Arrangement } from "./arrange";
 import { clamp, ease, mixHex, noise1, range, rgba, rng } from "./math";
+import { tokens } from "./grid";
 import { styleOf } from "./music";
 import { captionAt } from "./voice";
 import { PALETTES } from "./palettes";
@@ -700,8 +701,10 @@ function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, 
   if (a <= 0) return;
   const palette = brandPalette(plan.palette, brand, schemeOf(plan));
   const u = Math.min(w, h) / 1080;
-  const x = 52 * u;
-  const y = 54 * u;
+  // On the design grid: the lock-up's top-left corner sits on the title-safe corner.
+  const safe = tokens(w, h).safe;
+  const x = safe.left;
+  const y = safe.top + 19 * u;
   resetCtx(ctx);
   ctx.save();
   ctx.globalAlpha = a * 0.78;
