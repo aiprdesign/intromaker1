@@ -25,6 +25,11 @@ const notifyReady = () => readyListeners.forEach((fn) => fn());
 export { assetUrl } from "./assets";
 import { loadBrandFont } from "./fonts";
 
+/** Load images ahead of a still render (resolves when each has loaded or failed). */
+export function preloadImages(srcs: string[]) {
+  return Promise.all(srcs.map(loadImage));
+}
+
 function loadImage(src: string) {
   if (pending.has(src)) return pending.get(src)!;
   const p = new Promise<void>((resolve) => {

@@ -1,6 +1,8 @@
 "use client";
 
 import { ensureFonts } from "@/engine/fonts";
+import { preloadImages } from "@/engine/media";
+import { placeholderSources, withPlaceholders } from "@/engine/placeholders";
 import { aspectSize, renderScene } from "@/engine/renderer";
 import { SKILL_MAP } from "@/engine/skills";
 import type { Scene, SkillId, VideoPlan } from "@/engine/types";
@@ -66,8 +68,13 @@ export function skillThumb(skill: SkillId, plan: VideoPlan): string {
   if (hit) return hit;
   const s = SKILL_MAP[skill];
   const scene: Scene = { skill, text: s.sample.text, subtext: s.sample.subtext, items: s.sample.items, duration: 4.5, transition: "cut", eyebrow: plan.style === "saas" ? "Features" : undefined };
-  return remember(key, paint(scene, plan));
+  // A style that shows your media previews with stand-in pictures when the film has none.
+  const preview = withPlaceholders(scene, plan);
+  return remember(key, paint(preview.scene, preview.plan));
 }
 
-/** Fonts first, or the first thumbnails render in fallback type and stay cached that way. */
-export const thumbsReady = () => ensureFonts();
+/**
+ * Fonts first, or the first thumbnails render in fallback type and stay cached that way; and the
+ * stand-in pictures, so the slide-style previews that use them aren't painted empty.
+ */
+export const thumbsReady = () => Promise.all([ensureFonts(), preloadImages(placeholderSources())]);

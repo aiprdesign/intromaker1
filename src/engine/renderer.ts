@@ -813,11 +813,12 @@ function applyCamera(sc: SkillContext, globalT: number) {
     const bar = Math.floor(globalT / beat) % 4 === 0 ? 1.6 : 1;
     pulse = Math.exp(-phase * 7) * 0.012 * bar;
   }
-  // Cinematic dolly: every shot keeps pushing in slowly (about 4% over the shot, easing in from
-  // rest), drifting a touch to one side, so no frame is ever static. Cuts hide the reset.
+  // Cinematic dolly: every shot keeps pulling back slowly (5% over the shot, from slightly closer
+  // to its resting framing), drifting a touch to one side, so no frame is ever static. Cuts hide
+  // the reset.
   const p = clamp(sc.t / Math.max(0.5, sc.d));
   const saas = sc.style === "saas";
-  const push = (saas ? 0.065 : 0.04) * (p * p * (3 - 2 * p) * 0.35 + p * 0.65);
+  const push = 0.05 * (1 - (p * p * (3 - 2 * p) * 0.35 + p * 0.65));
   const side = sc.seed % 2 ? 1 : -1;
   // SaaS shots land: a quick settle from slightly closer and turned, like a camera move ending.
   const arrive = saas ? 1 - ease.outExpo(clamp(sc.t / 0.75)) : 0;

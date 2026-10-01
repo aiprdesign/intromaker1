@@ -250,7 +250,7 @@ export const TEMPLATES: Template[] = [
     id: "keynote",
     name: "Cinematic Keynote",
     category: "Premium",
-    description: "Epic launch keynote: volumetric light, slow push-ins and a cinematic trailer score.",
+    description: "Epic launch keynote: volumetric light, slow pull-backs and a cinematic trailer score.",
     vibe: "Grand and cinematic, like a flagship launch event. Big statements, dramatic light, slower pacing, trailer music.",
     palette: "midnight",
     font: "inter",

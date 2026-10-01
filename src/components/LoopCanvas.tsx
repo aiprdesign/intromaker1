@@ -5,13 +5,14 @@ import { ensureFonts } from "@/engine/fonts";
 import { mediaState } from "@/engine/media";
 import { aspectSize, renderFrame, renderScene, totalDuration } from "@/engine/renderer";
 import type { Scene, VideoPlan } from "@/engine/types";
+import { withPlaceholders } from "@/engine/placeholders";
 import { useVisible } from "./useVisible";
 
 type Props =
   | { plan: VideoPlan; scene?: undefined; long?: number; fps?: number; className?: string }
   | {
       scene: Scene;
-      plan: Pick<VideoPlan, "palette" | "font" | "seed"> & Partial<Pick<VideoPlan, "style" | "look" | "bpm">>;
+      plan: Pick<VideoPlan, "palette" | "font" | "seed"> & Partial<Pick<VideoPlan, "style" | "look" | "bpm" | "brand" | "product" | "title">>;
       long?: number;
       fps?: number;
       className?: string;
@@ -32,7 +33,11 @@ export default function LoopCanvas(props: Props) {
     ensureFonts().then(() => {
       const p = propsRef.current;
       const ctx = canvas.getContext("2d")!;
-      if (p.scene) renderScene(ctx, p.scene, p.plan, Math.min(2.2, p.scene.duration * 0.5), canvas.width, canvas.height, 0, { grain: false });
+      if (p.scene) {
+        // Slides that show your media get stand-in pictures until there are real ones.
+        const { scene, plan } = withPlaceholders(p.scene, p.plan);
+        renderScene(ctx, scene, plan, Math.min(2.2, p.scene.duration * 0.5), canvas.width, canvas.height, 0, { grain: false });
+      }
       else renderFrame(ctx, p.plan, 3, canvas.width, canvas.height, { grain: false });
     });
   }, []);
@@ -75,7 +80,8 @@ export default function LoopCanvas(props: Props) {
         const time = (now - t0) / 1000;
         if (p.scene) {
           const { w, h } = { w: canvas.width, h: canvas.height };
-          renderScene(ctx, p.scene, p.plan, time % p.scene.duration, w, h, 0, { grain: false });
+          const { scene, plan } = withPlaceholders(p.scene, p.plan);
+          renderScene(ctx, scene, plan, time % p.scene.duration, w, h, 0, { grain: false });
         } else {
           const d = totalDuration(p.plan);
           renderFrame(ctx, p.plan, time % d, canvas.width, canvas.height, { grain: false });

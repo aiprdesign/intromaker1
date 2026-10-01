@@ -14,6 +14,16 @@ import { WATERMARK, type PlanLimits } from "@/lib/plans";
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
 
+type ViewSize = "s" | "m" | "l" | "fit";
+const VIEWS: [ViewSize, string, string][] = [
+  ["s", "S", "Small preview"],
+  ["m", "M", "Medium preview"],
+  ["l", "L", "Large preview"],
+  ["fit", "Fit", "As wide as the space allows"],
+];
+/** How tall the preview may be, per size (Fit has no height limit). */
+const VIEW_HEIGHT: Record<ViewSize, string> = { s: "40vh", m: "62vh", l: "82vh", fit: "none" };
+
 export default function Player({
   plan,
   autoPlay = true,
@@ -46,6 +56,31 @@ export default function Player({
   const [playing, setPlaying] = useState(autoPlay);
   const [time, setTime] = useState(0);
   const [muted, setMuted] = useState(false);
+  // Preview size: small, medium (default), large, or the full width; remembered. Full screen too.
+  const [view, setView] = useState<ViewSize>("m");
+  const stageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("intromaker.preview-size");
+      if (v && VIEWS.some(([id]) => id === v)) setView(v as ViewSize);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseView = (v: ViewSize) => {
+    setView(v);
+    try {
+      localStorage.setItem("intromaker.preview-size", v);
+    } catch {
+      /* ignore */
+    }
+  };
+  const fullScreen = () => {
+    const el = stageRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void el.requestFullscreen?.().catch(() => {});
+  };
   const [exporting, setExporting] = useState<number | null>(null);
   const [presetId, setPresetId] = useState<string>("current");
   // Designer's grid overlay: preview only, never part of an export.
@@ -278,7 +313,12 @@ export default function Player({
 
   return (
     <div className="player">
-      <div className={`stage stage-${plan.aspect.replace(":", "x")}`}>
+      <div
+        ref={stageRef}
+        className={`stage stage-${plan.aspect.replace(":", "x")}${view === "fit" ? " fit" : ""}`}
+        style={{ ["--stage-h" as string]: VIEW_HEIGHT[view] }}
+        onDoubleClick={fullScreen}
+      >
         <canvas ref={canvasRef} width={w} height={h} onClick={toggle} />
         {/* Paused mid-film (editing a slide), the play button moves to the corner so the frame stays visible. */}
         {!playing && exporting === null && (
@@ -334,6 +374,16 @@ export default function Player({
             );
           })}
           <div className="playhead" style={{ left: `${(time / duration) * 100}%` }} />
+        </div>
+        <div className="view-size" role="radiogroup" aria-label="Preview size">
+          {VIEWS.map(([id, label, title]) => (
+            <button key={id} role="radio" aria-checked={view === id} className={view === id ? "active" : ""} onClick={() => chooseView(id)} title={title}>
+              {label}
+            </button>
+          ))}
+          <button onClick={fullScreen} title="Full screen (double-click the video)" aria-label="Full screen">
+            <svg viewBox="0 0 24 24" width="14" height="14"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+          </button>
         </div>
         <button className="icon-btn" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} title="Generated soundtrack">
           {muted ? (

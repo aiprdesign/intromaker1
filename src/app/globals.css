@@ -1004,13 +1004,57 @@ textarea {
   cursor: pointer;
 }
 .stage-9x16 {
-  max-width: min(100%, calc(62vh * 9 / 16));
+  max-width: min(100%, calc(var(--stage-h, 62vh) * 9 / 16));
 }
 .stage-1x1 {
-  max-width: min(100%, 62vh);
+  max-width: min(100%, var(--stage-h, 62vh));
 }
 .stage-16x9 {
-  max-width: min(100%, calc(62vh * 16 / 9));
+  max-width: min(100%, calc(var(--stage-h, 62vh) * 16 / 9));
+}
+.stage.fit {
+  max-width: 100%;
+}
+/* Full screen: the video as large as the screen allows, letterboxed on black. */
+.stage:fullscreen {
+  max-width: none;
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  display: grid;
+  place-items: center;
+}
+.stage:fullscreen canvas {
+  width: auto;
+  height: auto;
+  max-width: 100vw;
+  max-height: 100vh;
+}
+.view-size {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  flex: none;
+}
+.view-size button {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font: 600 12px var(--body);
+  padding: 7px 9px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.view-size button + button {
+  border-left: 1px solid var(--line);
+}
+.view-size button.active,
+.view-size button:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
 }
 .stage-play {
   position: absolute;
