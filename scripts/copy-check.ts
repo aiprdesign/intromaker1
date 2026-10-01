@@ -5,6 +5,7 @@
  */
 import { mentionsOffer, offerKey, offersIn } from "../src/engine/claims";
 import { cleanCta, contextCta, lowerFirst, offersFree } from "../src/engine/planner";
+import { speakable } from "../src/engine/voice";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -67,6 +68,19 @@ const film = { scenes: [{ text: "Plan *faster*" }, { text: "Hassle-free payroll"
 const found = offersIn(film);
 check(found.length === 1 && found[0].scene === 2 && found[0].text === "Try for Free!", "the end card's offer is found on its slide");
 check(offerKey("Try for Free!") === offerKey("try for free") && offerKey("Try for Free!") !== offerKey("Try for $5"), "a confirmation covers the same words, not edited ones");
+
+console.log("Voice-over reads specs naturally");
+for (const [raw, said] of [
+  ["Folds down to 6 ft. Fits in your bag.", "Folds down to 6 feet. Fits in your bag."],
+  ["A 12 in. skillet", "A 12 inch skillet"],
+  ["#1 in sales, available in 3 colours", "Number 1 in sales, available in 3 colours"],
+  ["Measures 10 x 12 x 3 in", "Measures 10 by 12 by 3 inches"],
+  ["16 oz cups", "16 ounce cups"],
+  ["Heats to 450°F", "Heats to 450 degrees Fahrenheit"],
+  ["Ships in 2-3 days", "Ships in 2 to 3 days"],
+]) check(speakable(raw) === said, speakable(raw) === said ? `"${raw}" → "${said}"` : `"${raw}" → "${speakable(raw)}", wanted "${said}"`);
+check(speakable("4K video, 5G ready").startsWith("4 K video") && speakable("4K video, 5G ready").includes("5G ready"), "4K is spelled, 5G is left alone");
+check(speakable("Bluetooth 5.3, 40 hrs playtime").includes("40 hour playtime"), "a unit before a noun is singular");
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");
 process.exit(failed ? 1 : 0);

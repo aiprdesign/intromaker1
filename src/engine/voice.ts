@@ -78,12 +78,150 @@ export const DEFAULT_VOICE: VoiceSettings = LOCAL_VOICE
 
 const UNITS: Record<string, string> = { k: "thousand", K: "thousand", m: "million", M: "million", b: "billion", B: "billion" };
 
+/**
+ * Units a narrator reads out in full after a number ([singular, plural]): "6 ft" → "6 feet",
+ * "1 lb" → "1 pound", "500 mAh" → "500 milliamp hours". Case matters where it disambiguates
+ * (mW vs MW, ms vs MS); words that are also ordinary words ("in", "m", "A", "g") have their own
+ * rules in sayUnits.
+ */
+const UNIT_WORDS: [RegExp, string, string][] = [
+  [/fl\.?\s?oz\.?/, "fluid ounce", "fluid ounces"],
+  [/(?:ft|feet|foot)\.?/i, "foot", "feet"],
+  [/(?:inch|inches)/i, "inch", "inches"],
+  [/(?:yd|yds)\.?/, "yard", "yards"],
+  [/mi\.?(?=\s|$|[,;:!?)])/, "mile", "miles"],
+  [/km/i, "kilometre", "kilometres"],
+  [/cm/, "centimetre", "centimetres"],
+  [/mm/, "millimetre", "millimetres"],
+  [/(?:lbs?|LBS?)\.?/, "pound", "pounds"],
+  [/oz\.?/i, "ounce", "ounces"],
+  [/kg/i, "kilogram", "kilograms"],
+  [/mg/, "milligram", "milligrams"],
+  [/(?:ml|mL|ML)/, "millilitre", "millilitres"],
+  [/(?:gal|gals)\.?/i, "gallon", "gallons"],
+  [/qt\.?/i, "quart", "quarts"],
+  [/mAh/i, "milliamp hour", "milliamp hours"],
+  [/kWh/i, "kilowatt hour", "kilowatt hours"],
+  [/Wh/, "watt hour", "watt hours"],
+  [/kW/, "kilowatt", "kilowatts"],
+  [/W(?=\s|$|[,;:!?)/])/, "watt", "watts"],
+  [/V(?=\s|$|[,;:!?)/])/, "volt", "volts"],
+  [/GHz/i, "gigahertz", "gigahertz"],
+  [/MHz/i, "megahertz", "megahertz"],
+  [/kHz/i, "kilohertz", "kilohertz"],
+  [/Hz/i, "hertz", "hertz"],
+  [/dB/i, "decibel", "decibels"],
+  [/TB/, "terabyte", "terabytes"],
+  [/GB/, "gigabyte", "gigabytes"],
+  [/MB/, "megabyte", "megabytes"],
+  [/Gbps/i, "gigabit per second", "gigabits per second"],
+  [/Mbps/i, "megabit per second", "megabits per second"],
+  [/mph/i, "mile per hour", "miles per hour"],
+  [/(?:km\/h|kph)/i, "kilometre per hour", "kilometres per hour"],
+  [/rpm/i, "R P M", "R P M"],
+  [/(?:hrs?|hours?)\.?/i, "hour", "hours"],
+  [/(?:mins?|minutes?)\.?/i, "minute", "minutes"],
+  [/(?:secs?|seconds?)\.?/i, "second", "seconds"],
+  [/ms/, "millisecond", "milliseconds"],
+  [/(?:pcs?|pieces?)\.?/i, "piece", "pieces"],
+  [/(?:pk|packs?)\.?/i, "pack", "packs"],
+  [/(?:ct)\.?/, "count", "count"],
+];
+
+/** Letters a narrator spells out (and reads as one word otherwise wrongly, like "led" for LED). */
+const SPELL = /\b(USB|LED|LCD|OLED|HDMI|HDR|UHD|QLED|SSD|HDD|RAM|GPS|NFC|UV|IPX|IP|BPA|PVC|ABS|RGB|AC|DC|PC|TV|DIY|SPF)(?=-?[A-Z0-9]*\b)/g;
+
+/** Words after a unit that keep it plural ("6 feet long", "2 pounds of coffee"). */
+const KEEPS_PLURAL = /^(of|per|in|on|at|and|or|to|for|with|from|by|each|long|wide|tall|high|deep|thick|away|across|diagonal|apart|total|max|maximum|minimum|more|less|faster|slower|ago|later|left|or)$/i;
+
+/** Say a number and its unit the way a person would ("6 ft" → "6 feet", "1 in." → "1 inch"). */
+function sayUnits(text: string) {
+  const num = "(\\d+(?:[.,]\\d+)?(?:\\s?\\/\\s?\\d+)?)";
+  // One unit, read out: singular for 1, and singular before the noun it describes, like people
+  // say it ("a 12 inch skillet", "16 ounce cups", "40 hour playtime"); a full stop that ended the
+  // sentence stays, one that only marked the abbreviation goes ("12 in. skillet").
+  const unit = (one: string, many: string) => (m: string, n: string, ...rest: unknown[]) => {
+    const str = rest[rest.length - 1] as string;
+    const offset = rest[rest.length - 2] as number;
+    const after = str.slice(offset + m.length);
+    const next = after.match(/^\s+([a-z][a-z-]*)/)?.[1];
+    const single = /^1(?:\.0+)?$/.test(n.trim()) || (!!next && !KEEPS_PLURAL.test(next));
+    const stop = /\.$/.test(m) && (after === "" || /^\s+[A-Z]/.test(after)) ? "." : "";
+    return `${n} ${single ? one : many}${stop}`;
+  };
+  let t = text;
+  // Feet and inches written with marks: 5'11" → 5 feet 11 inches; 12" → 12 inches; 6' → 6 feet.
+  t = t.replace(/\b(\d+)\s?['′’]\s?(\d+(?:\.\d+)?)\s?(?:["″”]|'')/g, (_, f: string, i: string) => `${f} ${f === "1" ? "foot" : "feet"} ${i} ${i === "1" ? "inch" : "inches"}`);
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?(?:["″”]|'')(?=[\s,.;:!?)x×]|$)/g, unit("inch", "inches"));
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?['′](?=[\s,.;:!?)x×]|$)/g, unit("foot", "feet"));
+  // Dimensions: 10 x 12 x 3 → 10 by 12 by 3 (then the unit after it is read as usual).
+  t = t.replace(/(\d(?:[.,]\d+)?)\s?[x×X]\s?(?=\d)/g, "$1 by ");
+  // "in" means inches only when it's clearly a size: "12 in.", "5 in wide", "10 by 12 in", or at
+  // the end of a phrase. "#1 in sales" and "fits in your bag" stay as they are.
+  const inches = unit("inch", "inches");
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?(in\.|IN\b|in\b)/g, (m: string, n: string, word: string, offset: number, str: string) => {
+    const after = str.slice(offset + m.length);
+    const next = after.match(/^\s+([A-Za-z]+)/)?.[1] ?? "";
+    const size =
+      word !== "in" ||
+      after === "" ||
+      /^\s*[,;:!?)]/.test(after) ||
+      /^\.(\s|$)/.test(after) ||
+      /^(by|wide|long|tall|high|deep|thick|across|diagonal|screen|display|monitor|laptop|tablet|tv|skillet|pan|handle|blade|wheel|wheels|frame|bag|box|cube|ring|lens)$/i.test(next);
+    return size ? inches(m, n, offset, str) : m;
+  });
+  // "m" is metres with a length word; otherwise it's millions, below.
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?m\b(?=\s*(?:cable|cord|lead|hose|long|wide|tall|high|deep|length|range|reach|rope|tape|roll|away))/gi, unit("metre", "metres"));
+  // Grams (lowercase g): "100g", but never "5G" (the network).
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?g\b(?!\s*(?:network|lte|phone|signal))/g, unit("gram", "grams"));
+  // Litres (L), amps (A), frames per second, when right after a number and on their own.
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?L\b/g, unit("litre", "litres"));
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?A\b(?=\s|$|[,;:!?)/])/g, unit("amp", "amps"));
+  t = t.replace(/\b(\d+)\s?fps\b/gi, "$1 frames per second");
+  // Temperatures.
+  t = t.replace(/(-?\d+(?:\.\d+)?)\s?°\s?F\b/g, (_, n: string) => `${n} degrees Fahrenheit`);
+  t = t.replace(/(-?\d+(?:\.\d+)?)\s?°\s?C\b/g, (_, n: string) => `${n} degrees Celsius`);
+  t = t.replace(/(\d)\s?°/g, "$1 degrees");
+  // Every other unit in the table.
+  for (const [re, one, many] of UNIT_WORDS) {
+    const pattern = new RegExp(`${num}\\s?(?:${re.source})(?![A-Za-z])`, re.flags.includes("i") ? "gi" : "g");
+    t = t.replace(pattern, unit(one, many));
+  }
+  // "5 volts/2 amps" → "5 volts, 2 amps".
+  t = t.replace(/([a-z])\s?\/\s?(?=\d)/g, "$1, ");
+  // Screen and video resolutions: 4K, 8K (not "4 thousand").
+  t = t.replace(/\b([2-8])K\b(?=\s*(?:$|[,.;:!?)]|uhd|hdr|video|display|tv|monitor|camera|resolution|screen|ultra|streaming|gaming))/gi, "$1 K");
+  // Percent, "x" as times ("10x faster"), number signs, ranges, round-the-clock.
+  t = t.replace(/(\d)\s?%/g, "$1 percent");
+  t = t.replace(/\b(\d+(?:\.\d+)?)\s?[x×](?=\s|$|[,.;:!?)])/gi, "$1 times");
+  t = t.replace(/#\s?(\d+)/g, "number $1");
+  t = t.replace(/\b24\/7\b/g, "twenty-four seven");
+  t = t.replace(/\b(\d+)\s?[-–]\s?(\d+)\b(?!\s?[-–]\s?\d)/g, "$1 to $2");
+  // Common shorthand.
+  t = t
+    .replace(/\bw\/o\b/gi, "without")
+    .replace(/\bw\/(?=\s|[A-Za-z])/gi, "with ")
+    .replace(/\bapprox\.?(?=\s)/gi, "approximately")
+    .replace(/\bincl\.?(?=\s)/gi, "including")
+    .replace(/\be\.g\.,?/gi, "for example")
+    .replace(/\bi\.e\.,?/gi, "that is")
+    .replace(/\betc\./gi, "et cetera")
+    .replace(/\bvs\.?(?=\s)/gi, "versus")
+    .replace(/\bNo\.\s?(?=\d)/g, "number ");
+  // Spec codes spelled out: USB-C → U S B C, IPX5 → I P X 5, LED → L E D.
+  t = t.replace(/\b(USB|IPX|IP)-?([A-Z0-9]+)\b/g, (_, a: string, b: string) => `${a.split("").join(" ")} ${/^\d+$/.test(b) ? b : b.split("").join(" ")}`);
+  t = t.replace(SPELL, (m: string) => m.split("").join(" "));
+  return t;
+}
+
 /** Rewrite on-screen copy the way a narrator says it ("10,000+ teams" → "more than 10,000 teams"). */
 export function speakable(text: string) {
-  return text
-    .replace(/\*/g, "")
-    .replace(/\s*\|\s*/g, ". ")
-    .replace(/[★✓✕→↗▲▼•]+/g, " ")
+  return sayUnits(
+    text
+      .replace(/\*/g, "")
+      .replace(/\s*\|\s*/g, ". ")
+      .replace(/[★✓✕→↗▲▼•]+/g, " "),
+  )
     .replace(/(\$|€|£)?(\d[\d,.]*)\s?([kKmMbB])?\+(?=\s|$|[,.])/g, (_, cur: string | undefined, n: string, u: string | undefined) => `more than ${cur ?? ""}${n}${u ? ` ${UNITS[u]}` : ""}`)
     .replace(/(\$|€|£)(\d[\d,.]*)\s?([kKmMbB])\b/g, (_, cur: string, n: string, u: string) => `${cur}${n} ${UNITS[u]}`)
     .replace(/\b(\d[\d,.]*)([kKmMbB])\b/g, (_, n: string, u: string) => `${n} ${UNITS[u]}`)
