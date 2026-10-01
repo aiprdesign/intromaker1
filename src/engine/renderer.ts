@@ -826,8 +826,14 @@ function applyCamera(sc: SkillContext, globalT: number) {
   // SaaS shots land: a quick settle from slightly closer and turned, like a camera move ending.
   const arrive = saas ? 1 - ease.outExpo(clamp(sc.t / 0.75)) : 0;
   const s = 1.035 + push + pulse + 0.05 * arrive;
-  const dx = noise1(globalT * 0.45, 11) * 9 * u + side * p * 14 * u + side * arrive * 26 * u;
-  const dy = noise1(globalT * 0.37, 23) * 7 * u - p * 6 * u;
+  // Each shot gets its own camera grammar (so a film doesn't repeat one move): a pull-back that
+  // drifts aside, one that cranes up, or one that trucks across — all inside the overscan.
+  const move = (sc.seed >>> 3) % 3;
+  const eased = p * p * (3 - 2 * p);
+  const across = move === 2 ? side * (eased - 0.5) * 26 * u : side * p * 14 * u;
+  const crane = move === 1 ? (0.5 - eased) * 16 * u : -p * 6 * u;
+  const dx = noise1(globalT * 0.45, 11) * (move === 2 ? 5 : 9) * u + across + side * arrive * 26 * u;
+  const dy = noise1(globalT * 0.37, 23) * (move === 1 ? 4 : 7) * u + crane;
   // SaaS shots never roll or skew: text, cards and UI rows stay perfectly level.
   const rot = saas ? 0 : noise1(globalT * 0.23, 37) * 0.007;
   ctx.translate(w / 2 + dx, h / 2 + dy);

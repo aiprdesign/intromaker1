@@ -869,7 +869,7 @@ export function blurInLayout(
   layout: HeadlineLayout,
   start: number,
   stagger: number,
-  opts: { alpha?: number; exitAt?: number; gradient?: [string, string] } = {},
+  opts: { alpha?: number; exitAt?: number; gradient?: [string, string]; still?: boolean } = {},
 ) {
   const { ctx, t, u, w, palette } = sc;
   const exit = opts.exitAt !== undefined ? range(t, opts.exitAt, opts.exitAt + 0.4) : 0;
@@ -894,12 +894,31 @@ export function blurInLayout(
   const sweepAt = start + (totalWords - 1) * stagger * pace.stagger + pace.dur + 0.15;
   const sweep = mode === "shine" ? range(t, sweepAt, sweepAt + 0.9) : 0;
   const frame = Math.floor(t * 24);
+  // Hold life: once the last word has landed, the headline keeps moving instead of freezing —
+  // its tracking opens out and it grows a touch, against the camera's slow pull-back, so the type
+  // floats in its own plane over the stage (the long, slow "title breath" of film titles).
+  const landAt = start + Math.max(0, totalWords - 1) * stagger * pace.stagger + pace.dur;
+  const holdEnd = opts.exitAt !== undefined ? opts.exitAt + 0.4 : sc.d;
+  const hold = opts.still || typing ? 0 : smooth(clamp(range(t, landAt - 0.25, Math.max(landAt + 0.5, holdEnd))));
+  const tracking = layout.tracking + layout.size * 0.014 * hold;
+  const blockY = (layout.ys[0] + layout.ys[layout.ys.length - 1]) / 2;
+  if (hold > 0) {
+    const grow = 1 + 0.022 * hold;
+    ctx.save();
+    ctx.translate(w / 2, blockY);
+    ctx.scale(grow, grow);
+    ctx.translate(-w / 2, -blockY);
+  }
+  // Kinetic exit: words leave one after another (in reading order), each lifting away and
+  // dissolving, rather than the whole block fading as one.
+  const exitGap = Math.min(0.035, 0.12 / Math.max(1, totalWords - 1));
+  const wordExit = (n: number) => (opts.exitAt !== undefined ? clamp(range(t, opts.exitAt + n * exitGap, opts.exitAt + n * exitGap + 0.28)) : 0);
   let gi = 0;
   let cursor: { x: number; y: number } | null = null;
   layout.lines.forEach((line, li) => {
     const y = layout.ys[li];
     const words = line.split(" ");
-    const widths = words.map((wd) => ctx.measureText(wd.replace(/\*/g, "")).width + layout.tracking * Math.max(0, wd.length - 1));
+    const widths = words.map((wd) => ctx.measureText(wd.replace(/\*/g, "")).width + tracking * Math.max(0, wd.length - 1));
     const space = ctx.measureText(" ").width;
     const total = widths.reduce((a, b) => a + b, 0) + space * (words.length - 1);
     const lineX0 = w / 2 - total / 2;
@@ -908,14 +927,25 @@ export function blurInLayout(
       const accent = /^\*.*\*$/.test(word) || word.startsWith("*") || word.endsWith("*");
       const clean = word.replace(/\*/g, "");
       const t0 = start + wi * stagger * pace.stagger;
+      const exit = typing ? 0 : wordExit(wi);
+      const exitE = exit * exit;
+      const alpha0 = (opts.alpha ?? 1) * (typing ? 1 - range(t, opts.exitAt ?? Infinity, (opts.exitAt ?? Infinity) + 0.4) : 1 - exit);
       const k = clamp(range(t, t0, t0 + pace.dur));
       const e = mode === "glow" ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 3);
       const size = layout.size;
-      const charX = (ci: number) => x + (ci ? ctx.measureText(clean.slice(0, ci)).width : 0) + layout.tracking * ci;
+      const charX = (ci: number) => x + (ci ? ctx.measureText(clean.slice(0, ci)).width : 0) + tracking * ci;
       const accentFill = () => {
-        const g = ctx.createLinearGradient(x, y - size / 2, x + widths[i], y + size / 2);
-        g.addColorStop(0, (opts.gradient ?? [palette.primary, palette.secondary])[0]);
-        g.addColorStop(1, (opts.gradient ?? [palette.primary, palette.secondary])[1]);
+        // The brand gradient flows through the accent word (a slow, endless colour current).
+        const [c0, c1] = opts.gradient ?? [palette.primary, palette.secondary];
+        const span = Math.max(widths[i], size * 2);
+        const shift = ((((t - t0) * 0.32) % 1) + 1) % 1;
+        const gx = x - span * 2 * shift;
+        const g = ctx.createLinearGradient(gx, y - size / 2, gx + span * 2, y + size / 2);
+        g.addColorStop(0, c0);
+        g.addColorStop(0.25, c1);
+        g.addColorStop(0.5, c0);
+        g.addColorStop(0.75, c1);
+        g.addColorStop(1, c0);
         return g;
       };
       /** The word's glyphs, each at its kerned position (optionally per-glyph transformed). */
@@ -932,6 +962,15 @@ export function blurInLayout(
       };
       ctx.save();
       ctx.textAlign = "left";
+      if (exit > 0 && mode !== "mask" && mode !== "roll") {
+        // Lift off: up and slightly back, losing focus as it goes.
+        const cx = x + widths[i] / 2;
+        const sz = 1 - 0.08 * exitE;
+        ctx.translate(cx, y - size * 0.42 * exitE);
+        ctx.scale(sz, sz);
+        ctx.translate(-cx, -y);
+        if (mode !== "blur" && mode !== "glow") ctx.filter = `blur(${(exit * 9 * u).toFixed(1)}px)`;
+      }
       const fill = accent ? accentFill() : palette.text;
       ctx.fillStyle = fill;
       let drawn = false;
@@ -1118,14 +1157,14 @@ export function blurInLayout(
         }
         drawn = true;
       } else {
-        const blur = (1 - e) * (mode === "glow" ? 22 : 14) * u + exit * 10 * u;
+        const blur = (1 - e) * (mode === "glow" ? 22 : 14) * u + exit * 12 * u;
         ctx.globalAlpha = alpha0 * e;
         if (blur > 0.6) ctx.filter = `blur(${blur.toFixed(1)}px)`;
         if (mode === "glow") {
           ctx.shadowColor = rgba(palette.primary, 0.8 * (1 - e * 0.6));
           ctx.shadowBlur = 30 * u;
         }
-        ctx.translate(0, (1 - e) * size * (mode === "glow" ? 0.12 : 0.35) - exit * size * 0.2);
+        ctx.translate(0, (1 - e) * size * (mode === "glow" ? 0.12 : 0.35));
       }
       let cx = x;
       let complete = true;
@@ -1166,11 +1205,83 @@ export function blurInLayout(
       ctx.restore();
     }
   }
+  if (hold > 0) ctx.restore();
   ctx.textAlign = "center";
   return wi;
 }
 
+/**
+ * Back light: two soft pools of the brand colours orbiting slowly behind a subject (a headline,
+ * a product), so the space behind it breathes with light. `k` fades it in and out.
+ */
+export function backLight(sc: SkillContext, cx: number, cy: number, rx: number, ry: number, k: number) {
+  if (k <= 0.01) return;
+  const { ctx, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  ctx.save();
+  ctx.globalCompositeOperation = palette.light ? "source-over" : "lighter";
+  [palette.primary, palette.secondary].forEach((c, i) => {
+    const a = T * 0.45 + i * Math.PI;
+    const x = cx + Math.cos(a) * rx * 0.32;
+    const y = cy + Math.sin(a * 0.8) * ry * 0.22;
+    const r = Math.max(rx, ry) * (0.75 + 0.08 * Math.sin(T * 0.9 + i * 2));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, ry / Math.max(1, rx));
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    g.addColorStop(0, rgba(c, (palette.light ? 0.1 : 0.16) * k));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+/**
+ * Anamorphic streak: a thin horizontal lens flare through (cx, cy) that flashes on an impact and
+ * decays (`k` 0..1 is its life). A widescreen-camera signature, used sparingly.
+ */
+export function lensStreak(sc: SkillContext, cx: number, cy: number, k: number) {
+  if (k <= 0 || k >= 1) return;
+  const { ctx, w, u, palette } = sc;
+  const life = Math.pow(1 - k, 2) * Math.min(1, k * 12);
+  const half = w * (0.25 + 0.55 * Math.pow(k, 0.4));
+  ctx.save();
+  ctx.globalCompositeOperation = palette.light ? "source-over" : "lighter";
+  const g = ctx.createLinearGradient(cx - half, 0, cx + half, 0);
+  g.addColorStop(0, rgba(palette.primary, 0));
+  g.addColorStop(0.42, rgba(palette.primary, 0.35 * life));
+  g.addColorStop(0.5, `rgba(255,255,255,${(palette.light ? 0.5 : 0.8) * life})`);
+  g.addColorStop(0.58, rgba(palette.secondary, 0.35 * life));
+  g.addColorStop(1, rgba(palette.secondary, 0));
+  ctx.fillStyle = g;
+  const th = 2.2 * u;
+  ctx.fillRect(cx - half, cy - th / 2, half * 2, th);
+  // Soft bloom around the core.
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(1, 0.06);
+  const b = ctx.createRadialGradient(0, 0, 0, 0, 0, half * 0.7);
+  b.addColorStop(0, rgba(palette.primary, 0.3 * life));
+  b.addColorStop(1, rgba(palette.primary, 0));
+  ctx.fillStyle = b;
+  ctx.fillRect(-half, -half, half * 2, half * 2);
+  ctx.restore();
+  ctx.restore();
+}
+
 /** Glyphs the decode effect cycles through before a character locks in. */
+/** When the last word of a `blurInLayout` headline has landed. */
+export function landedAt(sc: SkillContext, layout: HeadlineLayout, start: number, stagger: number) {
+  const mode = sc.look?.text === "liquid" ? "blur" : (sc.look?.text ?? "blur");
+  const pace = FX_PACE[mode] ?? { stagger: 1, dur: 0.7 };
+  const words = layout.lines.reduce((a, l) => a + l.split(" ").length, 0);
+  return start + Math.max(0, words - 1) * stagger * pace.stagger + pace.dur;
+}
+
+const smooth = (x: number) => x * x * (3 - 2 * x);
+
 const DECODE_GLYPHS = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&*+=<>/?";
 
 /** How far apart words start (× the scene's stagger) and how long each word's reveal takes. */
@@ -1199,7 +1310,7 @@ function liquidLayout(sc: SkillContext, layout: HeadlineLayout, start: number, s
   off.ctx.textBaseline = ctx.textBaseline;
   off.ctx.translate(-bx, -by);
   const settled = { ...sc, ctx: off.ctx, t: start + 60, look: sc.look ? { ...sc.look, text: "blur" as const } : undefined };
-  const words = blurInLayout(settled, layout, start, stagger, { alpha: 1, gradient: opts.gradient });
+  const words = blurInLayout(settled, layout, start, stagger, { alpha: 1, gradient: opts.gradient, still: true });
   const exit = opts.exitAt !== undefined ? range(t, opts.exitAt, opts.exitAt + 0.45) : 0;
   const out = liquidText(off.canvas, {
     t: t - start,

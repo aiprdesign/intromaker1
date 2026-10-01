@@ -22,6 +22,9 @@ import {
   glassCard,
   iconFor,
   iconsFor,
+  landedAt,
+  lensStreak,
+  backLight,
   pill,
   saasBackground,
   saasFont,
@@ -133,8 +136,13 @@ function blurReveal(sc: SkillContext) {
   if (imageless(sc)) iconConstellation(sc, { fade: range(t, exitAt, exitAt + 0.4) });
   const layout = sentence(sc, { text: accented(scene.text), cy: h * 0.47, sizeFrac: 0.115, widthFrac: 0.8, maxLines: h > w ? 4 : 3 });
   const top = layout.ys[0] - layout.size * 0.62;
+  const midY = (layout.ys[0] + layout.ys[layout.ys.length - 1]) / 2;
+  // Light gathers behind the sentence as it forms; a lens streak flashes as the last word lands.
+  const land = landedAt(sc, layout, 0.2, stagger(sc));
+  backLight(sc, w / 2, midY, w * 0.36, layout.size * (layout.lines.length + 1.2), ease.inOutCubic(range(t, 0.2, land + 0.3)) * (1 - range(t, exitAt, exitAt + 0.4)));
   eyebrow(sc, scene.eyebrow ?? scene.items?.[0] ?? "", top - 44 * u, range(t, 0.05, 0.5) * (1 - range(t, exitAt, exitAt + 0.3)));
   const n = blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt });
+  lensStreak(sc, w / 2, midY, range(t, land - 0.2, land + 0.9));
   const bottom = layout.ys[layout.ys.length - 1] + layout.size * 0.62;
   subText(sc, scene.subtext, bottom + 46 * u, range(t, 0.35 + n * stagger(sc), 0.95 + n * stagger(sc)) * (1 - range(t, exitAt, exitAt + 0.4)));
 }
@@ -1170,6 +1178,16 @@ function testimonial(sc: SkillContext) {
   const cy0 = qTop - 110 * u;
   const k = clamp(spring(t - 0.1, 10, 7), 0, 1.05);
   chapter(sc, cy0 - 6 * u);
+  // Once it has landed the whole card floats: a slow bob and a slight tilt, as if a pane of glass
+  // were turning in the light (quote and author ride with it).
+  const T = sc.globalT ?? t;
+  const live = ease.inOutCubic(range(t, 0.6, 1.6));
+  const midY = cy0 + ch / 2;
+  ctx.save();
+  ctx.translate(w / 2, midY + Math.sin(T * 0.9) * 6 * u * live);
+  ctx.transform(1, Math.sin(T * 0.55) * 0.005 * live, Math.cos(T * 0.47) * 0.004 * live, 1, 0, 0);
+  ctx.translate(-w / 2, -midY);
+  backLight(sc, w / 2, midY, cw * 0.55, ch * 0.6, clamp(t / 0.6) * (1 - ex));
   ctx.save();
   ctx.globalAlpha = clamp(t / 0.25) * (1 - ex);
   ctx.translate(w / 2, cy0 + ch / 2 + (1 - Math.min(1, k)) * 50 * u);
@@ -1177,9 +1195,22 @@ function testimonial(sc: SkillContext) {
   ctx.translate(-w / 2, -(cy0 + ch / 2));
   glassCard(sc, cx0, cy0, cw, ch, { r: 26 * u });
   borderBeam(sc, cx0, cy0, cw, ch, t * 0.25, { r: 26 * u, alpha: 0.7 });
-  // Stars.
+  // An oversized quotation mark set into the glass, drifting against the card (parallax).
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(cx0, cy0, cw, ch, 26 * u);
+  ctx.clip();
+  ctx.font = displayFont(saasFont(sc), 300 * u);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = rgba(palette.primary, palette.light ? 0.1 : 0.14);
+  ctx.globalAlpha *= ease.outCubic(range(t, 0.3, 1));
+  ctx.fillText("“", cx0 + 28 * u - Math.sin(T * 0.9) * 8 * u, cy0 + 4 * u + (1 - ease.outCubic(range(t, 0.3, 1.2))) * 40 * u);
+  ctx.restore();
+  // Stars (with a shimmer that ripples through them every few seconds once they're in).
   for (let i = 0; i < 5; i++) {
-    const sk = ease.outBack(range(t, 0.35 + i * 0.08, 0.65 + i * 0.08), 2.2);
+    const ripple = t > 1.4 ? Math.sin(Math.PI * clamp((((t - 1.6 - i * 0.07) % 2.4) + 2.4) % 2.4 / 0.35)) : 0;
+    const sk = ease.outBack(range(t, 0.35 + i * 0.08, 0.65 + i * 0.08), 2.2) * (1 + 0.16 * ripple);
     ctx.save();
     ctx.translate(w / 2 + (i - 2) * 34 * u, cy0 + 56 * u);
     ctx.scale(sk, sk);
@@ -1191,10 +1222,7 @@ function testimonial(sc: SkillContext) {
     ctx.restore();
   }
   ctx.restore();
-  ctx.save();
-  ctx.globalAlpha = 1 - ex;
-  blurInLayout(sc, layout, 0.6, 0.035);
-  ctx.restore();
+  blurInLayout(sc, layout, 0.6, 0.035, { exitAt: d - 0.4 });
   // Author row.
   const ak = ease.outCubic(range(t, 1.2, 1.7)) * (1 - ex);
   if (ak > 0) {
@@ -1241,6 +1269,7 @@ function testimonial(sc: SkillContext) {
     }
     ctx.restore();
   }
+  ctx.restore();
 }
 
 /* ───────────────────────── Trusted-by Marquee ───────────────────────── */
@@ -1289,8 +1318,73 @@ function marquee(sc: SkillContext) {
       ctx.fillRect(side ? w * 0.75 : 0, h * 0.48, w * 0.25, h * 0.36);
     }
   } else {
+    // No customer logos: the teams the product serves stream past instead, as two counter-moving
+    // rows of glass chips on a slight perspective tilt (no company names are invented).
     const bottom = layout.ys[layout.ys.length - 1] + layout.size * 0.62;
-    subText(sc, scene.subtext, bottom + 44 * u, range(t, 0.4 + n * stagger(sc), 1 + n * stagger(sc)) * (1 - ex));
+    const hasSub = !!scene.subtext && !/logos? from your website/i.test(scene.subtext);
+    if (hasSub) subText(sc, scene.subtext, bottom + 44 * u, range(t, 0.4 + n * stagger(sc), 1 + n * stagger(sc)) * (1 - ex));
+    const teams = ["Product", "Engineering", "Design", "Marketing", "Sales", "Support", "Operations", "Finance", "Data", "Leadership"];
+    const icons = ["Boxes", "CodeXml", "PenTool", "Megaphone", "Handshake", "LifeBuoy", "Settings", "Wallet", "ChartColumn", "Users"];
+    const fs = 30 * u;
+    const chipH = fs * 2.3;
+    const gap = 22 * u;
+    const rowsY = [h * (hasSub ? 0.62 : 0.56), h * (hasSub ? 0.76 : 0.71)];
+    ctx.save();
+    ctx.font = subFont(fs, 600);
+    const widths = teams.map((x) => ctx.measureText(x).width + chipH + fs * 1.2);
+    ctx.restore();
+    const total = widths.reduce((a, b) => a + b + gap, 0);
+    const T = sc.globalT ?? t;
+    rowsY.forEach((ry, ri) => {
+      const dir = ri === 0 ? -1 : 1;
+      // Rows glide in from opposite sides, then keep streaming.
+      const enter = (1 - ease.outCubic(range(t, 0.45 + ri * 0.12, 1.5 + ri * 0.12))) * w * 0.5 * -dir;
+      const off = ((((T * 55 * u * dir + ri * total * 0.37) % total) + total) % total) - enter;
+      ctx.save();
+      ctx.globalAlpha = k;
+      // A gentle tilt: the far row sits slightly smaller, like a strip on a curved floor.
+      const sk = 1 - ri * 0.04;
+      ctx.translate(w / 2, ry);
+      ctx.transform(sk, 0, (ri ? -0.04 : 0.04), sk, 0, 0);
+      ctx.translate(-w / 2, -ry);
+      for (let rep = -1; rep <= Math.ceil(w / total) + 1; rep++) {
+        let x = rep * total - off;
+        teams.forEach((_, j) => {
+          const i = ri ? teams.length - 1 - j : j;
+          const team = teams[i];
+          const cw2 = widths[i];
+          if (x + cw2 > -60 * u && x < w + 60 * u) {
+            const cyc = ry + Math.sin(T * 1.4 + i * 0.9 + ri) * 3 * u;
+            // Chips dissolve towards the frame edges (the rows stream out of nothing).
+            const mid = x + cw2 / 2;
+            const edge = clamp(Math.min(mid, w - mid) / (w * 0.22));
+            ctx.save();
+            ctx.globalAlpha *= edge * edge * (3 - 2 * edge);
+            glassCard(sc, x, cyc - chipH / 2, cw2, chipH, { r: chipH / 2 });
+            const ts = chipH * 0.66;
+            const tx = x + chipH / 2 + 2 * u;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(tx, cyc, ts / 2, 0, TAU);
+            const g = ctx.createLinearGradient(tx - ts / 2, cyc - ts / 2, tx + ts / 2, cyc + ts / 2);
+            g.addColorStop(0, palette.primary);
+            g.addColorStop(1, palette.secondary);
+            ctx.fillStyle = g;
+            ctx.fill();
+            drawIcon(ctx, icons[i], tx, cyc, ts * 0.56, palette.light ? "#ffffff" : palette.bg0);
+            ctx.font = subFont(fs, 600);
+            ctx.fillStyle = palette.text;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText(team, x + chipH + fs * 0.2, cyc + 1);
+            ctx.restore();
+            ctx.restore();
+          }
+          x += cw2 + gap;
+        });
+      }
+      ctx.restore();
+    });
   }
 }
 

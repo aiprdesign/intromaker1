@@ -7,7 +7,7 @@
 import { exitT } from "../fx";
 import { clamp, ease, mixHex, range, rgba } from "../math";
 import { getImage } from "../media";
-import { blurInLayout, drawIcon, glassCard, iconsFor, saasBackground, sentence, spring } from "../saasfx";
+import { backLight, blurInLayout, drawIcon, glassCard, iconsFor, saasBackground, sentence, spring } from "../saasfx";
 import { scratch } from "../scratch";
 import { subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -536,10 +536,16 @@ function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, box
   const ph = src.height * s;
   // Rise in on a spring, then float gently; a slow push keeps it alive.
   const rise = (1 - Math.min(1, k)) * boxH * 0.35;
-  const bob = Math.sin(T * 1.2) * 5 * u;
+  const bob = Math.sin(T * 1.2) * 7 * u;
   const push = 1 + 0.035 * range(sc.t, 0, sc.d);
   const scale = (0.86 + 0.14 * Math.min(1, k)) * push;
+  // Turntable sway: once landed the product turns a few degrees each way and leans with its
+  // float, so it reads as an object in space rather than a pasted photo.
+  const live = clamp(k);
+  const yaw = Math.sin(T * 0.5) * 0.06 * live;
+  const lean = Math.sin(T * 0.8 + 1) * 0.012 * live;
   const floorY = cy + ph / 2;
+  backLight(sc, cx, cy + rise, pw * 0.7, ph * 0.6, alpha * clamp(k));
   ctx.save();
   ctx.globalAlpha = alpha;
   if (cut.cut) {
@@ -556,20 +562,25 @@ function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, box
     ctx.arc(0, 0, pw * 0.62, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    // Soft reflection on the floor.
+    // Soft reflection on the floor: the product flipped and squashed, faded out by a mask (so
+    // no box is painted over the stage), turning with the product's sway.
+    const rh = Math.max(1, Math.ceil(ph * 0.55));
+    const refl = scratch("product-reflection", Math.max(1, Math.ceil(pw)), rh);
+    refl.ctx.setTransform(1, 0, 0, -0.55, 0, ph * 0.55);
+    refl.ctx.drawImage(src, 0, 0, pw, ph);
+    refl.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    refl.ctx.globalCompositeOperation = "destination-in";
+    const mask = refl.ctx.createLinearGradient(0, 0, 0, rh);
+    mask.addColorStop(0, "rgba(0,0,0,1)");
+    mask.addColorStop(0.65, "rgba(0,0,0,0)");
+    refl.ctx.fillStyle = mask;
+    refl.ctx.fillRect(0, 0, pw, rh);
     ctx.save();
-    ctx.translate(cx, floorY + rise + bob);
-    ctx.scale(scale, -scale * 0.55);
-    ctx.globalAlpha = alpha * (palette.light ? 0.12 : 0.16) * clamp(k);
-    ctx.drawImage(src, -pw / 2, -ph * 0.02, pw, ph);
-    ctx.restore();
-    ctx.save();
-    ctx.globalCompositeOperation = "source-over";
-    const fade = ctx.createLinearGradient(0, floorY, 0, floorY + ph * 0.5);
-    fade.addColorStop(0, rgba(palette.light ? palette.bg1 : palette.bg0, 0));
-    fade.addColorStop(1, rgba(palette.light ? palette.bg1 : palette.bg0, 0.9 * alpha));
-    ctx.fillStyle = fade;
-    ctx.fillRect(cx - pw, floorY, pw * 2, ph * 0.55);
+    ctx.translate(cx, cy + rise + bob + (ph * scale) / 2 - ph * 0.01);
+    ctx.scale(scale * (1 - Math.abs(yaw) * 0.5), scale);
+    ctx.transform(1, -yaw * 0.3, 0, 1, 0, 0);
+    ctx.globalAlpha = alpha * (palette.light ? 0.14 : 0.2) * clamp(k);
+    ctx.drawImage(refl.canvas, 0, 0, pw, rh, -pw / 2, 0, pw, rh);
     ctx.restore();
   }
   // The product itself, with a light sweep across it (clipped to its own shape).
@@ -597,7 +608,9 @@ function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, box
     lc.globalCompositeOperation = "source-over";
   }
   ctx.translate(cx, cy + rise + bob);
-  ctx.scale(scale, scale);
+  ctx.rotate(lean);
+  ctx.scale(scale * (1 - Math.abs(yaw) * 0.5), scale);
+  ctx.transform(1, yaw * 0.3, 0, 1, 0, 0);
   if (!cut.cut) {
     ctx.shadowColor = `rgba(0,0,0,${palette.light ? 0.25 : 0.5})`;
     ctx.shadowBlur = 50 * u;
