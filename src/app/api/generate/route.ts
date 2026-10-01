@@ -16,6 +16,7 @@ import {
   ANGLES,
   type Angle,
   planFromSite,
+  parseSaasPrompt,
   productFromPrompt,
   healthPlan,
   safePlan,
@@ -238,7 +239,20 @@ function readBody(body: Body) {
   // Uploaded product photos make it a product video: of the imported listing or site (the
   // uploads lead), or of the product the prompt describes.
   const photos = (Array.isArray(body.photos) ? body.photos : []).filter((p): p is string => typeof p === "string" && PHOTO.test(p)).slice(0, 12);
-  const listed = readSite(body.site);
+  const read = readSite(body.site);
+  // A partly read listing (the name from its link and its main photo) takes the features the
+  // visitor typed in the prompt ("with noise cancelling, all-day battery and a pocket case").
+  const typed = read?.partial && prompt ? parseSaasPrompt(prompt) : null;
+  const listed =
+    read && typed
+      ? {
+          ...read,
+          name: read.name === "Your product" || /^your product$/i.test(read.tagline) ? typed.brand ?? read.name : read.name,
+          tagline: /^your product$/i.test(read.tagline) && typed.pitch ? typed.pitch : read.tagline,
+          headlines: [...read.headlines, ...typed.features].slice(0, 12),
+          features: [...read.features, ...typed.features.map(() => "")].slice(0, 12),
+        }
+      : read;
   const rawSite = photos.length
     ? listed
       ? { ...listed, kind: "product" as const, images: [...new Set([...photos, ...listed.images])].slice(0, 14) }

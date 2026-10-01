@@ -321,6 +321,26 @@ async function main() {
     parsed?.kind === "product" && parsed.name === "Aero" && parsed.tagline === "Aero Buds Pro Wireless Earbuds" && parsed.headlines.join() === "Noise cancelling,Secure fit" && parsed.images.join() === "https://m.media-amazon.com/images/I/61a.jpg" && !parsed.logo && !JSON.stringify(parsed).includes("59.99"),
     "an Amazon listing gives the product, its bullets and photos (never the price or the marketplace's logo)",
   );
+  const market = await import("../src/lib/marketplaces");
+  check(
+    market.titleFromLink("https://www.amazon.com/Aero-Buds-Wireless-Earbuds-Cancelling/dp/B0C1234XYZ/ref=sr_1_3") === "Aero Buds Wireless Earbuds Cancelling" &&
+      market.titleFromLink("https://www.walmart.com/ip/Aero-Buds-Pro-Earbuds/123456") === "Aero Buds Pro Earbuds" &&
+      market.titleFromLink("https://www.etsy.com/listing/123456/handmade-ceramic-mug") === "Handmade Ceramic Mug" &&
+      market.titleFromLink("https://www.amazon.com/dp/B0C1234XYZ") === "",
+    "a blocked listing still gets the product's name from its link",
+  );
+  check(
+    market.sigV4Key("wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY", "20120215", "us-east-1", "iam").toString("hex") === "f4780e2d9f65fa895f9c67b32ce1baf0b0d8a43505a000a1a9e090d414db404d",
+    "Amazon API requests are signed correctly (AWS Signature V4 known answer)",
+  );
+  const altAmazon = `<html><head><meta name="title" content="Amazon.com: Aero Buds Pro Wireless Earbuds : Electronics"><title>Amazon.com: Aero Buds Pro Wireless Earbuds : Electronics</title></head><body><div id="productOverview_feature_div"><table><tr><td>Brand</td><td>Aero</td></tr></table></div><div id="featurebullets_feature_div"><ul><li><span class="a-list-item">NOISE CANCELLING: quiet on the go.</span></li></ul></div><script>{"mainUrl":"https://m.media-amazon.com/images/I/61a._AC_SL1500_.jpg"}</script></body></html>`;
+  const alt = listing.readListing(altAmazon, new URL("https://www.amazon.com/dp/B0C1234XYZ"), { id: "amazon", name: "Amazon" });
+  check(
+    alt?.tagline === "Aero Buds Pro Wireless Earbuds" && alt.name === "Aero" && alt.headlines[0] === "Noise cancelling" && alt.images[0] === "https://m.media-amazon.com/images/I/61a.jpg",
+    "Amazon pages read through markup changes (title tag, overview table, other bullet and photo blocks)",
+  );
+  const viaApi = listing.readListing("<html></html>", new URL("https://www.ebay.com/itm/123456789012"), { id: "ebay", name: "eBay" }, { title: "Aero Buds Pro Wireless Earbuds", brand: "Aero", description: "", bullets: ["Noise Cancelling", "Water Resistant"], images: ["https://i.ebayimg.com/images/g/AbC/s-l500.jpg"] });
+  check(viaApi?.images[0] === "https://i.ebayimg.com/images/g/AbC/s-l1600.jpg" && viaApi.headlines.length === 2, "a marketplace API's product becomes the listing (full-size photos, features)");
   const { calloutTitle } = await import("../src/engine/planner");
   check(
     calloutTitle("Premium Sound Quality With Deep Bass") === "Premium sound quality" &&

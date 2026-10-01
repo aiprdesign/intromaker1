@@ -194,6 +194,11 @@ export interface SiteData {
   kind?: "site" | "product";
   /** The marketplace a listing came from ("Amazon", "eBay", or a store's domain). */
   marketplace?: string;
+  /**
+   * The marketplace let us read only part of the listing (the product name from its link and its
+   * main photo): the studio asks for more photos and the features.
+   */
+  partial?: boolean;
 }
 
 export interface Scene {

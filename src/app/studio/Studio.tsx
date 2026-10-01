@@ -1209,6 +1209,13 @@ export default function Studio() {
                     </span>
                   ))}
               </div>
+              {site.partial && (
+                <p className="hint warn">
+                  {site.marketplace ?? "The marketplace"} only let us read part of this listing: the product name from the link and its main photo. Add more
+                  photos above, and type the product&apos;s name and features in the prompt (e.g. &ldquo;Aero Buds: wireless earbuds with noise cancelling, all-day
+                  battery and a pocket case&rdquo;), then Generate.
+                </p>
+              )}
               {!site.shots?.full && site.kind !== "product" && (
                 <p className="hint">Tip: install Google Chrome or Microsoft Edge to capture live screenshots of the site.</p>
               )}

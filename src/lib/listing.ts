@@ -2,6 +2,7 @@ import { parse, type HTMLElement } from "node-html-parser";
 import type { SiteData } from "@/engine/types";
 import { captureSite } from "./capture";
 import { networkProblem } from "./scrape";
+import { amazonApi, amazonImageByAsin, ebayApi, titleFromLink, type ApiProduct } from "./marketplaces";
 import { assertPublicUrl, safeFetch, UrlError } from "./netguard";
 
 /**
@@ -127,18 +128,27 @@ const meta = (root: HTMLElement, ...keys: string[]) => {
 };
 
 function readAmazon(root: HTMLElement, html: string): Partial<Product> {
-  const byline = clean(root.querySelector("#bylineInfo")?.text ?? "");
-  const brand = byline.match(/^Visit the (.+?) Store$/i)?.[1] ?? byline.match(/^Brand:\s*(.+)$/i)?.[1] ?? "";
+  // Amazon's markup changes often: every field has several places to come from.
+  const byline = clean(root.querySelector("#bylineInfo, #brand, a#brand")?.text ?? "");
+  const overview = new Map<string, string>();
+  for (const row of root.querySelectorAll("#productOverview_feature_div tr, #poExpander tr, #productDetails_techSpec_section_1 tr")) {
+    const cells = row.querySelectorAll("td, th").map((c) => clean(c.text));
+    if (cells.length >= 2 && cells[0] && cells[1]) overview.set(cells[0].toLowerCase(), cells[1]);
+  }
+  const brand =
+    byline.match(/^Visit the (.+?) Store$/i)?.[1] ?? byline.match(/^Brand:\s*(.+)$/i)?.[1] ?? overview.get("brand") ?? overview.get("manufacturer") ?? (byline.length <= 30 ? byline : "");
   const bullets = root
-    .querySelectorAll("#feature-bullets li span.a-list-item, #feature-bullets li")
+    .querySelectorAll(
+      "#feature-bullets li span.a-list-item, #feature-bullets li, #featurebullets_feature_div li span.a-list-item, #feature-bullets-btf li, #productFactsDesktopExpander li span.a-list-item, #productFactsDesktop_feature_div li",
+    )
     .map((el) => clean(el.text))
-    .filter((t) => t.length > 8 && !/make sure this fits|see more product details/i.test(t));
+    .filter((t) => t.length > 8 && !/make sure this fits|see more product details|›\s*see more/i.test(t));
   const images: string[] = [];
-  for (const re of [/"hiRes":"(https:[^"]+)"/g, /"large":"(https:[^"]+)"/g]) {
+  for (const re of [/"hiRes":"(https:[^"]+)"/g, /"large":"(https:[^"]+)"/g, /"mainUrl":"(https:[^"]+)"/g]) {
     for (const m of html.matchAll(re)) images.push(m[1]);
     if (images.length) break;
   }
-  const dyn = root.querySelector("#landingImage, #imgBlkFront")?.getAttribute("data-a-dynamic-image");
+  const dyn = root.querySelector("#landingImage, #imgBlkFront, #main-image")?.getAttribute("data-a-dynamic-image");
   if (!images.length && dyn) {
     try {
       images.push(...Object.keys(JSON.parse(dyn.replace(/&quot;/g, '"'))));
@@ -146,13 +156,18 @@ function readAmazon(root: HTMLElement, html: string): Partial<Product> {
       /* ignore */
     }
   }
-  const hires = root.querySelector("#landingImage")?.getAttribute("data-old-hires");
-  if (hires) images.unshift(hires);
+  const main = root.querySelector("#landingImage, #imgTagWrapperId img, #main-image, #imgBlkFront");
+  const hires = main?.getAttribute("data-old-hires") || main?.getAttribute("src");
+  if (hires && /^https:/.test(hires)) images.unshift(hires);
+  // The title: the product title element, else the page's own title tag ("Amazon.com: X : Category").
+  const fromTag = clean(root.querySelector('meta[name="title"]')?.getAttribute("content") ?? root.querySelector("title")?.text ?? "")
+    .replace(/^Amazon(\.[a-z.]+)?\s*:\s*/i, "")
+    .replace(/\s*:\s*[^:]*$/, "");
   return {
-    title: clean(root.querySelector("#productTitle")?.text ?? ""),
+    title: clean(root.querySelector("#productTitle, #title")?.text ?? "") || fromTag,
     brand: clean(brand),
     bullets: [...new Set(bullets)],
-    description: clean(root.querySelector("#productDescription")?.text ?? ""),
+    description: clean(root.querySelector("#productDescription")?.text ?? "") || clean(root.querySelector('meta[name="description"]')?.getAttribute("content") ?? ""),
     images,
   };
 }
@@ -319,10 +334,52 @@ const blockedError = (market: Market) =>
     "listing",
   );
 
-/** Fetch and read a listing: a plain fetch first, a real browser when the marketplace blocks that. */
+/** Where the listing's product code and storefront are, for the APIs and image failsafe. */
+function listingIds(url: string) {
+  const u = new URL(url);
+  const amazon = u.hostname.match(/(?:^|\.)amazon\.([a-z.]{2,6})$/)?.[1];
+  const asin = u.pathname.match(/\/dp\/([A-Z0-9]{10})/i)?.[1]?.toUpperCase();
+  const ebay = u.hostname.match(/(?:^|\.)ebay\.([a-z.]{2,6})$/)?.[1];
+  const item = u.pathname.match(/\/itm\/(\d{6,})/)?.[1];
+  return { amazon, asin, ebay, item };
+}
+
+/** The marketplace's own API, when its keys are configured (the reliable route). */
+async function fromApi(url: string): Promise<ApiProduct | null> {
+  const id = listingIds(url);
+  if (id.amazon && id.asin) return amazonApi(id.asin, id.amazon);
+  if (id.ebay && id.item) return ebayApi(id.item, id.ebay);
+  return null;
+}
+
+/**
+ * Last resort when the page can't be read: the product name from the link and, for Amazon, the
+ * main photo from Amazon's image server by its code. The film is made from that, and the studio
+ * asks for more photos and the features.
+ */
+async function fromLink(url: string, rawUrl: string, market: Market): Promise<SiteData | null> {
+  const id = listingIds(url);
+  const image = id.asin ? await amazonImageByAsin(id.asin) : null;
+  if (!image) return null;
+  const title = titleFromLink(rawUrl) || "Your product";
+  const site = readListing("<html></html>", new URL(url), market, { title, brand: "", description: "", bullets: [], images: [image] });
+  return site ? { ...site, partial: true } : null;
+}
+
+/**
+ * Read a listing, with failsafes: the marketplace's API when configured, then the page itself,
+ * then a real browser, then what the link carries (name and, for Amazon, the main photo).
+ */
 export async function scrapeListing(rawUrl: string, market: Market): Promise<SiteData> {
   // The plain product link (https://www.amazon.com/dp/ASIN), not the long one with tracking.
-  const url = canonicalListing(rawUrl);
+  let url = canonicalListing(rawUrl);
+  // 1. The marketplace's API.
+  const api = await fromApi(url);
+  if (api && api.images.length) {
+    const site = readListing("<html></html>", new URL(url), market, api);
+    if (site) return site;
+  }
+  // 2. The page.
   let html = "";
   let finalUrl = url;
   // A connection problem (the store is down) is reported as that, not as the marketplace blocking us.
@@ -339,19 +396,43 @@ export async function scrapeListing(rawUrl: string, market: Market): Promise<Sit
     if (["refused", "timeout", "tls", "unreachable"].includes(p.code)) down = p;
   }
   // Short links (amzn.to) land on the listing itself.
+  url = finalUrl;
   const landed = marketOf(finalUrl) ?? market;
   const shop = landed.id === "shop" ? await readShopify(new URL(finalUrl)) : null;
-  if ((!html || BLOCKED.test(html.slice(0, 20_000))) && !shop) {
+  const blocked = (h: string) => !h || BLOCKED.test(h.slice(0, 20_000));
+  if (blocked(html) && !shop) {
+    // 3. A real browser.
     await assertPublicUrl(finalUrl);
     const live = await captureSite(finalUrl).catch(() => null);
-    if (live?.html && !BLOCKED.test(live.html.slice(0, 20_000))) {
+    if (live?.html && !blocked(live.html)) {
       html = live.html;
       finalUrl = live.finalUrl || finalUrl;
-    } else throw down ?? blockedError(landed);
+    } else {
+      // 4. What the link carries (or the API's details without photos, plus the image failsafe).
+      const partial = await fromLink(url, rawUrl, landed);
+      if (partial) return api ? { ...partial, ...pickInfo(readListing("<html></html>", new URL(url), landed, { ...api, images: partial.images })) } : partial;
+      throw down ?? blockedError(landed);
+    }
   }
-  const site = readListing(html || "<html></html>", new URL(finalUrl), landed, shop);
-  if (!site) throw blockedError(landed);
-  if (!site.images.length)
+  const site = readListing(html || "<html></html>", new URL(finalUrl), landed, shop ?? (api ? { ...api, images: [] } : null));
+  if (!site) {
+    const partial = await fromLink(url, rawUrl, landed);
+    if (partial) return partial;
+    throw blockedError(landed);
+  }
+  if (!site.images.length) {
+    // The page was read but its photos weren't found: the API's photos, or Amazon's main photo.
+    const id = listingIds(url);
+    const image = api?.images[0] ?? (id.asin ? await amazonImageByAsin(id.asin) : null);
+    if (image) return { ...site, images: [...(api?.images ?? [image])], partial: true };
     throw new UrlError(`We read the ${landed.name} listing but couldn't get its photos. Save them and add them with "Add product photos".`, "listing");
+  }
   return site;
+}
+
+/** The product details of a read listing (name, pitch, features), without its photos. */
+function pickInfo(site: SiteData | null): Partial<SiteData> {
+  if (!site) return {};
+  const { name, tagline, description, headlines, features } = site;
+  return { name, tagline, description, headlines, features, partial: false };
 }

@@ -772,6 +772,7 @@ export function readSite(raw: unknown): SiteData | null {
     themeColor: typeof r.themeColor === "string" && /^#[0-9a-f]{3,8}$/i.test(r.themeColor) ? r.themeColor : null,
     kind: r.kind === "product" ? "product" : undefined,
     marketplace: typeof r.marketplace === "string" ? r.marketplace.slice(0, 60) : undefined,
+    partial: r.partial === true ? true : undefined,
   };
 }
 
