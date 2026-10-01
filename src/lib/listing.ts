@@ -27,6 +27,37 @@ const MARKETS: { id: string; name: string; host: RegExp; path?: RegExp }[] = [
   { id: "bestbuy", name: "Best Buy", host: /(^|\.)bestbuy\.(com|ca)$/i, path: /\/site\/|\/product\//i },
 ];
 
+/**
+ * A listing link in its plain canonical form: everything after the product's code is dropped
+ * (the product-name slug, ref= paths, tracking and session parameters). Amazon links become
+ * https://www.amazon.<tld>/dp/<ASIN> (the 10-character product code), eBay /itm/<id>, Etsy
+ * /listing/<id>; other stores keep their path without the query. A bare ASIN ("B0C1234XYZ") is
+ * read as an amazon.com link.
+ */
+export function canonicalListing(raw: string): string {
+  const typed = raw.trim();
+  if (/^[A-Z0-9]{10}$/.test(typed) && /\d/.test(typed)) return `https://www.amazon.com/dp/${typed}`;
+  let u: URL;
+  try {
+    u = new URL(/^https?:\/\//i.test(typed) ? typed : `https://${typed}`);
+  } catch {
+    return typed;
+  }
+  const host = u.hostname.toLowerCase();
+  const amazon = host.match(/(?:^|\.)amazon\.([a-z.]{2,6})$/);
+  if (amazon) {
+    const asin = u.pathname.match(/\/(?:dp|gp\/product|gp\/aw\/d|d|o\/ASIN|exec\/obidos\/ASIN|exec\/obidos\/tg\/detail\/-)\/([A-Z0-9]{10})(?=[/?#]|$)/i)?.[1] ?? u.searchParams.get("asin");
+    if (asin && /^[A-Z0-9]{10}$/i.test(asin)) return `https://www.amazon.${amazon[1]}/dp/${asin.toUpperCase()}`;
+  }
+  const ebay = host.match(/(?:^|\.)ebay\.([a-z.]{2,6})$/);
+  const ebayItem = u.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{6,})/)?.[1];
+  if (ebay && ebayItem) return `https://www.ebay.${ebay[1]}/itm/${ebayItem}`;
+  const etsy = /(?:^|\.)etsy\.com$/.test(host) ? u.pathname.match(/\/listing\/(\d+)/)?.[1] : null;
+  if (etsy) return `https://www.etsy.com/listing/${etsy}`;
+  // Other stores: the product page itself, without tracking parameters.
+  return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, "") || "/"}`;
+}
+
 /** Which marketplace a listing URL is on (null for other sites). */
 export function marketOf(raw: string): Market | null {
   let u: URL;
@@ -290,14 +321,15 @@ const blockedError = (market: Market) =>
 
 /** Fetch and read a listing: a plain fetch first, a real browser when the marketplace blocks that. */
 export async function scrapeListing(rawUrl: string, market: Market): Promise<SiteData> {
-  const url = /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`;
+  // The plain product link (https://www.amazon.com/dp/ASIN), not the long one with tracking.
+  const url = canonicalListing(rawUrl);
   let html = "";
   let finalUrl = url;
   // A connection problem (the store is down) is reported as that, not as the marketplace blocking us.
   let down: UrlError | null = null;
   try {
     const res = await safeFetch(url, { headers: { Accept: "text/html,application/xhtml+xml", "Accept-Language": "en-GB,en;q=0.9" } });
-    finalUrl = res.url || url;
+    finalUrl = canonicalListing(res.url || url);
     if (res.ok) html = (await res.text()).slice(0, 4_000_000);
     else if (res.status === 404 || res.status === 410) throw new UrlError(`That ${market.name} listing wasn't found. It may have ended or moved; check the link.`, "notfound");
   } catch (e) {

@@ -58,11 +58,12 @@ export default function HeroPrompt() {
 
   const fromListing = (raw: string) => {
     const u = raw.trim();
-    if (!isUrl(u)) {
-      setProductError("Paste the product's link, like amazon.com/dp/… or yourstore.com/products/…");
+    // A bare Amazon product code (ASIN, 10 characters) works too.
+    if (!isUrl(u) && !(/^[A-Z0-9]{10}$/i.test(u) && /\d/.test(u))) {
+      setProductError("Paste the product's link (like amazon.com/dp/B0…, ebay.com/itm/… or yourstore.com/products/…) or its 10-character Amazon code.");
       return;
     }
-    router.push(`/studio?url=${encodeURIComponent(u)}${fmtQuery}`);
+    router.push(`/studio?url=${encodeURIComponent(/^[A-Z0-9]{10}$/i.test(u) ? `amazon.com/dp/${u.toUpperCase()}` : u)}${fmtQuery}`);
   };
   const addPhotos = async (files: FileList | File[] | null) => {
     if (!Array.from(files ?? []).some((f) => f.type.startsWith("image/"))) return;

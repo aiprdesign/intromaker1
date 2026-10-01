@@ -2,7 +2,7 @@ import { parse, type HTMLElement } from "node-html-parser";
 import type { SiteData } from "@/engine/types";
 import { createHash } from "node:crypto";
 import { captureSite, cleanSvg, save } from "./capture";
-import { marketOf, readListing, scrapeListing } from "./listing";
+import { canonicalListing, marketOf, readListing, scrapeListing } from "./listing";
 import { safeFetch, UrlError } from "./netguard";
 
 const MAX_HTML = 3_000_000;
@@ -291,7 +291,7 @@ async function fetchPage(raw: string): Promise<{ html: string; finalUrl: string 
 
 export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}): Promise<SiteData> {
   // Marketplace listings (Amazon, eBay, Etsy, Shopify stores…) become product videos.
-  const market = marketOf(rawUrl);
+  const market = marketOf(canonicalListing(rawUrl));
   if (market) return scrapeListing(rawUrl, market);
   const withScheme = /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`;
   // Prefer a live render in a real browser (JS sites, lazy images, screenshots); else static fetch.

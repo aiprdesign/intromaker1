@@ -305,6 +305,15 @@ async function main() {
     listing.marketOf("https://www.amazon.co.uk/Some-Thing/dp/B0TEST1234")?.id === "amazon" && listing.marketOf("https://www.ebay.com/itm/123")?.id === "ebay" && listing.marketOf("https://shop.example/products/mug")?.id === "shop" && !listing.marketOf("https://www.amazon.com/"),
     "listing links are recognised (Amazon, eBay, Shopify stores), other pages aren't",
   );
+  check(
+    listing.canonicalListing("https://www.amazon.com/Aero-Buds-Wireless-Earbuds-Cancelling/dp/B0C1234XYZ/ref=sr_1_3?crid=2X&keywords=earbuds&qid=1700&sr=8-3&th=1") === "https://www.amazon.com/dp/B0C1234XYZ" &&
+      listing.canonicalListing("amazon.co.uk/gp/product/B0C1234XYZ?psc=1") === "https://www.amazon.co.uk/dp/B0C1234XYZ" &&
+      listing.canonicalListing("https://www.amazon.de/gp/aw/d/B0C1234XYZ/?_encoding=UTF8") === "https://www.amazon.de/dp/B0C1234XYZ" &&
+      listing.canonicalListing("B0C1234XYZ") === "https://www.amazon.com/dp/B0C1234XYZ" &&
+      listing.canonicalListing("https://www.ebay.co.uk/itm/Aero-Buds/123456789012?hash=item1c&_trkparms=x") === "https://www.ebay.co.uk/itm/123456789012" &&
+      listing.canonicalListing("https://shop.example/products/mug?variant=42&utm_source=x") === "https://shop.example/products/mug",
+    "listing links are cleaned to the product code (amazon.com/dp/ASIN), dropping slugs and tracking",
+  );
   check(listing.fullSize("https://m.media-amazon.com/images/I/61a._AC_SX679_.jpg") === "https://m.media-amazon.com/images/I/61a.jpg", "thumbnail addresses are upgraded to full-size photos");
   const amazonHtml = `<span id="productTitle">Aero Buds Pro Wireless Earbuds, 40H Playtime</span><a id="bylineInfo">Visit the Aero Store</a><span class="a-price">$59.99</span><div id="feature-bullets"><ul><li><span class="a-list-item">NOISE CANCELLING: two microphones per bud.</span></li><li><span class="a-list-item">Secure fit - three sizes of ear tips.</span></li></ul></div><img src="https://m.media-amazon.com/images/G/01/nav-logo.png"><script>{"hiRes":"https://m.media-amazon.com/images/I/61a._AC_SL1500_.jpg"}</script>`;
   const parsed = listing.readListing(amazonHtml, new URL("https://www.amazon.com/dp/B0TEST1234"), { id: "amazon", name: "Amazon" });
