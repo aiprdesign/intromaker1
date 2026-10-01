@@ -30,6 +30,7 @@ COPY --from=build /app/.next/standalone ./
 # (images.unoptimized): leave it out, so the image ships only permissively licensed code.
 RUN rm -rf node_modules/sharp node_modules/@img
 COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
 COPY docker-entry.js ./
 RUN mkdir -p /data && chown -R node:node /data /ms-playwright
 # No USER or VOLUME here: docker-entry.js starts as root only to hand the mounted data volume to

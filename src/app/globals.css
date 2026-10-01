@@ -553,6 +553,211 @@ textarea {
   margin-top: 40px;
 }
 
+/* ───────── Sample films (homepage) ───────── */
+
+.samples {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.samples-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.samples-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--text);
+  font: 600 15px var(--body);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.samples-tab span {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.samples-tab:hover {
+  background: var(--panel-2);
+}
+.samples-tab.on {
+  border-color: transparent;
+  background: linear-gradient(var(--bg-2), var(--bg-2)) padding-box, var(--grad) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 30px rgba(124, 77, 255, 0.25);
+}
+.samples-stage {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background: #000;
+  box-shadow: 0 40px 120px -30px rgba(124, 77, 255, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+.samples-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  cursor: pointer;
+}
+.samples-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 14px 12px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+.samples-stage:hover .samples-controls,
+.samples-controls:focus-within {
+  opacity: 1;
+}
+.samples-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.samples-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.samples-bar {
+  flex: 1;
+  display: flex;
+  gap: 3px;
+  min-width: 0;
+}
+.samples-seg {
+  position: relative;
+  flex-basis: 0;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.samples-seg::before,
+.samples-seg i {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  height: 4px;
+  border-radius: 2px;
+}
+.samples-seg::before {
+  right: 0;
+  background: rgba(255, 255, 255, 0.25);
+}
+.samples-seg i {
+  background: #fff;
+}
+.samples-seg:hover::before {
+  background: rgba(255, 255, 255, 0.45);
+}
+.samples-time {
+  flex: none;
+  color: rgba(255, 255, 255, 0.85);
+  font: 500 13px var(--body);
+  font-variant-numeric: tabular-nums;
+}
+.samples-chapters {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 18px 0 0;
+  padding: 0;
+}
+.samples-chapters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font: 500 13px var(--body);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.samples-chapters button span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+.samples-chapters button:hover {
+  color: var(--text);
+}
+.samples-chapters button.on {
+  color: var(--text);
+  border-color: var(--line-2);
+  background: var(--panel-2);
+}
+.samples-chapters button.on span {
+  background: var(--grad);
+  color: #fff;
+}
+.samples-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 22px;
+}
+.samples-foot p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 640px;
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .samples-foot {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  .samples-time {
+    display: none;
+  }
+  .samples-controls {
+    gap: 8px;
+    padding: 20px 8px 8px;
+  }
+  .samples-stage {
+    border-radius: 14px;
+  }
+}
+
 .palette-row {
   display: flex;
   flex-wrap: wrap;

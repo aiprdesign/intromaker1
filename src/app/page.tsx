@@ -2,6 +2,7 @@ import Link from "next/link";
 import HeroPrompt from "@/components/HeroPrompt";
 import LoopCanvas from "@/components/LoopCanvas";
 import PricingCards from "@/components/PricingCards";
+import SampleFilms from "@/components/SampleFilms";
 import Nav, { Logo } from "@/components/Nav";
 import SkillGrid from "@/components/SkillGrid";
 import { HOME_BACKDROP } from "@/engine/demos";
@@ -38,6 +39,15 @@ export default function Home() {
           {/* The headline follows the chosen tab (launch film, or product video). */}
           <HeroPrompt />
         </div>
+      </section>
+
+      <section className="section" id="samples">
+        <div className="section-head">
+          <span className="eyebrow">Sample films</span>
+          <h2>See what it makes.</h2>
+          <p>A SaaS launch, a product video and a trailer for three imaginary brands, each built from its best slides. They play live in your browser, frame for frame what you export.</p>
+        </div>
+        <SampleFilms />
       </section>
 
       <section className="section" id="skills">
