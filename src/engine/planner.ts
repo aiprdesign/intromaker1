@@ -1675,6 +1675,28 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
 
 
 /**
+ * A feature title short enough for a callout chip: up to the first connector ("Premium sound
+ * quality with deep bass" → "Premium sound quality"), at most four words, and Title Case turned
+ * into sentence case, keeping model codes, acronyms and names the listing capitalises mid-sentence
+ * ("IPX5 water resistant", "Works with Alexa").
+ */
+export function calloutTitle(raw: string, prose = ""): string {
+  const words = raw.replace(/[.!:;,]+$/, "").trim().split(/\s+/).filter(Boolean);
+  const join = words.findIndex((w, i) => i >= 2 && /^(with|and|for|that|to|in|on|so|from)$/i.test(w));
+  let out = join > 0 ? words.slice(0, join) : words;
+  if (out.length > 4) out = out.slice(0, 4);
+  while (out.length > 1 && /^(for|and|with|to|of|the|a|an|in|on|or|your|by)$/i.test(out[out.length - 1])) out.pop();
+  const proper = new Set([...prose.matchAll(/(?<![.!?]\s|^)\b([A-Z][a-z]+)\b/g)].map((m) => m[1]));
+  // "All-Day battery" → "All-day battery".
+  if (out[0] && !/^[A-Z]{2,}/.test(out[0])) out[0] = out[0].replace(/-([A-Z])(?=[a-z]{2,}\b)/g, (_, c: string) => `-${c.toLowerCase()}`);
+  if (out.length > 1 && out.every((w) => /^[A-Z0-9]/.test(w)))
+    out = out.map((w, i) =>
+      i === 0 ? w.replace(/-([A-Z])(?=[a-z]{2,}\b)/g, (_, c: string) => `-${c.toLowerCase()}`) : /\d|^[A-Z]{2,}|[a-z][A-Z]/.test(w) || proper.has(w) ? w : w.toLowerCase(),
+    );
+  return out.join(" ");
+}
+
+/**
  * A product video for a physical product (a marketplace listing or uploaded product photos):
  * the product rises onto the stage, its features are called out around it, then every angle in
  * a gallery and the end card. No software moments (no cursors, palettes or dashboards).
@@ -1697,8 +1719,9 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   const concept = detectConcept(`${whole.name} ${whole.tagline}`);
   const product = sentenceCopy(site.tagline, 7) || shortenCopy(site.tagline, 7) || site.name;
   const seen = new Set<string>();
+  const prose = `${whole.description} ${whole.features.join(" ")}`;
   const feats = site.headlines
-    .map((t, i) => ({ title: sentenceCopy(t, 5) || shortenCopy(t, 5), desc: (sentenceCopy(site.features[i] ?? "", 12) || shortenCopy(site.features[i] ?? "", 10)).replace(/[.,;:]$/, "") }))
+    .map((t, i) => ({ title: calloutTitle(t, prose), desc: (sentenceCopy(site.features[i] ?? "", 12) || shortenCopy(site.features[i] ?? "", 10)).replace(/[.,;:]$/, "") }))
     .filter((f) => f.title && !seen.has(norm(f.title)) && !!seen.add(norm(f.title)) && norm(f.title) !== norm(product));
   const firstLine = (site.description.split(/(?<=[.!?])\s+/)[0] ?? "").replace(/\.$/, "");
   const scenes: Scene[] = [];
@@ -1719,12 +1742,15 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
     : site.name && !norm(product).includes(norm(site.name)) ? `by ${site.name}` : undefined;
   const reveal: Scene = { role: "reveal", skill: "product-hero", text: title, subtext: by, duration: beats(8), transition: "zoom", media: photo(0) };
   const featuresTitle = concept.id !== "general" && concept.id !== "ecommerce" ? concept.featuresTitle : "Made for *everyday*";
+  // A long film with five or more features gives the close-ups their own labels (the callouts
+  // keep three); otherwise the lens shows the details on its own.
+  const zoomLabels = target >= 30 && feats.length >= 5 ? feats.slice(3, 6).map((f) => f.title) : [];
   // Its features called out around it (another photo when there is one, so the shot changes).
   const callouts: Scene | null =
     feats.length >= 2
       ? {
           role: "features", skill: "product-hero", text: featuresTitle, eyebrow: "Features",
-          items: feats.slice(0, 4).map((f) => f.title),
+          items: feats.slice(0, zoomLabels.length ? 3 : 4).map((f) => f.title),
           duration: beats(Math.min(4, feats.length) * 2 + 6), transition: "dolly",
           media: photo(photos > 1 ? 1 + (variant % Math.max(1, photos - 1)) : 0),
           why: "The listing's bullet points, called out around the product",
@@ -1746,10 +1772,9 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
     photos >= 2 && target >= 20
       ? { role: "gallery", skill: galleryKinds[variant % 3], text: "From every *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
       : null;
-  const spare = feats.slice(4, 7).map((f) => f.title);
   const closer: Scene | null =
     target >= 30
-      ? { role: "gallery", skill: "product-zoom", text: "Every *detail*", eyebrow: "Details", items: spare.length >= 2 ? spare : [], duration: beats(12), transition: "whip", media: photo(0), why: "A close look at the product's details" }
+      ? { role: "gallery", skill: "product-zoom", text: "Every *detail*", eyebrow: "Details", items: zoomLabels, duration: beats(12), transition: "whip", media: photo(0), why: "A close look at the product's details" }
       : null;
   const order =
     target < 20
@@ -1763,7 +1788,7 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   // The end card: the product's own pitch, and where to get it.
   scenes.push({
     role: "cta", skill: "product-end",
-    text: `Get yours *today*`,
+    text: ["Get yours *today*", "Make it *yours*", "Treat *yourself*"][variant % 3],
     subtext: site.cta && !/free/i.test(site.cta) ? site.cta : "Shop now",
     duration: beats(8),
     transition: "flash",

@@ -50,6 +50,14 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
   if (roles[roles.length - 1] !== "cta") add("arc", 8, "does not end on the CTA");
   // Best-in-class launch films show the product *doing* something, not only talking about it.
   if (target >= 20 && !roles.some((r) => IN_ACTION.has(r))) add("arc", 3, "no product-in-action moment (tour, demo, live UI)");
+  // Product videos: the product is revealed on the stage, its callouts are short, and the film
+  // closes on the product itself.
+  if (plan.product) {
+    if (!sc.some((s) => s.role === "reveal" && s.skill === "product-hero")) add("arc", 4, "product never revealed on the stage");
+    if (sc[sc.length - 1]?.skill !== "product-end") add("arc", 3, "product film doesn't end on the product");
+    for (const s of sc.filter((x) => x.skill === "product-hero" || x.skill === "product-zoom"))
+      for (const it of s.items ?? []) if (words(it).length > 4) add("copy", 2, `product callout too long: "${it}"`);
+  }
   // Interaction moments need their inputs: a command to run, a prompt to send, tasks to tick off.
   for (const s of sc.filter((x) => x.role === "demo")) {
     if ((s.items ?? []).length < (s.skill === "ai-prompt" ? 1 : 3)) add("arc", 2, `${s.skill} demo has too few items`);

@@ -52,6 +52,30 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
   const budget = wordBudget(s.duration);
   const items = s.items ?? [];
   const head = clean(s.text);
+  // Product videos speak about the product itself, and say where to find it.
+  if (plan.product) {
+    if (s.role === "reveal") {
+      const by = clean(s.subtext);
+      const meet = head.split(/\s+/).length >= 3 ? `Meet the ${head}` : `Meet ${head}`;
+      return fit([by ? `${meet}, ${by.replace(/[.!]+$/, "")}.` : "", `${meet}.`], budget);
+    }
+    if (s.role === "cta") {
+      // The close names the product (its short name), and where to find it when there's an address.
+      const domain = plan.brand?.domain && !/localhost|^\d+\.\d+/.test(plan.brand.domain) ? plan.brand.domain : "";
+      const words = (plan.title || name).split(/\s+/);
+      const nick = words.length > 4 ? words.slice(0, 3).join(" ") : words.join(" ");
+      return fit(
+        [
+          domain ? `${sentence(head)} ${nick}, at ${domain}.` : "",
+          `${sentence(head)} ${nick}.`,
+          domain ? `${nick}, at ${domain}.` : "",
+          `${nick}.`,
+        ],
+        budget,
+      );
+    }
+    if (s.skill === "product-zoom" && items.length >= 2) return fit([`${sentence(head)} ${sentence(list(items, 3))}`, sentence(head)], budget);
+  }
   switch (s.role) {
     case "quote":
       return undefined;

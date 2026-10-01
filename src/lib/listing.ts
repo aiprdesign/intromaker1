@@ -211,7 +211,12 @@ export function splitBullet(b: string): [string, string] {
       .map((w, i) => (/\d/.test(w) || w.length <= 3 ? w : i === 0 ? w.charAt(0) + w.slice(1).toLowerCase() : w.toLowerCase()))
       .join(" ");
   title = title.replace(/[^\p{L}\p{N}\s&'+/.-]/gu, "").trim();
-  if (title.split(/\s+/).length > 6) title = tidy(title.split(/\s+/).slice(0, 5));
+  // Short enough for a callout: up to the first connector ("Premium sound with deep bass" →
+  // "Premium sound"), at most four words.
+  const tw = title.split(/\s+/);
+  const join = tw.findIndex((w, i) => i >= 2 && /^(with|and|for|that|to|in|on|so)$/i.test(w));
+  if (join > 0) title = tidy(tw.slice(0, join));
+  if (title.split(/\s+/).length > 4) title = tidy(title.split(/\s+/).slice(0, 4));
   return [title, desc.charAt(0).toUpperCase() + desc.slice(1)];
 }
 
@@ -241,6 +246,15 @@ export function readListing(html: string, base: URL, market: Market, extra?: Par
   // Without bullets, the description's sentences carry the features.
   if (!parts.length && description) {
     for (const s of description.split(/(?<=[.!?])\s+/).slice(0, 4)) if (s.split(/\s+/).length >= 4) parts.push(splitBullet(s));
+  }
+  // Title Case headings ("Comfortable Fit") in sentence case, keeping names the listing itself
+  // capitalises mid-sentence ("works with Alexa"), model codes and acronyms (IPX5, USB-C).
+  const prose = `${description} ${parts.map((p) => p[1]).join(" ")}`;
+  const proper = new Set([...prose.matchAll(/(?<![.!?]\s|^)\b([A-Z][a-z]+)\b/g)].map((m) => m[1]));
+  for (const p of parts) {
+    const words = p[0].split(/\s+/);
+    if (words.length > 1 && words.every((w) => /^[A-Z0-9]/.test(w)))
+      p[0] = words.map((w, i) => (i === 0 || /\d|^[A-Z]{2,}|[a-z][A-Z]/.test(w) || proper.has(w) ? w : w.toLowerCase())).join(" ");
   }
   return {
     url: base.toString(),

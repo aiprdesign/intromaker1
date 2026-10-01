@@ -312,6 +312,13 @@ async function main() {
     parsed?.kind === "product" && parsed.name === "Aero" && parsed.tagline === "Aero Buds Pro Wireless Earbuds" && parsed.headlines.join() === "Noise cancelling,Secure fit" && parsed.images.join() === "https://m.media-amazon.com/images/I/61a.jpg" && !parsed.logo && !JSON.stringify(parsed).includes("59.99"),
     "an Amazon listing gives the product, its bullets and photos (never the price or the marketplace's logo)",
   );
+  const { calloutTitle } = await import("../src/engine/planner");
+  check(
+    calloutTitle("Premium Sound Quality With Deep Bass") === "Premium sound quality" &&
+      calloutTitle("IPX5 Water Resistant") === "IPX5 water resistant" &&
+      calloutTitle("Works With Alexa Devices", "Control it by voice with Alexa or your phone.") === "Works with Alexa devices",
+    "product callouts are short, in sentence case, keeping model codes and names",
+  );
   const photosRoute = await import("../src/app/api/photos/route");
   const upload = (parts: Blob[], origin = "http://localhost:3000") => {
     const form = new FormData();

@@ -179,7 +179,16 @@ export function studioCard(img: HTMLImageElement, key: string, aspect: number, p
 function productImage(sc: SkillContext): { img: HTMLImageElement; key: string } | null {
   const src = sc.scene.media?.kind === "image" ? sc.scene.media.src : sc.brand?.images?.[0];
   const img = getImage(src);
-  return img && src && img.naturalWidth ? { img, key: src } : null;
+  if (!img || !src || !img.naturalWidth) return null;
+  // The reveal, the close-ups and the end card stand the product on the stage: when this photo is a lifestyle
+  // shot, the first photo that cuts out cleanly takes its place.
+  if ((sc.scene.role === "reveal" || sc.scene.role === "cta" || sc.scene.skill === "product-zoom") && !productCutout(img, src)?.cut) {
+    for (const alt of sc.brand?.images ?? []) {
+      const a = getImage(alt);
+      if (a?.naturalWidth && productCutout(a, alt)?.cut) return { img: a, key: alt };
+    }
+  }
+  return { img, key: src };
 }
 
 function calloutItems(scene: Scene) {
@@ -287,7 +296,7 @@ function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, box
 /** A feature chip: icon tile + short title, on glass. */
 function callout(sc: SkillContext, text: string, icon: string, cx: number, cy: number, k: number, align: "left" | "right" | "center") {
   const { ctx, u, palette, w, h } = sc;
-  const portrait = h > w;
+  const portrait = h >= w * 0.95;
   const fs = (portrait ? 36 : 33) * u;
   ctx.save();
   ctx.font = subFont(fs, 650);
@@ -328,7 +337,8 @@ function callout(sc: SkillContext, text: string, icon: string, cx: number, cy: n
 function productHero(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene } = sc;
   saasBackground(sc, { beams: 0, grid: false });
-  const portrait = h > w;
+  // Square frames stack the callouts under the product too (side columns would run off the edge).
+  const portrait = h >= w * 0.95;
   const ex = ease.inCubic(exitT(sc, 0.4));
   const items = calloutItems(scene);
   const T = heroTiming(scene, sc.beat);
@@ -595,7 +605,7 @@ function zoomTiming(d: number, n: number) {
 function productZoom(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene } = sc;
   saasBackground(sc, { beams: 0, grid: false });
-  const portrait = h > w;
+  const portrait = h >= w * 0.95;
   topHeadline(sc);
   const ex = ease.inCubic(exitT(sc, 0.4));
   const k = clamp(spring(t - 0.1, 7, 6), 0, 1.06);
