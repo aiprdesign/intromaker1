@@ -7,6 +7,7 @@ import { PALETTES } from "./palettes";
 import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
 import { drawLogo, getImage } from "./media";
+import { withPlaceholders } from "./placeholders";
 import { setBrandFont, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
@@ -95,6 +96,8 @@ function drawScene(
   transitionIn = true,
   music?: MusicPulse,
 ) {
+  // A slide that shows your pictures but has none yet shows a placeholder graphic in their place.
+  ({ scene, plan } = withPlaceholders(scene, plan));
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   const beat = 60 / (plan.bpm ?? 120);
   const saas = plan.style === "saas";

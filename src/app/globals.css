@@ -3919,3 +3919,6 @@ code.secret {
   font-size: 13px;
   margin: 2px 0 4px;
 }
+.media-what small.warn {
+  color: #ffc93c;
+}

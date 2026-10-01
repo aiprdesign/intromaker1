@@ -1,3 +1,4 @@
+import { needsPicture, placeholderSources } from "./placeholders";
 import type { Media, VideoPlan } from "./types";
 
 /**
@@ -227,7 +228,9 @@ export async function preloadPlanMedia(plan: VideoPlan) {
   const transitions = plan.scenes.some((s) => s.skill === "gallery-flow" || s.transition === "cube")
     ? import("./gl").then((m) => m.loadTransitions()).then(() => notifyReady())
     : Promise.resolve();
-  await Promise.all([...imgs.map(loadImage), ...vids.map(loadVideo), loadBrandFont(plan.brand?.font), transitions]);
+  // Slides still waiting for a picture show placeholder graphics: have those ready too.
+  const placeholders = plan.scenes.some((s) => needsPicture(s, plan)) ? placeholderSources() : [];
+  await Promise.all([...imgs.map(loadImage), ...placeholders.map(loadImage), ...vids.map(loadVideo), loadBrandFont(plan.brand?.font), transitions]);
 }
 
 /** Export: seek every video used at time `time` to its exact frame. */

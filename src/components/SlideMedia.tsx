@@ -43,8 +43,11 @@ export default function SlideMedia({
   library,
   onChange,
   onAdd,
+  waiting = false,
 }: {
   value?: Media;
+  /** The slide has no picture of its own yet, so it shows a placeholder graphic. */
+  waiting?: boolean;
   /** Images and videos to choose from (the site's, uploads, links added before). */
   library: Media[];
   /** undefined = automatic. */
@@ -115,11 +118,13 @@ export default function SlideMedia({
       <div className="media-current">
         <span className="media-thumb">{value ? <Thumb m={value} /> : <span className="media-auto">Auto</span>}</span>
         <span className="media-what">
-          <strong>{value ? (value.kind === "video" ? "Chosen video" : "Chosen image") : "Automatic"}</strong>
-          <small>{value ? "Shown in this slide" : "The director's pick for this slide"}</small>
+          <strong>{value ? (value.kind === "video" ? "Chosen video" : "Chosen image") : waiting ? "Placeholder" : "Automatic"}</strong>
+          <small className={!value && waiting ? "warn" : undefined}>
+            {value ? "Shown in this slide" : waiting ? "No image yet: add one to replace the placeholder" : "The director's pick for this slide"}
+          </small>
         </span>
-        <button type="button" className="btn btn-ghost sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-          {open ? "Done" : "Change"}
+        <button type="button" className={`btn sm ${waiting && !value && !open ? "btn-primary" : "btn-ghost"}`} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          {open ? "Done" : waiting && !value ? "Add image" : "Change"}
         </button>
       </div>
       {open && (

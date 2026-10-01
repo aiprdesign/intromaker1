@@ -1,10 +1,11 @@
 import type { Brand, Media, Scene, SkillId, VideoPlan } from "./types";
 
 /**
- * Stand-in pictures for slide previews (the skill gallery, the slide-style picker, template
- * samples) when there's no real media yet: a product on a white studio background (the product
- * slides cut it out like a real listing photo), an app screen, a full website page and a photo.
- * They're drawn in the browser as data URLs, used only in previews, and never saved in a film.
+ * Placeholder pictures for slides that show your media when there's none yet (no image on the
+ * slide, none from the site): a "Product image" tile on a white studio background (the product
+ * slides cut it out like a real listing photo), an app screen, a full website page and an "Image"
+ * frame. They're drawn in the browser as data URLs and are never saved in a film: add a real
+ * picture in the slide editor and it takes their place.
  */
 
 type Kind = "product" | "product2" | "ui" | "page" | "photo";
@@ -24,59 +25,67 @@ const bar = (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: nu
   g.fill();
 };
 
-/** A generic product (a smart speaker) on white, softly lit: a second angle is narrower. */
+/** The picture icon: a frame with a sun and two hills. */
+function pictureIcon(g: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+  const w = size;
+  const h = size * 0.78;
+  g.save();
+  g.strokeStyle = color;
+  g.fillStyle = color;
+  g.lineWidth = size * 0.07;
+  g.lineJoin = "round";
+  g.beginPath();
+  g.roundRect(cx - w / 2, cy - h / 2, w, h, size * 0.12);
+  g.stroke();
+  g.beginPath();
+  g.arc(cx + w * 0.2, cy - h * 0.16, size * 0.09, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.moveTo(cx - w * 0.38, cy + h * 0.34);
+  g.lineTo(cx - w * 0.1, cy - h * 0.04);
+  g.lineTo(cx + w * 0.08, cy + h * 0.16);
+  g.lineTo(cx + w * 0.2, cy + h * 0.04);
+  g.lineTo(cx + w * 0.38, cy + h * 0.34);
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+
+/**
+ * The product placeholder graphic: a soft tile with a dashed outline, a picture icon and
+ * "Product image", on a white studio background (so product slides cut it out like a real photo).
+ * The second one is a portrait tile, for "another angle".
+ */
 function product(alt: boolean) {
   const [c, g] = canvas(900, 900);
   g.fillStyle = "#ffffff";
   g.fillRect(0, 0, 900, 900);
-  const w = alt ? 300 : 380;
+  const w = alt ? 440 : 560;
+  const h = alt ? 620 : 560;
   const x = 450 - w / 2;
-  const top = 190;
-  const h = 560;
-  // Body: brushed aluminium-ish gradient.
-  const body = g.createLinearGradient(x, 0, x + w, 0);
-  body.addColorStop(0, "#9aa1ad");
-  body.addColorStop(0.25, "#d9dde4");
-  body.addColorStop(0.55, "#eef0f4");
-  body.addColorStop(1, "#8d94a1");
-  g.fillStyle = body;
+  const y = 450 - h / 2;
+  const fill = g.createLinearGradient(0, y, 0, y + h);
+  fill.addColorStop(0, "#f1f3f8");
+  fill.addColorStop(1, "#d9dee8");
+  g.fillStyle = fill;
   g.beginPath();
-  g.roundRect(x, top, w, h, alt ? 70 : 90);
+  g.roundRect(x, y, w, h, 56);
   g.fill();
-  // Fabric band with a dot pattern.
-  g.save();
+  g.setLineDash([22, 14]);
+  g.lineWidth = 6;
+  g.strokeStyle = "#a3abbb";
   g.beginPath();
-  g.roundRect(x, top + h * 0.38, w, h * 0.5, 30);
-  g.clip();
-  const fab = g.createLinearGradient(x, 0, x + w, 0);
-  fab.addColorStop(0, "#3b414c");
-  fab.addColorStop(0.5, "#5a616e");
-  fab.addColorStop(1, "#343944");
-  g.fillStyle = fab;
-  g.fillRect(x, top + h * 0.38, w, h * 0.5);
-  g.fillStyle = "rgba(255,255,255,0.08)";
-  for (let yy = top + h * 0.4; yy < top + h * 0.88; yy += 14) for (let xx = x + 8; xx < x + w; xx += 14) g.fillRect(xx, yy, 4, 4);
-  g.restore();
-  // Top control ring and a status light.
-  g.fillStyle = "#c4c9d2";
-  g.beginPath();
-  g.ellipse(450, top + 70, w * 0.28, 22, 0, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = "#2ec4b6";
-  g.beginPath();
-  g.arc(450, top + 70, 9, 0, Math.PI * 2);
-  g.fill();
-  // Specular highlight down one side.
-  const hi = g.createLinearGradient(x + w * 0.18, 0, x + w * 0.3, 0);
-  hi.addColorStop(0, "rgba(255,255,255,0)");
-  hi.addColorStop(0.5, "rgba(255,255,255,0.55)");
-  hi.addColorStop(1, "rgba(255,255,255,0)");
-  g.fillStyle = hi;
-  g.fillRect(x + w * 0.18, top + 30, w * 0.12, h * 0.32);
-  g.fillStyle = "rgba(255,255,255,0.75)";
-  g.font = "600 22px sans-serif";
+  g.roundRect(x + 14, y + 14, w - 28, h - 28, 44);
+  g.stroke();
+  g.setLineDash([]);
+  pictureIcon(g, 450, 450 - 40, 150, "#8b94a8");
+  g.fillStyle = "#6f788c";
+  g.font = "700 34px sans-serif";
   g.textAlign = "center";
-  g.fillText("YOUR PRODUCT", 450, top + h * 0.3);
+  g.fillText("PRODUCT IMAGE", 450, 450 + 90);
+  g.font = "500 22px sans-serif";
+  g.fillStyle = "#8b94a8";
+  g.fillText(alt ? "another angle" : "add yours to this slide", 450, 450 + 130);
   return c.toDataURL("image/png");
 }
 
@@ -178,40 +187,30 @@ function page() {
   return c.toDataURL("image/jpeg", 0.85);
 }
 
-/** A warm lifestyle photo: soft light, a table and the product on it. */
+/** The image placeholder graphic: a dashed frame with a picture icon and "Image". */
 function photo() {
   const [c, g] = canvas(1600, 1000);
-  const sky = g.createLinearGradient(0, 0, 0, 1000);
-  sky.addColorStop(0, "#f7c59f");
-  sky.addColorStop(0.55, "#e8916b");
-  sky.addColorStop(1, "#6d3f3a");
-  g.fillStyle = sky;
+  const bg = g.createLinearGradient(0, 0, 1600, 1000);
+  bg.addColorStop(0, "#e9ecf3");
+  bg.addColorStop(1, "#cfd5e1");
+  g.fillStyle = bg;
   g.fillRect(0, 0, 1600, 1000);
-  for (let i = 0; i < 14; i++) {
-    const x = (i * 263) % 1600;
-    const y = 80 + ((i * 137) % 420);
-    const r = 40 + (i % 4) * 30;
-    const b = g.createRadialGradient(x, y, 0, x, y, r);
-    b.addColorStop(0, "rgba(255,240,220,0.45)");
-    b.addColorStop(1, "rgba(255,240,220,0)");
-    g.fillStyle = b;
-    g.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  g.fillStyle = "#4a2c28";
-  g.fillRect(0, 760, 1600, 240);
-  g.fillStyle = "rgba(255,255,255,0.08)";
-  g.fillRect(0, 760, 1600, 6);
-  bar(g, 700, 470, 200, 300, "#2f343e", 50);
-  bar(g, 700, 600, 200, 150, "#454c58", 20);
-  g.fillStyle = "#2ec4b6";
+  g.setLineDash([26, 16]);
+  g.lineWidth = 8;
+  g.strokeStyle = "#a3abbb";
   g.beginPath();
-  g.arc(800, 510, 8, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = "rgba(255,255,255,0.85)";
-  g.font = "600 30px sans-serif";
+  g.roundRect(40, 40, 1520, 920, 40);
+  g.stroke();
+  g.setLineDash([]);
+  pictureIcon(g, 800, 440, 230, "#8b94a8");
+  g.fillStyle = "#6f788c";
+  g.font = "700 52px sans-serif";
   g.textAlign = "center";
-  g.fillText("Your photo", 800, 900);
-  return c.toDataURL("image/jpeg", 0.85);
+  g.fillText("IMAGE", 800, 640);
+  g.font = "500 30px sans-serif";
+  g.fillStyle = "#8b94a8";
+  g.fillText("add yours to this slide", 800, 690);
+  return c.toDataURL("image/jpeg", 0.88);
 }
 
 /** The data URL for a placeholder (drawn once). */
@@ -249,8 +248,22 @@ export function placeholderSources() {
  * A preview's scene and plan with stand-in pictures, when the slide shows media and there's none
  * of its own (no media on the slide, no images in the brand). Anything real is left alone.
  */
+const memo = new WeakMap<Scene, { plan: object; out: { scene: Scene; plan: object } }>();
 export function withPlaceholders<P extends Partial<VideoPlan>>(scene: Scene, plan: P): { scene: Scene; plan: P } {
   if (typeof document === "undefined") return { scene, plan };
+  const hit = memo.get(scene);
+  if (hit && hit.plan === plan) return hit.out as { scene: Scene; plan: P };
+  const out = placeholdersFor(scene, plan);
+  memo.set(scene, { plan, out });
+  return out;
+}
+
+/** Does this slide show a placeholder (it needs a picture and has none of its own)? */
+export function needsPicture(scene: Scene, plan: Partial<VideoPlan>) {
+  return withPlaceholders(scene, plan).scene !== scene;
+}
+
+function placeholdersFor<P extends Partial<VideoPlan>>(scene: Scene, plan: P): { scene: Scene; plan: P } {
   const isProduct = PRODUCT.includes(scene.skill);
   const kind = isProduct ? "product" : PICTURE[scene.skill];
   if (!kind || scene.media || plan.brand?.images?.length) return { scene, plan };

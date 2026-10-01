@@ -35,6 +35,7 @@ import { offerKey, offersIn } from "@/engine/claims";
 import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import SlideMedia from "@/components/SlideMedia";
+import { needsPicture } from "@/engine/placeholders";
 import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
@@ -1073,6 +1074,7 @@ export default function Studio() {
             library={mediaLibrary}
             onChange={(m) => updateScene(i, { media: m })}
             onAdd={(m) => setExtraMedia((cur) => [m, ...cur.filter((x) => x.src !== m.src)].slice(0, 24))}
+            waiting={needsPicture(s, plan)}
           />
         )}
         {narrating && (
@@ -1747,6 +1749,15 @@ export default function Studio() {
               onScene={setActiveScene}
               limits={account?.limits}
               beforeExport={async () => {
+                // Slides still showing a placeholder instead of your picture.
+                const waiting = plan.scenes.map((x, k) => (needsPicture(x, plan) ? k + 1 : 0)).filter(Boolean);
+                if (
+                  waiting.length &&
+                  !window.confirm(
+                    `Slide${waiting.length > 1 ? "s" : ""} ${waiting.join(", ")} still show${waiting.length > 1 ? "" : "s"} a placeholder instead of your image. Add images in the slide editor (Image → Add image), or export with the placeholder${waiting.length > 1 ? "s" : ""}?`,
+                  )
+                )
+                  return false;
                 if (pendingOffers.length) {
                   const ok = window.confirm(
                     `This intro makes an offer: ${pendingOffers.map((o) => `“${o.text}”`).join(", ")}.\n\nExport only if viewers can really get it, exactly as worded. Is it a real offer?`,
