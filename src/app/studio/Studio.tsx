@@ -32,8 +32,10 @@ import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
 import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { offerKey, offersIn } from "@/engine/claims";
-import { SKILL_MAP } from "@/engine/skills";
-import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
+import { qrTarget } from "@/engine/skills/endings";
+import SlideMedia from "@/components/SlideMedia";
+import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 const FILM_KEY = "intromaker.film";
@@ -952,10 +954,36 @@ export default function Studio() {
   keys.current = { selectScene: (i) => selectScene(i), removeScene, duplicateScene, selected, count: plan.scenes.length };
 
   /** One slide's editor: in the storyboard grid, and under the player when picked on the timeline. */
+  // Pictures a slide can show: the site's images, screenshots and videos, uploaded photos, links
+  // and uploads added in the slide editor, and what the film already uses.
+  const [extraMedia, setExtraMedia] = useState<Media[]>([]);
+  const mediaLibrary = useMemo(() => {
+    const out: Media[] = [];
+    const seen = new Set<string>();
+    const add = (src: string | null | undefined, kind: Media["kind"] = "image") => {
+      if (!src) return;
+      const u = assetUrl(src);
+      if (seen.has(u)) return;
+      seen.add(u);
+      out.push({ src: u, kind });
+    };
+    site?.images.forEach((x) => add(x));
+    plan.brand?.images.forEach((x) => add(x));
+    add(site?.shots?.hero);
+    site?.shots?.sections.forEach((x) => add(x));
+    add(site?.shots?.full);
+    site?.videos.forEach((x) => add(x, "video"));
+    plan.brand?.videos.forEach((x) => add(x, "video"));
+    photos.forEach((x) => add(x));
+    extraMedia.forEach((m) => add(m.src, m.kind));
+    plan.scenes.forEach((x) => x.media && add(x.media.src, x.media.kind));
+    return out.slice(0, 48);
+  }, [site, plan.brand, plan.scenes, photos, extraMedia]);
+
   const sceneCard = (s: Scene, i: number, where: "grid" | "inspector") => {
     const skill = SKILL_MAP[s.skill];
     // Blur Reveal's list is only a fallback eyebrow; SaaS films have the chapter label for that.
-    const showItems = skill.itemsHint !== undefined && !(plan.style === "saas" && s.skill === "blur-reveal");
+    const showItems = skill.itemsHint !== undefined && !(plan.style === "saas" && s.skill === "blur-reveal") && s.skill !== "qr-end";
     return (
       <div
         className={`scene-card${selected === i ? " selected" : ""}${where === "grid" ? cardReorder.classOf(i) : ""}`}
@@ -1004,10 +1032,49 @@ export default function Studio() {
             />
           </label>
         )}
+        {s.skill === "qr-end" &&
+          (() => {
+            const typed = (s.items?.[0] ?? "").trim();
+            const target = qrTarget({ scene: s, brand: plan.brand });
+            return (
+              <label className="fld">
+                <span className="fld-cap">
+                  QR code link <em>where the code takes viewers</em>
+                </span>
+                <input
+                  className={`input${typed && !target ? " invalid" : ""}`}
+                  type="text"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={s.items?.[0] ?? ""}
+                  placeholder={plan.brand?.domain ? `Leave empty for ${plan.brand.domain}` : "https://yoursite.com/offer"}
+                  onChange={(e) => updateScene(i, { items: e.target.value.trim() ? [e.target.value] : undefined })}
+                  aria-label="QR code link"
+                />
+                <span className={`hint${target ? "" : " warn"}`}>
+                  {target ? `Scans to ${target}` : typed ? "That doesn't look like a link (e.g. yoursite.com/offer)." : "Add a link: there's no website for the code to open."}
+                </span>
+              </label>
+            );
+          })()}
+        {s.skill !== "qr-end" && (s.role === "cta" || i === plan.scenes.length - 1) && SKILL_MAP["qr-end"] && (
+          <button type="button" className="link-btn qr-add" onClick={() => updateScene(i, { skill: "qr-end" })} title="Turn this end card into one with a scannable QR code">
+            ▦ Show a QR code on this slide
+          </button>
+        )}
         <label className="fld">
           <span className="fld-cap">Subtext</span>
           <input className="input" value={s.subtext ?? ""} maxLength={60} placeholder="Optional" onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })} />
         </label>
+        {(MEDIA_SKILLS.has(s.skill) || s.media) && (
+          <SlideMedia
+            value={s.media}
+            library={mediaLibrary}
+            onChange={(m) => updateScene(i, { media: m })}
+            onAdd={(m) => setExtraMedia((cur) => [m, ...cur.filter((x) => x.src !== m.src)].slice(0, 24))}
+          />
+        )}
         {narrating && (
           <div className="vo-line">
             <label className="fld">

@@ -58,3 +58,24 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Cinematic", skills: [...signatureSkills, ...energySkills, ...worldSkills] },
 ];
+
+/** Slides that show a picture or video of their own (`scene.media`), which can be changed per slide. */
+export const MEDIA_SKILLS = new Set<SkillId>([
+  "ui-tour",
+  "ui-cards",
+  "ui-assemble",
+  "site-scroll",
+  "testimonial",
+  "type-mask",
+  "gallery-flow",
+  "carousel-3d",
+  "tilt-wall",
+  "before-after",
+  "product-showcase",
+  "photo-montage",
+  "product-hero",
+  "product-end",
+  "product-spin",
+  "product-zoom",
+  "product-teaser",
+]);
