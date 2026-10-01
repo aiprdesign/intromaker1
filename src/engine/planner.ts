@@ -4,6 +4,7 @@ import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { writeVoiceover } from "./script";
 import { isHealthClaim, isNumericClaim, isUnsafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
+import { DEFAULT_TRAILER_STYLE, detectTrailerStyle, TRAILER_STYLE_MAP } from "./trailers";
 import {
   FONTS,
   PALETTE_IDS,
@@ -147,179 +148,13 @@ export interface PlanRequest {
   seed?: number;
   style?: StyleChoice;
   template?: string;
+  /** Trailer films: the trailer style picked (see trailers.ts); otherwise matched to the prompt. */
+  trailerStyle?: string;
   /** Claim-safe copy (default on): generic wording, no superlatives, guarantees or numbers. */
   safe?: boolean;
   /** Remake number (see SiteRequest.variant). */
   variant?: number;
 }
-
-interface Mood {
-  palette: PaletteId;
-  font: FontId;
-  bpm: number;
-  hook: SkillId[];
-  title: SkillId[];
-  body: SkillId[];
-  outro: SkillId[];
-  transitions: Transition[];
-}
-
-const MOODS: { keys: RegExp; mood: Mood }[] = [
-  {
-    keys: /\b(cyber|hack|matrix|glitch|security|code|dev|crypto|web3|blockchain)/,
-    mood: {
-      palette: "cyber",
-      font: "grotesk",
-      bpm: 128,
-      hook: ["glitch-reveal", "hyperspace", "warp-tunnel"],
-      title: ["particle-assemble", "glitch-reveal", "glass-shatter"],
-      body: ["hud-scan", "glitch-reveal", "kinetic-slam", "split-wipe", "orbit-rings", "flip-3d"],
-      outro: ["cinematic-title", "neon-draw", "god-rays"],
-      transitions: ["glitch", "whip", "flash", "dolly"],
-    },
-  },
-  {
-    keys: /\b(ai|tech|futur|saas|app|platform|software|startup|data|cloud|robot|quantum)/,
-    mood: {
-      palette: "cosmos",
-      font: "grotesk",
-      bpm: 120,
-      hook: ["hyperspace", "shockwave", "warp-tunnel"],
-      title: ["particle-assemble", "orbit-rings", "god-rays", "flip-3d"],
-      body: ["liquid-gradient", "hud-scan", "orbit-rings", "type-cascade", "kinetic-slam", "flip-3d"],
-      outro: ["cinematic-title", "particle-assemble", "god-rays"],
-      transitions: ["dolly", "leak", "whip", "zoom"],
-    },
-  },
-  {
-    keys: /\b(fire|action|sport|fight|power|rage|beast|war|battle|gym|fitness|race|car|speed)/,
-    mood: {
-      palette: "inferno",
-      font: "anton",
-      bpm: 140,
-      hook: ["shockwave", "hyperspace", "glass-shatter"],
-      title: ["shockwave", "kinetic-slam", "glass-shatter"],
-      body: ["kinetic-slam", "split-wipe", "shockwave", "glitch-reveal", "glass-shatter", "flip-3d"],
-      outro: ["cinematic-title", "kinetic-slam", "god-rays"],
-      transitions: ["whip", "flash", "dolly", "shutter"],
-    },
-  },
-  {
-    keys: /\b(space|galax|cosmic|star|planet|orbit|astro|universe|nasa|rocket)/,
-    mood: {
-      palette: "cosmos",
-      font: "anton",
-      bpm: 110,
-      hook: ["hyperspace", "warp-tunnel"],
-      title: ["particle-assemble", "shockwave", "god-rays"],
-      body: ["orbit-rings", "cinematic-title", "hud-scan", "liquid-gradient", "god-rays"],
-      outro: ["cinematic-title", "god-rays"],
-      transitions: ["dolly", "leak", "zoom"],
-    },
-  },
-  {
-    keys: /\b(luxury|gold|premium|elegant|fashion|jewel|perfume|watch|royal|vip|hotel|wedding)/,
-    mood: {
-      palette: "gold",
-      font: "grotesk",
-      bpm: 96,
-      hook: ["cinematic-title", "god-rays"],
-      title: ["particle-assemble", "cinematic-title", "god-rays"],
-      body: ["liquid-gradient", "type-cascade", "cinematic-title", "orbit-rings", "flip-3d"],
-      outro: ["cinematic-title", "god-rays"],
-      transitions: ["leak", "shutter", "dolly"],
-    },
-  },
-  {
-    keys: /\b(retro|80s|synth|vapor|arcade|outrun|vhs|disco|miami)/,
-    mood: {
-      palette: "synthwave",
-      font: "anton",
-      bpm: 118,
-      hook: ["neon-draw", "hyperspace", "warp-tunnel"],
-      title: ["retro-grid", "neon-draw"],
-      body: ["neon-draw", "kinetic-slam", "split-wipe", "shape-burst", "flip-3d"],
-      outro: ["retro-grid"],
-      transitions: ["glitch", "wipe", "leak", "whip"],
-    },
-  },
-  {
-    keys: /\b(music|dj|party|club|night|festival|concert|neon|rave|edm|beat)/,
-    mood: {
-      palette: "synthwave",
-      font: "anton",
-      bpm: 128,
-      hook: ["neon-draw", "shockwave", "warp-tunnel"],
-      title: ["neon-draw", "shockwave", "warp-tunnel"],
-      body: ["kinetic-slam", "neon-draw", "split-wipe", "glitch-reveal", "shape-burst", "glass-shatter"],
-      outro: ["neon-draw", "retro-grid", "god-rays"],
-      transitions: ["flash", "whip", "glitch", "leak"],
-    },
-  },
-  {
-    keys: /\b(game|gaming|esport|stream|twitch|youtube|toxic|zombie|clan|squad)/,
-    mood: {
-      palette: "toxic",
-      font: "anton",
-      bpm: 140,
-      hook: ["glitch-reveal", "shockwave", "warp-tunnel"],
-      title: ["shockwave", "glitch-reveal", "glass-shatter"],
-      body: ["kinetic-slam", "hud-scan", "split-wipe", "glitch-reveal", "glass-shatter"],
-      outro: ["shockwave", "cinematic-title", "god-rays"],
-      transitions: ["glitch", "whip", "flash", "dolly"],
-    },
-  },
-  {
-    keys: /\b(nature|eco|green|organic|health|wellness|calm|yoga|travel|ocean|aurora)/,
-    mood: {
-      palette: "aurora",
-      font: "grotesk",
-      bpm: 92,
-      hook: ["liquid-gradient", "god-rays"],
-      title: ["particle-assemble", "liquid-gradient", "god-rays"],
-      body: ["liquid-gradient", "type-cascade", "orbit-rings", "flip-3d"],
-      outro: ["cinematic-title", "liquid-gradient", "god-rays"],
-      transitions: ["leak", "dolly", "zoom"],
-    },
-  },
-  {
-    keys: /\b(fun|kid|party|summer|birthday|colorful|colourful|playful|social|tiktok|reel|food)/,
-    mood: {
-      palette: "synthwave",
-      font: "anton",
-      bpm: 124,
-      hook: ["shape-burst"],
-      title: ["shape-burst", "type-cascade", "flip-3d"],
-      body: ["type-cascade", "split-wipe", "shape-burst", "kinetic-slam", "flip-3d"],
-      outro: ["shape-burst", "type-cascade", "flip-3d"],
-      transitions: ["wipe", "whip", "zoom"],
-    },
-  },
-  {
-    keys: /\b(news|editorial|podcast|documentary|corporate|business|finance|report|minimal)/,
-    mood: {
-      palette: "mono",
-      font: "grotesk",
-      bpm: 100,
-      hook: ["type-cascade", "split-wipe", "glass-shatter"],
-      title: ["cinematic-title", "type-cascade", "flip-3d"],
-      body: ["split-wipe", "type-cascade", "hud-scan", "kinetic-slam", "flip-3d", "glass-shatter"],
-      outro: ["cinematic-title", "god-rays"],
-      transitions: ["shutter", "wipe", "whip"],
-    },
-  },
-];
-
-const DEFAULT_MOOD: Mood = {
-  palette: "cyber",
-  font: "anton",
-  bpm: 124,
-  hook: ["hyperspace", "shockwave", "warp-tunnel"],
-  title: ["particle-assemble", "shockwave", "god-rays", "glass-shatter"],
-  body: ["kinetic-slam", "glitch-reveal", "split-wipe", "liquid-gradient", "type-cascade", "hud-scan", "flip-3d", "glass-shatter"],
-  outro: ["cinematic-title", "god-rays"],
-  transitions: ["flash", "whip", "dolly", "leak", "glitch"],
-};
 
 /** Words that never carry meaning in a prompt. */
 const FILLER = new Set(
@@ -596,16 +431,9 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
   const r = rng(seed);
   const pick = <T,>(arr: T[]) => arr[Math.floor(r() * arr.length)];
 
-  // Score every mood by keyword hits; earlier moods win ties.
-  let mood = DEFAULT_MOOD;
-  let best = 0;
-  for (const m of MOODS) {
-    const hits = lower.match(new RegExp(m.keys.source, "g"))?.length ?? 0;
-    if (hits > best) {
-      best = hits;
-      mood = m.mood;
-    }
-  }
+  // The trailer style you picked, else the one whose keywords the prompt hits most.
+  const look = TRAILER_STYLE_MAP[req.trailerStyle ?? ""] ?? detectTrailerStyle(lower, DEFAULT_TRAILER_STYLE);
+  const mood = look.mood;
   const brand = extractBrand(prompt);
   const numbers = stats(prompt);
   // Drop phrases that only describe the video's style ("retro 80s synthwave", "hype gaming channel").
@@ -705,6 +533,8 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
     bpm: mood.bpm,
     seed,
     scenes,
+    style: "trailer",
+    trailerStyle: look.id,
   }));
 }
 
@@ -795,6 +625,8 @@ export interface SiteRequest {
   colors?: Brand["colors"];
   style?: StyleChoice;
   template?: string;
+  /** Trailer films: the trailer style picked (see trailers.ts); otherwise matched to the site. */
+  trailerStyle?: string;
   /** Creative angle for the story: problem-led (default), product-first or proof-first. */
   angle?: Angle;
   /** Claim-safe copy (default on): generic wording, no superlatives, guarantees or numbers. */
@@ -1835,15 +1667,9 @@ function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
   const seed = (req.seed ?? hashString(site.url)) >>> 0;
   const r = rng(seed);
   const pick = <T,>(arr: readonly T[]) => arr[Math.floor(r() * arr.length)];
-  let mood = MOODS[1].mood; // SaaS default: tech
-  let best = 0;
-  for (const m of MOODS) {
-    const hits = text.match(new RegExp(m.keys.source, "g"))?.length ?? 0;
-    if (hits > best) {
-      best = hits;
-      mood = m.mood;
-    }
-  }
+  // (A website defaults to the tech trailer.)
+  const look = TRAILER_STYLE_MAP[req.trailerStyle ?? ""] ?? detectTrailerStyle(text, "tech");
+  const mood = look.mood;
   const beat = 60 / mood.bpm;
   const beats = (n: number, minSec: number) => Math.max(n, Math.ceil(minSec / beat)) * beat;
   const target = LENGTH_SECONDS[req.length];
@@ -1936,7 +1762,7 @@ function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
 
   const palette = req.palette && req.palette !== "auto" ? req.palette : mood.palette;
   return beatSync(
-    sanitizePlan({ title: site.name, palette, font: mood.font, aspect: req.aspect, bpm: mood.bpm, seed, scenes, brand, style: "trailer" }),
+    sanitizePlan({ title: site.name, palette, font: mood.font, aspect: req.aspect, bpm: mood.bpm, seed, scenes, brand, style: "trailer", trailerStyle: look.id }),
   );
 }
 
@@ -2058,6 +1884,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     brand: sanitizeBrand(raw.brand),
     style: raw.style === "saas" ? "saas" : "trailer",
     template: typeof raw.template === "string" && /^[a-z]{2,20}$/.test(raw.template) ? raw.template : undefined,
+    trailerStyle: typeof raw.trailerStyle === "string" && TRAILER_STYLE_MAP[raw.trailerStyle] ? raw.trailerStyle : undefined,
     music: raw.music === "saas" || raw.music === "trailer" ? raw.music : undefined,
     flavor: ["tech", "soft", "pop", "minimal", "neon"].includes(raw.flavor as string) ? raw.flavor : undefined,
     scheme: raw.scheme === "vibrant" || raw.scheme === "60-30-10" ? raw.scheme : undefined,

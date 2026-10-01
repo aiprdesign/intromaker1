@@ -155,6 +155,16 @@ async function main() {
   check(!stored.includes("pass-word-1") && stored.includes("scrypt$"), "the password is stored only as an scrypt hash");
   check((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "nope-nope" }) }))).status === 401, "a wrong password is refused");
   check((await accSession.POST(ureq("/api/account/session", { method: "POST", origin: "https://evil.example", body: JSON.stringify({ email: "ana@example.com", password: "pass-word-1" }) }))).status === 403, "sign-in from another site is refused");
+  // Plans are unlimited by default for now; the owner's limits (set in Admin → Plans) are still
+  // enforced, so the checks below set the old Free / Pro limits first.
+  const plansLib = await import("../src/lib/plans");
+  check(Object.values(plansLib.DEFAULT_LIMITS).every((l) => l.savedFilms >= 100_000 && l.importsPerDay >= 100_000 && !l.watermark && l.maxLong === 3840), "every plan is unlimited by default, for now");
+  const oldFree = { savedFilms: 3, aiPerMonth: 0, importsPerDay: 3, watermark: true, maxLong: 1920, maxFps: 30 };
+  const oldPro = { savedFilms: 200, aiPerMonth: 100, importsPerDay: 50, watermark: false, maxLong: 3840, maxFps: 60 };
+  check(plansLib.readLimits({ free: oldFree, pro: oldPro }).free.savedFilms >= 100_000, "plans saved with the old defaults (never customised) become unlimited too");
+  check(plansLib.readLimits({ free: { ...oldFree, savedFilms: 5 } }).free.savedFilms === 5, "limits the owner changed are kept");
+  // (Customised, so they're enforced: one value differs from the old defaults.)
+  await admin.writeSettings({ plans: { free: { ...oldFree, maxLong: 1280 }, pro: { ...oldPro, maxFps: 30 } } });
   const save = (cookie: string, body: object) => accFilms.POST(ureq("/api/account/films", { method: "POST", cookie, body: JSON.stringify({ plan, ...body }) }));
   const saved = await Promise.all([1, 2, 3].map(() => save(ucookie, {})));
   check(saved.every((r) => r.status === 200), "Free keeps 3 saved intros");
@@ -167,9 +177,9 @@ async function main() {
   check((await accFilm.GET(ureq(`/api/account/films/${firstId}`, { cookie: ocookie }), { params: Promise.resolve({ id: firstId }) })).status === 404, "another account can't open someone's intro");
   check((await accFilms.GET(ureq("/api/account/films"))).status === 401, "saved intros need a signed-in account");
 
-  // Plans: Free has no AI allowance and 3 imports a day; the owner grants Pro.
+  // Plans (with the owner's limits): Free has no AI allowance and 3 imports a day; the owner grants Pro.
   const anaId = (await acc.currentUser(ureq("/", { cookie: ucookie })))!.id;
-  check((await acc.limitsFor(await acc.getUser(anaId))).aiPerMonth === 0, "Free has no AI allowance by default");
+  check((await acc.limitsFor(await acc.getUser(anaId))).aiPerMonth === 0, "Free's AI allowance follows the owner's limit");
   const imports: number[] = [];
   const importReq = () => ureq("/api/scrape", { method: "POST", ip: "198.51.100.77", body: JSON.stringify({ url: "http://127.0.0.1/" }) });
   for (let i = 0; i < 4; i++) imports.push((await scrapeRoute.POST(importReq())).status);

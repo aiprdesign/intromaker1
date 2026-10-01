@@ -8,7 +8,7 @@
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
-import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, pageBands, segmentShot } from "../media";
+import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, pageBands, segmentShot, snapBands } from "../media";
 import {
   blurInLayout,
   borderBeam,
@@ -1495,7 +1495,8 @@ function stopSections(secs: { y: number; h: number }[], iw: number, d: number) {
 function siteScroll(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   const img = getImage(scene.media?.kind === "image" ? scene.media.src : undefined);
-  const bands = img && img.naturalWidth ? (brand?.page?.src === scene.media?.src ? brand!.page!.bands : pageBands(img)) : [];
+  // The page's own sections (snapped to the screenshot's real dividers), or found in the screenshot.
+  const bands = img && img.naturalWidth ? (brand?.page?.src === scene.media?.src ? snapBands(img, brand!.page!.bands) : pageBands(img)) : [];
   const iw = img?.naturalWidth ?? 0;
   const ih = img?.naturalHeight ?? 0;
   const secs = bands.map(([a, b]) => ({ y: a * ih, h: (b - a) * ih })).filter((x) => x.h > 8);

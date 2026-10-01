@@ -359,7 +359,7 @@ async function fromApi(url: string): Promise<ApiProduct | null> {
  */
 async function fromLink(url: string, rawUrl: string, market: Market): Promise<SiteData | null> {
   const id = listingIds(url);
-  const image = id.asin ? await amazonImageByAsin(id.asin) : null;
+  const image = id.asin ? await amazonImageByAsin(id.asin, id.amazon) : null;
   if (!image) return null;
   const title = titleFromLink(rawUrl) || "Your product";
   const site = readListing("<html></html>", new URL(url), market, { title, brand: "", description: "", bullets: [], images: [image] });
@@ -423,7 +423,7 @@ export async function scrapeListing(rawUrl: string, market: Market): Promise<Sit
   if (!site.images.length) {
     // The page was read but its photos weren't found: the API's photos, or Amazon's main photo.
     const id = listingIds(url);
-    const image = api?.images[0] ?? (id.asin ? await amazonImageByAsin(id.asin) : null);
+    const image = api?.images[0] ?? (id.asin ? await amazonImageByAsin(id.asin, id.amazon) : null);
     if (image) return { ...site, images: [...(api?.images ?? [image])], partial: true };
     throw new UrlError(`We read the ${landed.name} listing but couldn't get its photos. Save them and add them with "Add product photos".`, "listing");
   }

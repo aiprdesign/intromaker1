@@ -30,6 +30,7 @@ import {
 } from "@/engine/planner";
 import { SKILLS } from "@/engine/skills";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
+import { TRAILER_STYLE_MAP } from "@/engine/trailers";
 import { rankMoments, detectConcept } from "@/engine/concepts";
 import { writeVoiceover } from "@/engine/script";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData, type VideoPlan } from "@/engine/types";
@@ -210,6 +211,7 @@ type Body = Partial<PlanRequest> & {
   photos?: unknown;
   colors?: Brand["colors"];
   style?: StyleChoice;
+  trailerStyle?: string;
   ai?: unknown;
   template?: string;
   angle?: unknown;
@@ -267,13 +269,14 @@ function readBody(body: Body) {
   // A product's "Epic trailer" is its product video in a trailer style (cold open, trailer score).
   const template = site?.kind === "product" && style === "trailer" && !TEMPLATE_MAP[asked].trailer ? "drop" : asked;
   const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
+  const trailerStyle = typeof body.trailerStyle === "string" && TRAILER_STYLE_MAP[body.trailerStyle] ? body.trailerStyle : undefined;
   const variant = Math.min(50, Math.max(0, Math.floor(Number(body.variant) || 0)));
   const wantSaas = style === "saas" || site?.kind === "product" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
-  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template, safe, variant };
+  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, trailerStyle, template, safe, variant };
   const concept = rawSite
     ? detectConcept(`${rawSite.name} ${rawSite.tagline} ${rawSite.description}`, [...rawSite.headlines, ...rawSite.features, ...rawSite.steps, ...rawSite.pains].join(" "))
     : detectConcept(prompt);
-  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, template, angle, safe, variant, direction: prompt }) : planFromPrompt(request));
+  const builtin = () => (site ? planFromSite(site, { aspect, length, palette, seed, colors, style, trailerStyle, template, angle, safe, variant, direction: prompt }) : planFromPrompt(request));
   return { prompt, aspect, length, palette, seed, site, colors, style, template, angle, wantSaas, builtin, concept, safe, variant };
 }
 type Ctx = ReturnType<typeof readBody>;

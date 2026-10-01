@@ -260,6 +260,8 @@ export interface VideoPlan {
   brand?: Brand;
   /** "saas": clean product-launch look and upbeat score; "trailer": epic cinematic. */
   style?: "saas" | "trailer";
+  /** Trailer films: the trailer style (see trailers.ts) their palette, type, tempo and effects come from. */
+  trailerStyle?: string;
   /** Style template id (see templates.ts). */
   template?: string;
   look?: Look;

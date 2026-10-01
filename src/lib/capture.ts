@@ -424,7 +424,7 @@ async function slot(): Promise<(() => void) | null> {
  * then splitting any block taller than two screens into its own children. Tiny strips merge into
  * their neighbour; gaps between blocks are kept out.
  */
-async function pageBlocks(page: Page, maxH: number): Promise<{ y: number; h: number }[]> {
+export async function pageBlocks(page: Page, maxH: number): Promise<{ y: number; h: number }[]> {
   return page
     .evaluate((maxH) => {
       const vw = document.documentElement.clientWidth;
@@ -435,9 +435,16 @@ async function pageBlocks(page: Page, maxH: number): Promise<{ y: number; h: num
       const shown = (el: Element) => {
         const cs = getComputedStyle(el);
         const b = box(el);
-        return cs.display !== "none" && cs.visibility !== "hidden" && b.h >= 24 && b.w >= vw * 0.5;
+        // Layers placed over the page (fixed bars, absolute backdrops) aren't sections.
+        if (cs.position === "fixed" || cs.position === "absolute") return false;
+        return cs.display !== "none" && cs.visibility !== "hidden" && Number(cs.opacity) > 0.05 && b.h >= 24 && b.w >= vw * 0.5;
       };
-      const kids = (el: Element) => Array.from(el.children).filter(shown);
+      // Something to see: text, a picture, a video, a canvas, or a background image.
+      const hasContent = (el: Element) =>
+        !!el.textContent?.trim() || !!el.querySelector("img,svg,video,canvas,picture,iframe") || getComputedStyle(el).backgroundImage !== "none";
+      // display: contents wrappers have no box of their own: look through them.
+      const kids = (el: Element): Element[] =>
+        Array.from(el.children).flatMap((c) => (getComputedStyle(c).display === "contents" ? kids(c) : shown(c) ? [c] : []));
       let root: Element = document.body;
       for (let i = 0; i < 8; i++) {
         const k = kids(root);
@@ -451,8 +458,9 @@ async function pageBlocks(page: Page, maxH: number): Promise<{ y: number; h: num
         const b = box(el);
         if (b.y >= maxH) return;
         const inner = kids(el);
-        // A block taller than two screens is really a wrapper around several sections.
-        if (b.h > 1800 && depth < 3 && inner.length >= 2) return inner.forEach((c) => add(c, depth + 1));
+        // A block taller than a screen and a half is really a wrapper around several sections.
+        if (b.h > 1350 && depth < 5 && inner.length >= 2) return inner.forEach((c) => add(c, depth + 1));
+        if (!hasContent(el)) return;
         out.push({ y: Math.max(0, b.y), h: Math.min(b.h, maxH - Math.max(0, b.y)) });
       };
       kids(root).forEach((c) => add(c, 0));

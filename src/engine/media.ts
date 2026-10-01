@@ -1021,11 +1021,147 @@ export function findHotspots(d: Drawable, frameW: number, frameH: number, fx = 0
 
 const bandCache = new Map<string, [number, number][]>();
 
+/** A place a page could be split, with how sure we are that a section ends there. */
+interface Divider {
+  y: number;
+  score: number;
+}
+const dividerCache = new Map<string, { H: number; dividers: Divider[]; busy: Float32Array }>();
+
 /**
- * A full-page screenshot's sections when the page's own layout wasn't recorded: full-width quiet
- * gutters and background changes mark where one section ends and the next begins. Returns
- * [top, bottom] fractions of the image height; sections shorter than about a quarter screen merge
- * into their neighbour.
+ * Where a full-page screenshot could be divided into sections, scored (in rows of a 160px-wide
+ * copy):
+ * - the background colour changes from one full-width colour to another (score 3);
+ * - a thin full-width rule between two areas of the same background (score 2);
+ * - an empty gutter, by its height: a section break is a tall gap, the space between a heading
+ *   and its content is a short one (up to 2.5).
+ * Each row's background is its most common colour (so text and pictures on it don't move it),
+ * and a row is empty when almost none of it has edges.
+ */
+function pageDividers(img: HTMLImageElement) {
+  const hit = dividerCache.get(img.src);
+  if (hit) return hit;
+  const W = 160;
+  const H = Math.max(40, Math.round((W * img.naturalHeight) / img.naturalWidth));
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const g = c.getContext("2d", { willReadFrequently: true })!;
+  g.drawImage(img, 0, 0, W, H);
+  const px = g.getImageData(0, 0, W, H).data;
+  const busy = new Float32Array(H);
+  const bgc: number[][] = [];
+  const pure = new Float32Array(H);
+  const hist = new Map<number, number>();
+  for (let y = 0; y < H; y++) {
+    hist.clear();
+    let edges = 0;
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const q = ((px[i] >> 4) << 8) | ((px[i + 1] >> 4) << 4) | (px[i + 2] >> 4);
+      hist.set(q, (hist.get(q) ?? 0) + 1);
+      // Only changes along the row: a full-width rule or a background edge is still an empty row.
+      if (x > 0 && Math.abs(px[i] - px[i - 4]) + Math.abs(px[i + 1] - px[i - 3]) + Math.abs(px[i + 2] - px[i - 2]) > 36) edges++;
+    }
+    let n = 0;
+    for (const k of hist.values()) if (k > n) n = k;
+    // The row's colour: its median (steady across text and pictures, and along a gradient).
+    const ch = [0, 1, 2].map((o) => {
+      const v: number[] = [];
+      for (let x = 0; x < W; x += 2) v.push(px[(y * W + x) * 4 + o]);
+      return v.sort((a, b) => a - b)[v.length >> 1];
+    });
+    bgc.push(ch);
+    pure[y] = n / W;
+    busy[y] = edges / W;
+  }
+  const dividers: Divider[] = [];
+  const diff = (a: number[], b: number[]) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+  const pixel = (x: number, y: number) => [px[(y * W + x) * 4], px[(y * W + x) * 4 + 1], px[(y * W + x) * 4 + 2]];
+  const edgeMatch = (y: number) => diff(pixel(1, y), bgc[y]) < 30 && diff(pixel(W - 2, y), bgc[y]) < 30;
+  // Background changes: a jump between steady runs of rows above and below (a gradient changes
+  // a little every row, so it doesn't count). Only the strongest row of a jump is kept.
+  for (let y = 3; y < H - 3; y++) {
+    const jump = diff(bgc[y - 1], bgc[y]);
+    if (jump < 40 || diff(bgc[y - 3], bgc[y - 1]) >= 18 || diff(bgc[y], bgc[y + 2]) >= 18) continue;
+    // A section's background runs to both edges of the page (a row of cards doesn't).
+    if (!edgeMatch(y - 1) || !edgeMatch(y)) continue;
+    if (jump >= diff(bgc[y - 2], bgc[y - 1]) && jump >= diff(bgc[y], bgc[y + 1])) dividers.push({ y, score: 3 });
+  }
+  // Rules: a thin row that differs from matching backgrounds on both sides.
+  for (let y = 2; y < H - 2; y++) {
+    if (pure[y] < 0.8 || pure[y - 2] < 0.6 || pure[y + 2] < 0.6) continue;
+    if (diff(bgc[y - 2], bgc[y + 2]) < 16 && diff(bgc[y], bgc[y - 2]) >= 24) dividers.push({ y, score: 2 });
+  }
+  // Gutters: runs of empty rows; the cut goes in the middle (on the rule, if there is one). A
+  // gutter counts only when it's comparable to the page's widest: sections are set apart by more
+  // space than a heading is from its content.
+  const rowH = img.naturalWidth / W; // page px per row
+  const gutters: Divider[] = [];
+  // Where the content above a gutter began (the end of the previous real gap).
+  let contentFrom = 0;
+  for (let y = 0; y < H; ) {
+    if (busy[y] > 0.02) {
+      y++;
+      continue;
+    }
+    let e = y;
+    while (e < H && busy[e] <= 0.02) e++;
+    const tall = (e - y) * rowH;
+    if (y > 0 && e < H && tall >= 24) {
+      let mid = Math.round((y + e) / 2);
+      for (let k = y; k < e; k++) if (diff(bgc[k], bgc[Math.max(0, y - 1)]) >= 24 && diff(bgc[k], bgc[Math.min(H - 1, e)]) >= 24) mid = k;
+      // Under a short block (a heading), the gap leads into that heading's content.
+      const above = (y - contentFrom) * rowH;
+      gutters.push({ y: mid, score: Math.min(2.5, tall / 70) * (above < 100 ? 0.5 : 1) });
+    }
+    if (tall >= 24) contentFrom = e;
+    y = e;
+  }
+  const widest = Math.max(0, ...gutters.map((g) => g.score));
+  for (const g of gutters) if (g.score >= widest * 0.6) dividers.push(g);
+  const out = { H, dividers, busy };
+  dividerCache.set(img.src, out);
+  return out;
+}
+
+/**
+ * Pick the cuts: the surest dividers first, keeping every section at least `minH` rows tall; then
+ * any section taller than `maxH` is split at its best remaining divider. Returns [top, bottom]
+ * fractions.
+ */
+function chooseBands(H: number, dividers: Divider[], minH: number, maxH: number, fixed: number[] = []) {
+  const cuts = [0, H, ...fixed].sort((a, b) => a - b);
+  const fits = (y: number, gap: number) => cuts.every((c) => Math.abs(c - y) >= gap);
+  for (const d of [...dividers].sort((a, b) => b.score - a.score || a.y - b.y)) {
+    if (d.score < 1) break;
+    if (fits(d.y, minH)) {
+      cuts.push(d.y);
+      cuts.sort((a, b) => a - b);
+    }
+  }
+  // Over-tall sections: split at their best inner divider (a smaller minimum is fine there).
+  for (let pass = 0; pass < 4; pass++) {
+    let changed = false;
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const [a, b] = [cuts[i], cuts[i + 1]];
+      if (b - a <= maxH) continue;
+      const inner = dividers.filter((d) => d.y > a + minH * 0.6 && d.y < b - minH * 0.6).sort((p, q) => q.score - p.score || Math.abs(p.y - (a + b) / 2) - Math.abs(q.y - (a + b) / 2));
+      if (!inner.length) continue;
+      cuts.splice(i + 1, 0, inner[0].y);
+      changed = true;
+      break;
+    }
+    if (!changed) break;
+  }
+  return cuts.slice(0, -1).map((a, i) => [a / H, cuts[i + 1] / H] as [number, number]);
+}
+
+/**
+ * A full-page screenshot's sections when the page's own layout wasn't recorded, from its scored
+ * dividers (see pageDividers): background changes and rules first, then the tallest gutters,
+ * never cutting a section shorter than about a fifth of a screen, and splitting any taller than
+ * about a screen and a half. Returns [top, bottom] fractions of the image height.
  */
 export function pageBands(img: HTMLImageElement): [number, number][] {
   if (!img.naturalWidth) return [];
@@ -1033,58 +1169,45 @@ export function pageBands(img: HTMLImageElement): [number, number][] {
   if (hit) return hit;
   let out: [number, number][] = [];
   try {
-    const W = 96;
-    const H = Math.max(40, Math.round((W * img.naturalHeight) / img.naturalWidth));
-    const c = document.createElement("canvas");
-    c.width = W;
-    c.height = H;
-    const g = c.getContext("2d", { willReadFrequently: true })!;
-    g.drawImage(img, 0, 0, W, H);
-    const px = g.getImageData(0, 0, W, H).data;
-    const mean: number[][] = [];
-    const quiet: boolean[] = [];
-    for (let y = 0; y < H; y++) {
-      let r = 0, gg = 0, b = 0, busy = 0;
-      for (let x = 0; x < W; x++) {
-        const i = (y * W + x) * 4;
-        r += px[i];
-        gg += px[i + 1];
-        b += px[i + 2];
-        if (x > 0 && Math.abs(px[i] - px[i - 4]) + Math.abs(px[i + 1] - px[i - 3]) + Math.abs(px[i + 2] - px[i - 2]) > 40) busy++;
-      }
-      mean.push([r / W, gg / W, b / W]);
-      quiet.push(busy <= 1);
-    }
-    // Cuts: the middle of each quiet run, and rows where the background colour changes.
-    const cuts = new Set<number>([0, H]);
-    for (let y = 0; y < H; ) {
-      if (!quiet[y]) {
-        y++;
-        continue;
-      }
-      let e = y;
-      while (e < H && quiet[e]) e++;
-      if (e - y >= 2) cuts.add(Math.round((y + e) / 2));
-      y = e;
-    }
-    for (let y = 1; y < H; y++) {
-      const [a, b] = [mean[y - 1], mean[y]];
-      if (quiet[y - 1] && quiet[y] && Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) > 24) cuts.add(y);
-    }
-    const ys = [...cuts].sort((a, b) => a - b);
-    const minH = Math.max(3, Math.round((W * 0.17)));
-    const merged: [number, number][] = [];
-    for (let i = 0; i < ys.length - 1; i++) {
-      const [a, b] = [ys[i], ys[i + 1]];
-      const last = merged[merged.length - 1];
-      if (last && (b - a < minH || last[1] - last[0] < minH)) last[1] = b;
-      else merged.push([a, b]);
-    }
-    out = merged.length >= 2 ? merged.map(([a, b]) => [a / H, b / H] as [number, number]) : [];
+    const { H, dividers } = pageDividers(img);
+    // In rows of the 160px copy: a 1440px page's screen is ~100 rows tall.
+    const bands = chooseBands(H, dividers, Math.round(160 * 0.2), Math.round(160 * 0.95));
+    out = bands.length >= 2 ? bands : [];
   } catch {
     out = [];
   }
   bandCache.set(img.src, out);
+  return out;
+}
+
+const snapCache = new Map<string, [number, number][]>();
+/**
+ * The page's own sections (from its layout) checked against the screenshot: a boundary that falls
+ * on content (a block's box can include margins, or end mid-way through a background) moves to the
+ * nearest real divider within reach, so a section never starts or ends through text or a picture.
+ */
+export function snapBands(img: HTMLImageElement, bands: [number, number][]): [number, number][] {
+  if (!img.naturalWidth || bands.length < 2) return bands;
+  const key = `${img.src}|${bands.map((b) => b[0].toFixed(4)).join(",")}`;
+  const hit = snapCache.get(key);
+  if (hit) return hit;
+  let out = bands;
+  try {
+    const { H, dividers, busy } = pageDividers(img);
+    const reach = Math.round(160 * 0.07);
+    const edges = bands.map((b) => b[0]).slice(1).map((f) => {
+      const y = Math.round(f * H);
+      // Already on an empty row: keep it.
+      if (busy[Math.min(H - 1, Math.max(0, y))] <= 0.02) return y;
+      const near = dividers.filter((d) => Math.abs(d.y - y) <= reach).sort((a, b) => b.score - a.score || Math.abs(a.y - y) - Math.abs(b.y - y));
+      return near.length ? near[0].y : y;
+    });
+    const cuts = [bands[0][0] * H, ...edges, bands[bands.length - 1][1] * H].sort((a, b) => a - b).filter((y, i, a) => i === 0 || y - a[i - 1] >= 2);
+    out = cuts.slice(0, -1).map((a, i) => [a / H, cuts[i + 1] / H] as [number, number]);
+  } catch {
+    out = bands;
+  }
+  snapCache.set(key, out);
   return out;
 }
 

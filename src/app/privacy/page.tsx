@@ -115,7 +115,7 @@ export default function Privacy() {
       <footer className="footer">
         <Logo />
         <span>
-          © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link> · <Link href="/licenses">Licences</Link>
+          © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
         </span>
       </footer>
     </main>

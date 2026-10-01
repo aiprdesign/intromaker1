@@ -135,7 +135,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
               type="email"
               value={form.contactEmail}
               maxLength={120}
-              placeholder="for upgrades and password resets"
+              placeholder="for commercial licences, upgrades and password resets"
               aria-invalid={emailBad}
               onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
             />

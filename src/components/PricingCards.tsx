@@ -4,43 +4,54 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DEFAULT_LIMITS, describeLimits, type PlanId, type PlanLimits } from "@/lib/plans";
 
-/** Free and Pro, with the limits the site owner has set (the defaults until they load). */
+/**
+ * Free and unlimited for now (with the limits the site owner has set, the defaults until they
+ * load), and a commercial licence on request.
+ */
 export default function PricingCards() {
   const [plans, setPlans] = useState<Record<PlanId, PlanLimits>>(DEFAULT_LIMITS);
-  const [proPrice, setProPrice] = useState<string | null>(null);
+  const [contact, setContact] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/account")
       .then((r) => r.json())
       .then((a) => {
         if (a.plans) setPlans(a.plans);
-        setProPrice(a.proPrice ?? null);
+        setContact(a.contactEmail ?? null);
       })
       .catch(() => {});
   }, []);
-  const cards = [
-    { id: "free" as const, name: "Free", price: "$0", period: "forever", intro: ["All 64 motion skills", "Generated soundtrack and voice-over"], cta: "Try for Free!", href: "/studio" },
-    { id: "pro" as const, name: "Pro", price: proPrice || "Ask us", period: "", intro: ["Everything in Free"], cta: "Get Pro", href: "/account", featured: true },
-  ];
+  const licenceHref = contact ? `mailto:${contact}?subject=${encodeURIComponent("IntroMaker commercial licence")}` : "/license";
   return (
     <div className="pricing two">
-      {cards.map((p) => (
-        <div className={`price-card ${p.featured ? "featured" : ""}`} key={p.id}>
-          {p.featured && <span className="badge">For launches</span>}
-          <h3>{p.name}</h3>
-          <div className="price">
-            {p.price}
-            <small>{p.period}</small>
-          </div>
-          <ul>
-            {[...p.intro, ...describeLimits(plans[p.id])].map((f) => (
-              <li key={f}>{f}</li>
-            ))}
-          </ul>
-          <Link href={p.href} className={`btn ${p.featured ? "btn-primary" : "btn-ghost"}`}>
-            {p.cta}
-          </Link>
+      <div className="price-card">
+        <h3>Free</h3>
+        <div className="price">
+          $0<small>unlimited, for now</small>
         </div>
-      ))}
+        <ul>
+          {["All 64 motion skills", "Generated soundtrack and voice-over", ...describeLimits(plans.free), "For personal and non-commercial use"].map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+        <Link href="/studio" className="btn btn-ghost">
+          Start making videos
+        </Link>
+      </div>
+      <div className="price-card featured">
+        <span className="badge">For business</span>
+        <h3>Commercial licence</h3>
+        <div className="price">
+          Contact us<small></small>
+        </div>
+        <ul>
+          {["Use IntroMaker for a business, a client or an agency", "Run it on your own servers or in your product", "Everything in Free, with no limits", "Terms to suit your use"].map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+        <a href={licenceHref} className="btn btn-primary">
+          Contact for a licence
+        </a>
+      </div>
     </div>
   );
 }

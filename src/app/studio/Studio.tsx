@@ -19,6 +19,8 @@ import { isLocalProvider } from "@/lib/providers";
 import TemplatePicker from "@/components/TemplatePicker";
 import TextFxPicker, { TEXT_FX_OPTIONS } from "@/components/TextFxPicker";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
+import { applyTrailerStyle, detectTrailerStyle, TRAILER_STYLE_MAP } from "@/engine/trailers";
+import TrailerStylePicker from "@/components/TrailerStylePicker";
 import { CONCEPT_MAP } from "@/engine/concepts";
 import Player from "@/components/Player";
 import VoicePanel, { loadVoiceSettings } from "@/components/VoicePanel";
@@ -93,6 +95,18 @@ export default function Studio() {
   const [style, setStyle] = useState<StyleChoice>("auto");
   const styleRef = useRef(style);
   styleRef.current = style;
+  // Trailer films: the trailer style ("auto" matches it to the product), remembered.
+  const [trailerStyle, setTrailerStyle] = useState<string>("auto");
+  const trailerStyleRef = useRef(trailerStyle);
+  trailerStyleRef.current = trailerStyle;
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("intromaker.trailer-style");
+      if (saved && (saved === "auto" || TRAILER_STYLE_MAP[saved])) setTrailerStyle(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [ai, setAi] = useState<AiSettingsValue>(DEFAULT_AI);
   const [aiOpen, setAiOpen] = useState(false);
   const [engineLabel, setEngineLabel] = useState("");
@@ -267,6 +281,42 @@ export default function Studio() {
     setPlan((p) => (p.style === "saas" ? applyBackground(applyTemplate(p, id, { palette: palette !== "auto" ? palette : undefined }), bgRef.current) : p));
     setVersion((v) => v + 1);
   };
+  /** The trailer style matched to this film's product (what Auto uses). */
+  const detectedTrailer = () =>
+    site
+      ? detectTrailerStyle([site.name, site.tagline, site.description, ...site.headlines].join(" ").toLowerCase(), "tech").id
+      : detectTrailerStyle(prompt.toLowerCase()).id;
+  /** Pick a trailer style: the trailer on screen restyles instantly, and new trailers use it. */
+  const chooseTrailerStyle = (id: string) => {
+    setTrailerStyle(id);
+    trailerStyleRef.current = id;
+    try {
+      localStorage.setItem("intromaker.trailer-style", id);
+    } catch {
+      /* ignore */
+    }
+    const use = id === "auto" ? detectedTrailer() : id;
+    setPlan((p) => (p.style === "trailer" ? applyTrailerStyle(p, use, { palette: palette !== "auto" ? palette : undefined }) : p));
+    setVersion((v) => v + 1);
+  };
+  /**
+   * Switch between Auto, SaaS launch and Epic trailer, applied straight away: a product video
+   * restyles instantly (a trailer style, or back to the studio look); any other film is remade in
+   * the new style from the same website or prompt.
+   */
+  const chooseStyle = (id: StyleChoice) => {
+    setStyle(id);
+    styleRef.current = id;
+    const p = planRef.current;
+    if (p.product) {
+      if (id === "trailer") chooseTemplate(TEMPLATE_MAP[templateRef.current]?.trailer ? templateRef.current : "drop", true);
+      else if (TEMPLATE_MAP[templateRef.current]?.trailer) chooseTemplate("studio", true);
+      return;
+    }
+    const hasFilm = p !== HERO_PLAN && (!!site || !!promptRef.current.trim() || !!prompt.trim());
+    const isTrailer = p.style === "trailer";
+    if (hasFilm && (id === "trailer" ? !isTrailer : isTrailer)) void generate({ prompt: promptRef.current || prompt });
+  };
   useEffect(() => setAi(loadAiSettings()), []);
   // Voice-over settings are the studio's (they follow you across storyboards); the lines live on scenes.
   const [voice, setVoice] = useState<VoiceSettings>(DEFAULT_VOICE);
@@ -402,11 +452,12 @@ export default function Studio() {
     const len = opts.length ?? length;
     const template = templateRef.current;
     const style = styleRef.current;
+    const trailerStyle = trailerStyleRef.current !== "auto" ? trailerStyleRef.current : undefined;
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     const aiCfg = aiForRequest(loadAiSettings());
     const safeCopy = safeRef.current;
     const shots = photosRef.current.length ? photosRef.current : undefined;
-    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, photos: shots, colors, style, ai: aiCfg, template, angle: opts.angle, safe: safeCopy, variant: opts.variant };
+    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, photos: shots, colors, style, trailerStyle, ai: aiCfg, template, angle: opts.angle, safe: safeCopy, variant: opts.variant };
     // Local AI runs where the model is: from this browser when the server is online.
     if (isLocalProvider(aiCfg.provider) && !localViaServerRef.current) {
       try {
@@ -434,8 +485,8 @@ export default function Studio() {
     } catch {
       // Offline or API unavailable: the director also runs in the browser.
       const plan = s
-        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, template, angle: opts.angle, safe: safeCopy, variant: opts.variant, direction: p })
-        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, template, safe: safeCopy, variant: opts.variant });
+        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, trailerStyle, template, angle: opts.angle, safe: safeCopy, variant: opts.variant, direction: p })
+        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, trailerStyle, template, safe: safeCopy, variant: opts.variant });
       return { plan, engine: "builtin", engineLabel: "", label };
     }
   };
@@ -458,6 +509,9 @@ export default function Studio() {
       setTemplate(suggested);
       templateRef.current = suggested;
     }
+    // A trailer style you picked applies to every trailer film (the AI director's too).
+    const ts = trailerStyleRef.current;
+    if (p.style === "trailer" && ts !== "auto" && p.trailerStyle !== ts) p = applyTrailerStyle(p, ts, { palette: palette !== "auto" ? palette : undefined });
     setPlan({ ...applyBackground(p, bgRef.current), scheme: schemeRef.current });
     setVersion((v) => v + 1);
     setEngine(take.engine);
@@ -1404,16 +1458,40 @@ export default function Studio() {
                 ["trailer", "Epic trailer"],
               ] as [StyleChoice, string][]
             ).map(([id, label]) => (
-              <button key={id} className={style === id ? "active" : ""} onClick={() => setStyle(id)}>
+              <button key={id} className={style === id ? "active" : ""} onClick={() => chooseStyle(id)} disabled={loading}>
                 {label}
               </button>
             ))}
           </div>
 
+          {style === "trailer" && !plan.product && (
+            <>
+              <label className="field-label">
+                Video style{" "}
+                <span className="tpl-desc">
+                  {TRAILER_STYLE_MAP[trailerStyle === "auto" ? (plan.style === "trailer" && plan.trailerStyle) || detectedTrailer() : trailerStyle]?.name}
+                </span>
+              </label>
+              <button
+                className={`chip auto-style ${trailerStyle === "auto" ? "active" : ""}`}
+                aria-pressed={trailerStyle === "auto"}
+                onClick={() => chooseTrailerStyle("auto")}
+                title="Each new trailer takes the style that matches your product"
+              >
+                ✦ Auto: matched to your product{trailerStyle === "auto" ? ` (${TRAILER_STYLE_MAP[detectedTrailer()]?.name})` : ""}
+              </button>
+              <TrailerStylePicker value={trailerStyle === "auto" ? "" : trailerStyle} onChange={chooseTrailerStyle} />
+              <p className="hint">
+                {TRAILER_STYLE_MAP[trailerStyle === "auto" ? detectedTrailer() : trailerStyle]?.description}
+                {plan.style !== "trailer" ? " Making the trailer…" : ""}
+              </p>
+            </>
+          )}
+
           {(style !== "trailer" || plan.product) && (
             <>
               <label className="field-label">
-                {plan.product ? "Product video style" : "SaaS template"} <span className="tpl-desc">{TEMPLATE_MAP[template]?.name}</span>
+                {plan.product ? (style === "trailer" ? "Trailer style" : "Product video style") : "SaaS template"} <span className="tpl-desc">{TEMPLATE_MAP[template]?.name}</span>
               </label>
               {plan.concept && plan.concept !== "general" && CONCEPT_MAP[plan.concept] && (
                 <div className="concept-hint">
@@ -1440,7 +1518,7 @@ export default function Studio() {
                 ✦ Auto: best style for your product
                 {autoStyle && suggestedFor(plan) ? ` (${TEMPLATE_MAP[suggestedFor(plan)!].name})` : ""}
               </button>
-              <TemplatePicker value={template} onChange={(id) => chooseTemplate(id)} />
+              <TemplatePicker value={template} onChange={(id) => chooseTemplate(id)} categories={plan.product && style === "trailer" ? ["Product Trailers"] : undefined} />
               <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
               <details className="fold">
                 <summary>

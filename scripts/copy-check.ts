@@ -8,6 +8,8 @@ import { cleanCta, contextCta, lowerFirst, offersFree } from "../src/engine/plan
 import { speakable } from "../src/engine/voice";
 import { applyTemplate, trailerBeats } from "../src/engine/templates";
 import type { VideoPlan } from "../src/engine/types";
+import { applyTrailerStyle, detectTrailerStyle, TRAILER_STYLES } from "../src/engine/trailers";
+import { planFromPrompt } from "../src/engine/planner";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -102,6 +104,19 @@ check(applyTemplate(cut, "noir").scenes.filter((x) => x.skill === "product-tease
 check(applyTemplate(cut, "studio").scenes[0].skill === "product-hero", "a clean style removes the cold open again");
 check(applyTemplate({ ...ad, target: 12 }, "drop").scenes[0].skill === "product-hero", "short films keep the trailer look without a cold open");
 check(applyTemplate({ ...ad, product: undefined }, "drop").scenes[0].skill === "product-hero", "software films get the look only");
+
+console.log("Trailer video styles");
+const trailer = planFromPrompt({ prompt: "Epic cinematic trailer for Nova, a racing game with fast cars", aspect: "16:9", length: "standard", style: "trailer" });
+check(trailer.style === "trailer" && !!trailer.trailerStyle, `a trailer is matched to a style (${trailer.trailerStyle})`);
+check(planFromPrompt({ prompt: "Epic cinematic trailer for Nova, a racing game with fast cars", aspect: "16:9", length: "standard", style: "trailer", trailerStyle: "luxury" }).palette === "gold", "a picked trailer style is used for new trailers");
+const lux = applyTrailerStyle(trailer, "luxury");
+check(lux.palette === "gold" && lux.bpm === 96 && lux.trailerStyle === "luxury", "picking a style restyles the trailer instantly (palette, tempo)");
+check(lux.scenes.every((x, i) => x.text === trailer.scenes[i].text), "restyling never changes the words");
+check(lux.scenes.every((x) => Math.abs(x.duration / (60 / 96) - Math.round(x.duration / (60 / 96))) < 1e-6), "scenes snap to the new tempo");
+const withLogo: VideoPlan = { ...trailer, scenes: trailer.scenes.map((x, i) => (i === 1 ? { ...x, skill: "logo-reveal" as const } : x)) };
+check(applyTrailerStyle(withLogo, "retro").scenes[1].skill === "logo-reveal", "scenes showing your material keep their slide");
+check(detectTrailerStyle("a luxury perfume and jewellery brand").id === "luxury" && detectTrailerStyle("plain words").id === "hype", "Auto matches the product's words, else the all-rounder");
+check(new Set(TRAILER_STYLES.map((t) => t.name)).size === TRAILER_STYLES.length && TRAILER_STYLES.length >= 12, `${TRAILER_STYLES.length} named trailer styles`);
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");
 process.exit(failed ? 1 : 0);

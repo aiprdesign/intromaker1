@@ -73,7 +73,8 @@ export default function Home() {
       <section className="section" id="pricing">
         <div className="section-head">
           <span className="eyebrow">Pricing</span>
-          <h2>Start free. Go epic.</h2>
+          <h2>Free and unlimited, for now.</h2>
+          <p className="lead">For personal and non-commercial use. Using it for business? Contact us for a commercial licence.</p>
         </div>
         <PricingCards />
       </section>
@@ -88,7 +89,7 @@ export default function Home() {
       <footer className="footer">
         <Logo />
         <span>
-          © {new Date().getFullYear()} IntroMaker. Rendered in your browser. · <Link href="/privacy">Privacy</Link> · <Link href="/licenses">Open-source licences</Link>
+          © {new Date().getFullYear()} IntroMaker. Rendered in your browser. · <Link href="/privacy">Privacy</Link> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
         </span>
       </footer>
     </main>

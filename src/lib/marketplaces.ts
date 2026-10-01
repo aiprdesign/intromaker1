@@ -222,18 +222,40 @@ export function titleFromLink(raw: string): string {
   return text === text.toLowerCase() ? text.replace(/\b([a-z])/g, (c) => c.toUpperCase()) : text;
 }
 
+/** Amazon's image-link service per store (the one Amazon provides for showing a product's photo). */
+const IMAGE_LINK: Record<string, [string, string]> = {
+  com: ["ws-na", "US"],
+  ca: ["ws-na", "CA"],
+  "com.mx": ["ws-na", "MX"],
+  "com.br": ["ws-na", "BR"],
+  "co.uk": ["ws-eu", "GB"],
+  de: ["ws-eu", "DE"],
+  fr: ["ws-eu", "FR"],
+  it: ["ws-eu", "IT"],
+  es: ["ws-eu", "ES"],
+  in: ["ws-in", "IN"],
+  "co.jp": ["ws-fe", "JP"],
+};
+
 /**
- * The product's main photo from Amazon's public image server, by its 10-character code, or null.
- * (An unknown code returns a 1×1 placeholder, so the response must be a real JPEG of some size.)
+ * The product's main photo by its 10-character code, or null: Amazon's public image server, then
+ * Amazon's own image-link service for the listing's store. (An unknown code returns a small
+ * placeholder, so the response must be a real JPEG of some size.) Returns the photo's final address.
  */
-export async function amazonImageByAsin(asin: string): Promise<string | null> {
-  for (const url of [`https://m.media-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_SX1500_.jpg`, `https://images-na.ssl-images-amazon.com/images/P/${asin}.01.L.jpg`]) {
+export async function amazonImageByAsin(asin: string, tld = "com"): Promise<string | null> {
+  const [ws, market] = IMAGE_LINK[tld] ?? IMAGE_LINK.com;
+  const sources = [
+    `https://m.media-amazon.com/images/P/${asin}.01._SCLZZZZZZZ_SX1500_.jpg`,
+    `https://images-na.ssl-images-amazon.com/images/P/${asin}.01.L.jpg`,
+    `https://${ws}.amazon-adsystem.com/widgets/q?_encoding=UTF8&ASIN=${asin}&Format=_SL1500_&ID=AsinImage&MarketPlace=${market}&ServiceVersion=20070822&WS=1`,
+  ];
+  for (const url of sources) {
     try {
       const res = await safeFetch(url, { headers: { Accept: "image/*" } });
       if (!res.ok) continue;
       const type = res.headers.get("content-type") ?? "";
       const size = (await res.arrayBuffer()).byteLength;
-      if (type.startsWith("image/jpeg") && size > 2000) return url;
+      if (type.startsWith("image/jpeg") && size > 2000) return res.url && /^https:\/\//.test(res.url) ? res.url : url;
     } catch {
       /* try the next address */
     }
