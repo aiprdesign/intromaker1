@@ -331,7 +331,37 @@ async function captureLogo(page: Page, key: string): Promise<string | null> {
     const bg = [0, 1, 2].map((k) => corners.reduce((a, i) => a + px[i + k], 0) / 4);
     const uniform = corners.every((i) => Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) < 30);
     if (uniform) {
+      // Only the background connected to the shot's edges is cleared (plus a soft band around
+      // it): white or black inside the logo (a white letter in a dark badge) is part of it.
+      const W = c.width;
+      const H = c.height;
+      const dist0 = (p: number) => Math.abs(px[p * 4] - bg[0]) + Math.abs(px[p * 4 + 1] - bg[1]) + Math.abs(px[p * 4 + 2] - bg[2]);
+      const outside = new Uint8Array(W * H);
+      const stack: number[] = [];
+      const seed = (p: number) => {
+        if (!outside[p] && dist0(p) < 60) {
+          outside[p] = 1;
+          stack.push(p);
+        }
+      };
+      for (let x = 0; x < W; x++) {
+        seed(x);
+        seed((H - 1) * W + x);
+      }
+      for (let y = 0; y < H; y++) {
+        seed(y * W);
+        seed(y * W + W - 1);
+      }
+      while (stack.length) {
+        const p = stack.pop()!;
+        const x = p % W;
+        if (x > 0) seed(p - 1);
+        if (x < W - 1) seed(p + 1);
+        if (p >= W) seed(p - W);
+        if (p < W * (H - 1)) seed(p + W);
+      }
       for (let i = 0; i < px.length; i += 4) {
+        if (!outside[i / 4]) continue;
         const dist = Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]);
         // Soft edge: clear on the background colour, fading in over a small band…
         const a = Math.min(1, Math.max(0, (dist - 18) / 70));

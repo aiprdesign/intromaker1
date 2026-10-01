@@ -56,13 +56,19 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
       if (white((y * W + x) * 4, 236)) whiteBorder++;
     }
     if (whiteBorder / border >= 0.8) {
+      // The studio background's own colour (the border's median): only pixels within a hair of it
+      // are background, so a white or light product (and its highlights) is never eaten.
+      const samples: number[][] = [];
+      for (let x = 0; x < W; x += 3) for (const y of [0, H - 1]) samples.push([px[(y * W + x) * 4], px[(y * W + x) * 4 + 1], px[(y * W + x) * 4 + 2]]);
+      for (let y = 0; y < H; y += 3) for (const x of [0, W - 1]) samples.push([px[(y * W + x) * 4], px[(y * W + x) * 4 + 1], px[(y * W + x) * 4 + 2]]);
+      const med = [0, 1, 2].map((ch) => samples.map((v) => v[ch]).sort((a, b) => a - b)[samples.length >> 1]);
+      const near = (i: number, tol: number) => px[i + 3] > 200 && Math.abs(px[i] - med[0]) <= tol && Math.abs(px[i + 1] - med[1]) <= tol && Math.abs(px[i + 2] - med[2]) <= tol;
       // Flood the background in from the edges.
       const bg = new Uint8Array(W * H);
       const stack: number[] = [];
       const seed = (x: number, y: number) => {
         const p = y * W + x;
-        // Strict: only near-pure white is background, so a white product's highlights survive.
-        if (!bg[p] && white(p * 4, 243)) {
+        if (!bg[p] && near(p * 4, 6)) {
           bg[p] = 1;
           stack.push(p);
         }
@@ -92,11 +98,13 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
             px[p * 4 + 3] = 0;
             continue;
           }
-          // Soft edge: light pixels touching the background fade with their lightness.
+          // Soft edge: only anti-aliased pixels that are nearly the background colour fade (by how
+          // close they are), so the product's own light edges keep full strength.
           const edge = (x > 0 && bg[p - 1]) || (x < W - 1 && bg[p + 1]) || (y > 0 && bg[p - W]) || (y < H - 1 && bg[p + W]);
-          if (edge) {
-            const m = Math.min(px[p * 4], px[p * 4 + 1], px[p * 4 + 2]);
-            px[p * 4 + 3] = Math.round(px[p * 4 + 3] * clamp((255 - m) / 60 + 0.35));
+          if (edge && near(p * 4, 24)) {
+            const i = p * 4;
+            const diff = Math.max(Math.abs(px[i] - med[0]), Math.abs(px[i + 1] - med[1]), Math.abs(px[i + 2] - med[2]));
+            px[i + 3] = Math.round(px[i + 3] * clamp(0.4 + (diff / 24) * 0.6));
           }
           if (x < x0) x0 = x;
           if (x > x1) x1 = x;

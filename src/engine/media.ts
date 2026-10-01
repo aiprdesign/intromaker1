@@ -394,7 +394,7 @@ function stepDown(src: HTMLCanvasElement, bucket: number): HTMLCanvasElement {
 }
 
 /** Clean a raster logo once, at a working size of at least ~1200px on its long side. */
-function prepareRaster(img: HTMLImageElement, lightStage: boolean): HTMLCanvasElement | null {
+export function prepareRaster(img: HTMLImageElement, lightStage: boolean): HTMLCanvasElement | null {
   const long = Math.max(img.naturalWidth, img.naturalHeight);
   const fit = Math.min(1, 2048 / long);
   const w0 = Math.max(1, Math.round(img.naturalWidth * fit));
@@ -481,13 +481,87 @@ function keyWhite(px: Uint8ClampedArray, w: number, h: number) {
   for (let x = 0; x < w; x++) border.push(x, (h - 1) * w + x);
   for (let y = 0; y < h; y++) border.push(y * w, y * w + w - 1);
   fill(border, bg, 1);
-  // Enclosed light regions: background when their rim is neutral ink.
+  // Enclosed light regions: the holes in letters ("o", "e", "a") are background too, but white
+  // that is part of the design stays: a white letter or symbol knocked out of a solid badge or
+  // pill, a large white area, or white inside a coloured mark.
+  // Ink components (connected non-light pixels), to tell thin letter strokes from solid shapes.
+  const comp = new Int32Array(n).fill(-1);
+  const comps: { area: number; x0: number; y0: number; x1: number; y1: number }[] = [];
+  for (let p = 0; p < n; p++) {
+    if (comp[p] >= 0 || light(p)) continue;
+    const id = comps.length;
+    const c = { area: 0, x0: w, y0: h, x1: 0, y1: 0 };
+    comps.push(c);
+    const stack = [p];
+    comp[p] = id;
+    while (stack.length) {
+      const q = stack.pop()!;
+      const x = q % w;
+      const y = (q - x) / w;
+      c.area++;
+      if (x < c.x0) c.x0 = x;
+      if (x > c.x1) c.x1 = x;
+      if (y < c.y0) c.y0 = y;
+      if (y > c.y1) c.y1 = y;
+      for (const r of [x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1, q >= w ? q - w : -1, q < n - w ? q + w : -1]) {
+        if (r >= 0 && comp[r] < 0 && !light(r)) {
+          comp[r] = id;
+          stack.push(r);
+        }
+      }
+    }
+  }
+  // How solid a component is: its ink over its filled shape (ink plus the holes it encloses). A
+  // letter's ring is thin (an "o" is ~0.5–0.75 ink); a badge with a knocked-out glyph is ~0.8+.
+  const solidity = new Map<number, number>();
+  const solidOf = (id: number) => {
+    const hit = solidity.get(id);
+    if (hit !== undefined) return hit;
+    const c = comps[id];
+    const bw = c.x1 - c.x0 + 1;
+    const bh = c.y1 - c.y0 + 1;
+    const out = new Uint8Array(bw * bh);
+    const stack: number[] = [];
+    const seed = (x: number, y: number) => {
+      const k = (y - c.y0) * bw + (x - c.x0);
+      if (!out[k] && comp[y * w + x] !== id) {
+        out[k] = 1;
+        stack.push(k);
+      }
+    };
+    for (let x = c.x0; x <= c.x1; x++) {
+      seed(x, c.y0);
+      seed(x, c.y1);
+    }
+    for (let y = c.y0; y <= c.y1; y++) {
+      seed(c.x0, y);
+      seed(c.x1, y);
+    }
+    let outside = 0;
+    while (stack.length) {
+      const k = stack.pop()!;
+      outside++;
+      const x = (k % bw) + c.x0;
+      const y = Math.floor(k / bw) + c.y0;
+      if (x > c.x0) seed(x - 1, y);
+      if (x < c.x1) seed(x + 1, y);
+      if (y > c.y0) seed(x, y - 1);
+      if (y < c.y1) seed(x, y + 1);
+    }
+    const filled = bw * bh - outside;
+    const v = filled > 0 ? c.area / filled : 1;
+    solidity.set(id, v);
+    return v;
+  };
+  // Each enclosed light region, with the ink component that surrounds it.
   const seen = new Uint8Array(n);
+  const regions: { px: number[]; owner: number; neutral: boolean }[] = [];
   for (let p = 0; p < n; p++) {
     if (bg[p] || seen[p] || !light(p)) continue;
     const region = fill([p], seen, 1);
     let rim = 0;
     let coloured = 0;
+    const owners = new Map<number, number>();
     for (const q of region) {
       const x = q % w;
       for (const r of [x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1, q - w, q + w]) {
@@ -497,9 +571,37 @@ function keyWhite(px: Uint8ClampedArray, w: number, h: number) {
         const mn = Math.min(px[i], px[i + 1], px[i + 2]);
         rim++;
         if (mx - mn > 40) coloured++;
+        owners.set(comp[r], (owners.get(comp[r]) ?? 0) + 1);
       }
     }
-    if (rim && coloured / rim < 0.5) for (const q of region) bg[q] = 1;
+    const owner = [...owners.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? -1;
+    regions.push({ px: region, owner, neutral: rim > 0 && coloured / rim < 0.5 });
+  }
+  // A single letter encloses one or two holes; a shape with text knocked out of it ("ACME" in a
+  // pill) encloses several white regions, and those are its lettering.
+  const holes = new Map<number, number>();
+  for (const r of regions) holes.set(r.owner, (holes.get(r.owner) ?? 0) + 1);
+  for (const { px: region, owner, neutral } of regions) {
+    // White inside a coloured mark is part of the logo.
+    if (!neutral) continue;
+    // Large white areas are design, not letter holes.
+    if (region.length > n * 0.03) continue;
+    if (owner >= 0 && (holes.get(owner) ?? 0) >= 3) continue;
+    // A letter's hole is a compact blob (it fills ~0.6–0.8 of its box); a white letter or symbol
+    // knocked out of a badge ("N", "A", "C") is a stroke shape that fills much less of its box.
+    let rx0 = w, ry0 = h, rx1 = 0, ry1 = 0;
+    for (const q of region) {
+      const x = q % w;
+      const y = (q - x) / w;
+      if (x < rx0) rx0 = x;
+      if (x > rx1) rx1 = x;
+      if (y < ry0) ry0 = y;
+      if (y > ry1) ry1 = y;
+    }
+    if (region.length / ((rx1 - rx0 + 1) * (ry1 - ry0 + 1)) < 0.55) continue;
+    // White inside a very solid shape (a small dot in a big badge) is part of the logo too.
+    if (owner >= 0 && solidOf(owner) >= 0.9) continue;
+    for (const q of region) bg[q] = 1;
   }
   // Edge band: background plus two pixels around it.
   let band = bg;
@@ -611,14 +713,94 @@ function adaptInk(g: CanvasRenderingContext2D, w: number, h: number, lightStage:
     if (inkness(i) > 0.5) ink++;
   }
   if (!(opaque > 0 && opaque < (px.length / 4) * 0.92 && ink / opaque > 0.06)) return;
-  const to = lightStage ? [17, 17, 24] : [255, 255, 255];
-  for (let i = 0; i < px.length; i += 4) {
-    if (px[i + 3] < 4) continue;
-    const k = inkness(i);
-    if (k <= 0) continue;
-    for (let c = 0; c < 3; c++) px[i + c] = Math.round(px[i + c] + (to[c] - px[i + c]) * k);
+  // Only wordmark ink is adapted: connected ink that sits on the transparent background. Ink
+  // enclosed by the logo's own colours (white text in a coloured badge, black text in a white
+  // pill) and solid neutral shapes (the pill itself) keep their colour.
+  const n = w * h;
+  const inkAt = new Float32Array(n);
+  for (let p = 0; p < n; p++) inkAt[p] = px[p * 4 + 3] >= 4 ? inkness(p * 4) : 0;
+  const label = new Int32Array(n).fill(-1);
+  const adapt = new Uint8Array(0 + n);
+  for (let p = 0; p < n; p++) {
+    if (label[p] >= 0 || inkAt[p] <= 0.05) continue;
+    const members: number[] = [];
+    const stack = [p];
+    label[p] = p;
+    let onClear = false;
+    let x0 = w, y0 = h, x1 = 0, y1 = 0;
+    while (stack.length) {
+      const q = stack.pop()!;
+      members.push(q);
+      const x = q % w;
+      const y = (q - x) / w;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      for (const r of [x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1, q >= w ? q - w : -1, q < n - w ? q + w : -1]) {
+        if (r < 0) {
+          onClear = true;
+          continue;
+        }
+        if (px[r * 4 + 3] < 40) onClear = true;
+        else if (label[r] < 0 && inkAt[r] > 0.05) {
+          label[r] = p;
+          stack.push(r);
+        }
+      }
+    }
+    // A shape that holds other opaque content (a badge with a letter in it, a pill with text) is
+    // a container: recolouring it would hide what's inside. A letter's holes are transparent.
+    let container = false;
+    if (onClear) {
+      const bw = x1 - x0 + 1;
+      const bh = y1 - y0 + 1;
+      const mine = new Uint8Array(bw * bh);
+      for (const q of members) mine[(Math.floor(q / w) - y0) * bw + ((q % w) - x0)] = 1;
+      const out = new Uint8Array(bw * bh);
+      const st: number[] = [];
+      const seed = (k: number) => {
+        if (!out[k] && !mine[k]) {
+          out[k] = 1;
+          st.push(k);
+        }
+      };
+      for (let x = 0; x < bw; x++) {
+        seed(x);
+        seed((bh - 1) * bw + x);
+      }
+      for (let y = 0; y < bh; y++) {
+        seed(y * bw);
+        seed(y * bw + bw - 1);
+      }
+      while (st.length) {
+        const k = st.pop()!;
+        const x = k % bw;
+        if (x > 0) seed(k - 1);
+        if (x < bw - 1) seed(k + 1);
+        if (k >= bw) seed(k - bw);
+        if (k < bw * (bh - 1)) seed(k + bw);
+      }
+      let inside = 0;
+      for (let k = 0; k < bw * bh; k++) {
+        if (mine[k] || out[k]) continue;
+        const q = (Math.floor(k / bw) + y0) * w + (k % bw) + x0;
+        if (px[q * 4 + 3] >= 40) inside++;
+      }
+      container = inside > Math.max(4, members.length * 0.005);
+    }
+    if (onClear && !container) for (const q of members) adapt[q] = 1;
   }
-  g.putImageData(d, 0, 0);
+  const to = lightStage ? [17, 17, 24] : [255, 255, 255];
+  let changed = false;
+  for (let p = 0; p < n; p++) {
+    if (!adapt[p]) continue;
+    const i = p * 4;
+    const k = inkAt[p];
+    for (let c = 0; c < 3; c++) px[i + c] = Math.round(px[i + c] + (to[c] - px[i + c]) * k);
+    changed = true;
+  }
+  if (changed) g.putImageData(d, 0, 0);
 }
 
 /* ───────── Brand colours ───────── */
