@@ -59,6 +59,7 @@ export const SKILL_IDS = [
   "liquid-logo",
   "qr-end",
   "product-hero",
+  "product-end",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -355,6 +356,8 @@ export interface SkillContext {
   noStage?: boolean;
   /** Product concept id (see concepts.ts) for on-brand icon choices. */
   concept?: string;
+  /** A physical product film: product photos are shown cut out of their white backgrounds. */
+  product?: boolean;
   /** The score at this moment, so motion can hit with the music (full-film renders only). */
   music?: MusicPulse;
 }

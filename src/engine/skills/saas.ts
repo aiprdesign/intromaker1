@@ -1296,7 +1296,7 @@ function marquee(sc: SkillContext) {
 
 /* ───────────────────────── CTA Lock-up ───────────────────────── */
 
-function ctaTiming(d: number, beat: number) {
+export function ctaTiming(d: number, beat: number) {
   // The click lands on a beat, with the score's final chord (see arrange.ts).
   const click = ctaClickAt(d, beat);
   const hover = click - 0.4;
@@ -1379,20 +1379,31 @@ function ctaLockup(sc: SkillContext) {
   }
   const layout = sentence(sc, { text: accented(scene.text), cy: h * (hasLogo ? 0.44 : 0.4), sizeFrac: 0.1, widthFrac: 0.8, maxLines: 2 });
   blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt: d + 1 });
-  // Button.
+  const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + 80 * u;
+  const button = ctaButton(sc, w / 2, by, S, T);
+  ctx.restore();
+  ctaCursor(sc, w / 2 + button.bw * 0.1, by + 4 * u, T);
+}
+
+/**
+ * The end card's button: springs in, glows on hover, presses on the click beat with a ripple and a
+ * shimmer; the domain pill follows beneath. Returns its size.
+ */
+export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T: ReturnType<typeof ctaTiming>) {
+  const { ctx, t, u, palette, scene, brand } = sc;
+  const ex = 0;
   const label = scene.subtext || "Get started";
   const bk = clamp(spring(t - T.button, 11, 7), 0, 1.08);
   const press = Math.max(0, 1 - Math.abs(t - T.click) / 0.12);
   const released = clamp(spring(t - T.click - 0.1, 14, 9));
   const bScale = (0.8 + 0.2 * bk) * (1 - press * 0.05) * (t > T.click ? 0.97 + 0.03 * released : 1);
   const hover = ease.outCubic(range(t, T.hover, T.hover + 0.25));
-  const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + 80 * u;
   ctx.save();
   ctx.font = subFont(32 * u * S, 700);
   const bw = ctx.measureText(`${label}  →`).width + 84 * u * S;
   const bh = 82 * u * S;
   ctx.globalAlpha = clamp(bk * 2) * (1 - ex);
-  ctx.translate(w / 2, by);
+  ctx.translate(cx, by);
   ctx.scale(bScale, bScale);
   // Glow grows on hover, bursts on click.
   const burst = range(t, T.click, T.click + 0.6);
@@ -1422,28 +1433,32 @@ function ctaLockup(sc: SkillContext) {
   ctx.textBaseline = "middle";
   ctx.fillText(`${label}  →`, 0, 1 * u);
   ctx.restore();
-  borderBeam(sc, w / 2 - bw / 2 - 6 * u, by - bh / 2 - 6 * u, bw + 12 * u, bh + 12 * u, t * 0.6, { r: bh / 2 + 6 * u, alpha: clamp(bk) * (1 - ex) });
-  clickRipple(sc, w / 2 + bw * 0.1, by, range(t, T.click, T.click + 0.6), "#ffffff");
+  borderBeam(sc, cx - bw / 2 - 6 * u, by - bh / 2 - 6 * u, bw + 12 * u, bh + 12 * u, t * 0.6, { r: bh / 2 + 6 * u, alpha: clamp(bk) * (1 - ex) });
+  clickRipple(sc, cx + bw * 0.1, by, range(t, T.click, T.click + 0.6), "#ffffff");
   // Domain pill.
   const dk = ease.outCubic(range(t, T.click + 0.2, T.click + 0.7));
   if (brand?.domain && dk > 0) {
     ctx.save();
     ctx.globalAlpha = dk;
-    pill(sc, brand.domain, w / 2, by + bh / 2 + 62 * u * S + (1 - dk) * 14 * u, {
+    pill(sc, brand.domain, cx, by + bh / 2 + 62 * u * S + (1 - dk) * 14 * u, {
       size: 26 * u * S,
       fill: rgba(palette.light ? "#ffffff" : palette.bg0, 0.6),
       border: rgba(palette.text, 0.18),
     });
     ctx.restore();
   }
-  ctx.restore();
-  // Cursor.
+  return { bw, bh };
+}
+
+/** The cursor glides in to the button, clicks on the beat, and leaves. */
+export function ctaCursor(sc: SkillContext, tx: number, ty: number, T: ReturnType<typeof ctaTiming>) {
+  const { t, w, h } = sc;
+  const press = Math.max(0, 1 - Math.abs(t - T.click) / 0.12);
   const start = { x: w * 0.82, y: h * 1.05 };
-  const target = { x: w / 2 + bw * 0.1, y: by + 4 * u };
   const k = ease.inOutCubic(range(t, T.button + 0.1, T.hover + 0.2));
   const away = ease.inCubic(range(t, T.click + 0.6, T.click + 1.3));
   if (t > T.button) {
-    drawCursor(sc, lerp(lerp(start.x, target.x, k), w * 1.1, away), lerp(lerp(start.y, target.y, k), h * 1.1, away), press);
+    drawCursor(sc, lerp(lerp(start.x, tx, k), w * 1.1, away), lerp(lerp(start.y, ty, k), h * 1.1, away), press);
   }
 }
 

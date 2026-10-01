@@ -1,6 +1,7 @@
 import { parse, type HTMLElement } from "node-html-parser";
 import type { SiteData } from "@/engine/types";
 import { captureSite } from "./capture";
+import { networkProblem } from "./scrape";
 import { assertPublicUrl, safeFetch, UrlError } from "./netguard";
 
 /**
@@ -278,6 +279,8 @@ export async function scrapeListing(rawUrl: string, market: Market): Promise<Sit
   const url = /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`;
   let html = "";
   let finalUrl = url;
+  // A connection problem (the store is down) is reported as that, not as the marketplace blocking us.
+  let down: UrlError | null = null;
   try {
     const res = await safeFetch(url, { headers: { Accept: "text/html,application/xhtml+xml", "Accept-Language": "en-GB,en;q=0.9" } });
     finalUrl = res.url || url;
@@ -286,6 +289,8 @@ export async function scrapeListing(rawUrl: string, market: Market): Promise<Sit
   } catch (e) {
     if (e instanceof UrlError && e.code === "notfound") throw e;
     if (e instanceof UrlError && ["dns", "invalid"].includes(e.code)) throw e;
+    const p = e instanceof UrlError ? e : networkProblem(e, new URL(url));
+    if (["refused", "timeout", "tls", "unreachable"].includes(p.code)) down = p;
   }
   // Short links (amzn.to) land on the listing itself.
   const landed = marketOf(finalUrl) ?? market;
@@ -296,7 +301,7 @@ export async function scrapeListing(rawUrl: string, market: Market): Promise<Sit
     if (live?.html && !BLOCKED.test(live.html.slice(0, 20_000))) {
       html = live.html;
       finalUrl = live.finalUrl || finalUrl;
-    } else throw blockedError(landed);
+    } else throw down ?? blockedError(landed);
   }
   const site = readListing(html || "<html></html>", new URL(finalUrl), landed, shop);
   if (!site) throw blockedError(landed);

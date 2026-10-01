@@ -20,6 +20,7 @@ import { getImage, getMedia, type Drawable } from "../media";
 import { glassCard, pill, saasBackground, sentence, blurInLayout } from "../saasfx";
 import { scratch } from "../scratch";
 import { subFont } from "../text";
+import { studioCard } from "./product";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { topHeadline } from "./saas";
 
@@ -45,8 +46,13 @@ export function gallery(sc: SkillContext, want: number, aspect = 1.6): Img[] {
     seen.add(key);
     out.push(fitted(d, key, aspect, sc.palette, ui));
   };
-  if (scene.media) add(getMedia(scene.media, t), scene.media.src, !!brand?.parts?.some((p) => p.src === scene.media!.src));
-  for (const src of brand?.images ?? []) add(getImage(src), src);
+  // Product films show their white-background photos cut out on a studio card.
+  const photo = (src: string) => {
+    const img = getImage(src);
+    return img && sc.product && img.naturalWidth ? studioCard(img, src, aspect, sc.palette) : img;
+  };
+  if (scene.media) add(scene.media.kind === "image" ? photo(scene.media.src) : getMedia(scene.media, t), scene.media.src, !!brand?.parts?.some((p) => p.src === scene.media!.src));
+  for (const src of brand?.images ?? []) add(photo(src), src);
   for (const p of (brand?.parts ?? []).filter((p) => p.kind !== "button" && p.w * p.h > 120 * 90).sort((a, b) => b.w * b.h - a.w * a.h)) add(getImage(p.src), p.src, true);
   for (let i = 0; out.length < Math.max(3, Math.min(want, 3)); i++) out.push(mockShot(sc.palette, sc.seed + i, i));
   return out.slice(0, Math.max(want, 3));

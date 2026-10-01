@@ -67,6 +67,7 @@ export interface RenderOptions {
 type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   bpm?: number;
   brand?: VideoPlan["brand"];
+  product?: boolean;
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
@@ -121,6 +122,7 @@ function drawScene(
     look: plan.textFx ? { ...(plan.look ?? NO_LOOK), text: plan.textFx } : plan.look,
     globalT,
     concept: plan.concept,
+    product: plan.product,
     music,
   };
   resetCtx(target);

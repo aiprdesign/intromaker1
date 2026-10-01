@@ -297,7 +297,7 @@ function productBrief(c: Ctx) {
     `\nPRODUCT VIDEO: this is a physical product (from ${from}); every ASSETS image is a product photo. Film it like a product ad: ` +
     `product-hero for the reveal (media = the main photo, headline = the product name, subtext = "by <brand>" or a short line) and again for 2-4 feature callouts ` +
     `(items = short feature titles from the listing's bullet points, 1-4 words each), gallery-flow or carousel-3d with the photos (3+ photos), tilt-wall as the hook with 4+ photos, ` +
-    `feature-slides for long films ("Title — one-line benefit" with photos), and cta last (subtext = "Shop now" unless the listing's own button says otherwise). ` +
+    `feature-slides for long films ("Title — one-line benefit" with photos), and product-end last (media = the main photo, headline = the closing line, subtext = "Shop now" unless the listing's own button says otherwise). ` +
     `No software moments: no ui-tour, site-scroll, ui-assemble, command-k, ai-prompt, click-flow, notify-stack, kanban, code-deploy, chart-grow, integrations or logo-reveal. ` +
     `Never mention prices, discounts, ratings or reviews.`
   );

@@ -5,13 +5,13 @@
  * Everything stays level: the product rises and floats straight, it never tilts.
  */
 import { exitT } from "../fx";
-import { clamp, ease, range, rgba } from "../math";
+import { clamp, ease, mixHex, range, rgba } from "../math";
 import { getImage } from "../media";
 import { blurInLayout, drawIcon, glassCard, iconsFor, saasBackground, sentence, spring } from "../saasfx";
 import { scratch } from "../scratch";
 import { subFont } from "../text";
-import type { Scene, SfxCue, Skill, SkillContext } from "../types";
-import { topHeadline } from "./saas";
+import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
+import { ctaButton, ctaCursor, ctaTiming, topHeadline } from "./saas";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 
@@ -118,6 +118,60 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
   }
   cuts.set(key, out);
   return out;
+}
+
+const cards = new Map<string, HTMLCanvasElement>();
+/**
+ * A product photo as a studio card for galleries: the cut-out product on a soft gradient in the
+ * film's colours with a floor shadow, instead of a flat white rectangle. Photos that aren't on a
+ * white background (lifestyle shots) are returned as they are.
+ */
+export function studioCard(img: HTMLImageElement, key: string, aspect: number, p: Palette): HTMLCanvasElement | HTMLImageElement {
+  const cut = productCutout(img, key);
+  if (!cut?.cut) return img;
+  const id = `${key}@${aspect.toFixed(2)}${p.bg0}${p.primary}`;
+  const hit = cards.get(id);
+  if (hit) return hit;
+  const ch = 900;
+  const cw = Math.round(ch * aspect);
+  const c = document.createElement("canvas");
+  c.width = cw;
+  c.height = ch;
+  const g = c.getContext("2d")!;
+  const top = p.light ? mixHex(p.bg1, p.primary, 0.05) : mixHex(p.bg1, p.primary, 0.14);
+  const floor = p.light ? mixHex(p.bg0, p.text, 0.06) : mixHex(p.bg0, "#000000", 0.25);
+  const bg = g.createLinearGradient(0, 0, 0, ch);
+  bg.addColorStop(0, top);
+  bg.addColorStop(0.68, p.light ? p.bg1 : mixHex(p.bg1, p.bg0, 0.4));
+  bg.addColorStop(1, floor);
+  g.fillStyle = bg;
+  g.fillRect(0, 0, cw, ch);
+  const spot = g.createRadialGradient(cw / 2, ch * 0.42, 0, cw / 2, ch * 0.42, Math.max(cw, ch) * 0.55);
+  spot.addColorStop(0, rgba(p.light ? "#ffffff" : p.primary, p.light ? 0.8 : 0.22));
+  spot.addColorStop(1, rgba(p.light ? "#ffffff" : p.primary, 0));
+  g.fillStyle = spot;
+  g.fillRect(0, 0, cw, ch);
+  const src = cut.canvas;
+  const k = Math.min((cw * 0.7) / src.width, (ch * 0.7) / src.height);
+  const pw = src.width * k;
+  const ph = src.height * k;
+  const x = (cw - pw) / 2;
+  const y = (ch - ph) / 2 - ch * 0.03;
+  g.save();
+  g.translate(cw / 2, y + ph + ch * 0.015);
+  g.scale(1, 0.12);
+  const sh = g.createRadialGradient(0, 0, 0, 0, 0, pw * 0.6);
+  sh.addColorStop(0, `rgba(0,0,0,${p.light ? 0.3 : 0.6})`);
+  sh.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = sh;
+  g.beginPath();
+  g.arc(0, 0, pw * 0.6, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+  g.imageSmoothingQuality = "high";
+  g.drawImage(src, x, y, pw, ph);
+  cards.set(id, c);
+  return c;
 }
 
 /** The scene's product photo: its own media, else the first listing image. */
@@ -355,6 +409,45 @@ function productHero(sc: SkillContext) {
   });
 }
 
+/**
+ * Product End Card: the product beside the closing line and the button (stacked in vertical
+ * films), with the brand above the line. The button presses on the final beat, like the SaaS
+ * end card; the product keeps floating so the last frame is a clean thumbnail.
+ */
+function productEnd(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, brand } = sc;
+  saasBackground(sc, { beams: 0, grid: false });
+  const portrait = h > w;
+  const T = ctaTiming(d, sc.beat);
+  const k = clamp(spring(t - 0.05, 7, 6), 0, 1.06);
+  const S = portrait ? 1.3 : 1;
+  // The product: left of centre (landscape) or above the text (portrait).
+  const box = portrait ? { cx: w / 2, cy: h * 0.33, w: w * 0.74, h: h * 0.34 } : { cx: w * 0.31, cy: h * 0.47, w: w * 0.34, h: h * 0.48 };
+  drawProduct(sc, box.cx, box.cy, box.w, box.h, k, clamp(t / 0.25));
+  const tx = portrait ? w / 2 : w * 0.68;
+  // Brand name above the line.
+  const nk = ease.outCubic(range(t, 0.25, 0.7));
+  const nameY = portrait ? h * 0.58 : h * 0.3;
+  if (brand?.name && nk > 0) {
+    ctx.save();
+    ctx.globalAlpha = nk;
+    ctx.font = subFont(30 * u * S, 700);
+    ctx.fillStyle = rgba(palette.text, 0.7);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(brand.name.toUpperCase().split("").join("\u200A"), tx, nameY + (1 - nk) * 10 * u);
+    ctx.restore();
+  }
+  const layout = sentence(sc, { cy: portrait ? h * 0.66 : h * 0.44, sizeFrac: portrait ? 0.1 : 0.085, widthFrac: portrait ? 0.86 : 0.5, maxLines: 2 });
+  ctx.save();
+  ctx.translate(tx - w / 2, 0);
+  blurInLayout(sc, layout, 0.3, 0.07, { exitAt: d + 1 });
+  ctx.restore();
+  const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + 70 * u;
+  const button = ctaButton(sc, tx, by, S, T);
+  ctaCursor(sc, tx + button.bw * 0.1, by + 4 * u, T);
+}
+
 export const productSkills: Skill[] = [
   {
     id: "product-hero",
@@ -368,6 +461,18 @@ export const productSkills: Skill[] = [
     sfx: (scene, beat) => {
       const T = heroTiming(scene, beat);
       return [at(0.05, "whoosh"), at(T.land + 0.35, "shimmer"), ...T.calls.map((c) => at(c, "pop"))];
+    },
+  },
+  {
+    id: "product-end",
+    name: "Product End Card",
+    tagline: "The product beside the closing line and a button that presses on the final beat.",
+    bestFor: "The last scene of a product video. Headline = closing line ('Get yours *today*'); subtext = the button label ('Shop now'); media = the product photo.",
+    sample: { text: "Get yours *today*", subtext: "Shop now" },
+    render: productEnd,
+    sfx: (scene, beat) => {
+      const T = ctaTiming(scene.duration, beat);
+      return [at(0.05, "whoosh"), at(T.button, "pop"), at(T.click, "click"), at(T.click + 0.05, "success")];
     },
   },
 ];

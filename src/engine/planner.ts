@@ -1760,11 +1760,12 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   for (let i = 1; i < scenes.length; i++) if (scenes[i].skill === "product-hero" && scenes[i - 1].skill === "product-hero" && icons) scenes[i] = { ...icons };
   // The end card: the product's own pitch, and where to get it.
   scenes.push({
-    role: "cta", skill: "cta",
+    role: "cta", skill: "product-end",
     text: `Get yours *today*`,
     subtext: site.cta && !/free/i.test(site.cta) ? site.cta : "Shop now",
     duration: beats(8),
     transition: "flash",
+    media: photo(0),
   });
   const plan = sanitizePlan({ title, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target, product: true });
   const styled = applyTemplate(plan, req.template ?? "studio", { palette: req.palette && req.palette !== "auto" ? req.palette : undefined });
