@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ensureFonts } from "@/engine/fonts";
 import { mediaState } from "@/engine/media";
 import { aspectSize, renderFrame, renderScene, totalDuration } from "@/engine/renderer";
@@ -17,7 +17,7 @@ type Props =
       className?: string;
     };
 
-/** Autoplaying, looping render of a plan or a single scene. Pauses offscreen. */
+/** Autoplaying, looping render of a plan or a single scene. Pauses offscreen and in hidden tabs. */
 export default function LoopCanvas(props: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   const visible = useVisible(ref);
@@ -37,8 +37,26 @@ export default function LoopCanvas(props: Props) {
     });
   }, []);
 
+  // Only animate on screen, in a visible tab, and when the viewer hasn't asked for reduced motion
+  // (then the poster frame stays): offscreen previews cost no CPU or GPU.
+  const [shown, setShown] = useState(true);
+  const [still, setStill] = useState(false);
   useEffect(() => {
-    if (!visible) return;
+    const onVis = () => setShown(!document.hidden);
+    onVis();
+    document.addEventListener("visibilitychange", onVis);
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onMotion = () => setStill(mq.matches);
+    onMotion();
+    mq.addEventListener("change", onMotion);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      mq.removeEventListener("change", onMotion);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visible || !shown || still) return;
     const canvas = ref.current!;
     const ctx = canvas.getContext("2d")!;
     let raf = 0;
@@ -69,7 +87,7 @@ export default function LoopCanvas(props: Props) {
       alive = false;
       cancelAnimationFrame(raf);
     };
-  }, [visible, fps]);
+  }, [visible, shown, still, fps]);
 
   const aspect = props.scene ? "16:9" : props.plan.aspect;
   const { w, h } = aspectSize(aspect, long);
