@@ -61,7 +61,8 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
       const stack: number[] = [];
       const seed = (x: number, y: number) => {
         const p = y * W + x;
-        if (!bg[p] && white(p * 4, 226)) {
+        // Strict: only near-pure white is background, so a white product's highlights survive.
+        if (!bg[p] && white(p * 4, 243)) {
           bg[p] = 1;
           stack.push(p);
         }
@@ -195,10 +196,9 @@ function heroTiming(scene: Scene, beat: number) {
 }
 
 /** Draw the product (cut-out or rounded photo) centred in a box, with floor shadow, reflection and sheen. */
-function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, boxH: number, k: number, alpha: number) {
+function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, boxH: number, k: number, alpha: number, pi = productImage(sc)) {
   const { ctx, u, palette } = sc;
   const T = sc.globalT ?? sc.t;
-  const pi = productImage(sc);
   if (!pi) return null;
   const cut = productCutout(pi.img, pi.key);
   if (!cut) return null;
@@ -281,7 +281,7 @@ function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, box
   }
   ctx.drawImage(layer.canvas, 0, 0, pw, ph, -pw / 2, -ph / 2, pw, ph);
   ctx.restore();
-  return { x: cx - (pw * scale) / 2, y: cy + rise + bob - (ph * scale) / 2, w: pw * scale, h: ph * scale };
+  return { x: cx - (pw * scale) / 2, y: cy + rise + bob - (ph * scale) / 2, w: pw * scale, h: ph * scale, src, cut: cut.cut };
 }
 
 /** A feature chip: icon tile + short title, on glass. */
@@ -448,6 +448,239 @@ function productEnd(sc: SkillContext) {
   ctaCursor(sc, tx + button.bw * 0.1, by + 4 * u, T);
 }
 
+/* ───────────────────────── Every Angle ───────────────────────── */
+
+/** The product's photos (up to 6), each with its cache key. */
+function productPhotos(sc: SkillContext) {
+  const srcs = [...new Set([...(sc.scene.media?.kind === "image" ? [sc.scene.media.src] : []), ...(sc.brand?.images ?? [])])].slice(0, 6);
+  return srcs.map((key) => ({ key, img: getImage(key) })).filter((p): p is { key: string; img: HTMLImageElement } => !!p.img && !!p.img.naturalWidth);
+}
+
+function spinTiming(d: number, n: number) {
+  const start = 0.35;
+  const seg = (d - start - 0.3) / Math.max(1, n);
+  return { start, seg, swap: Math.min(0.5, seg * 0.35) };
+}
+
+/**
+ * Every Angle: the product's photos take turns on the same spot of the stage, each sliding off
+ * level to one side as the next glides in from the other, over one floor shadow, with a row of
+ * dots counting the angles. A turntable feel without ever tilting the product.
+ */
+function productSpin(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette } = sc;
+  saasBackground(sc, { beams: 0, grid: false });
+  const portrait = h > w;
+  topHeadline(sc);
+  const photos = productPhotos(sc);
+  if (!photos.length) return;
+  const n = photos.length;
+  const T = spinTiming(d, n);
+  const box = portrait ? { cx: w / 2, cy: h * 0.52, w: w * 0.78, h: h * 0.4 } : { cx: w / 2, cy: h * 0.56, w: w * 0.42, h: h * 0.5 };
+  const ex = ease.inCubic(exitT(sc, 0.4));
+  const i = clamp(Math.floor((t - T.start) / T.seg), 0, n - 1);
+  const into = t - T.start - i * T.seg;
+  const k = clamp(spring(t - 0.1, 7, 6), 0, 1.06);
+  // The swap: the previous angle slides off as this one arrives.
+  const sw = i > 0 ? ease.inOutCubic(clamp(into / T.swap)) : 1;
+  const slide = box.w * 0.55;
+  if (i > 0 && sw < 1) {
+    ctx.save();
+    ctx.translate(-slide * sw, 0);
+    drawProduct(sc, box.cx, box.cy, box.w, box.h, 1, (1 - sw) * (1 - ex), photos[i - 1]);
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.translate(slide * (1 - sw), 0);
+  drawProduct(sc, box.cx, box.cy, box.w, box.h, i === 0 ? k : 1, clamp(t / 0.25) * sw * (1 - ex), photos[i]);
+  ctx.restore();
+  // Angle dots.
+  const dy = portrait ? h * 0.86 : h * 0.92;
+  const gap = 22 * u;
+  for (let j = 0; j < n; j++) {
+    const on = j === i ? sw : j === i - 1 ? 1 - sw : 0;
+    ctx.save();
+    ctx.globalAlpha = (0.35 + 0.65 * on) * (1 - ex) * clamp(t / 0.4);
+    ctx.fillStyle = on > 0.5 ? palette.primary : palette.text;
+    const x = w / 2 + (j - (n - 1) / 2) * gap;
+    ctx.beginPath();
+    ctx.roundRect(x - (5 + 8 * on) * u, dy - 5 * u, (10 + 16 * on) * u, 10 * u, 5 * u);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* ───────────────────────── Detail Zoom ───────────────────────── */
+
+const detailCache = new Map<string, [number, number][]>();
+/**
+ * Where the product has the most detail: cells of the cut-out with the most opaque, busy pixels
+ * (edges, buttons, textures), picked well apart. Fractions of the cut-out's width and height.
+ */
+function detailPoints(src: HTMLCanvasElement, key: string, want = 3): [number, number][] {
+  const hit = detailCache.get(key);
+  if (hit) return hit;
+  const N = 12;
+  const pts: { x: number; y: number; s: number }[] = [];
+  try {
+    const W = 144;
+    const H = Math.max(1, Math.round((W * src.height) / src.width));
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(src, 0, 0, W, H);
+    const px = g.getImageData(0, 0, W, H).data;
+    const at = (x: number, y: number) => (y * W + x) * 4;
+    const lum = (i: number) => 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2];
+    // Per cell: how much of it is product, and how busy (edges + colour) it is inside.
+    const cover: number[] = [];
+    const busy: number[] = [];
+    for (let cy = 0; cy < N; cy++)
+      for (let cx = 0; cx < N; cx++) {
+        let opaque = 0;
+        let cells = 0;
+        let edge = 0;
+        let chroma = 0;
+        for (let y = Math.floor((cy * H) / N); y < Math.floor(((cy + 1) * H) / N) - 1; y++)
+          for (let x = Math.floor((cx * W) / N); x < Math.floor(((cx + 1) * W) / N) - 1; x++) {
+            cells++;
+            const i = at(x, y);
+            if (px[i + 3] < 200) continue;
+            opaque++;
+            const r = at(x + 1, y);
+            const d = at(x, y + 1);
+            if (px[r + 3] >= 200) edge += Math.abs(lum(i) - lum(r));
+            if (px[d + 3] >= 200) edge += Math.abs(lum(i) - lum(d));
+            chroma += Math.max(px[i], px[i + 1], px[i + 2]) - Math.min(px[i], px[i + 1], px[i + 2]);
+          }
+        cover.push(cells ? opaque / cells : 0);
+        busy.push(cells ? (edge + chroma * 1.5) / cells : 0);
+      }
+    // Only cells well inside the product (they and their neighbours are all product), so the lens
+    // never magnifies empty background at the outline.
+    for (let cy = 1; cy < N - 1; cy++)
+      for (let cx = 1; cx < N - 1; cx++) {
+        const i = cy * N + cx;
+        const inside = [i, i - 1, i + 1, i - N, i + N].every((j) => cover[j] > 0.92);
+        if (inside) pts.push({ x: (cx + 0.5) / N, y: (cy + 0.5) / N, s: busy[i] });
+      }
+  } catch {
+    /* unreadable: fall back below */
+  }
+  pts.sort((a, b) => b.s - a.s);
+  const out: [number, number][] = [];
+  for (const p of pts) {
+    if (out.every(([x, y]) => Math.hypot(x - p.x, y - p.y) > 0.28)) out.push([p.x, p.y]);
+    if (out.length >= want) break;
+  }
+  const fallback: [number, number][] = [[0.5, 0.45], [0.38, 0.6], [0.62, 0.6]];
+  while (out.length < want) out.push(fallback[out.length]);
+  // Visit them in reading order, so the lens travels smoothly.
+  out.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  detailCache.set(key, out);
+  return out;
+}
+
+function zoomTiming(d: number, n: number) {
+  const first = 0.9;
+  const each = (d - first - 0.5) / Math.max(1, n);
+  return { first, each, move: Math.min(0.55, each * 0.4) };
+}
+
+/**
+ * Detail Zoom: the product centre stage while a magnifying lens glides to its most detailed
+ * parts in turn, enlarging each, with the feature it shows called out beside the lens.
+ */
+function productZoom(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene } = sc;
+  saasBackground(sc, { beams: 0, grid: false });
+  const portrait = h > w;
+  topHeadline(sc);
+  const ex = ease.inCubic(exitT(sc, 0.4));
+  const k = clamp(spring(t - 0.1, 7, 6), 0, 1.06);
+  const box = portrait ? { cx: w / 2, cy: h * 0.55, w: w * 0.78, h: h * 0.46 } : { cx: w / 2, cy: h * 0.58, w: w * 0.44, h: h * 0.6 };
+  const rect = drawProduct(sc, box.cx, box.cy, box.w, box.h, k, clamp(t / 0.25) * (1 - ex));
+  if (!rect) return;
+  const pi = productImage(sc);
+  const pts = detailPoints(rect.src, pi?.key ?? "product", 3);
+  const labels = calloutItems(scene);
+  const T = zoomTiming(d, pts.length);
+  if (t < T.first - T.move) return;
+  // Which stop, and how far between the previous and this one.
+  const idx = clamp(Math.floor((t - T.first) / T.each), 0, pts.length - 1);
+  const local = t - T.first - idx * T.each;
+  const mv = idx === 0 ? ease.outCubic(clamp((t - (T.first - T.move)) / T.move)) : ease.inOutCubic(clamp(local / T.move));
+  const from = idx === 0 ? [0.5, 1.1] : pts[idx - 1];
+  const to = pts[idx];
+  const fx = from[0] + (to[0] - from[0]) * mv;
+  const fy = from[1] + (to[1] - from[1]) * mv;
+  const lx = rect.x + fx * rect.w;
+  const ly = rect.y + fy * rect.h;
+  const R = Math.min(w, h) * (portrait ? 0.17 : 0.14);
+  const zoom = 2.7;
+  const appear = idx === 0 ? mv : 1;
+  ctx.save();
+  ctx.globalAlpha = appear * (1 - ex);
+  // Lens shadow and glass.
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 40 * u;
+  ctx.shadowOffsetY = 14 * u;
+  ctx.fillStyle = palette.light ? mixHex(palette.bg0, palette.text, 0.05) : palette.bg1;
+  ctx.beginPath();
+  ctx.arc(lx, ly, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  // The magnified product inside the lens.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(lx, ly, R, 0, Math.PI * 2);
+  ctx.clip();
+  const sx = fx * rect.src.width;
+  const sy = fy * rect.src.height;
+  const scale = (rect.w / rect.src.width) * zoom;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(rect.src, lx - sx * scale, ly - sy * scale, rect.src.width * scale, rect.src.height * scale);
+  // Glass highlight.
+  const gl = ctx.createLinearGradient(lx - R, ly - R, lx + R * 0.2, ly + R * 0.2);
+  gl.addColorStop(0, "rgba(255,255,255,0.35)");
+  gl.addColorStop(0.45, "rgba(255,255,255,0)");
+  ctx.fillStyle = gl;
+  ctx.fillRect(lx - R, ly - R, R * 2, R * 2);
+  const inner = ctx.createRadialGradient(lx, ly, R * 0.72, lx, ly, R);
+  inner.addColorStop(0, "rgba(0,0,0,0)");
+  inner.addColorStop(1, "rgba(0,0,0,0.16)");
+  ctx.fillStyle = inner;
+  ctx.fillRect(lx - R, ly - R, R * 2, R * 2);
+  ctx.restore();
+  // Rim.
+  ctx.lineWidth = 6 * u;
+  ctx.strokeStyle = palette.light ? "#ffffff" : rgba(palette.text, 0.9);
+  ctx.beginPath();
+  ctx.arc(lx, ly, R, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 2 * u;
+  ctx.strokeStyle = palette.primary;
+  ctx.beginPath();
+  ctx.arc(lx, ly, R + 5 * u, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  // The feature this stop shows, beside the lens on the open side.
+  const label = labels[idx];
+  if (label) {
+    const lk = clamp(spring(local - T.move, 10, 6.5), 0, 1.1);
+    if (lk > 0) {
+      const right = lx < w / 2;
+      const cx = portrait ? w / 2 : right ? lx + R + 30 * u : lx - R - 30 * u;
+      const cy = portrait ? Math.min(h * 0.9, ly + R + 60 * u) : ly;
+      ctx.save();
+      ctx.globalAlpha = 1 - ex;
+      callout(sc, label, iconsFor(labels, sc)[idx], cx, cy, lk, portrait ? "center" : right ? "right" : "left");
+      ctx.restore();
+    }
+  }
+}
+
 export const productSkills: Skill[] = [
   {
     id: "product-hero",
@@ -473,6 +706,32 @@ export const productSkills: Skill[] = [
     sfx: (scene, beat) => {
       const T = ctaTiming(scene.duration, beat);
       return [at(0.05, "whoosh"), at(T.button, "pop"), at(T.click, "click"), at(T.click + 0.05, "success")];
+    },
+  },
+  {
+    id: "product-spin",
+    name: "Every Angle",
+    tagline: "The product's photos take turns on the stage, each sliding off level as the next glides in, with dots counting the angles.",
+    bestFor: "Physical products with 2+ photos from different angles. Headline = a short line ('From every *angle*'); the photos come from the product images.",
+    sample: { text: "From every *angle*" },
+    render: productSpin,
+    sfx: (scene) => {
+      const n = 4;
+      const T = spinTiming(scene.duration, n);
+      return [at(0.05, "whoosh"), ...Array.from({ length: n - 1 }, (_, i) => at(T.start + (i + 1) * T.seg, "swoosh"))];
+    },
+  },
+  {
+    id: "product-zoom",
+    name: "Detail Zoom",
+    tagline: "A magnifying lens glides over the product to its most detailed parts, enlarging each, with the feature it shows called out beside it.",
+    bestFor: "Physical products: the close-up moment. Headline = a short line ('Every *detail*'); items = up to 3 short feature titles, one per stop (optional).",
+    sample: { text: "Every *detail*", items: ["Soft-touch finish", "Magnetic case", "Charging light"] },
+    itemsHint: "One short feature per close-up (optional)",
+    render: productZoom,
+    sfx: (scene) => {
+      const T = zoomTiming(scene.duration, 3);
+      return [at(T.first - 0.3, "whoosh"), ...[0, 1, 2].map((i) => at(T.first + i * T.each + T.move, "pop"))];
     },
   },
 ];

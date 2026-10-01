@@ -60,6 +60,8 @@ export const SKILL_IDS = [
   "qr-end",
   "product-hero",
   "product-end",
+  "product-spin",
+  "product-zoom",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];

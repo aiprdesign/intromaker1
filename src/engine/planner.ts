@@ -1739,15 +1739,17 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
     target >= 30 && described.length >= 3 && photos >= 3
       ? { role: "features", skill: "feature-slides", text: `Inside *${nick}*`, eyebrow: "Details", items: described.slice(0, 3).map((f) => `${f.title} — ${f.desc}`), duration: beats(15.5), transition: "push" }
       : null;
-  // Every angle: a gallery, and in long films a second, different one to close on.
-  const flowFirst = variant % 2 === 0;
+  // Every angle: the photos take turns on the stage (remakes try the gallery and carousel), and
+  // long films close in on the details with a magnifying lens.
+  const galleryKinds = ["product-spin", "gallery-flow", "carousel-3d"] as const;
   const gallery: Scene | null =
-    photos >= 3 && target >= 20
-      ? { role: "gallery", skill: flowFirst ? "gallery-flow" : "carousel-3d", text: "From every *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
+    photos >= 2 && target >= 20
+      ? { role: "gallery", skill: galleryKinds[variant % 3], text: "From every *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
       : null;
+  const spare = feats.slice(4, 7).map((f) => f.title);
   const closer: Scene | null =
-    photos >= 3 && target >= 30
-      ? { role: "gallery", skill: flowFirst ? "carousel-3d" : "gallery-flow", text: "Every *detail*", eyebrow: "Details", items: [], duration: beats(10), transition: "whip" }
+    target >= 30
+      ? { role: "gallery", skill: "product-zoom", text: "Every *detail*", eyebrow: "Details", items: spare.length >= 2 ? spare : [], duration: beats(12), transition: "whip", media: photo(0), why: "A close look at the product's details" }
       : null;
   const order =
     target < 20
