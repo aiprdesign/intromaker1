@@ -2,6 +2,7 @@ import { parse, type HTMLElement } from "node-html-parser";
 import type { SiteData } from "@/engine/types";
 import { createHash } from "node:crypto";
 import { captureSite, cleanSvg, save } from "./capture";
+import { marketOf, readListing, scrapeListing } from "./listing";
 import { safeFetch, UrlError } from "./netguard";
 
 const MAX_HTML = 3_000_000;
@@ -289,6 +290,9 @@ async function fetchPage(raw: string): Promise<{ html: string; finalUrl: string 
 }
 
 export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}): Promise<SiteData> {
+  // Marketplace listings (Amazon, eBay, Etsy, Shopify stores…) become product videos.
+  const market = marketOf(rawUrl);
+  if (market) return scrapeListing(rawUrl, market);
   const withScheme = /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`;
   // Prefer a live render in a real browser (JS sites, lazy images, screenshots); else static fetch.
   // The live capture gives up (null) on error pages, so the static fetch then explains what's wrong.
@@ -315,6 +319,11 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
     ({ html, finalUrl } = await fetchPage(rawUrl));
   }
   const base = new URL(finalUrl);
+  // A store's own product page (schema.org Product with photos) is a product too.
+  if (/\/(products?|item|p|dp|shop)\/[^/]+/i.test(base.pathname) && /"@type"\s*:\s*"Product"/.test(html)) {
+    const product = readListing(html, base, { id: "store", name: base.hostname.replace(/^www\./, "") });
+    if (product && product.images.length) return product;
+  }
   const root = parse(html, { comment: false, blockTextElements: { script: false, style: false, noscript: false } });
   const baseHref = root.querySelector("base")?.getAttribute("href");
   const pageBase = baseHref ? new URL(baseHref, base) : base;

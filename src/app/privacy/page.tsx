@@ -62,6 +62,17 @@ export default function Privacy() {
           networks are refused. Please import only sites you have the right to use.
         </p>
 
+        <h2>Product listings and photos</h2>
+        <p>
+          A marketplace listing (Amazon, eBay, Etsy, a Shopify store…) is read like a website: its title, bullet points and photo addresses. Its photos are
+          passed through to your browser and not stored; prices, ratings and reviews are not used. Product photos you add are resized and re-saved as plain
+          JPEGs in your browser first (so camera details such as location are dropped), then{" "}
+          {CAPTURE_STORAGE === "browser"
+            ? "held in the server's memory only while your film is being made (up to 30 minutes)."
+            : "stored on the server like website screenshots and deleted automatically after 7 days."}{" "}
+          Please use only listings and photos you have the right to use, such as your own.
+        </p>
+
         <h2>API keys</h2>
         <p>
           Keys you enter (AI providers, cloud voices) are saved in your browser&apos;s local storage, not on the server. They are sent with each request that

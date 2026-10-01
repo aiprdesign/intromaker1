@@ -16,6 +16,7 @@ import {
   ANGLES,
   type Angle,
   planFromSite,
+  productFromPrompt,
   healthPlan,
   safePlan,
   safeSite,
@@ -189,7 +190,7 @@ async function siteImages(site: SiteData) {
   const picks = [sh.hero, ...sh.sections.slice(0, 3)].filter((x): x is string => !!x);
   const out: { data: string; mediaType: "image/jpeg" }[] = [];
   for (const src of picks) {
-    const id = src.match(/id=([a-f0-9]{16}-(?:hero|full|s\d|p\d{1,2}))$/)?.[1];
+    const id = src.match(/id=([a-f0-9]{16}-(?:hero|full|s\d|p\d{1,2}|u\d{1,2}))$/)?.[1];
     if (!id) continue;
     try {
       const data = await readShot(`${id}.jpg`);
@@ -204,6 +205,8 @@ async function siteImages(site: SiteData) {
 
 type Body = Partial<PlanRequest> & {
   site?: unknown;
+  /** Uploaded product photos (/api/shot URLs from /api/photos): makes a product video. */
+  photos?: unknown;
   colors?: Brand["colors"];
   style?: StyleChoice;
   ai?: unknown;
@@ -222,6 +225,8 @@ type Body = Partial<PlanRequest> & {
   engineLabel?: string;
 };
 
+const PHOTO = /^\/api\/shot\?id=[a-f0-9]{16}-u\d{1,2}$/;
+
 function readBody(body: Body) {
   const prompt = String(body.prompt ?? "").slice(0, 1000);
   const aspect: Aspect = body.aspect === "9:16" || body.aspect === "1:1" ? body.aspect : "16:9";
@@ -230,7 +235,15 @@ function readBody(body: Body) {
   const seed = Number(body.seed) || undefined;
   const safe = body.safe !== false;
   // Claim-safe: the director (built-in or AI) only ever sees the site's claim-free copy.
-  const rawSite = readSite(body.site);
+  // Uploaded product photos make it a product video: of the imported listing or site (the
+  // uploads lead), or of the product the prompt describes.
+  const photos = (Array.isArray(body.photos) ? body.photos : []).filter((p): p is string => typeof p === "string" && PHOTO.test(p)).slice(0, 12);
+  const listed = readSite(body.site);
+  const rawSite = photos.length
+    ? listed
+      ? { ...listed, kind: "product" as const, images: [...new Set([...photos, ...listed.images])].slice(0, 14) }
+      : productFromPrompt(prompt, photos)
+    : listed;
   // Health and medical claims are screened out in every mode.
   const site = rawSite ? (safe ? safeSite(rawSite) : stripHealth(rawSite)) : rawSite;
   const colors =
@@ -277,6 +290,19 @@ function featureCardBrief(c: Ctx) {
   );
 }
 
+/** Physical products (a marketplace listing or uploaded photos) get a product video, not a software film. */
+function productBrief(c: Ctx) {
+  const from = c.site?.marketplace ? `a ${c.site.marketplace} listing` : "the maker's product photos";
+  return (
+    `\nPRODUCT VIDEO: this is a physical product (from ${from}); every ASSETS image is a product photo. Film it like a product ad: ` +
+    `product-hero for the reveal (media = the main photo, headline = the product name, subtext = "by <brand>" or a short line) and again for 2-4 feature callouts ` +
+    `(items = short feature titles from the listing's bullet points, 1-4 words each), gallery-flow or carousel-3d with the photos (3+ photos), tilt-wall as the hook with 4+ photos, ` +
+    `feature-slides for long films ("Title — one-line benefit" with photos), and cta last (subtext = "Shop now" unless the listing's own button says otherwise). ` +
+    `No software moments: no ui-tour, site-scroll, ui-assemble, command-k, ai-prompt, click-flow, notify-stack, kanban, code-deploy, chart-grow, integrations or logo-reveal. ` +
+    `Never mention prices, discounts, ratings or reviews.`
+  );
+}
+
 /** A note when a prompt film's cards include the category's typical features the prompt didn't name. */
 function typicalNote(c: Ctx, plan: VideoPlan): string | null {
   if (c.site || !c.concept.starter) return null;
@@ -299,7 +325,7 @@ async function directorRequest(c: Ctx) {
     (c.prompt ? `Prompt: ${c.prompt}\n\n` : "") +
     `Style: ${c.wantSaas ? "SAAS" : "TRAILER"}. Aspect ratio: ${c.aspect}. Target total length: ${LENGTH_SECONDS[c.length]} seconds.` +
     (c.wantSaas ? `\nSTYLE TEMPLATE "${TEMPLATE_MAP[c.template].name}": ${TEMPLATE_MAP[c.template].vibe} Write copy in this voice.` : "") +
-    (c.wantSaas ? momentBrief(c) : "") +
+    (c.wantSaas && c.site?.kind === "product" ? productBrief(c) : c.wantSaas ? momentBrief(c) : "") +
     (c.wantSaas && c.concept.id !== "general"
       ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat" && !(c.safe && ["quote", "logos", "metric"].includes(r))).join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${(c.concept.cta.find((l) => !/free/i.test(l)) ?? c.concept.cta[0]).replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
       : "") +

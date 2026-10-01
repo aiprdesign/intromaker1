@@ -25,6 +25,8 @@ export const RULES = {
   scrape: { limit: 8, windowMs: 10 * MIN },
   /** Third-party images and videos, proxied so the canvas stays untainted. */
   asset: { limit: 400, windowMs: 10 * MIN },
+  /** Product photo uploads (up to 10 photos per request). */
+  photos: { limit: 20, windowMs: 10 * MIN },
   /** Captured screenshots served back from disk. */
   shot: { limit: 800, windowMs: 10 * MIN },
   /** Storyboard generation (built-in director is cheap; AI is not). */

@@ -96,7 +96,8 @@ export function safeCopy(text: string | undefined) {
 
 /** Numbers used as a claim: counts, percentages, multipliers, ratings ("10,000+ teams", "99.9%", "4.9/5"). */
 export function isNumericClaim(text: string) {
-  return /\d[\d,.]*\s*[kmb]?\+|\d\s?%|\b\d+(?:\.\d+)?\s?[x×]\b|\b\d(?:\.\d)?\s?\/\s?5\b|\b\d[\d,.]*\s*(?:[kmb]\s+)?(?:teams?|customers?|companies|users?|businesses|developers|people|brands|merchants|members|orgs?|organizations|downloads|installs|reviews)\b/i.test(text);
+  // (Quantified performance too: "up to 40 hours", "charges in 10 minutes", "40H playtime".)
+  return /\bup to\s+\d|\b\d[\d,.]*\s*(?:h|hrs?|hours?|mins?|minutes?|secs?|seconds?|days?|weeks?|months?|years?)\b|\d[\d,.]*\s*[kmb]?\+|\d\s?%|\b\d+(?:\.\d+)?\s?[x×]\b|\b\d(?:\.\d)?\s?\/\s?5\b|\b\d[\d,.]*\s*(?:[kmb]\s+)?(?:teams?|customers?|companies|users?|businesses|developers|people|brands|merchants|members|orgs?|organizations|downloads|installs|reviews)\b/i.test(text);
 }
 
 /**

@@ -299,6 +299,33 @@ async function main() {
     "unknown domains, refused connections, bad certificates and timeouts each get their own message",
   );
 
+  console.log("Product listings and photos");
+  const listing = await import("../src/lib/listing");
+  check(
+    listing.marketOf("https://www.amazon.co.uk/Some-Thing/dp/B0TEST1234")?.id === "amazon" && listing.marketOf("https://www.ebay.com/itm/123")?.id === "ebay" && listing.marketOf("https://shop.example/products/mug")?.id === "shop" && !listing.marketOf("https://www.amazon.com/"),
+    "listing links are recognised (Amazon, eBay, Shopify stores), other pages aren't",
+  );
+  check(listing.fullSize("https://m.media-amazon.com/images/I/61a._AC_SX679_.jpg") === "https://m.media-amazon.com/images/I/61a.jpg", "thumbnail addresses are upgraded to full-size photos");
+  const amazonHtml = `<span id="productTitle">Aero Buds Pro Wireless Earbuds, 40H Playtime</span><a id="bylineInfo">Visit the Aero Store</a><span class="a-price">$59.99</span><div id="feature-bullets"><ul><li><span class="a-list-item">NOISE CANCELLING: two microphones per bud.</span></li><li><span class="a-list-item">Secure fit - three sizes of ear tips.</span></li></ul></div><img src="https://m.media-amazon.com/images/G/01/nav-logo.png"><script>{"hiRes":"https://m.media-amazon.com/images/I/61a._AC_SL1500_.jpg"}</script>`;
+  const parsed = listing.readListing(amazonHtml, new URL("https://www.amazon.com/dp/B0TEST1234"), { id: "amazon", name: "Amazon" });
+  check(
+    parsed?.kind === "product" && parsed.name === "Aero" && parsed.tagline === "Aero Buds Pro Wireless Earbuds" && parsed.headlines.join() === "Noise cancelling,Secure fit" && parsed.images.join() === "https://m.media-amazon.com/images/I/61a.jpg" && !parsed.logo && !JSON.stringify(parsed).includes("59.99"),
+    "an Amazon listing gives the product, its bullets and photos (never the price or the marketplace's logo)",
+  );
+  const photosRoute = await import("../src/app/api/photos/route");
+  const upload = (parts: Blob[], origin = "http://localhost:3000") => {
+    const form = new FormData();
+    for (const p of parts) form.append("photo", p, "photo.jpg");
+    return photosRoute.POST(new Request("http://localhost:3000/api/photos", { method: "POST", body: form, headers: { origin, host: "localhost:3000", "x-forwarded-for": "198.51.100.77" } }));
+  };
+  const jpeg = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Array(100).fill(0), 0xff, 0xd9])], { type: "image/jpeg" });
+  const html = new Blob(["<html><script>alert(1)</script></html>".padEnd(120, " ")], { type: "image/jpeg" });
+  const okUp = await upload([jpeg]);
+  const urls = okUp.status === 200 ? ((await okUp.json()) as { photos: string[] }).photos : [];
+  check(urls.length === 1 && /^\/api\/shot\?id=[a-f0-9]{16}-u0$/.test(urls[0]), "an uploaded JPEG is stored and served from /api/shot");
+  check((await upload([html])).status === 415, "anything that isn't a JPEG is refused, whatever it claims to be");
+  check((await upload([jpeg], "https://evil.example")).status === 403, "uploads from another site are refused");
+
   console.log("Local AI");
   check(!serverReachesLocal(), "hosted server never reaches model servers on its own machine");
 

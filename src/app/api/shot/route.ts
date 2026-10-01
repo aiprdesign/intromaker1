@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   const limited = rateLimit(req, "shot");
   if (limited) return limited;
   const id = new URL(req.url).searchParams.get("id") ?? "";
-  if (!/^[a-f0-9]{16}-(hero|full|s\d|p\d{1,2}|logo)$/.test(id)) return new Response("Bad id", { status: 400 });
+  if (!/^[a-f0-9]{16}-(hero|full|s\d|p\d{1,2}|u\d{1,2}|logo)$/.test(id)) return new Response("Bad id", { status: 400 });
   // Logos are PNG or SVG; everything else is JPEG.
   const exts = id.endsWith("-logo") ? (["png", "svg"] as const) : (["jpg"] as const);
   for (const ext of exts) {

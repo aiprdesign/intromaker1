@@ -230,7 +230,8 @@ export default function Studio() {
   };
   /** The style suggested for a plan's kind of product (when auto is on and it differs). */
   const suggestedFor = (p: VideoPlan) => {
-    const id = p.style === "saas" && p.concept ? CONCEPT_MAP[p.concept]?.template : undefined;
+    // Product videos look best in the bright studio; software films get their category's style.
+    const id = p.style === "saas" ? (p.product ? "studio" : p.concept ? CONCEPT_MAP[p.concept]?.template : undefined) : undefined;
     return id && TEMPLATE_MAP[id] ? id : undefined;
   };
   /** Switch template: restyles the current SaaS storyboard instantly (no regeneration). */
@@ -259,6 +260,47 @@ export default function Studio() {
   const playPlan = useMemo(() => ({ ...plan, voiceover: voice }), [plan, voice]);
   const [siteUrl, setSiteUrl] = useState("");
   const [site, setSite] = useState<SiteData | null>(null);
+  // Uploaded product photos (/api/shot URLs): with them, Generate makes a product video.
+  const [photos, setPhotos] = useState<string[]>([]);
+  const photosRef = useRef<string[]>([]);
+  photosRef.current = photos;
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInput = useRef<HTMLInputElement | null>(null);
+  /** Re-encode in the browser (at most 2000px, JPEG, no camera metadata such as location), then upload. */
+  const addPhotos = async (files: FileList | File[] | null) => {
+    const list = Array.from(files ?? []).filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, 12 - photosRef.current.length));
+    if (!list.length) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      const form = new FormData();
+      for (const f of list) {
+        const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
+        const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(bmp.width * k));
+        c.height = Math.max(1, Math.round(bmp.height * k));
+        const g = c.getContext("2d")!;
+        // Transparent PNGs land on white, like a studio product shot.
+        g.fillStyle = "#ffffff";
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(bmp, 0, 0, c.width, c.height);
+        bmp.close();
+        const blob = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("Couldn't read that photo."))), "image/jpeg", 0.9));
+        form.append("photo", blob, "photo.jpg");
+      }
+      const res = await fetch("/api/photos", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't upload the photos. Try again.");
+      setPhotos((cur) => [...cur, ...(data.photos as string[])].slice(0, 12));
+      setImportError((e) => (e?.code === "listing" ? null : e));
+    } catch (e) {
+      setPhotoError((e as Error).message || "Couldn't upload the photos.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
   const [brandColors, setBrandColors] = useState<Brand["colors"]>(undefined);
   const [logoColors, setLogoColors] = useState<Brand["colors"]>(undefined);
   /** Which brand colours drive the film: detected across the site (auto), the logo's, or none. */
@@ -319,7 +361,8 @@ export default function Studio() {
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     const aiCfg = aiForRequest(loadAiSettings());
     const safeCopy = safeRef.current;
-    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, colors, style, ai: aiCfg, template, angle: opts.angle, safe: safeCopy, variant: opts.variant };
+    const shots = photosRef.current.length ? photosRef.current : undefined;
+    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, photos: shots, colors, style, ai: aiCfg, template, angle: opts.angle, safe: safeCopy, variant: opts.variant };
     // Local AI runs where the model is: from this browser when the server is online.
     if (isLocalProvider(aiCfg.provider) && !localViaServerRef.current) {
       try {
@@ -1000,7 +1043,7 @@ export default function Studio() {
           <div className="panel-scroll">
             {tab === "create" && (
               <>
-          <label className="field-label first">From a website</label>
+          <label className="field-label first">From a website or product listing</label>
           <form
             className="url-row"
             onSubmit={(e) => {
@@ -1012,8 +1055,8 @@ export default function Studio() {
               className="input"
               value={siteUrl}
               onChange={(e) => setSiteUrl(e.target.value)}
-              placeholder="yourproduct.com"
-              aria-label="Website URL"
+              placeholder="yourproduct.com or an Amazon / eBay listing"
+              aria-label="Website or listing URL"
               inputMode="url"
             />
             <button className="btn btn-ghost" type="submit" disabled={importing || loading}>
@@ -1040,6 +1083,11 @@ export default function Studio() {
                     Import {importError.suggestion.replace(/^https?:\/\//, "").replace(/\/$/, "")}
                   </button>
                 )}
+                {importError.code === "listing" && (
+                  <button className="btn btn-primary sm" onClick={() => photoInput.current?.click()}>
+                    Add product photos
+                  </button>
+                )}
                 {["timeout", "refused", "server", "busy", "failed", undefined].includes(importError.code) && (
                   <button className="btn btn-ghost sm" onClick={() => void importSite(importError.url)}>
                     Try again
@@ -1063,6 +1111,48 @@ export default function Studio() {
               </div>
             </div>
           )}
+          <div
+            className={`photo-drop ${photos.length ? "has" : ""}`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              void addPhotos(e.dataTransfer.files);
+            }}
+          >
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                void addPhotos(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button type="button" className="btn btn-ghost sm" onClick={() => photoInput.current?.click()} disabled={photoBusy || photos.length >= 12}>
+              {photoBusy ? "Adding photos…" : "＋ Add product photos"}
+            </button>
+            <span className="hint">
+              {photos.length
+                ? `${photos.length} photo${photos.length > 1 ? "s" : ""}: Generate makes a product video.`
+                : "Or drop them here for a product video. Use photos you own or have the right to use."}
+            </span>
+            {photos.length > 0 && (
+              <div className="photo-thumbs">
+                {photos.map((src) => (
+                  <span key={src} className="photo-thumb">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" />
+                    <button className="icon-btn sm" aria-label="Remove photo" onClick={() => setPhotos((cur) => cur.filter((x) => x !== src))}>
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {photoError && <p className="hint warn">{photoError}</p>}
+          </div>
           {site && (
             <div className="site-card">
               <div className="site-head">
@@ -1097,7 +1187,9 @@ export default function Studio() {
                 </div>
               )}
               <div className="site-stats">
-                <span className={site.shots?.full ? "live" : ""}>{site.shots?.full ? "● Live capture" : "Static import"}</span>
+                <span className={site.shots?.full ? "live" : ""}>
+                  {site.kind === "product" ? `${site.marketplace ?? "Product"} listing` : site.shots?.full ? "● Live capture" : "Static import"}
+                </span>
                 {[
                   [(site.shots?.sections.length ?? 0) + (site.shots?.full ? 2 : 0), "shots"],
                   [site.images.length, "images"],
@@ -1115,7 +1207,7 @@ export default function Studio() {
                     </span>
                   ))}
               </div>
-              {!site.shots?.full && (
+              {!site.shots?.full && site.kind !== "product" && (
                 <p className="hint">Tip: install Google Chrome or Microsoft Edge to capture live screenshots of the site.</p>
               )}
               {(brandColors || logoColors) && (

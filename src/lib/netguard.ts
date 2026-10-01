@@ -60,7 +60,7 @@ function isPrivateIp(ip: string) {
 }
 
 /** Why a website couldn't be used. The message is written for the visitor. */
-export type SiteProblem = "invalid" | "unreachable" | "dns" | "refused" | "timeout" | "tls" | "notfound" | "blocked" | "busy" | "server" | "notpage" | "parked" | "empty" | "redirects";
+export type SiteProblem = "invalid" | "unreachable" | "dns" | "refused" | "timeout" | "tls" | "notfound" | "blocked" | "busy" | "server" | "notpage" | "parked" | "empty" | "redirects" | "listing";
 
 export class UrlError extends Error {
   constructor(

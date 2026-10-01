@@ -6,6 +6,7 @@ import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
 import { gallerySkills } from "./gallery";
 import { mediaSkills } from "./media";
+import { productSkills } from "./product";
 import { momentSkills } from "./moments";
 import { slideSkills } from "./slides";
 import { saasSkills } from "./saas";
@@ -20,6 +21,7 @@ export const SKILLS: Skill[] = [
   ...interactionSkills,
   ...momentSkills,
   ...slideSkills,
+  ...productSkills,
   ...typeFxSkills,
   ...gallerySkills,
   ...componentSkills,
@@ -52,7 +54,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Openers & end cards", skills: endingSkills },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills] },
   { name: "Slides", skills: slideSkills },
-  { name: "Media & gallery", skills: [...gallerySkills, ...componentSkills, ...mediaSkills] },
+  { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Cinematic", skills: [...signatureSkills, ...energySkills, ...worldSkills] },
 ];

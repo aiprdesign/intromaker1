@@ -538,6 +538,39 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   return { ...plan, title: brand };
 }
 
+/**
+ * A product profile from a prompt and uploaded product photos ("Aero Buds: wireless earbuds with
+ * noise cancelling, all-day battery and a pocket case" + photos): filmed as a product video.
+ */
+export function productFromPrompt(prompt: string, photos: string[]): SiteData {
+  const parsed = parseSaasPrompt(prompt);
+  const description = prompt.replace(LEAD_IN, "").trim();
+  const tagline = parsed.pitch || description.split(/\s+/).slice(0, 6).join(" ");
+  return {
+    url: "",
+    domain: "",
+    name: parsed.brand ?? (tagline.split(/\s+/).slice(0, 3).join(" ") || "Your product"),
+    tagline,
+    description: description.charAt(0).toUpperCase() + description.slice(1),
+    headlines: parsed.features.filter((f) => norm(f) !== norm(tagline)),
+    features: [],
+    stats: [],
+    testimonials: [],
+    clientLogos: [],
+    steps: [],
+    pains: [],
+    font: null,
+    shots: { hero: null, full: null, sections: [] },
+    cta: null,
+    logo: null,
+    icon: null,
+    images: photos,
+    videos: [],
+    themeColor: null,
+    kind: "product",
+  };
+}
+
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
 /** Prompt → intro, with a narrator line on every scene (used when voice-over is on). */
 export function planFromPrompt(req: PlanRequest): VideoPlan {
@@ -733,9 +766,12 @@ export function readSite(raw: unknown): SiteData | null {
     cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
     logo: http(r.logo) || isShot(r.logo) ? (r.logo as string) : null,
     icon: http(r.icon) || isShot(r.icon) ? (r.icon as string) : null,
-    images: (Array.isArray(r.images) ? r.images : []).filter(http).slice(0, 14) as string[],
+    // Uploaded product photos are stored like captures.
+    images: (Array.isArray(r.images) ? r.images : []).filter((v) => http(v) || isShot(v)).slice(0, 14) as string[],
     videos: (Array.isArray(r.videos) ? r.videos : []).filter(http).slice(0, 4) as string[],
     themeColor: typeof r.themeColor === "string" && /^#[0-9a-f]{3,8}$/i.test(r.themeColor) ? r.themeColor : null,
+    kind: r.kind === "product" ? "product" : undefined,
+    marketplace: typeof r.marketplace === "string" ? r.marketplace.slice(0, 60) : undefined,
   };
 }
 
@@ -893,7 +929,9 @@ export function aiSelfIntro(text: string, name: string): { answer: string; first
 export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
   const safe = req.safe !== false;
   const input = safe ? safeSite(site) : stripHealth(site);
-  const plan = writeVoiceover(req.style === "trailer" ? planFromSiteTrailer(input, req) : trimToTarget(planFromSiteSaas(input, req)));
+  const plan = writeVoiceover(
+    req.style === "trailer" ? planFromSiteTrailer(input, req) : site.kind === "product" ? planFromProduct(input, req) : trimToTarget(planFromSiteSaas(input, req)),
+  );
   return safe ? safePlan(plan) : healthPlan(plan);
 }
 
@@ -1636,6 +1674,108 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
 }
 
 
+/**
+ * A product video for a physical product (a marketplace listing or uploaded product photos):
+ * the product rises onto the stage, its features are called out around it, then every angle in
+ * a gallery and the end card. No software moments (no cursors, palettes or dashboards).
+ */
+function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
+  const seed = (req.seed ?? hashString(site.url || site.tagline || site.name)) >>> 0;
+  const variant = Math.max(0, Math.floor(req.variant ?? 0));
+  // Remakes and takes tell it from another angle: story (a hook first), product-first (open on the
+  // product itself), or a gallery-led cut.
+  const angle: Angle = req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
+  const bpm = 116;
+  const beat = 60 / bpm;
+  const beats = (n: number) => n * beat;
+  const target = LENGTH_SECONDS[req.length];
+  const brand = brandFromSite(site, req.colors);
+  const photo = (i: number): Media | undefined => (brand.images[i] ? { src: brand.images[i], kind: "image" } : undefined);
+  const photos = brand.images.length;
+  const whole = ORIGINAL.get(site) ?? site;
+  // What the product is comes from its name (earbuds whose bullets mention "the gym" aren't fitness gear).
+  const concept = detectConcept(`${whole.name} ${whole.tagline}`);
+  const product = sentenceCopy(site.tagline, 7) || shortenCopy(site.tagline, 7) || site.name;
+  const seen = new Set<string>();
+  const feats = site.headlines
+    .map((t, i) => ({ title: sentenceCopy(t, 5) || shortenCopy(t, 5), desc: (sentenceCopy(site.features[i] ?? "", 12) || shortenCopy(site.features[i] ?? "", 10)).replace(/[.,;:]$/, "") }))
+    .filter((f) => f.title && !seen.has(norm(f.title)) && !!seen.add(norm(f.title)) && norm(f.title) !== norm(product));
+  const firstLine = (site.description.split(/(?<=[.!?])\s+/)[0] ?? "").replace(/\.$/, "");
+  const scenes: Scene[] = [];
+  // Hook: the listing's own first line when it's short, over a wall of the photos when there are several.
+  // What it's called: a prompt names the product ("Aero Buds") and pitches it ("Wireless earbuds");
+  // a listing's title already carries the brand ("Aero Buds Pro Wireless Earbuds").
+  const fromPrompt = !site.url;
+  const title = fromPrompt && site.name ? site.name : product;
+  const nick = title.split(/\s+/).length > 4 ? title.split(/\s+/).slice(0, 3).join(" ") : title;
+  if (target >= 20 && angle !== "product") {
+    const own = firstLine && firstLine.split(/\s+/).length <= 9 && norm(firstLine) !== norm(product) ? firstLine : "";
+    const hook = angle === "proof" ? `Meet *${nick}*` : own || `Say hello to *${nick}*`;
+    scenes.push({ role: "hook", skill: photos >= 4 ? "tilt-wall" : "blur-reveal", text: hook, eyebrow: photos >= 4 ? undefined : "Introducing", duration: beats(7), transition: "cut" });
+  }
+  // The reveal: the product itself.
+  const by = fromPrompt
+    ? norm(product) !== norm(title) ? product : undefined
+    : site.name && !norm(product).includes(norm(site.name)) ? `by ${site.name}` : undefined;
+  const reveal: Scene = { role: "reveal", skill: "product-hero", text: title, subtext: by, duration: beats(8), transition: "zoom", media: photo(0) };
+  const featuresTitle = concept.id !== "general" && concept.id !== "ecommerce" ? concept.featuresTitle : "Made for *everyday*";
+  // Its features called out around it (another photo when there is one, so the shot changes).
+  const callouts: Scene | null =
+    feats.length >= 2
+      ? {
+          role: "features", skill: "product-hero", text: featuresTitle, eyebrow: "Features",
+          items: feats.slice(0, 4).map((f) => f.title),
+          duration: beats(Math.min(4, feats.length) * 2 + 6), transition: "dolly",
+          media: photo(photos > 1 ? 1 + (variant % Math.max(1, photos - 1)) : 0),
+          why: "The listing's bullet points, called out around the product",
+        }
+      : null;
+  // Short films: the features as icon cards (the hero already had the stage).
+  const icons: Scene | null =
+    feats.length >= 2 ? { role: "features", skill: "icon-features", text: callouts && target >= 20 ? "The *details*" : featuresTitle, eyebrow: "Features", items: feats.slice(0, 4).map((f) => f.title), duration: beats(10), transition: "dolly" } : null;
+  // A slide per feature with its own photo (long films with enough of both).
+  const described = feats.filter((f) => f.desc.split(/\s+/).length >= 4);
+  const slides: Scene | null =
+    target >= 30 && described.length >= 3 && photos >= 3
+      ? { role: "features", skill: "feature-slides", text: `Inside *${nick}*`, eyebrow: "Details", items: described.slice(0, 3).map((f) => `${f.title} — ${f.desc}`), duration: beats(15.5), transition: "push" }
+      : null;
+  // Every angle: a gallery, and in long films a second, different one to close on.
+  const flowFirst = variant % 2 === 0;
+  const gallery: Scene | null =
+    photos >= 3 && target >= 20
+      ? { role: "gallery", skill: flowFirst ? "gallery-flow" : "carousel-3d", text: "From every *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
+      : null;
+  const closer: Scene | null =
+    photos >= 3 && target >= 30
+      ? { role: "gallery", skill: flowFirst ? "carousel-3d" : "gallery-flow", text: "Every *detail*", eyebrow: "Details", items: [], duration: beats(10), transition: "whip" }
+      : null;
+  const order =
+    target < 20
+      ? [reveal, icons]
+      : angle === "proof"
+        ? [gallery, reveal, slides ?? (target >= 30 ? icons : null), callouts, closer]
+        : [reveal, gallery, callouts, slides ?? (target >= 30 ? icons : null), closer];
+  scenes.push(...order.filter((x): x is Scene => !!x));
+  // Never two product shots back to back: the second becomes icon cards.
+  for (let i = 1; i < scenes.length; i++) if (scenes[i].skill === "product-hero" && scenes[i - 1].skill === "product-hero" && icons) scenes[i] = { ...icons };
+  // The end card: the product's own pitch, and where to get it.
+  scenes.push({
+    role: "cta", skill: "cta",
+    text: `Get yours *today*`,
+    subtext: site.cta && !/free/i.test(site.cta) ? site.cta : "Shop now",
+    duration: beats(8),
+    transition: "flash",
+  });
+  const plan = sanitizePlan({ title, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target, product: true });
+  const styled = applyTemplate(plan, req.template ?? "studio", { palette: req.palette && req.palette !== "auto" ? req.palette : undefined });
+  if (!feats.length || photos < 2) {
+    styled.notes = [
+      `${photos < 2 ? "Only one product photo was found" : "The listing has no bullet points"}, so this is a short product film. ${photos < 2 ? "Add more photos" : "Add features in your prompt"} for galleries and feature callouts.`,
+    ];
+  }
+  return styled;
+}
+
 function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
   const text = [site.name, site.tagline, site.description, ...site.headlines].join(" ").toLowerCase();
   const seed = (req.seed ?? hashString(site.url)) >>> 0;
@@ -1756,7 +1896,7 @@ export function beatSync(plan: VideoPlan): VideoPlan {
 }
 
 /** Only same-origin proxied assets may be referenced by a plan. */
-const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d|p\d{1,2}|logo)$/.test(s);
+const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d|p\d{1,2}|u\d{1,2}|logo)$/.test(s);
 const PART_KINDS = new Set(["media", "panel", "card", "button"]);
 function sanitizeParts(v: unknown): SitePart[] {
   if (!Array.isArray(v)) return [];
@@ -1872,6 +2012,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     concept: typeof raw.concept === "string" && CONCEPT_MAP[raw.concept] ? raw.concept : undefined,
     voiceover: sanitizeVoice(raw.voiceover),
     target: Number(raw.target) > 0 ? Math.min(120, Math.max(6, Number(raw.target))) : undefined,
+    product: raw.product === true ? true : undefined,
     offersOk: Array.isArray(raw.offersOk) ? raw.offersOk.filter((o): o is string => typeof o === "string").slice(0, 12).map((o) => o.slice(0, 120)) : undefined,
     notes: Array.isArray(raw.notes) ? raw.notes.filter((n): n is string => typeof n === "string").slice(0, 3).map((n) => n.slice(0, 300)) : undefined,
     look:

@@ -190,6 +190,39 @@ export const SITES: { id: string; site: SiteData }[] = [
     }),
   },
   {
+    // A marketplace listing (as read by src/lib/listing.ts): a physical product, filmed as a product video.
+    id: "aerobuds (amazon listing)",
+    site: {
+      url: "https://www.amazon.com/dp/B0TEST1234",
+      domain: "amazon.com",
+      name: "Aero",
+      tagline: "Aero Buds Pro Wireless Earbuds",
+      description: "Wireless earbuds with active noise cancelling and a pocket-size charging case.",
+      headlines: ["Active Noise Cancelling", "Long battery life", "IPX5 water resistant", "Comfortable Fit"],
+      features: [
+        "Two microphones on each bud cut out traffic and office chatter so you hear only your music.",
+        "Up to 40 hours of playtime with the charging case, and 10 minutes of charging gives 2 hours.",
+        "Sweat and rain resistant for workouts and runs.",
+        "Three sizes of ear tips for a secure, all-day fit.",
+      ],
+      stats: [],
+      testimonials: [],
+      clientLogos: [],
+      steps: [],
+      pains: [],
+      font: null,
+      shots: { hero: null, full: null, sections: [] },
+      cta: null,
+      logo: null,
+      icon: null,
+      images: ["https://m.media-amazon.com/images/I/61a.jpg", "https://m.media-amazon.com/images/I/71b.jpg", "https://m.media-amazon.com/images/I/81c.jpg", "https://m.media-amazon.com/images/I/91d.jpg"],
+      videos: [],
+      themeColor: null,
+      kind: "product",
+      marketplace: "Amazon",
+    },
+  },
+  {
     // Health / wellness copy full of FDA- and FTC-sensitive claims: none of them may reach the film.
     id: "vitalia (health claims)",
     site: base({

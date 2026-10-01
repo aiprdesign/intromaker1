@@ -805,6 +805,7 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "world-map": "reach",
   "feature-slides": "features",
   "liquid-logo": "reveal",
+  "product-hero": "reveal",
   cta: "cta",
   "qr-end": "cta",
 };
@@ -836,7 +837,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "qr-end", "liquid-logo"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "qr-end", "liquid-logo", "product-hero"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

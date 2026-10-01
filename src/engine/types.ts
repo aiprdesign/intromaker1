@@ -58,6 +58,7 @@ export const SKILL_IDS = [
   "problem-solution",
   "liquid-logo",
   "qr-end",
+  "product-hero",
 ] as const;
 
 export type SkillId = (typeof SKILL_IDS)[number];
@@ -186,6 +187,10 @@ export interface SiteData {
   images: string[];
   videos: string[];
   themeColor: string | null;
+  /** "product": a physical product (a marketplace listing or uploaded product photos), filmed as a product video. */
+  kind?: "site" | "product";
+  /** The marketplace a listing came from ("Amazon", "eBay", or a store's domain). */
+  marketplace?: string;
 }
 
 export interface Scene {
@@ -257,6 +262,8 @@ export interface VideoPlan {
   notes?: string[];
   /** Offers the maker confirmed are real (keys from offerKey), so the studio stops asking. */
   offersOk?: string[];
+  /** A physical product film (from a listing or product photos): suggests the Studio White style. */
+  product?: boolean;
   /** Product concept (devtools, ai, fintech…): picks icon families and story vocabulary. */
   concept?: string;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */

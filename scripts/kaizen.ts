@@ -38,7 +38,8 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
   const roles = sc.map((s) => s.role ?? "");
 
   // ── Arc (25): hook → reveal → product → value → proof → CTA.
-  if (!["hook", "pain"].includes(roles[0])) add("arc", 6, `opens on ${roles[0] || sc[0]?.skill}, not a hook`);
+  // A product video may open on the product itself (the product-first cut of an ad).
+  if (!["hook", "pain"].includes(roles[0]) && !(plan.product && roles[0] === "reveal")) add("arc", 6, `opens on ${roles[0] || sc[0]?.skill}, not a hook`);
   const reveal = roles.indexOf("reveal");
   if (reveal < 0 || reveal > 2) add("arc", 5, "brand reveal missing or late");
   if (target >= 20 && !roles.some((r) => PRODUCT.has(r)) && (site?.images.length || site?.shots.full)) add("arc", 4, "no product beat despite product media");
@@ -102,7 +103,8 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
     // (Liquid is the Liquid Motion style's signature; each one flows from a different direction.)
     if (sc[i].transition === sc[i - 1].transition && sc[i].transition !== "cut" && sc[i].transition !== "liquid") add("variety", 1, `transition ${sc[i].transition} twice in a row`);
   }
-  const distinct = new Set(sc.map((s) => s.skill)).size;
+  // The product reveal and the product with its feature callouts are different shots.
+  const distinct = new Set(sc.map((s) => (s.skill === "product-hero" && s.items?.length ? "product-callouts" : s.skill))).size;
   if (distinct < Math.min(5, sc.length)) add("variety", 4, `only ${distinct} distinct skills`);
 
   // ── Pacing (10).
