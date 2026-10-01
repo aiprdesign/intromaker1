@@ -35,6 +35,7 @@ import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import SlideMedia from "@/components/SlideMedia";
 import { needsPicture } from "@/engine/placeholders";
+import { slideContent } from "@/engine/newslide";
 import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
@@ -943,12 +944,25 @@ export default function Studio() {
     const at = selected !== null ? selected + 1 : plan.scenes.length;
     // Brand slides start from the film's own brand; the QR code uses the website unless a link is added.
     const brandName = (skill === "liquid-logo" || skill === "logo-reveal") && plan.brand?.name;
+    // Everything else is written from the film's own material, not the slide's sample: the
+    // built-in director's version of this slide for the same website, listing or prompt.
+    const source = promptRef.current.trim() || prompt.trim();
+    const direct = (variant: number, angle?: Angle) => {
+      const common = { aspect: plan.aspect, length, palette: "auto" as const, seed: (plan.seed + variant * 7919) >>> 0, style: styleRef.current, template: templateRef.current, safe: true, variant };
+      if (site) return planFromSite(site, { ...common, angle, colors: plan.brand?.colors, direction: source });
+      return source ? planFromPrompt({ prompt: source, ...common }) : null;
+    };
+    const content = brandName || skill === "qr-end" ? null : slideContent(skill, plan, direct);
     const scene: Scene = {
       skill,
-      text: brandName || k.sample.text,
-      subtext: k.sample.subtext,
-      items: skill === "qr-end" ? undefined : k.sample.items,
-      duration: skill === "qr-end" ? 4.5 : 3.5,
+      text: brandName || content?.text || k.sample.text,
+      subtext: content ? content.subtext : k.sample.subtext,
+      items: skill === "qr-end" ? undefined : content ? content.items : k.sample.items,
+      eyebrow: plan.style === "saas" ? content?.eyebrow : undefined,
+      media: content?.media,
+      role: content?.role,
+      vo: narrating ? content?.vo : undefined,
+      duration: skill === "qr-end" ? 4.5 : Math.min(6, Math.max(2.5, content?.duration ?? 3.5)),
       transition: plan.scenes[at - 1]?.transition ?? "cut",
     };
     const next = sanitizePlan({ ...plan, scenes: [...plan.scenes.slice(0, at), scene, ...plan.scenes.slice(at)] });

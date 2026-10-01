@@ -7,6 +7,8 @@ import { mentionsOffer, offerKey, offerSafe, offersIn } from "../src/engine/clai
 import { cleanCta, contextCta, lowerFirst, offersFree, safePlan } from "../src/engine/planner";
 import { speakable } from "../src/engine/voice";
 import { applyTemplate, trailerBeats } from "../src/engine/templates";
+import { slideContent } from "../src/engine/newslide";
+import { SKILL_MAP } from "../src/engine/skills";
 import type { VideoPlan } from "../src/engine/types";
 import { applyTrailerStyle, detectTrailerStyle, TRAILER_STYLES } from "../src/engine/trailers";
 import { planFromPrompt } from "../src/engine/planner";
@@ -142,6 +144,18 @@ for (const [raw, want] of [
   check(safe.scenes.length === 2 && !offersIn(safe).length, "a film is made claim-safe and offer-free, every slide kept");
   check(safe.scenes[1].subtext === "Try it today!" && safe.scenes[1].text === "Get started", `the end card keeps a plain call to action ("${safe.scenes[1].text}" / "${safe.scenes[1].subtext}")`);
   check(!/fastest|free/i.test(safe.scenes[0].text), `superlatives and offers go from the hook ("${safe.scenes[0].text}")`);
+}
+
+console.log("New slides are written from the film");
+{
+  const prompt = "Nimbus, a project management app for remote teams with tasks, docs and chat";
+  const film = planFromPrompt({ prompt, aspect: "16:9", length: "standard", safe: true });
+  const direct = (variant: number) => planFromPrompt({ prompt, aspect: "16:9", length: "standard", safe: true, variant, seed: 1 + variant });
+  for (const sk of ["bento", "icon-features", "word-swap", "feature-slides", "cta"] as const) {
+    const c = slideContent(sk, film, direct);
+    const all = [c.text, ...(c.items ?? [])].join(" ");
+    check(c.text !== SKILL_MAP[sk].sample.text && !/developers|Git deploys|your team\*?$/i.test(all), `${sk}: "${c.text}" ${c.items ? `(${c.items.join(", ")})` : ""}`);
+  }
 }
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");
