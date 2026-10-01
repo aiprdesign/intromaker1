@@ -20,7 +20,7 @@ export default async function License() {
       <Nav />
       <article className="legal">
         <h1>Licence</h1>
-        <p className="lead">IntroMaker is free and unlimited to use, for now, for personal and non-commercial purposes. Commercial use needs a licence.</p>
+        <p className="lead">IntroMaker is a portfolio project. It is free and unlimited to use, for now, for personal and non-commercial purposes; commercial use needs a licence.</p>
 
         <h2>Free: personal and non-commercial use</h2>
         <p>
@@ -31,8 +31,7 @@ export default async function License() {
         <h2>Commercial use: contact us</h2>
         <p>
           Using IntroMaker for a business, for clients, in an agency, or running its code on your own servers or inside a product you sell needs a commercial
-          licence. {mail ? <a href={mail}>Contact us at {contact}</a> : "Contact the site owner"} and tell us how you&apos;d like to use it; we&apos;ll
-          find terms that suit.
+          licence. {mail ? <a href={mail}>Contact us at {contact}</a> : "Contact the site owner"} and tell us how you&apos;d like to use it.
         </p>
 
         <h2>The source code</h2>

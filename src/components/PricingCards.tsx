@@ -38,13 +38,13 @@ export default function PricingCards() {
         </Link>
       </div>
       <div className="price-card featured">
-        <span className="badge">For business</span>
+        <span className="badge">Commercial use</span>
         <h3>Commercial licence</h3>
         <div className="price">
           Contact us<small></small>
         </div>
         <ul>
-          {["Use IntroMaker for a business, a client or an agency", "Run it on your own servers or in your product", "Everything in Free, with no limits", "Terms to suit your use"].map((f) => (
+          {["Use IntroMaker for a business, a client or an agency", "Run it on your own servers or in your product", "Everything in Free, with no limits", "Available on request"].map((f) => (
             <li key={f}>{f}</li>
           ))}
         </ul>
