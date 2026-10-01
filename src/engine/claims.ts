@@ -171,5 +171,46 @@ export function offersIn(plan: { scenes: { text: string; subtext?: string; items
   return out;
 }
 
+/** Clauses whose whole point is a deal: discounts, coupons, refunds, "no credit card". */
+const DEAL = /\d+\s?%\s*off\b|\b(?:discount|coupon|promo(?:\s+code)?|voucher|money[- ]back|refund|no credit card|without a credit card|save\s*(?:\$|€|£)\s?\d|(?:\$|€|£)\s?\d+\s*off|free\s+(?:plan|tier|version|account|shipping|delivery|returns?|gift|demo|consultation|quote|sample|month|week|for\s+\d+\s+days?)|free\s+(?:to\s+)?(?:start|use|try|join|download)|free forever)\b/i;
+
+/** Offer wording rewritten as neutral calls to action ("Try for Free!" → "Try it today"). */
+const OFFER_RULES: Rule[] = [
+  [/\b(?:start|begin|get|claim|activate)\s+(?:your\s+|a\s+|my\s+)?(?:\d+[- ]day\s+)?(?:free\s+)?trial\b/gi, "Get started"],
+  [/\b(?:get\s+)?start(?:ed)?\s+(?:for\s+)?free\b/gi, "Get started"],
+  [/\btry(\s+(?!for\b)[A-Za-z][\w]*)?\s+(?:it\s+)?(?:for\s+)?free\b/gi, (_m, who?: string) => `Try${who ?? " it"} today`],
+  [/\b(sign up|join(?: now)?|download|install|register|get it|create (?:an |your )?account)\s+(?:for\s+)?(?:free|free of charge|at no cost)\b/gi, (_m, verb: string) => verb],
+  [/\b(?:it'?s\s+)?(?:totally\s+|completely\s+|100%\s+)?free\s+(?:forever|to\s+(?:start|use|try|join|download|get started))\b/gi, ""],
+  [/\bfree\s+(?:plan|tier|version|account|forever|shipping|delivery|returns?|gift|download|demo|consultation|quote|sample|month|week|for\s+\d+\s+days?)\b/gi, ""],
+  [/\b(?:\d+[- ]day\s+)?(?:free\s+)?trials?\b/gi, ""],
+  [/\b(?:for\s+)?free(?:\s+of\s+charge)?\b|\bat no (?:extra )?cost\b/gi, ""],
+];
+
+/**
+ * The same line without an offer, so an intro never promises a deal it can't vouch for:
+ * clauses about discounts, coupons, refunds or "no credit card" are left out, and "free" /
+ * "trial" wording becomes a neutral call to action ("Try for Free!" → "Try it today", "Start
+ * your free trial" → "Get started", "Sign up free" → "Sign up"). Lines without an offer are
+ * returned as they are; "" means nothing is left.
+ */
+export function offerSafe(text: string): string;
+export function offerSafe(text: string | undefined): string | undefined;
+export function offerSafe(text: string | undefined) {
+  if (!text || !mentionsOffer(text)) return text;
+  // Clauses with their separators ("Ship faster — no credit card"), so the punctuation survives.
+  const parts = text.split(/((?<=[.!?])\s+|\s+[—–|·]\s+)/);
+  let s = "";
+  for (let k = 0; k < parts.length; k += 2) {
+    if (DEAL.test(parts[k])) continue;
+    s += (s && parts[k - 1] ? parts[k - 1] : "") + parts[k];
+  }
+  for (const [re, to] of OFFER_RULES) s = s.replace(re, to as string);
+  s = tidy(s.replace(/\b(?:for|and|with|or|—|–)\s*(?=[.!?]*$)/i, "")).replace(/^[!.?\s]+/, "");
+  // A lone verb or filler isn't a line.
+  if (!/[a-z]{2,}/i.test(s.replace(/\*/g, "")) || /^(?:get|try|start|sign|join|and|or|the|it|now)\W*$/i.test(s.replace(/\*/g, "").trim())) return "";
+  if (s && /^[A-Z]/.test(text.replace(/^[*\s]+/, ""))) s = s.replace(/^(\**)([a-z])/, (_m, star: string, c: string) => star + c.toUpperCase());
+  return s;
+}
+
 /** The key a confirmation is stored under (so an edited offer asks again). */
 export const offerKey = (text: string) => text.toLowerCase().replace(/[^a-z0-9%$€£]+/g, " ").trim();

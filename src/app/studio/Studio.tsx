@@ -30,8 +30,7 @@ import { DEFAULT_VOICE, speakable, wordBudget } from "@/engine/voice";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
-import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
-import { offerKey, offersIn } from "@/engine/claims";
+import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, safePlan, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import SlideMedia from "@/components/SlideMedia";
@@ -145,27 +144,9 @@ export default function Studio() {
       /* ignore */
     }
   };
-  // Claim-safe copy: generic wording with no superlatives, guarantees, speed claims or numbers.
-  // On by default; the site's own claims (stats, quotes, customer logos) only when switched off.
-  const [safe, setSafe] = useState(true);
-  const safeRef = useRef(safe);
-  safeRef.current = safe;
-  useEffect(() => {
-    try {
-      if (localStorage.getItem("intromaker.claims") === "site") setSafe(false);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-  const chooseSafe = (on: boolean) => {
-    setSafe(on);
-    safeRef.current = on;
-    try {
-      localStorage.setItem("intromaker.claims", on ? "safe" : "site");
-    } catch {
-      /* ignore */
-    }
-  };
+  // Claim-safe copy, always: generic wording with no superlatives, guarantees, speed claims,
+  // numbers or offers ("free", trials, discounts), and never a health claim.
+  const safeRef = useRef(true);
   // Headline text effect: null keeps each template's own; a choice applies to every headline.
   const [textFx, setTextFx] = useState<TextFx | null>(null);
   useEffect(() => {
@@ -884,11 +865,35 @@ export default function Studio() {
     if (s) setSeek({ t: startOf(p, i) + Math.min(s.duration * 0.6, s.duration - 0.3), key: Date.now() });
   };
 
-  // Offers on screen (free, trials, discounts) the maker hasn't confirmed are real yet.
-  const pendingOffers = offersIn(plan).filter((o) => !(plan.offersOk ?? []).includes(offerKey(o.text)));
-  const confirmOffers = () => {
-    record("offers");
-    setPlan((p) => ({ ...p, offersOk: [...new Set([...(p.offersOk ?? []), ...offersIn(p).map((o) => offerKey(o.text))])].slice(-12) }));
+  /**
+   * Keep your own edits claim-safe, without asking: when you leave a field, the slide's words get
+   * the same pass as the director's (superlatives, guarantees, numbers and offers reworded or left
+   * out), and a note says what changed. Returns the safe plan.
+   */
+  const keepClaimSafe = (only?: number) => {
+    const cur = planRef.current;
+    const safe = safePlan(cur, { keepScenes: true });
+    const changed: string[] = [];
+    const scenes = cur.scenes.map((sc, k) => {
+      if (only !== undefined && k !== only) return sc;
+      const next = safe.scenes[k];
+      const fields = ["text", "subtext", "eyebrow", "items", "vo"] as const;
+      if (fields.every((f) => JSON.stringify(sc[f]) === JSON.stringify(next[f]))) return sc;
+      for (const f of fields) {
+        const a = sc[f];
+        const b = next[f];
+        if (JSON.stringify(a) === JSON.stringify(b) || !a) continue;
+        changed.push(`“${String(Array.isArray(a) ? a.join(", ") : a).replace(/\*/g, "")}”${b && (!Array.isArray(b) || b.length) ? ` → “${String(Array.isArray(b) ? b.join(", ") : b).replace(/\*/g, "")}”` : " (left out)"}`);
+      }
+      return { ...sc, text: next.text, subtext: next.subtext, eyebrow: next.eyebrow, items: next.items, vo: next.vo };
+    });
+    if (!changed.length) return cur;
+    const out = { ...cur, scenes };
+    record(`claims:${only ?? "all"}`);
+    setPlan(out);
+    planRef.current = out;
+    setToast({ text: `Kept it claim-safe: ${changed.slice(0, 2).join("; ")}${changed.length > 2 ? ` and ${changed.length - 2} more` : ""}`, key: Date.now() });
+    return out;
   };
 
   const updateScene = (i: number, patch: Partial<Scene>) => {
@@ -1004,14 +1009,14 @@ export default function Studio() {
         {plan.style === "saas" && (
           <label className="fld">
             <span className="fld-cap">Chapter label</span>
-            <input className="input eyebrow-input" value={s.eyebrow ?? ""} placeholder="Optional, e.g. How it works" onChange={(e) => updateScene(i, { eyebrow: e.target.value || undefined })} />
+            <input className="input eyebrow-input" value={s.eyebrow ?? ""} placeholder="Optional, e.g. How it works" onChange={(e) => updateScene(i, { eyebrow: e.target.value || undefined })} onBlur={() => keepClaimSafe(i)} />
           </label>
         )}
         <label className="fld">
           <span className="fld-cap">
             Headline <em>*word* = accent colour</em>
           </span>
-          <input className={`input headline ${plan.style === "saas" ? "natural" : ""}`} value={s.text} maxLength={200} onChange={(e) => updateScene(i, { text: e.target.value })} />
+          <input className={`input headline ${plan.style === "saas" ? "natural" : ""}`} value={s.text} maxLength={200} onChange={(e) => updateScene(i, { text: e.target.value })} onBlur={() => keepClaimSafe(i)} />
         </label>
         {showItems && (
           <label className="fld">
@@ -1030,6 +1035,7 @@ export default function Studio() {
                     .filter((x, j, arr) => x || j === arr.length - 1),
                 })
               }
+              onBlur={() => keepClaimSafe(i)}
             />
           </label>
         )}
@@ -1066,7 +1072,7 @@ export default function Studio() {
         )}
         <label className="fld">
           <span className="fld-cap">Subtext</span>
-          <input className="input" value={s.subtext ?? ""} maxLength={60} placeholder="Optional" onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })} />
+          <input className="input" value={s.subtext ?? ""} maxLength={60} placeholder="Optional" onChange={(e) => updateScene(i, { subtext: e.target.value || undefined })} onBlur={() => keepClaimSafe(i)} />
         </label>
         {(MEDIA_SKILLS.has(s.skill) || s.media) && (
           <SlideMedia
@@ -1081,7 +1087,7 @@ export default function Studio() {
           <div className="vo-line">
             <label className="fld">
               <span className="fld-cap">Narration</span>
-              <textarea className="input" rows={2} value={s.vo ?? ""} maxLength={240} placeholder="Leave empty for no voice here" onChange={(e) => updateScene(i, { vo: e.target.value || undefined })} />
+              <textarea className="input" rows={2} value={s.vo ?? ""} maxLength={240} placeholder="Leave empty for no voice here" onChange={(e) => updateScene(i, { vo: e.target.value || undefined })} onBlur={() => keepClaimSafe(i)} />
             </label>
             {(() => {
               const n = s.vo ? speakable(s.vo).split(/\s+/).filter(Boolean).length : 0;
@@ -1497,21 +1503,9 @@ export default function Studio() {
           </div>
             </div>
           </div>
-          <label className="field-label">
-            Wording <span className="tpl-desc">{safe ? "Claim-safe" : "Site's claims"}</span>
-          </label>
-          <div className="seg-control">
-            <button className={safe ? "active" : ""} onClick={() => chooseSafe(true)}>
-              Claim-safe (generic)
-            </button>
-            <button className={!safe ? "active" : ""} onClick={() => chooseSafe(false)}>
-              Use site&apos;s claims
-            </button>
-          </div>
-          <p className="hint" title="Automated screening, not legal advice: review the copy before publishing.">
-            {safe
-              ? "No superlatives, guarantees, results, numbers, certifications, green claims or endorsements; health claims always removed. Not legal advice."
-              : "Adds the site's stats, quotes, certifications and logos: you must be able to back them up. Health claims still removed."}
+          <p className="hint claim-note" title="Automated screening, not legal advice.">
+            ✓ Claim-safe wording, automatically: superlatives, guarantees, numbers, offers (&ldquo;free&rdquo;, trials, discounts) and health claims are reworded
+            or left out, in what the director writes and in your own edits.
           </p>
 
               </>
@@ -1712,30 +1706,7 @@ export default function Studio() {
             </a>
           </p>
           {note && <p className="hint warn">{note}</p>}
-          {pendingOffers.length > 0 && (
-            <div className="offer-warn" role="alert">
-              <strong>Confirm {pendingOffers.length === 1 ? "this offer is" : "these offers are"} real</strong>
-              <ul>
-                {pendingOffers.map((o) => (
-                  <li key={o.text}>
-                    “{o.text}” <span className="hint sm">slide {o.scene + 1}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="hint sm">
-                Only publish an offer viewers can really get, exactly as worded (a free plan or trial, a discount). If it isn&apos;t available, change the wording on
-                the slide.
-              </p>
-              <div className="import-error-actions">
-                <button className="btn btn-primary sm" onClick={confirmOffers}>
-                  It&apos;s a real offer
-                </button>
-                <button className="btn btn-ghost sm" onClick={() => selectScene(pendingOffers[0].scene)}>
-                  Edit slide {pendingOffers[0].scene + 1}
-                </button>
-              </div>
-            </div>
-          )}
+
 
           </div>
         </aside>
@@ -1758,13 +1729,8 @@ export default function Studio() {
                   )
                 )
                   return false;
-                if (pendingOffers.length) {
-                  const ok = window.confirm(
-                    `This intro makes an offer: ${pendingOffers.map((o) => `“${o.text}”`).join(", ")}.\n\nExport only if viewers can really get it, exactly as worded. Is it a real offer?`,
-                  );
-                  if (!ok) return false;
-                  confirmOffers();
-                }
+                // Every exported intro is claim-safe: anything still unsafe is reworded first (no questions).
+                if (keepClaimSafe() !== plan) await new Promise((r) => setTimeout(r, 60));
                 // Lines still recording are finished first, so the narration is in the file.
                 const film = await narration.ensure();
                 if (film) return film;

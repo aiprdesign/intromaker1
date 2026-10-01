@@ -2,7 +2,7 @@ import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { writeVoiceover } from "./script";
-import { isHealthClaim, isNumericClaim, isUnsafe, safeCopy } from "./claims";
+import { isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
 import { DEFAULT_TRAILER_STYLE, detectTrailerStyle, TRAILER_STYLE_MAP } from "./trailers";
 import {
@@ -903,33 +903,41 @@ const CLAIM_SKILLS = new Set(["testimonial", "logo-marquee", "chart-grow", "numb
  * headline that is one replaced with a neutral line; quote, customer-wall and metric scenes
  * left out (the film is re-timed to keep its length).
  */
-export function safePlan(plan: VideoPlan): VideoPlan {
+export function safePlan(plan: VideoPlan, opts: { keepScenes?: boolean } = {}): VideoPlan {
   const name = plan.brand?.name ?? plan.title;
   const neutral = (role?: string) => (role === "hook" ? `Introducing *${name}*` : role === "cta" ? `Try *${name}*` : `See *${name}* in action`);
-  const fix = (x: string | undefined) => (x ? safeCopy(x) || undefined : x);
+  // Claims softened, then any offer ("free", "trial", "% off") reworded or left out.
+  const clean = (x: string) => offerSafe(safeCopy(x));
+  const fix = (x: string | undefined) => (x ? clean(x) || undefined : x);
   const before = plan.scenes.reduce((a, sc) => a + sc.duration, 0);
-  const kept = plan.scenes.filter((sc, i) => i === 0 || !(CLAIM_ROLES.has(sc.role ?? "") || CLAIM_SKILLS.has(sc.skill)));
-  const scenes = kept.map((sc) => {
+  const kept = opts.keepScenes ? plan.scenes : plan.scenes.filter((sc, i) => i === 0 || !(CLAIM_ROLES.has(sc.role ?? "") || CLAIM_SKILLS.has(sc.skill)));
+  const scenes = kept.map((sc, i) => {
     // Word-swap alternatives are rewritten one by one; claims among them are dropped.
     const text = sc.text.includes("|")
       ? sc.text
           .split("|")
-          .map((part, k) => (k === 0 ? safeCopy(part) : isNumericClaim(part) || isUnsafe(part) ? "" : safeCopy(part)))
+          .map((part, k) => (k === 0 ? clean(part) : isNumericClaim(part) || isUnsafe(part) ? "" : clean(part)))
           .filter(Boolean)
           .join("|")
       : (isNumericClaim(sc.text) || isUnsafe(sc.text)) && sc.role !== "reveal"
         ? neutral(sc.role)
-        : safeCopy(sc.text) || neutral(sc.role);
-    const items = sc.items?.filter((it) => !isNumericClaim(it) && !isUnsafe(it)).map((it) => safeCopy(it)).filter(Boolean);
+        : clean(sc.text) || neutral(sc.role);
+    const items = sc.items?.filter((it) => !isNumericClaim(it) && !isUnsafe(it)).map((it) => clean(it)).filter(Boolean);
+    // The end card's button keeps a label: a plain call to action when its offer goes.
+    const isEnd = sc.role === "cta" || i === kept.length - 1;
+    const sub = sc.subtext && (isNumericClaim(sc.subtext) || isUnsafe(sc.subtext)) && sc.role !== "cta" ? undefined : fix(sc.subtext);
     return {
       ...sc,
       text,
-      subtext: sc.subtext && (isNumericClaim(sc.subtext) || isUnsafe(sc.subtext)) && sc.role !== "cta" ? undefined : fix(sc.subtext),
+      subtext: sub ?? (isEnd && sc.subtext && mentionsOffer(sc.subtext) ? "Get started" : undefined),
       eyebrow: sc.eyebrow && isUnsafe(sc.eyebrow) ? undefined : fix(sc.eyebrow),
-      items: items?.length ? items : sc.items?.length ? undefined : sc.items,
+      // (The QR code's link isn't copy: it stays as it is.)
+      items: sc.skill === "qr-end" ? sc.items : items?.length ? items : sc.items?.length ? undefined : sc.items,
       vo: sc.vo && !isNumericClaim(sc.vo) && !isUnsafe(sc.vo) ? fix(sc.vo) : sc.vo ? undefined : sc.vo,
     };
   });
+  // (Your own edits: nothing is added, so a narration line you cleared stays cleared.)
+  if (opts.keepScenes) return { ...plan, scenes };
   // Keep the film's length: the time of any scene left out goes to the scenes around it.
   const after = scenes.reduce((a, sc) => a + sc.duration, 0);
   const k = after > 0 && before > after ? Math.min(1.35, before / after) : 1;

@@ -3,8 +3,8 @@
  * "free" is only offered when the copy really offers it, and site buttons are cleaned.
  * Run: npm run check:copy
  */
-import { mentionsOffer, offerKey, offersIn } from "../src/engine/claims";
-import { cleanCta, contextCta, lowerFirst, offersFree } from "../src/engine/planner";
+import { mentionsOffer, offerKey, offerSafe, offersIn } from "../src/engine/claims";
+import { cleanCta, contextCta, lowerFirst, offersFree, safePlan } from "../src/engine/planner";
 import { speakable } from "../src/engine/voice";
 import { applyTemplate, trailerBeats } from "../src/engine/templates";
 import type { VideoPlan } from "../src/engine/types";
@@ -117,6 +117,32 @@ const withLogo: VideoPlan = { ...trailer, scenes: trailer.scenes.map((x, i) => (
 check(applyTrailerStyle(withLogo, "retro").scenes[1].skill === "logo-reveal", "scenes showing your material keep their slide");
 check(detectTrailerStyle("a luxury perfume and jewellery brand").id === "luxury" && detectTrailerStyle("plain words").id === "hype", "Auto matches the product's words, else the all-rounder");
 check(new Set(TRAILER_STYLES.map((t) => t.name)).size === TRAILER_STYLES.length && TRAILER_STYLES.length >= 12, `${TRAILER_STYLES.length} named trailer styles`);
+
+console.log("Offers reworded automatically (no questions)");
+for (const [raw, want] of [
+  ["Try for Free!", "Try it today!"],
+  ["Start your 14-day free trial", "Get started"],
+  ["Sign up free", "Sign up"],
+  ["Start building today. No credit card required.", "Start building today."],
+  ["Shop now — free returns", "Shop now"],
+  ["Get 50% off your first month", ""],
+  ["Free plan available", ""],
+  ["Hassle-free invoicing", "Hassle-free invoicing"],
+  ["Free up your team", "Free up your team"],
+]) check(offerSafe(raw) === want, `"${raw}" → "${want}"${offerSafe(raw) === want ? "" : ` (got "${offerSafe(raw)}")`}`);
+{
+  const offerFilm: VideoPlan = {
+    title: "Nimbus", palette: "midnight", font: "inter", aspect: "16:9", bpm: 120, seed: 1, style: "saas",
+    scenes: [
+      { role: "hook", skill: "blur-reveal", text: "The *fastest* way to plan, free forever", duration: 3, transition: "cut" },
+      { role: "cta", skill: "cta", text: "Start your free trial", subtext: "Try for Free!", duration: 3, transition: "cut" },
+    ],
+  };
+  const safe = safePlan(offerFilm, { keepScenes: true });
+  check(safe.scenes.length === 2 && !offersIn(safe).length, "a film is made claim-safe and offer-free, every slide kept");
+  check(safe.scenes[1].subtext === "Try it today!" && safe.scenes[1].text === "Get started", `the end card keeps a plain call to action ("${safe.scenes[1].text}" / "${safe.scenes[1].subtext}")`);
+  check(!/fastest|free/i.test(safe.scenes[0].text), `superlatives and offers go from the hook ("${safe.scenes[0].text}")`);
+}
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");
 process.exit(failed ? 1 : 0);

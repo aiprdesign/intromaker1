@@ -124,7 +124,8 @@ const CLAIM_RULES = `CLAIM-SAFE COPY (required — overrides the rules above): e
 - No numbers used as claims (customer counts, percentages, ratings, uptime, revenue), no testimonials, no customer-logo walls, no metric or number scenes (testimonial, logo-marquee, chart-grow, number-ticker are not used).
 - No efficacy or outcome promises ("stops every threat", "boost your revenue", "save money") — describe what the product does, not results it guarantees.
 - FTC/FDA: no health or medical claims of any kind (treats, cures, prevents, diagnoses, heals, improves sleep/stress/mood, clinically proven, FDA approved, doctor recommended); no certification or compliance claims (SOC 2, HIPAA, GDPR, "compliant", "certified", "bank-grade"); no green claims (eco-friendly, sustainable, carbon neutral); no endorsements ("as seen on", "recommended by"); no origin claims ("Made in USA").
-- Word-swap lines use neutral verbs ("Your work, planned|built|shared"). CTAs are simple actions ("Get started", "Try Acme"); "free" only when the website itself offers it.`;
+- No offers: never "free", free trials, discounts, "% off", coupons, "no credit card" or money-back promises.
+- Word-swap lines use neutral verbs ("Your work, planned|built|shared"). CTAs are simple actions ("Get started", "Book a demo", "Try Acme").`;
 
 export async function GET() {
   const server = await serverAi();
@@ -236,7 +237,8 @@ function readBody(body: Body) {
   const length: Length = body.length === "short" || body.length === "long" ? body.length : "standard";
   const palette: PaletteId | "auto" = (PALETTE_IDS as readonly string[]).includes(body.palette as string) ? (body.palette as PaletteId) : "auto";
   const seed = Number(body.seed) || undefined;
-  const safe = body.safe !== false;
+  // Claim-safe, always (the studio no longer offers the site's own claims).
+  const safe = true;
   // Claim-safe: the director (built-in or AI) only ever sees the site's claim-free copy.
   // Uploaded product photos make it a product video: of the imported listing or site (the
   // uploads lead), or of the product the prompt describes.

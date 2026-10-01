@@ -3735,23 +3735,6 @@ code.secret {
   flex-wrap: wrap;
   gap: 6px;
 }
-.offer-warn {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(251, 191, 36, 0.5);
-  background: rgba(251, 191, 36, 0.08);
-  font-size: 13px;
-}
-.offer-warn ul {
-  margin: 0;
-  padding-left: 18px;
-}
-.offer-warn p {
-  margin: 0;
-}
 
 /* Product photos: drop zone + thumbnails (a product video from your own or your listing's photos). */
 .photo-drop {
@@ -3921,4 +3904,7 @@ code.secret {
 }
 .media-what small.warn {
   color: #ffc93c;
+}
+.claim-note {
+  margin-top: 14px;
 }
