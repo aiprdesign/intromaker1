@@ -18,7 +18,7 @@ export default function PricingCards() {
       .catch(() => {});
   }, []);
   const cards = [
-    { id: "free" as const, name: "Free", price: "$0", period: "forever", intro: ["All 63 motion skills", "Generated soundtrack and voice-over"], cta: "Try for Free!", href: "/studio" },
+    { id: "free" as const, name: "Free", price: "$0", period: "forever", intro: ["All 64 motion skills", "Generated soundtrack and voice-over"], cta: "Try for Free!", href: "/studio" },
     { id: "pro" as const, name: "Pro", price: proPrice || "Ask us", period: "", intro: ["Everything in Free"], cta: "Get Pro", href: "/account", featured: true },
   ];
   return (

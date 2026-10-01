@@ -54,6 +54,8 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
   const head = clean(s.text);
   // Product videos speak about the product itself, and say where to find it.
   if (plan.product) {
+    // The trailer's cold open plays to the music; the narrator comes in on the reveal.
+    if (s.skill === "product-teaser") return undefined;
     if (s.role === "reveal") {
       const by = clean(s.subtext);
       const meet = head.split(/\s+/).length >= 3 ? `Meet the ${head}` : `Meet ${head}`;

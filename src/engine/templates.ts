@@ -32,14 +32,16 @@ export type Role =
   | "support"
   | "cta";
 
-export type TemplateCategory = "Clean & Epic" | "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
-export const TEMPLATE_CATEGORIES: TemplateCategory[] = ["Clean & Epic", "Modern", "3D & Sci-Fi", "Clean & Light", "Bold & Playful", "Premium"];
+export type TemplateCategory = "Clean & Epic" | "Product Trailers" | "Modern" | "Clean & Light" | "3D & Sci-Fi" | "Bold & Playful" | "Premium";
+export const TEMPLATE_CATEGORIES: TemplateCategory[] = ["Clean & Epic", "Product Trailers", "Modern", "3D & Sci-Fi", "Clean & Light", "Bold & Playful", "Premium"];
 
 export interface Template {
   id: string;
   name: string;
   /** Gallery group (defaults to "Modern"). */
   category?: TemplateCategory;
+  /** A movie-trailer cut: product videos open cold on close-ups (Trailer Cold Open) before the reveal. */
+  trailer?: boolean;
   description: string;
   /** Creative brief handed to the AI director. */
   vibe: string;
@@ -94,6 +96,8 @@ function roleLength(scene: Scene, role: Role): [number, number] {
     case "pain":
       return [(scene.items?.length ?? 2) * 2 + 5, 4.5];
     case "hook":
+      // The trailer cold open: two beats a shot, and the white-out into the reveal.
+      if (scene.skill === "product-teaser") return [Math.max(1, Math.min(3, scene.items?.length ?? 1)) * 2.5 + 1.5, 3.4];
       return [7, 3.2];
     case "reveal":
       // Video in text needs time to hold the letters before diving through them.
@@ -764,6 +768,101 @@ export const TEMPLATES: Template[] = [
     revealNoLogo: "logo-reveal",
     sample: sample("A brighter way to *work*."),
   },
+  {
+    id: "drop",
+    name: "Hero Drop",
+    category: "Product Trailers",
+    trailer: true,
+    description: "The product launch trailer: a cold open of close-ups cut on the hits, light rays, streaking type and a flash cut to the product, with a cinematic score.",
+    vibe: "Epic and cinematic, like a flagship product trailer. One or two words a shot, big moments, every cut on a hit.",
+    palette: "midnight",
+    font: "inter",
+    bpm: 112,
+    music: "trailer",
+    flavor: "tech",
+    look: { grid: false, beams: 1, aurora: 0.4, card: "glass", text: "streak", textScale: 1.12, grain: 0.9, vignette: 1.5, shader: "rays", shaderStrength: 0.85, depth: 6 },
+    transitions: ["flash", "zoom", "whip"],
+    pace: 0.95,
+    roles: {},
+    revealNoLogo: "logo-reveal",
+    sample: sample("Built *different*.", "blur-reveal", { eyebrow: "Coming soon" }),
+  },
+  {
+    id: "spotlight",
+    name: "Spotlight",
+    category: "Product Trailers",
+    trailer: true,
+    description: "Pure black and one cone of light: the product steps into the spotlight between hard cuts, with focus-pull type and a slow, heavy trailer score.",
+    vibe: "Dramatic and minimal. Very few words, long holds in the light, hard cuts and slow zooms.",
+    palette: "ink",
+    font: "grotesk",
+    bpm: 100,
+    music: "trailer",
+    flavor: "minimal",
+    look: { grid: false, beams: 0, aurora: 0, backdrop: "beam", card: "flat", text: "focus", textScale: 1.14, grain: 1, vignette: 1.5, depth: 8 },
+    transitions: ["cut", "zoom", "dissolve"],
+    pace: 1.05,
+    roles: {},
+    revealNoLogo: "logo-reveal",
+    sample: sample("Step into the *light*.", "blur-reveal", { eyebrow: "In the spotlight" }),
+  },
+  {
+    id: "noir",
+    name: "Noir Gold",
+    category: "Product Trailers",
+    trailer: true,
+    description: "A luxury trailer: black and gold, a soft beam of light, elegant serif type that unmasks, slow dissolves and light leaks. For beauty, fragrance, jewellery and premium goods.",
+    vibe: "Luxurious, slow and seductive. Short elegant lines, long dissolves, warm light leaks.",
+    palette: "gold",
+    font: "serif",
+    bpm: 90,
+    music: "trailer",
+    flavor: "soft",
+    look: { grid: false, beams: 0, aurora: 0.2, backdrop: "beam", card: "flat", text: "mask", textScale: 1.1, grain: 1, vignette: 1.5 },
+    transitions: ["dissolve", "leak", "flash"],
+    pace: 1.12,
+    roles: {},
+    revealNoLogo: "logo-reveal",
+    sample: sample("Pure *indulgence*.", "blur-reveal", { eyebrow: "The collection" }),
+  },
+  {
+    id: "blockbuster",
+    name: "Blockbuster",
+    category: "Product Trailers",
+    trailer: true,
+    description: "Summer-blockbuster energy: fiery orange light, smoke, condensed headline type, whip pans, flash cuts and light leaks on a driving score.",
+    vibe: "Loud, bold and fast. Punchy two-word lines in big condensed type, whips and flashes on every hit.",
+    palette: "inferno",
+    font: "anton",
+    bpm: 124,
+    music: "trailer",
+    flavor: "tech",
+    look: { grid: false, beams: 0.6, aurora: 0.5, card: "glass", text: "streak", textScale: 1.16, grain: 1, vignette: 1.6, shader: "smoke", shaderStrength: 0.7, depth: 6 },
+    transitions: ["whip", "flash", "leak", "zoom"],
+    pace: 0.9,
+    roles: {},
+    revealNoLogo: "logo-reveal",
+    sample: sample("Bring the *heat*.", "blur-reveal", { eyebrow: "This summer" }),
+  },
+  {
+    id: "neondrop",
+    name: "Neon Drop",
+    category: "Product Trailers",
+    trailer: true,
+    description: "A gaming-gear trailer: neon on black, glitch and flash cuts, chromatic type and a fast cyber score. For gadgets, gaming and tech accessories.",
+    vibe: "Fast, electric and techy. Very short lines, glitch cuts on every hit, neon colour.",
+    palette: "cyber",
+    font: "grotesk",
+    bpm: 128,
+    music: "trailer",
+    flavor: "tech",
+    look: { grid: false, beams: 1.5, aurora: 0.8, card: "glass", text: "chroma", textScale: 1.1, grain: 1, vignette: 1.4, shader: "neuro", shaderStrength: 0.6, depth: 6 },
+    transitions: ["glitch", "flash", "whip"],
+    pace: 0.9,
+    roles: {},
+    revealNoLogo: "logo-reveal",
+    sample: sample("Level *up*.", "blur-reveal", { eyebrow: "Next gen" }),
+  },
 ];
 
 export const TEMPLATE_MAP = Object.fromEntries(TEMPLATES.map((t) => [t.id, t])) as Record<string, Template>;
@@ -809,6 +908,7 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "product-end": "cta",
   "product-spin": "gallery",
   "product-zoom": "gallery",
+  "product-teaser": "hook",
   cta: "cta",
   "qr-end": "cta",
 };
@@ -821,6 +921,53 @@ export function roleOf(scene: Scene, index: number, count: number): Role | undef
 }
 
 /**
+ * A line cut into trailer beats: at its connectors ("Wireless earbuds | with active noise
+ * cancelling"), at most 4 words a beat and 3 beats. A name alone builds word by word.
+ */
+export function trailerBeats(line: string): string[] {
+  const words = line.replace(/\*/g, "").replace(/[.!?]+$/, "").split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return words;
+  if (words.length <= 3) return words.length === 3 || /^[A-Z]/.test(words[1]) ? words : [words.join(" ")];
+  const beats: string[][] = [[]];
+  for (const w of words) {
+    const cur = beats[beats.length - 1];
+    if (cur.length && (cur.length >= 4 || (/^(with|and|for|that|so|to|plus|in|on|from|by)$/i.test(w) && cur.length >= 2))) beats.push([w]);
+    else cur.push(w);
+  }
+  return beats.slice(0, 3).map((b) => b.join(" "));
+}
+
+/**
+ * Trailer styles give product videos a cold open: close-ups of the product, cut on the beat, with
+ * its own line said in beats, before the reveal. It replaces another opener (taking its line), and
+ * goes again when you switch back to a style that isn't a trailer.
+ */
+function trailerCut(plan: VideoPlan, tpl: Template): Scene[] {
+  const scenes = plan.scenes;
+  if (!plan.product || !scenes.length) return scenes;
+  const open = scenes[0].skill === "product-teaser";
+  if (!tpl.trailer) return open && TEMPLATE_MAP[plan.template ?? ""]?.trailer ? scenes.slice(1) : scenes;
+  // Short films (under ~18s) keep the trailer look but go straight to the product.
+  if (open || (plan.target ?? 30) < 18) return scenes;
+  // The line: the opener's, else the reveal's benefit, else the product's (short) name.
+  const hook = scenes[0].role === "hook" && !/^(meet|say hello to)\b/i.test(scenes[0].text) ? scenes[0].text : "";
+  const reveal = scenes.find((s) => s.role === "reveal");
+  const benefit = reveal?.subtext && !/^by\s/i.test(reveal.subtext) ? reveal.subtext : "";
+  const name = (reveal?.text || plan.title || "").split(/\s+/).slice(0, 3).join(" ");
+  const line = (hook || benefit || name).replace(/\*/g, "");
+  const teaser: Scene = {
+    role: "hook",
+    skill: "product-teaser",
+    text: line.split(/\s+/).length >= 2 ? line : `Meet ${line}`,
+    items: trailerBeats(line),
+    duration: 4,
+    transition: "cut",
+    why: "Trailer cold open: close-ups of the product, cut on the beat",
+  };
+  return [teaser, ...(scenes[0].role === "hook" ? scenes.slice(1) : scenes)];
+}
+
+/**
  * Restyle a plan with a template: palette, font, tempo, music, background look, transitions,
  * role skills and pacing. Content (copy, items, media) is untouched.
  */
@@ -829,7 +976,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   const beat = 60 / tpl.bpm;
   const r = rng(hashString(`${plan.seed}:${tpl.id}`));
   let last: Transition = "cut";
-  const scenes = plan.scenes.map((scene, i, all) => {
+  const base = trailerCut(plan, tpl);
+  const scenes = base.map((scene, i, all) => {
     const role = roleOf(scene, i, all.length);
     if (!role) return scene;
     let skill = tpl.roles[role] ?? DEFAULT_ROLE_SKILL[role];
@@ -840,7 +988,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
@@ -848,12 +996,14 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
       const pool = tpl.transitions.filter((t) => t !== last);
       transition = (pool.length ? pool : tpl.transitions)[Math.floor(r() * (pool.length || tpl.transitions.length))];
     }
+    // Out of the cold open, the product lands on a flash.
+    if (i > 0 && all[i - 1].skill === "product-teaser") transition = "flash";
     last = transition;
     return { ...scene, role, skill, duration, transition };
   });
   // Templates change the feel, not the runtime: keep the film within -12%/+10% of the length
   // the same storyboard runs at a neutral 120 bpm, scaling every scene proportionally.
-  const neutral = plan.scenes.reduce((a, scene, i, all) => {
+  const neutral = base.reduce((a, scene, i, all) => {
     const role = roleOf(scene, i, all.length);
     if (!role) return a + scene.duration;
     const [beats, floor] = roleLength(scene, role);

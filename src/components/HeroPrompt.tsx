@@ -43,7 +43,9 @@ export default function HeroPrompt() {
   const [productError, setProductError] = useState<string | null>(null);
   const [format, setFormat] = useState<(typeof FORMATS)[number]["id"]>("vertical");
   const fmt = FORMATS.find((f) => f.id === format) ?? FORMATS[0];
-  const fmtQuery = `&aspect=${encodeURIComponent(fmt.aspect)}&length=${fmt.length}`;
+  // The cut: a clean product ad (the default), or a cinematic trailer.
+  const [cut, setCut] = useState<"ad" | "trailer">("ad");
+  const fmtQuery = `&aspect=${encodeURIComponent(fmt.aspect)}&length=${fmt.length}${cut === "trailer" ? "&look=trailer" : ""}`;
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   // /#product (the nav's Product videos link) opens this tab.
@@ -150,6 +152,19 @@ export default function HeroPrompt() {
                   <strong className="short">{f.short}</strong>
                   <small>{f.detail}</small>
                 </span>
+              </button>
+            ))}
+          </div>
+          <div className="cut-row" role="radiogroup" aria-label="Look">
+            {(
+              [
+                ["ad", "Clean product ad", "Bright studio, benefits on screen"],
+                ["trailer", "Epic trailer", "Cold open, cinematic score"],
+              ] as const
+            ).map(([id, label, detail]) => (
+              <button key={id} type="button" role="radio" aria-checked={cut === id} className={`cut-chip${cut === id ? " active" : ""}`} onClick={() => setCut(id)}>
+                <strong>{label}</strong>
+                <small>{detail}</small>
               </button>
             ))}
           </div>

@@ -3,7 +3,7 @@ import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { writeVoiceover } from "./script";
 import { isHealthClaim, isNumericClaim, isUnsafe, safeCopy } from "./claims";
-import { applyTemplate, DEFAULT_TEMPLATE, fitLength } from "./templates";
+import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
 import {
   FONTS,
   PALETTE_IDS,
@@ -931,7 +931,12 @@ export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
   const safe = req.safe !== false;
   const input = safe ? safeSite(site) : stripHealth(site);
   const plan = writeVoiceover(
-    req.style === "trailer" ? planFromSiteTrailer(input, req) : site.kind === "product" ? planFromProduct(input, req) : trimToTarget(planFromSiteSaas(input, req)),
+    site.kind === "product"
+      ? // A product's trailer is the product video cut in a trailer style (cold open, trailer score).
+        planFromProduct(input, req.style === "trailer" && !TEMPLATE_MAP[req.template ?? ""]?.trailer ? { ...req, template: "drop" } : req)
+      : req.style === "trailer"
+        ? planFromSiteTrailer(input, req)
+        : trimToTarget(planFromSiteSaas(input, req)),
   );
   return safe ? safePlan(plan) : healthPlan(plan);
 }

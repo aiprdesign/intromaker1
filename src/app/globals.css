@@ -368,6 +368,45 @@ textarea {
   border-color: var(--cyan);
   box-shadow: 0 0 0 1px var(--cyan) inset;
 }
+/* The cut: clean product ad or epic trailer. */
+.cut-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: -4px 0 14px;
+}
+.cut-chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(10, 8, 20, 0.6);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  backdrop-filter: blur(12px);
+}
+.cut-chip strong {
+  font: 600 13px var(--body);
+  color: var(--text);
+}
+.cut-chip small {
+  display: block;
+  font-size: 11px;
+}
+.cut-chip.active {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan) inset;
+}
+@media (max-width: 640px) {
+  .cut-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .cut-chip {
+    border-radius: 14px;
+    padding: 7px 8px;
+  }
+}
 .format-shape {
   flex: none;
   border: 2px solid currentColor;
@@ -3714,4 +3753,14 @@ code.secret {
   height: 20px;
   font-size: 10px;
   padding: 0;
+}
+
+/* The narrator's progress, under the player (it records whichever tab is open). */
+.voice-status {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.voice-status.warn {
+  color: #ffc93c;
 }

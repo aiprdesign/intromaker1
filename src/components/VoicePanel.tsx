@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { loadAiSettings } from "@/components/AiSettings";
+import type { Narration } from "@/components/useNarration";
 import type { VideoPlan, VoiceSettings } from "@/engine/types";
-import { getClip, onClips, UPLOAD_KEY, VOICE_SOURCES, VOICES } from "@/engine/voice";
-import { generateVoiceover, loadRecording, loadVoiceKeys, missingLines, saveVoiceKeys, type VoiceKeys } from "@/lib/tts";
+import { getClip, UPLOAD_KEY, VOICE_SOURCES, VOICES } from "@/engine/voice";
+import { loadRecording } from "@/lib/tts";
 
 const STORAGE = "intromaker.voice.v1";
+
+export function saveVoiceSettings(v: VoiceSettings) {
+  try {
+    localStorage.setItem(STORAGE, JSON.stringify(v));
+  } catch {
+    /* private mode */
+  }
+}
 
 export function loadVoiceSettings(fallback: VoiceSettings): VoiceSettings {
   try {
@@ -20,8 +27,8 @@ export function loadVoiceSettings(fallback: VoiceSettings): VoiceSettings {
 }
 
 /**
- * Voice-over settings and recording. The narrator's lines live on the scenes (editable in the
- * storyboard); this records them with the chosen voice and re-times scenes that need longer.
+ * Voice-over settings. The narrator's lines live on the scenes (editable in the storyboard); the
+ * studio's narrator (useNarration) records them with the chosen voice and re-times scenes that need longer.
  */
 export default function VoicePanel({
   voice,
@@ -29,86 +36,24 @@ export default function VoicePanel({
   plan,
   onPlan,
   onRewrite,
+  narration,
 }: {
   voice: VoiceSettings;
   onVoice: (v: VoiceSettings) => void;
   plan: VideoPlan;
-  /** Called with the re-timed plan after recording. */
   onPlan: (p: VideoPlan) => void;
   onRewrite: () => void;
+  /** The studio's narrator (records in the background, whichever tab is open). */
+  narration: Narration;
 }) {
-  const [keys, setKeys] = useState<VoiceKeys>({});
-  const [server, setServer] = useState<{ openai: boolean; elevenlabs: boolean }>({ openai: false, elevenlabs: false });
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [, bump] = useState(0);
-
-  useEffect(() => {
-    const k = loadVoiceKeys();
-    // Reuse the OpenAI key already saved in AI settings.
-    const ai = loadAiSettings();
-    const openai = ai.provider === "openai" ? ai.apiKey : ai.saved?.openai?.apiKey;
-    setKeys({ ...k, openai: k.openai || openai || undefined });
-    fetch("/api/tts")
-      .then((r) => r.json())
-      .then(setServer)
-      .catch(() => {});
-    return onClips(() => bump((n) => n + 1));
-  }, []);
-
+  const { keys, setKey, server, busy, setBusy, error, setError, missing, lines, record } = narration;
   const set = (patch: Partial<VoiceSettings>) => {
     const next = { ...voice, ...patch };
     onVoice(next);
-    try {
-      localStorage.setItem(STORAGE, JSON.stringify(next));
-    } catch {
-      /* private mode */
-    }
+    saveVoiceSettings(next);
   };
-  const setKey = (patch: Partial<VoiceKeys>) => {
-    const next = { ...keys, ...patch };
-    setKeys(next);
-    saveVoiceKeys(next);
-  };
-
-  const withVoice = { ...plan, voiceover: voice };
-  const missing = missingLines(withVoice);
-  const lines = plan.scenes.filter((s) => s.vo).length;
   const source = VOICE_SOURCES.find((s) => s.id === voice.source)!;
   const voices = voice.source === "upload" ? [] : VOICES[voice.source];
-
-  const record = async () => {
-    setError(null);
-    try {
-      const out = await generateVoiceover(withVoice, keys, setBusy);
-      onPlan({ ...out, voiceover: undefined });
-      setBusy(null);
-    } catch (e) {
-      setBusy(null);
-      setError(e instanceof Error ? e.message : "Voice generation failed.");
-    }
-  };
-  // Narration records itself: when switched on, when the voice changes, for a new film or remake,
-  // and (after a short pause) for a line you've edited. Only lines without a clip are recorded.
-  // It stops on an error (e.g. a missing key) until something changes.
-  const recordRef = useRef(record);
-  recordRef.current = record;
-  const errorRef = useRef(error);
-  errorRef.current = error;
-  const busyRef = useRef(busy);
-  busyRef.current = busy;
-  const auto = voice.enabled && voice.source !== "upload" && missing > 0 && lines > 0;
-  const lineKey = plan.scenes.map((s) => s.vo ?? "").join("|");
-  useEffect(() => {
-    setError(null);
-  }, [voice.enabled, voice.source, voice.voice, voice.model]);
-  useEffect(() => {
-    if (!auto) return;
-    const id = setTimeout(() => {
-      if (!busyRef.current && !errorRef.current) void recordRef.current();
-    }, 1200);
-    return () => clearTimeout(id);
-  }, [auto, lineKey, voice.source, voice.voice, voice.model]);
 
   return (
     <div className="voice-panel">
@@ -183,7 +128,7 @@ export default function VoicePanel({
                 </>
               )}
               <div className="voice-row">
-                <button className="btn btn-primary grow" onClick={record} disabled={!!busy || !lines}>
+                <button className="btn btn-primary grow" onClick={() => void record()} disabled={!!busy || !lines}>
                   {busy ? "Recording…" : missing ? `🎙 Record voice-over (${missing} line${missing > 1 ? "s" : ""})` : "✓ Voice-over recorded"}
                 </button>
                 <button className="btn btn-ghost" onClick={onRewrite} disabled={!!busy} title="Write fresh narrator lines from the storyboard">

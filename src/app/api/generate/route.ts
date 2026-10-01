@@ -263,10 +263,12 @@ function readBody(body: Body) {
   const colors =
     body.colors && /^#[0-9a-f]{6}$/i.test(body.colors.primary) && /^#[0-9a-f]{6}$/i.test(body.colors.secondary) ? body.colors : undefined;
   const style: StyleChoice = body.style === "saas" || body.style === "trailer" ? body.style : "auto";
-  const template = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
+  const asked = typeof body.template === "string" && TEMPLATE_MAP[body.template] ? body.template : DEFAULT_TEMPLATE;
+  // A product's "Epic trailer" is its product video in a trailer style (cold open, trailer score).
+  const template = site?.kind === "product" && style === "trailer" && !TEMPLATE_MAP[asked].trailer ? "drop" : asked;
   const angle = ANGLES.find((a) => a.id === body.angle)?.id as Angle | undefined;
   const variant = Math.min(50, Math.max(0, Math.floor(Number(body.variant) || 0)));
-  const wantSaas = style === "saas" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
+  const wantSaas = style === "saas" || site?.kind === "product" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
   const request: PlanRequest = { prompt, aspect, length, palette, seed, style, template, safe, variant };
   const concept = rawSite
     ? detectConcept(`${rawSite.name} ${rawSite.tagline} ${rawSite.description}`, [...rawSite.headlines, ...rawSite.features, ...rawSite.steps, ...rawSite.pains].join(" "))
@@ -312,6 +314,9 @@ function productBrief(c: Ctx) {
     `product-hero for the reveal (media = the main photo, headline = the product name, subtext = "by <brand>" or a short line) and again for 2-4 feature callouts ` +
     `(items = short feature titles from the listing's bullet points, 1-4 words each), product-spin to show every angle (2+ photos; or gallery-flow / carousel-3d), product-zoom for a close look at the details in long films (items = up to 3 short feature titles, optional), tilt-wall as the hook with 4+ photos, ` +
     `feature-slides for long films ("Title — one-line benefit" with photos), and product-end last (media = the main photo, headline = the closing line, subtext = "Shop now" unless the listing's own button says otherwise). ` +
+    (TEMPLATE_MAP[c.template]?.trailer
+      ? `This is a PRODUCT TRAILER: open cold with product-teaser (items = 2-3 punchy feature words from the listing, 1-3 words each, one per close-up; no media), then the product-hero reveal right after it. `
+      : "") +
     `No software moments: no ui-tour, site-scroll, ui-assemble, command-k, ai-prompt, click-flow, notify-stack, kanban, code-deploy, chart-grow, integrations or logo-reveal. ` +
     `Never mention prices, discounts, ratings or reviews.`
   );
@@ -369,6 +374,8 @@ function finishPlan(c: Ctx, raw: z.infer<typeof SitePlanSchema>) {
       brand,
       style: out.style,
       concept: c.concept.id,
+      // A physical product: its photos are cut out on the stage and the narrator speaks about the product.
+      product: c.site?.kind === "product" ? true : undefined,
       scenes: out.scenes.map((s) => {
         const idx = "media" in s ? (s.media as number) : -1;
         // Testimonials get the real author's avatar when the quote matches the site's.

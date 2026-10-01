@@ -22,6 +22,7 @@ import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/template
 import { CONCEPT_MAP } from "@/engine/concepts";
 import Player from "@/components/Player";
 import VoicePanel, { loadVoiceSettings } from "@/components/VoicePanel";
+import { useNarration } from "@/components/useNarration";
 import { writeVoiceover } from "@/engine/script";
 import { DEFAULT_VOICE, speakable, wordBudget } from "@/engine/voice";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
@@ -50,6 +51,8 @@ const TRANSITION_NAMES: Record<string, string> = {
   cube: "3D cube",
 };
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
+
+const PRODUCT_VOICE_OFF = "intromaker.product-voice-off";
 
 export default function Studio() {
   const params = useSearchParams();
@@ -88,6 +91,8 @@ export default function Studio() {
   const [copied, setCopied] = useState(false);
   const [version, setVersion] = useState(0);
   const [style, setStyle] = useState<StyleChoice>("auto");
+  const styleRef = useRef(style);
+  styleRef.current = style;
   const [ai, setAi] = useState<AiSettingsValue>(DEFAULT_AI);
   const [aiOpen, setAiOpen] = useState(false);
   const [engineLabel, setEngineLabel] = useState("");
@@ -231,8 +236,21 @@ export default function Studio() {
   };
   /** The style suggested for a plan's kind of product (when auto is on and it differs). */
   const suggestedFor = (p: VideoPlan) => {
-    // Product videos look best in the bright studio; software films get their category's style.
-    const id = p.style === "saas" ? (p.product ? "studio" : p.concept ? CONCEPT_MAP[p.concept]?.template : undefined) : undefined;
+    // Product videos look best in the bright studio (or, as a trailer, in a trailer style); software
+    // films get their category's style.
+    const trailerCut = styleRef.current === "trailer";
+    const id =
+      p.style === "saas"
+        ? p.product
+          ? trailerCut
+            ? TEMPLATE_MAP[p.template ?? ""]?.trailer
+              ? p.template
+              : "drop"
+            : "studio"
+          : p.concept
+            ? CONCEPT_MAP[p.concept]?.template
+            : undefined
+        : undefined;
     return id && TEMPLATE_MAP[id] ? id : undefined;
   };
   /** Switch template: restyles the current SaaS storyboard instantly (no regeneration). */
@@ -252,13 +270,56 @@ export default function Studio() {
   useEffect(() => setAi(loadAiSettings()), []);
   // Voice-over settings are the studio's (they follow you across storyboards); the lines live on scenes.
   const [voice, setVoice] = useState<VoiceSettings>(DEFAULT_VOICE);
-  useEffect(() => setVoice(loadVoiceSettings(DEFAULT_VOICE)), []);
+  const [voiceLoaded, setVoiceLoaded] = useState(false);
+  useEffect(() => {
+    setVoice(loadVoiceSettings(DEFAULT_VOICE));
+    setVoiceLoaded(true);
+  }, []);
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  /** Set when the voice-over was switched on for a product video (not by you). */
+  const autoVoiceOn = useRef(false);
   const onVoice = (v: VoiceSettings) => {
     if (v.enabled && !voice.enabled) setPlan((p) => writeVoiceover(p));
+    // Switching it off on a product video means you don't want it auto-added to product videos.
+    if (v.enabled !== voice.enabled && planRef.current.product) {
+      try {
+        if (v.enabled) localStorage.removeItem(PRODUCT_VOICE_OFF);
+        else localStorage.setItem(PRODUCT_VOICE_OFF, "1");
+      } catch {
+        /* private mode */
+      }
+    }
+    autoVoiceOn.current = false;
     setVoice(v);
   };
   const narrating = voice.enabled && voice.source !== "upload";
   const playPlan = useMemo(() => ({ ...plan, voiceover: voice }), [plan, voice]);
+  // The narrator records in the background, whichever settings tab is open.
+  const narration = useNarration(plan, voice, (p) => setPlan(p));
+  // Product videos get a voice-over automatically (the format that sells best is narrated), with
+  // a voice that works here without a key; other films go back to silent if it was added for them.
+  useEffect(() => {
+    if (!voiceLoaded) return;
+    const cur = voiceRef.current;
+    if (!plan.product) {
+      if (autoVoiceOn.current && cur.enabled) setVoice({ ...cur, enabled: false });
+      autoVoiceOn.current = false;
+      return;
+    }
+    if (cur.enabled) return;
+    try {
+      if (localStorage.getItem(PRODUCT_VOICE_OFF)) return;
+    } catch {
+      /* private mode */
+    }
+    const v = narration.autoVoice(cur);
+    if (!v) return;
+    autoVoiceOn.current = true;
+    setPlan((p) => writeVoiceover(p));
+    setVoice(v);
+    // Runs per film shown (and once the voice settings and server keys are known), not per edit.
+  }, [version, voiceLoaded, !!plan.product, narration.server.openai, narration.server.elevenlabs]);
   const [siteUrl, setSiteUrl] = useState("");
   const [site, setSite] = useState<SiteData | null>(null);
   // Uploaded product photos (/api/shot URLs): with them, Generate makes a product video.
@@ -340,6 +401,7 @@ export default function Studio() {
     const pal = opts.palette ?? palette;
     const len = opts.length ?? length;
     const template = templateRef.current;
+    const style = styleRef.current;
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     const aiCfg = aiForRequest(loadAiSettings());
     const safeCopy = safeRef.current;
@@ -651,6 +713,11 @@ export default function Studio() {
     };
     if (fmt.aspect) setAspect(fmt.aspect);
     if (fmt.length) setLength(fmt.length);
+    // ?look=trailer: the product video cut as a trailer (the homepage's Trailer choice).
+    if (params.get("look") === "trailer") {
+      styleRef.current = "trailer";
+      setStyle("trailer");
+    }
     const web = params.get("url");
     if (web) {
       setSiteUrl(web);
@@ -1343,10 +1410,10 @@ export default function Studio() {
             ))}
           </div>
 
-          {style !== "trailer" && (
+          {(style !== "trailer" || plan.product) && (
             <>
               <label className="field-label">
-                SaaS template <span className="tpl-desc">{TEMPLATE_MAP[template]?.name}</span>
+                {plan.product ? "Product video style" : "SaaS template"} <span className="tpl-desc">{TEMPLATE_MAP[template]?.name}</span>
               </label>
               {plan.concept && plan.concept !== "general" && CONCEPT_MAP[plan.concept] && (
                 <div className="concept-hint">
@@ -1398,7 +1465,7 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{glow ? "Soft halo around text and highlights." : "Sharp text, no halo or bloom."}</p>
-          {style !== "trailer" && (
+          {(style !== "trailer" || plan.product) && (
             <details className="fold">
               <summary>
                 <span className="field-label inline">Background</span> <span className="tpl-desc">{BG_OPTIONS.find((o) => o.id === bg)?.name ?? "Template default"}</span>
@@ -1434,8 +1501,8 @@ export default function Studio() {
           <PaletteChooser
             value={colourChoice}
             onChange={chooseColours}
-            templatePalette={(style !== "trailer" && TEMPLATE_MAP[template]?.palette) || plan.palette}
-            templateName={style !== "trailer" ? TEMPLATE_MAP[template]?.name : undefined}
+            templatePalette={((style !== "trailer" || plan.product) && TEMPLATE_MAP[template]?.palette) || plan.palette}
+            templateName={style !== "trailer" || plan.product ? TEMPLATE_MAP[template]?.name : undefined}
             brandColors={brandColors}
             logoColors={logoColors}
             hasLogo={!!site?.logo}
@@ -1451,6 +1518,7 @@ export default function Studio() {
             plan={plan}
             onPlan={(p) => setPlan(p)}
             onRewrite={() => setPlan((p) => writeVoiceover(p, { overwrite: true }))}
+            narration={narration}
           />
               </>
             )}
@@ -1533,13 +1601,18 @@ export default function Studio() {
               seek={seek}
               onScene={setActiveScene}
               limits={account?.limits}
-              beforeExport={() => {
-                if (!pendingOffers.length) return true;
-                const ok = window.confirm(
-                  `This intro makes an offer: ${pendingOffers.map((o) => `“${o.text}”`).join(", ")}.\n\nExport only if viewers can really get it, exactly as worded. Is it a real offer?`,
-                );
-                if (ok) confirmOffers();
-                return ok;
+              beforeExport={async () => {
+                if (pendingOffers.length) {
+                  const ok = window.confirm(
+                    `This intro makes an offer: ${pendingOffers.map((o) => `“${o.text}”`).join(", ")}.\n\nExport only if viewers can really get it, exactly as worded. Is it a real offer?`,
+                  );
+                  if (!ok) return false;
+                  confirmOffers();
+                }
+                // Lines still recording are finished first, so the narration is in the file.
+                const film = await narration.ensure();
+                if (film) return film;
+                return window.confirm(`The voice-over couldn't be recorded${narration.failure() ? ` (${narration.failure()})` : ""}.\n\nExport without it?`) ? { ...playPlan, voiceover: undefined } : false;
               }}
               onExported={(p, preset) => {
                 // Tell the owner's admin area what was made (ignored when it's off).
@@ -1551,6 +1624,21 @@ export default function Studio() {
               }}
             />
           </div>
+
+          {narrating && (narration.busy || narration.error) && (
+            <p className={`voice-status${narration.error ? " warn" : ""}`} role="status">
+              {narration.error ? (
+                <>
+                  🎙 Voice-over: {narration.error}{" "}
+                  <button className="link-btn" onClick={() => chooseTab("voice")}>
+                    Voice settings
+                  </button>
+                </>
+              ) : (
+                <>🎙 {narration.busy}</>
+              )}
+            </p>
+          )}
 
           <div className="edit-bar">
             <span className="hint">

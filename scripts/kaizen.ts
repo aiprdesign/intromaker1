@@ -197,7 +197,9 @@ function experience(plan: VideoPlan, site: SiteData | null, requested: number, a
     // Customer quotes are verbatim; they aren't ours to judge.
     if (s.role === "quote") continue;
     if (s.role !== "reveal") lines.push([`${s.role} headline`, s.text.split("|")[0]]);
-    for (const it of s.items ?? []) lines.push([`${s.role} item`, it.split(/\s+[—–]\s+/)[0]]);
+    // (A trailer cold open says one line in beats, so its later beats continue it in lowercase.)
+    if (s.skill === "product-teaser") lines.push([`${s.role} beats`, (s.items ?? []).join(" ")]);
+    else for (const it of s.items ?? []) lines.push([`${s.role} item`, it.split(/\s+[—–]\s+/)[0]]);
     for (const sent of (s.vo ?? "").split(/(?<=[.!?])\s+/)) if (sent) lines.push([`${s.role} voice`, sent]);
   }
   let damage = 0;

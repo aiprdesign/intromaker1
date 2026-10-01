@@ -34,8 +34,11 @@ export default function Player({
   onScene?: (index: number) => void;
   /** Called after a video export finishes, with the film as exported and the preset's name. */
   onExported?: (plan: VideoPlan, preset: string) => void;
-  /** Asked before an export starts; returning false cancels it (e.g. an unconfirmed offer). */
-  beforeExport?: () => boolean;
+  /**
+   * Asked before an export starts; false (or null) cancels it (e.g. an unconfirmed offer). It may
+   * finish work first and return the film to export instead (e.g. with the voice-over recorded).
+   */
+  beforeExport?: () => boolean | VideoPlan | null | Promise<boolean | VideoPlan | null>;
   /** The viewer's plan: largest export, frame rate and watermark. */
   limits?: PlanLimits;
 }) {
@@ -239,15 +242,19 @@ export default function Player({
     else draw(t);
   };
 
+  const [preparing, setPreparing] = useState(false);
   const onExport = async () => {
-    if (beforeExport && !beforeExport()) return;
+    setPreparing(true);
+    const ok = await Promise.resolve(beforeExport ? beforeExport() : true).finally(() => setPreparing(false));
+    if (!ok) return;
+    const film = typeof ok === "object" ? ok : plan;
     setError(null);
     setPlaying(false);
     const ac = new AbortController();
     abortRef.current = ac;
     setExporting(0);
     try {
-      const out = planForPreset(plan, preset);
+      const out = planForPreset(film, preset);
       const { blob, ext } = await exportVideo(out, {
         long: preset.long,
         fps: Math.min(preset.fps, limits?.maxFps ?? preset.fps),
@@ -370,7 +377,7 @@ export default function Player({
         >
           PNG
         </button>
-        <button className="btn btn-primary" onClick={onExport} disabled={exporting !== null || !canRecord} title={canRecord ? "" : "Recording not supported in this browser"}>
+        <button className="btn btn-primary" onClick={onExport} disabled={exporting !== null || preparing || !canRecord} title={canRecord ? "" : "Recording not supported in this browser"}>
           Export video
         </button>
       </div>

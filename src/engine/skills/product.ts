@@ -699,6 +699,135 @@ function productZoom(sc: SkillContext) {
   }
 }
 
+/* ───────────────────────── Trailer Cold Open ───────────────────────── */
+
+/** The cold open's words: one per shot (the feature titles), or its headline alone. */
+function teaserWords(scene: Scene) {
+  const items = calloutItems(scene).slice(0, 3);
+  return items.length ? items : [scene.text].filter(Boolean);
+}
+
+/**
+ * Shots share the scene (it starts on a beat and lasts whole beats, so the cuts land on the music);
+ * the last moments flash white into the reveal.
+ */
+function teaserTiming(d: number, n: number, beat: number) {
+  const out = Math.min(0.45, d * 0.1, beat);
+  const seg = (d - out) / Math.max(1, n);
+  return { seg, end: d - out, out };
+}
+
+/**
+ * Trailer Cold Open: the movie-trailer start of a product video. Hard cuts on the beat between
+ * tight, slowly pushing close-ups of the product's photos (on its most detailed parts), each with
+ * one big word, a light flash on every cut and cinema bars, then a white flash into the reveal.
+ */
+function productTeaser(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene, beat } = sc;
+  const portrait = h >= w * 0.95;
+  saasBackground(sc, { beams: 0, grid: false });
+  // Trailers live in the dark: dark stages go darker still (light stages keep their look).
+  if (!palette.light) {
+    ctx.fillStyle = rgba("#000000", 0.55);
+    ctx.fillRect(0, 0, w, h);
+  }
+  const photos = productPhotos(sc);
+  const words = teaserWords(scene);
+  const n = Math.max(1, words.length);
+  const T = teaserTiming(d, n, beat);
+  const i = clamp(Math.floor(t / T.seg), 0, n - 1);
+  const local = t - i * T.seg;
+  const shotT = clamp(local / T.seg);
+  const pic = photos.length ? photos[i % photos.length] : null;
+  if (pic) {
+    const cut = productCutout(pic.img, pic.key);
+    const src: HTMLCanvasElement | HTMLImageElement = cut?.canvas ?? pic.img;
+    const sw = src.width;
+    const sh = src.height;
+    const focus = cut ? detailPoints(cut.canvas, `${pic.key}#teaser`, 3)[i % 3] : [0.5, 0.5];
+    // Close-up, wider, closer: each shot frames the product differently, pushing in slowly. The
+    // product's longest side is sized against the frame's shorter side, so a close-up crops into
+    // it without ever filling the frame with one flat surface (its outline always shows).
+    const side = i % 2 ? -1 : 1;
+    const short = Math.min(w, h);
+    const size = [1.25, 0.8, 1.05][i % 3] * (1 + 0.08 * ease.outQuad(shotT));
+    const scale = (short * size) / Math.max(sw, sh);
+    const dw = sw * scale;
+    const dh = sh * scale;
+    // The detail sits off-centre (alternating sides on wide frames), above the word.
+    const fxp = portrait ? w * 0.5 : w * (0.5 + side * 0.14);
+    const fyp = portrait ? h * 0.42 : h * 0.46;
+    const drift = side * 18 * u * shotT;
+    // Keep at least a third of the product's outline inside the frame on every side it crosses.
+    const x = clamp(fxp - focus[0] * dw + drift, Math.min(0, w - dw) - dw * 0.3, Math.max(0, w - dw) + dw * 0.3);
+    const y = clamp(fyp - focus[1] * dh, Math.min(0, h * 0.72 - dh) - dh * 0.25, h * 0.08);
+    // A pool of key light behind the product.
+    if (cut?.cut) {
+      const g = ctx.createRadialGradient(fxp, fyp, 0, fxp, fyp, Math.max(w, h) * 0.55);
+      g.addColorStop(0, rgba(palette.primary, palette.light ? 0.18 : 0.32));
+      g.addColorStop(1, rgba(palette.primary, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    ctx.save();
+    ctx.globalAlpha = clamp(local / 0.06);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, x, y, dw, dh);
+    ctx.restore();
+    // A light sweep across the shot.
+    const sx = -w * 0.3 + (w * 1.6) * ease.inOutCubic(shotT);
+    const sweep = ctx.createLinearGradient(sx - 160 * u, 0, sx + 160 * u, h * 0.3);
+    sweep.addColorStop(0, "rgba(255,255,255,0)");
+    sweep.addColorStop(0.5, `rgba(255,255,255,${palette.light ? 0.12 : 0.1})`);
+    sweep.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.save();
+    ctx.globalCompositeOperation = palette.light ? "source-over" : "lighter";
+    ctx.fillStyle = sweep;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+  // Vignette and a scrim where the word sits.
+  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, `rgba(0,0,0,${palette.light ? 0.18 : 0.6})`);
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+  const wordY = portrait ? h * 0.76 : h * 0.8;
+  const scrim = ctx.createLinearGradient(0, wordY - h * 0.22, 0, h);
+  scrim.addColorStop(0, rgba(palette.bg0, 0));
+  scrim.addColorStop(1, rgba(palette.bg0, 0.85));
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, wordY - h * 0.22, w, h);
+  // The word for this shot, in the style's own type treatment.
+  const word = words[i];
+  if (word && t < T.end) {
+    const shot = { ...sc, t: local, d: T.seg };
+    const layout = sentence(shot, { text: word, cy: wordY, sizeFrac: portrait ? 0.1 : 0.09, widthFrac: 0.8, maxLines: 2 });
+    blurInLayout(shot, layout, 0.04, 0.05, { exitAt: T.seg - 0.32 });
+  }
+  // Cinema bars (wide frames only).
+  if (!portrait) {
+    const bar = Math.max(0, (h - w / 2.39) / 2) * ease.outCubic(clamp(t / 0.4)) * (1 - ease.inCubic(clamp((t - T.end) / T.out)));
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, bar);
+    ctx.fillRect(0, h - bar, w, bar);
+  }
+  // A flash on every cut, out of black at the start, and a white-out into the reveal.
+  const flash = i > 0 ? 0.7 * (1 - clamp(local / 0.14)) : 0;
+  const white = ease.inCubic(clamp((t - T.end) / T.out));
+  if (flash + white > 0) {
+    ctx.save();
+    ctx.globalAlpha = clamp(flash + white);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+  if (t < 0.18) {
+    ctx.fillStyle = `rgba(0,0,0,${1 - t / 0.18})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+}
+
 export const productSkills: Skill[] = [
   {
     id: "product-hero",
@@ -750,6 +879,21 @@ export const productSkills: Skill[] = [
     sfx: (scene) => {
       const T = zoomTiming(scene.duration, 3);
       return [at(T.first - 0.3, "whoosh"), ...[0, 1, 2].map((i) => at(T.first + i * T.each + T.move, "pop"))];
+    },
+  },
+  {
+    id: "product-teaser",
+    name: "Trailer Cold Open",
+    tagline: "Hard cuts on the beat between tight close-ups of the product, one big word on each, with flashes and cinema bars, then a white flash into the reveal.",
+    bestFor:
+      "The opening of a product trailer (trailer styles). Items = 2-3 punchy feature words, one per shot ('Noise cancelling', 'All-day battery'); headline = a fallback line. Put the product reveal right after it.",
+    sample: { text: "Introducing", items: ["Noise cancelling", "All-day battery", "Pocket case"] },
+    itemsHint: "One punchy word or two per shot (2-3 shots)",
+    render: productTeaser,
+    sfx: (scene, beat) => {
+      const n = Math.max(1, teaserWords(scene).length);
+      const T = teaserTiming(scene.duration, n, beat);
+      return [at(0.02, "whoosh"), ...Array.from({ length: n - 1 }, (_, i) => at((i + 1) * T.seg, "strike")), at(T.end, "shimmer")];
     },
   },
 ];

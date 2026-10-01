@@ -6,6 +6,8 @@
 import { mentionsOffer, offerKey, offersIn } from "../src/engine/claims";
 import { cleanCta, contextCta, lowerFirst, offersFree } from "../src/engine/planner";
 import { speakable } from "../src/engine/voice";
+import { applyTemplate, trailerBeats } from "../src/engine/templates";
+import type { VideoPlan } from "../src/engine/types";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -81,6 +83,25 @@ for (const [raw, said] of [
 ]) check(speakable(raw) === said, speakable(raw) === said ? `"${raw}" → "${said}"` : `"${raw}" → "${speakable(raw)}", wanted "${said}"`);
 check(speakable("4K video, 5G ready").startsWith("4 K video") && speakable("4K video, 5G ready").includes("5G ready"), "4K is spelled, 5G is left alone");
 check(speakable("Bluetooth 5.3, 40 hrs playtime").includes("40 hour playtime"), "a unit before a noun is singular");
+
+console.log("Product trailers");
+check(JSON.stringify(trailerBeats("Wireless earbuds with active noise cancelling")) === JSON.stringify(["Wireless earbuds", "with active noise cancelling"]), "a line is said in beats, cut at its connectors");
+check(JSON.stringify(trailerBeats("Aero Buds Pro")) === JSON.stringify(["Aero", "Buds", "Pro"]), "a name builds word by word");
+const ad: VideoPlan = {
+  title: "Aero Buds Pro", palette: "studio", font: "inter", aspect: "16:9", bpm: 116, seed: 1, style: "saas", product: true, target: 20,
+  scenes: [
+    { role: "reveal", skill: "product-hero", text: "Aero Buds Pro", subtext: "Wireless earbuds with active noise cancelling", duration: 4, transition: "cut" },
+    { role: "features", skill: "product-hero", text: "Made for *everyday*", items: ["Noise cancelling", "Long battery life"], duration: 5, transition: "dolly" },
+    { role: "cta", skill: "product-end", text: "Get yours *today*", duration: 4, transition: "flash" },
+  ],
+};
+const cut = applyTemplate(applyTemplate(ad, "studio"), "drop");
+check(cut.scenes[0].skill === "product-teaser" && cut.scenes[1].transition === "flash" && cut.music === "trailer", "a trailer style opens cold, flashes into the reveal, with the trailer score");
+check(cut.scenes[0].text === "Wireless earbuds with active noise cancelling", "the cold open says the product's own line, not its callouts");
+check(applyTemplate(cut, "noir").scenes.filter((x) => x.skill === "product-teaser").length === 1, "switching between trailer styles keeps one cold open");
+check(applyTemplate(cut, "studio").scenes[0].skill === "product-hero", "a clean style removes the cold open again");
+check(applyTemplate({ ...ad, target: 12 }, "drop").scenes[0].skill === "product-hero", "short films keep the trailer look without a cold open");
+check(applyTemplate({ ...ad, product: undefined }, "drop").scenes[0].skill === "product-hero", "software films get the look only");
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");
 process.exit(failed ? 1 : 0);
