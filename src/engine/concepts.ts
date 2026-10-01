@@ -50,6 +50,12 @@ export interface Concept {
   template: string;
   /** Positioning line for the word-swap beat ("Ship faster|safer|together"). */
   swap: string;
+  /**
+   * What a product of this kind typically offers, in plain words (no claims): the feature cards
+   * for a prompt that names none ("an intro for my bakery booking app"). The film says so in a
+   * director's note, so the user can edit them to match.
+   */
+  starter?: string[];
 }
 
 const STORY: ConceptRole[] = ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"];
@@ -67,6 +73,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Start *building*", "Try *{name}*", "Ship with *{name}*"],
     template: "ink",
     swap: "Your code, built|tested|shipped",
+    starter: ["Deploy from Git", "Preview links", "Logs and monitoring", "Team workspaces"],
   },
   {
     id: "ai",
@@ -80,6 +87,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Try it *free*", "Meet your *AI teammate*", "Start with *{name}*"],
     template: "aiglow",
     swap: "Your work, drafted|summarised|automated",
+    starter: ["Ask in plain language", "First drafts", "Smart summaries", "Works with your tools"],
   },
   {
     id: "fintech",
@@ -93,6 +101,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Open an *account*", "Get started *free*", "Take control with *{name}*"],
     template: "flow",
     swap: "Your spend, tracked|approved|reported",
+    starter: ["Cards and payments", "Invoices", "Expense tracking", "Finance reports"],
   },
   {
     id: "security",
@@ -106,6 +115,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Book a *demo*", "See it in *action*", "Try *{name}*"],
     template: "hud",
     swap: "Your systems, monitored|reviewed|logged",
+    starter: ["Threat detection", "Access control", "Audit logs", "Alerts"],
   },
   {
     id: "analytics",
@@ -119,6 +129,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["See your *data*", "Start *free*", "Get insights with *{name}*"],
     template: "turntable",
     swap: "Your data, explored|measured|shared",
+    starter: ["Dashboards", "Reports", "Data connectors", "Shared insights"],
   },
   {
     id: "sales",
@@ -132,6 +143,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Book a *demo*", "Sell with *{name}*", "Start *free*"],
     template: "enterprise",
     swap: "Your deals, tracked|organised|shared",
+    starter: ["Pipeline view", "Contact history", "Email follow-ups", "Forecasts"],
   },
   {
     id: "marketing",
@@ -145,6 +157,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Grow your *audience*", "Start *free*", "Launch with *{name}*"],
     template: "pop",
     swap: "Your campaigns, planned|launched|measured",
+    starter: ["Email campaigns", "Audience segments", "Post scheduling", "Campaign reports"],
   },
   {
     id: "productivity",
@@ -158,6 +171,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Get started *free*", "Try it with your *team*", "Work with *{name}*"],
     template: "eclipse",
     swap: "Your work, planned|tracked|shared",
+    starter: ["Tasks and projects", "Shared notes", "Team calendar", "Comments"],
   },
   {
     id: "hr",
@@ -171,6 +185,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Book a *demo*", "Start *free*", "Build your team with *{name}*"],
     template: "clay",
     swap: "Your hiring, organised|scheduled|tracked",
+    starter: ["Job posts", "Candidate tracking", "Interview scheduling", "New-starter checklists"],
   },
   {
     id: "ecommerce",
@@ -184,6 +199,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Start *selling*", "Open your *store*", "Sell with *{name}*"],
     template: "pop",
     swap: "Your orders, listed|shipped|tracked",
+    starter: ["Online store", "Checkout", "Order tracking", "Inventory"],
   },
   {
     id: "health",
@@ -197,6 +213,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Book a *demo*", "Get *started*", "Care with *{name}*"],
     template: "paper",
     swap: "Your care, scheduled|recorded|followed up",
+    starter: ["Online booking", "Appointment reminders", "Secure messaging", "Patient records"],
   },
   {
     id: "education",
@@ -210,11 +227,12 @@ export const CONCEPTS: Concept[] = [
     cta: ["Start *learning*", "Try it *free*", "Learn with *{name}*"],
     template: "daybreak",
     swap: "Your courses, planned|published|tracked",
+    starter: ["Courses", "Quizzes", "Progress tracking", "Certificates"],
   },
   {
     id: "creative",
     name: "Design & creative",
-    keywords: /\b(design(ers)?|creative|video editing|photos?|editor|brand(ing)?|prototyp(e|ing)|canvas|illustrat(e|ion)|render(ing)?|animation|mockups?|figma)\b/g,
+    keywords: /\b(design(ers)?|creative|video editing|photos?|photograph(y|ers?)|galler(y|ies)|editor|brand(ing)?|prototyp(e|ing)|canvas|illustrat(e|ion)|render(ing)?|animation|mockups?|figma)\b/g,
     icons: ["Palette", "PenTool", "Image", "Clapperboard", "Layers", "WandSparkles"],
     orbit: ["Image", "Video", "PenTool", "Palette", "Folder", "MessagesSquare", "Cloud", "Shapes"],
     arc: ["hook", "reveal", "tour", "features", "cards", "quote", "logos", "how", "integrations", "pain", "bento", "meet", "cta"],
@@ -223,6 +241,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Start *creating*", "Try it *free*", "Create with *{name}*"],
     template: "holo",
     swap: "Your ideas, sketched|designed|shared",
+    starter: ["Templates", "Brand kit", "Easy editing", "One-click export"],
   },
   {
     id: "communication",
@@ -236,6 +255,161 @@ export const CONCEPTS: Concept[] = [
     cta: ["Try it *free*", "Support customers with *{name}*", "Get *started*"],
     template: "neon",
     swap: "Your inbox, sorted|routed|answered",
+    starter: ["Shared inbox", "Website chat", "Video calls", "Notifications"],
+  },
+  {
+    id: "fitness",
+    name: "Fitness & wellbeing",
+    keywords: /\b(fitness|workouts?|gym|exercis(e|es|ing)|personal trainers?|yoga|pilates|runners?|cycling|calories|nutrition|meal plans?|cardio|hiit|meditat(e|ion)|mindful(ness)?|habits?|sleep)\b/g,
+    icons: ["Dumbbell", "Activity", "Flame", "Timer", "Trophy", "Footprints"],
+    orbit: ["Smartphone", "HeartPulse", "Footprints", "Salad", "Moon", "CalendarCheck", "Trophy", "Users"],
+    arc: ["hook", "pain", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "bento", "meet", "cta"],
+    eyebrows: { features: "Your training", how: "How it works", tour: "In your pocket" },
+    featuresTitle: "Your training, *sorted*",
+    cta: ["Start *training*", "Get *moving*", "Train with *{name}*"],
+    template: "kinetic",
+    swap: "Your goals, planned|tracked|smashed",
+    starter: ["Workout plans", "Progress tracking", "Goals and streaks", "Guided sessions"],
+  },
+  {
+    id: "food",
+    name: "Food & hospitality",
+    keywords: /\b(restaurants?|food|online orders?|order ahead|recipes?|meals?|dining|diners?|chefs?|kitchens?|bakery|bakeries|bakers?|caf(e|é)s?|coffee|takeaway|take-out|cook(ing)?|grocer(y|ies)|hospitality|book a table|table bookings?)\b/g,
+    icons: ["Utensils", "ChefHat", "Coffee", "Croissant", "Pizza", "Salad"],
+    orbit: ["Smartphone", "CreditCard", "CalendarCheck", "Truck", "Star", "Receipt", "MapPin", "Bell"],
+    arc: ["hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "pain", "bento", "meet", "cta"],
+    eyebrows: { features: "On the menu", how: "How it works", tour: "Take a look" },
+    featuresTitle: "Made for *hungry* people",
+    cta: ["Order *now*", "Book a *table*", "Try *{name}*"],
+    template: "editorial",
+    swap: "Your orders, placed|cooked|served",
+    starter: ["Online ordering", "Table bookings", "Digital menu", "Order updates"],
+  },
+  {
+    id: "booking",
+    name: "Booking & scheduling",
+    keywords: /\b(bookings?|book online|reservations?|appointments?|salons?|spas?|barbers?|beauty|stylists?|time slots?|no-shows?|walk-ins?|online scheduling)\b/g,
+    icons: ["CalendarCheck", "Clock", "Bell", "ConciergeBell", "CreditCard", "Users"],
+    orbit: ["CalendarCheck", "Mail", "Smartphone", "CreditCard", "MessagesSquare", "MapPin", "Bell", "Star"],
+    arc: ["pain", "hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "bento", "meet", "cta"],
+    eyebrows: { features: "Booking made easy", how: "How it works", pain: "The old way" },
+    featuresTitle: "Booking, *made easy*",
+    cta: ["Book *now*", "Start taking *bookings*", "Book with *{name}*"],
+    template: "studio",
+    swap: "Your diary, booked|reminded|paid",
+    starter: ["Online booking", "Reminders", "Easy rescheduling", "Payments"],
+  },
+  {
+    id: "travel",
+    name: "Travel",
+    keywords: /\b(travel(l?ers?|l?ing)?|trips?|flights?|hotels?|vacations?|holidays?|itinerar(y|ies)|destinations?|getaways?|backpack(ing|ers)?|tourism|tourists?|adventures?)\b/g,
+    icons: ["Plane", "MapPin", "Luggage", "Hotel", "Compass", "Map"],
+    orbit: ["Plane", "Hotel", "MapPin", "CreditCard", "CalendarCheck", "Camera", "Globe", "Smartphone"],
+    arc: ["hook", "reveal", "tour", "features", "how", "reach", "quote", "cards", "logos", "integrations", "bento", "meet", "cta"],
+    eyebrows: { features: "Plan your trip", how: "How it works", tour: "Take a look" },
+    featuresTitle: "Every trip, *sorted*",
+    cta: ["Plan your *trip*", "Start *exploring*", "Travel with *{name}*"],
+    template: "aurora",
+    swap: "Your trip, planned|booked|shared",
+    starter: ["Flights and stays", "Trip itinerary", "Travel updates", "Shared plans"],
+  },
+  {
+    id: "realestate",
+    name: "Real estate",
+    keywords: /\b(real estate|propert(y|ies)|homes|houses?|home buyers?|listings?|rentals?|renters?|landlords?|tenants?|mortgages?|realtors?|estate agents?|apartments?|viewings?|leases?)\b/g,
+    icons: ["House", "Building2", "KeyRound", "MapPin", "Handshake", "FileSignature"],
+    orbit: ["House", "MapPin", "CalendarCheck", "FileSignature", "Landmark", "Camera", "Mail", "Smartphone"],
+    arc: ["hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "pain", "bento", "meet", "cta"],
+    eyebrows: { features: "Find your place", how: "How it works", tour: "Take a look" },
+    featuresTitle: "Home, *made simple*",
+    cta: ["Find your *home*", "List your *property*", "Move with *{name}*"],
+    template: "luxe",
+    swap: "Your home, found|viewed|yours",
+    starter: ["Property listings", "Viewing bookings", "Offers", "Documents in one place"],
+  },
+  {
+    id: "music",
+    name: "Music & audio",
+    keywords: /\b(music|songs?|playlists?|albums?|artists?|musicians?|bands?|podcasts?|audio|producers?|record labels?|concerts?|djs?|lyrics|radio)\b/g,
+    icons: ["Music", "Headphones", "Mic", "AudioLines", "ListMusic", "Radio"],
+    orbit: ["Headphones", "Mic", "Smartphone", "Heart", "Share2", "Radio", "Users", "Disc3"],
+    arc: ["hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "pain", "bento", "meet", "cta"],
+    eyebrows: { features: "Made for music", how: "How it works", tour: "Take a listen" },
+    featuresTitle: "Music, *your way*",
+    cta: ["Start *listening*", "Share your *sound*", "Listen on *{name}*"],
+    template: "bloom",
+    swap: "Your sound, recorded|released|heard",
+    starter: ["Playlists", "Artist pages", "New releases", "Listening stats"],
+  },
+  {
+    id: "events",
+    name: "Events & ticketing",
+    keywords: /\b(events?|ticket(s|ing)|conferences?|festivals?|gigs?|meetups?|venues?|rsvps?|attendees?|weddings?|parties|summits?)\b/g,
+    icons: ["Ticket", "CalendarDays", "PartyPopper", "MapPin", "Users", "QrCode"],
+    orbit: ["Ticket", "Mail", "Smartphone", "CreditCard", "MapPin", "QrCode", "Camera", "MessagesSquare"],
+    arc: ["hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "pain", "bento", "meet", "cta"],
+    eyebrows: { features: "Run your event", how: "How it works" },
+    featuresTitle: "Events, *made easy*",
+    cta: ["Get your *tickets*", "Create your *event*", "Host with *{name}*"],
+    template: "horizon",
+    swap: "Your event, planned|sold|remembered",
+    starter: ["Ticketing", "Guest check-in", "Event schedule", "Attendee updates"],
+  },
+  {
+    id: "legal",
+    name: "Legal",
+    keywords: /\b(legal|law|lawyers?|attorneys?|law firms?|contracts?|clauses?|litigation|legal cases?|case management|court|paralegals?|e-?signatures?|agreements?|ndas?|notar(y|ies))\b/g,
+    icons: ["Scale", "FileSignature", "Gavel", "Briefcase", "ShieldCheck", "FileText"],
+    orbit: ["FileText", "Signature", "Mail", "CalendarCheck", "Folder", "ShieldCheck", "Landmark", "Users"],
+    arc: ["pain", "hook", "reveal", "tour", "features", "how", "quote", "logos", "cards", "integrations", "bento", "meet", "cta"],
+    eyebrows: { features: "Built for legal teams", how: "How it works", pain: "The paperwork" },
+    featuresTitle: "Legal work, *simplified*",
+    cta: ["Book a *demo*", "Get *started*", "Work with *{name}*"],
+    template: "swiss",
+    swap: "Your contracts, drafted|reviewed|signed",
+    starter: ["Contract templates", "E-signatures", "Case tracking", "Secure documents"],
+  },
+  {
+    id: "logistics",
+    name: "Logistics & delivery",
+    keywords: /\b(logistics|fleets?|freight|shipments?|deliver(y|ies)|couriers?|delivery drivers?|route planning|dispatch(ers?)?|supply chains?|last[- ]mile|parcels?|trucks?)\b/g,
+    icons: ["Truck", "Package", "Route", "MapPin", "Warehouse", "Boxes"],
+    orbit: ["Truck", "Package", "MapPin", "Smartphone", "Warehouse", "Receipt", "Bell", "Database"],
+    arc: ["pain", "hook", "reveal", "tour", "features", "how", "reach", "cards", "quote", "logos", "integrations", "bento", "meet", "cta"],
+    eyebrows: { features: "Built for operations", how: "How it works" },
+    featuresTitle: "Every delivery, *on track*",
+    cta: ["Book a *demo*", "Start *shipping*", "Deliver with *{name}*"],
+    template: "midnight",
+    swap: "Your deliveries, planned|tracked|done",
+    starter: ["Live tracking", "Route planning", "Proof of delivery", "Fleet view"],
+  },
+  {
+    id: "nonprofit",
+    name: "Nonprofit & community",
+    keywords: /\b(nonprofits?|non-profits?|charit(y|ies|able)|donat(e|es|ions?|ors?)|fundrais(e|ing|ers?)|volunteers?|supporters?|good causes?)\b/g,
+    icons: ["HandHeart", "Heart", "Users", "Gift", "Globe", "Sprout"],
+    orbit: ["Mail", "HandHeart", "CreditCard", "Users", "Share2", "CalendarCheck", "Globe", "Megaphone"],
+    arc: ["hook", "pain", "reveal", "tour", "features", "how", "reach", "quote", "cards", "logos", "integrations", "bento", "meet", "cta"],
+    eyebrows: { features: "For your cause", how: "How it works" },
+    featuresTitle: "Good causes, *well run*",
+    cta: ["Support the *cause*", "Start *fundraising*", "Give with *{name}*"],
+    template: "daybreak",
+    swap: "Your cause, shared|funded|growing",
+    starter: ["Online donations", "Volunteer sign-ups", "Campaign pages", "Supporter updates"],
+  },
+  {
+    id: "pets",
+    name: "Pet care",
+    keywords: /\b(pets?|dogs?|cats?|pupp(y|ies)|kittens?|vets?|veterinar(y|ians?)|grooming|groomers?|dog walk(ing|ers?)|pet sitt(ing|ers?)|kennels?)\b/g,
+    icons: ["PawPrint", "Dog", "Cat", "Bone", "Heart", "CalendarCheck"],
+    orbit: ["PawPrint", "CalendarCheck", "MapPin", "Camera", "MessagesSquare", "CreditCard", "Bell", "Smartphone"],
+    arc: ["hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "pain", "bento", "meet", "cta"],
+    eyebrows: { features: "For every pet", how: "How it works" },
+    featuresTitle: "Happy pets, *happy owners*",
+    cta: ["Book *now*", "Get *started*", "Care with *{name}*"],
+    template: "clay",
+    swap: "Your pet, walked|fed|loved",
+    starter: ["Easy booking", "Pet profiles", "Photo updates", "Reminders"],
   },
 ];
 
@@ -369,6 +543,50 @@ export const DEMOS: Record<string, DemoSpec> = {
     skill: "notify-stack", title: "Every conversation, *one place*", eyebrow: "Live",
     items: ["New message — The team replied", "You were mentioned — In #launch", "Call starting — The team is joining", "Thread resolved — Marked done"],
   },
+  pets: {
+    skill: "click-flow", title: "Pet care, *sorted*", eyebrow: "In action", action: "Book",
+    items: ["Pick a time", "Add your pet's details", "Confirm the booking", "Get photo updates"],
+  },
+  fitness: {
+    skill: "click-flow", title: "Your plan, *ready*", eyebrow: "In action", action: "Start workout",
+    items: ["Warm up", "Log each set", "Track your progress", "Keep the streak going"],
+  },
+  booking: {
+    skill: "click-flow", title: "Bookings, *handled*", eyebrow: "In action", action: "Confirm",
+    items: ["Pick a time", "Confirm the booking", "Send a reminder", "Take payment"],
+  },
+  travel: {
+    skill: "click-flow", title: "Your trip, *planned*", eyebrow: "In action", action: "Book trip",
+    items: ["Choose flights", "Pick a place to stay", "Build the itinerary", "Share with friends"],
+  },
+  music: {
+    skill: "click-flow", title: "From studio to *stream*", eyebrow: "In action", action: "Release",
+    items: ["Upload the tracks", "Add the artwork", "Pick a release date", "Share the link"],
+  },
+  legal: {
+    skill: "click-flow", title: "Paperwork, *handled*", eyebrow: "In action", action: "Send for signature",
+    items: ["Draft the contract", "Review the clauses", "Collect approvals", "Send for e-signature"],
+  },
+  food: {
+    skill: "notify-stack", title: "Your kitchen, *in sync*", eyebrow: "Live",
+    items: ["New order — Two mains, one dessert", "Order ready — Out to the table", "Reservation — Party of four, 7:30", "New review — From a guest"],
+  },
+  realestate: {
+    skill: "notify-stack", title: "Every listing, *live*", eyebrow: "Live",
+    items: ["New enquiry — About a two-bed flat", "Viewing booked — Saturday, 11:00", "Offer received — Ready to review", "Documents signed — All parties done"],
+  },
+  events: {
+    skill: "notify-stack", title: "Your event, *live*", eyebrow: "Live",
+    items: ["Ticket sold — General admission", "Guest checked in — At the door", "Schedule updated — Sent to attendees", "Feedback in — From a guest"],
+  },
+  logistics: {
+    skill: "notify-stack", title: "Every delivery, *tracked*", eyebrow: "Live",
+    items: ["Order picked — Packed and ready", "Out for delivery — Driver on the way", "Delivered — Signed for at the door", "Route updated — Traffic avoided"],
+  },
+  nonprofit: {
+    skill: "notify-stack", title: "Your cause, *moving*", eyebrow: "Live",
+    items: ["New donation — Thank-you sent", "Volunteer signed up — For Saturday", "Campaign shared — By a supporter", "Update posted — Sent to supporters"],
+  },
 };
 
 /** Other moments a category's films also stage (candidates for the fit ranking below). */
@@ -411,7 +629,8 @@ const MOMENT_SIGNALS: Record<MomentSkill, RegExp> = {
   "click-flow": /\b(automat\w*|autopilot|workflows?|one[- ]click|busywork|reconcil\w*|approvals?|approve|scheduling|no[- ]code|hands[- ]free)\b/gi,
   "notify-stack": /\b(alerts?|notifications?|notify|real[- ]time|monitor\w*|orders?|incidents?|instant(ly)?|as it happens|stay on top)\b/gi,
   "code-deploy": /\b(deploy\w*|git(hub|lab)?|commits?|ci\/cd|build (logs|pipelines?)|preview (urls?|deployments?)|hosting|serverless|edge functions?|rollbacks?|apis?|sdks?|cli|developers?|repos?|codebase)\b/gi,
-  kanban: /\b(kanban|boards?|tasks?|to-?dos?|projects?|sprints?|roadmaps?|backlogs?|issues?|tickets?|pipelines?|deals?|stages?|candidates?|applicants?|hiring|recruit\w*)\b/gi,
+  // (Bare "deals" and "stages" aren't boards: "hotel deals", "early-stage".)
+  kanban: /\b(kanban|boards?|tasks?|to-?dos?|projects?|sprints?|roadmaps?|backlogs?|issues?|tickets?|pipelines?|deal (flow|stages?)|candidates?|applicants?|hiring|recruit\w*)\b/gi,
   "live-cursors": /\b(collaborat\w*|multiplayer|whiteboards?|canvas(es)?|co-?edit\w*|brainstorm\w*|together|design files?|mood ?boards?)\b/gi,
   "chat-thread": /\b(chat|messag\w*|channels?|conversations?|threads?|dms?|inbox(es)?|help ?desk|live chat|team communication|support tickets?)\b/gi,
 };

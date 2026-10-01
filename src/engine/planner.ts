@@ -341,7 +341,7 @@ const OUTRO_SUBS = ["Coming soon", "Available now", "Join the movement", "Start 
 function extractBrand(prompt: string): string | null {
   const quoted = prompt.match(/["“'‘]([^"”'’]{2,32})["”'’]/);
   if (quoted) return quoted[1].trim();
-  const named = prompt.match(/\b(?:called|named|for|brand|channel|company|startup|product)\s+([A-Z][\w.&-]*(?:\s+[A-Z0-9][\w.&-]*){0,2})/);
+  const named = prompt.match(/\b(?:called|named|for|brand|channel|company|startup|product)\s+([A-Z][\w.&-]*(?:\s+(?:&\s+)?[A-Z0-9][\w.&-]*){0,2})/);
   if (named) return named[1].trim();
   // "Sentinel stops threats…" / "Shopwave helps brands…": a capitalised name opening a sentence.
   const opener = prompt.match(/^\s*(?:meet\s+|introducing\s+)?([A-Z][a-z][\w.&-]{1,24})\s+(?:is|are|helps|lets|makes|stops|keeps|turns|gives|brings|writes|runs|puts|connects|automates|finds|builds|ships)\b/);
@@ -349,6 +349,9 @@ function extractBrand(prompt: string): string | null {
   // "Ledgerly: business banking…" / "Nimbus is a developer platform…" / "Meet Nimbus, …"
   const lead = prompt.match(/^\s*(?:meet\s+|introducing\s+)?([A-Z][\w.&-]{1,24}(?:\s+[A-Z][\w.&-]{1,24})?)\s*(?::|—|–|-\s|,|\s+(?:is|are|helps|lets|makes)\b)/i);
   if (lead && !/^(an?|the|my|our|this|make|create|build|launch)$/i.test(lead[1])) return lead[1].trim();
+  // "Sunrise Yoga studio intro with …": the capitalised name right before the request word.
+  const titled = prompt.match(/^\s*((?:[A-Z][\w.&'-]*\s+){0,2}[A-Z][\w.&'-]*)\s+(?:[a-z]+\s+){0,2}(?:intro|launch video|promo|teaser|explainer)\b/);
+  if (titled && !/^(an?|the|my|our|this|make|create|build|launch|intro|promo)$/i.test(titled[1].split(/\s+/)[0])) return titled[1].trim();
   // All-caps names ("PULSE"), ignoring common acronyms.
   const caps = prompt.match(/\b(?!(?:AI|API|SDK|CRM|HR|SEO|SaaS|UI|UX|B2B|CEO|CTO|SQL|LLM)\b)([A-Z][A-Z0-9.&-]{1,}(?:\s+[A-Z0-9][A-Z0-9.&-]+){0,2})\b/);
   if (caps) return caps[1].trim();
@@ -430,20 +433,30 @@ function naturalCase(phrase: string, source: string) {
  * Edge functions]; verb clauses ("writes your emails and summarises your meetings") become
  * features too.
  */
+/** "An intro for …" / "Launch video about …": the request, not the product. */
+const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer)\s+)?(?:video|film|teaser|trailer|intro|promo)\s+(?:for|about|of)\s+/i;
+
 export function parseSaasPrompt(prompt: string) {
   const brand = extractBrand(prompt);
   let body = prompt.replace(/["“”‘’]/g, "").trim();
-  body = body.replace(/^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer)\s+)?(?:video|film|teaser|trailer|intro|promo)\s+(?:for|about|of)\s+/i, "");
+  body = body.replace(LEAD_IN, "");
   body = body.replace(/^(?:meet|introducing)\s+/i, "");
-  if (brand) body = body.split(brand).join(" ").replace(/^\s*[,:—–-]?\s*(?:is|are)?\s*/i, "").trim();
+  if (brand) body = body.split(brand).join(" ").replace(/^\s*[,:—–-]?\s*(?:is|are)?\s*/i, "").replace(/\s+(?:called|named)(?=\s*(?:[,.;:—–-]|$))/gi, "").trim();
+  // "… studio intro with X": the request word isn't part of the pitch.
+  body = body.replace(/^((?:[\w'-]+\s+){0,2})(?:intro|launch video|promo video|promo|teaser|explainer)\b\s*/i, "$1").trim();
   // Real stats have magnitude ("10,000+ teams", "99.9% uptime"), not "SOC 2" or "3 steps".
   const numbers = stats(prompt).filter((n) => /\d{2,}|\d[kmbx%]|\+/i.test(n.split(" ")[0]));
   const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   // Pitch: the leading noun phrase, up to the first list or clause marker.
   const pitchRaw = body.split(/\s(?:with|that|which|who|featuring|including)\s|:|;|\.|,\s(?=\w+\s)/i)[0].trim();
   const pitchWords = pitchRaw.split(/\s+/).filter(Boolean);
+  // A one-word pitch ("studio") reads as the brand's own: "Sunrise Yoga studio".
   const pitch =
-    pitchWords.length >= 2 && pitchWords.length <= 10 ? cap(pitchRaw.replace(/^(an?|the)\s+/i, "The ")) : shortenCopy(cap(pitchRaw), 9);
+    pitchWords.length === 1 && brand
+      ? `${brand} ${pitchRaw.toLowerCase()}`
+      : pitchWords.length >= 2 && pitchWords.length <= 10
+        ? cap(pitchRaw.replace(/^(an?|the)\s+/i, "The "))
+        : shortenCopy(cap(pitchRaw), 9);
   // Features: list items and verb clauses after the pitch.
   let rest = body.slice(pitchRaw.length);
   // A bare pitch ("the AI assistant") reads better with its first verb clause:
@@ -456,9 +469,18 @@ export function parseSaasPrompt(prompt: string) {
     pitchOut = `${pitch} ${clause[1].toLowerCase()} ${clause[2].trim()}`;
     rest = rest.slice(clause[0].length);
   }
+  // A list opens with its connector ("… with X, Y and Z"); inside an item it belongs to the item
+  // ("share galleries with clients", "reports that write themselves").
+  rest = rest.replace(/^[\s,.;:—–-]*(?:with|that|which|who|featuring|including|plus)\s+/i, " ");
   const features = rest
-    .split(/(?<!\d),|,(?!\d)|[;:]|\.(?!\d)|\sand\s|\s&\s|\s(?:with|that|which|who|featuring|including|plus)\s/i)
-    .map((c) => c.trim().replace(/^(?:and|with|that|which|also|plus|to|it)\s+/i, "").replace(/\s+(?:for|to)\s+(?:teams?|startups?|you|everyone|businesses)\b.*$/i, ""))
+    .split(/(?<!\d),|,(?!\d)|[;:]|\.(?!\d)|\sand\s|\s&\s|\s(?:featuring|including|plus)\s/i)
+    .map((c) =>
+      c
+        .trim()
+        .replace(/^(?:(?:it|they|we|you)\s+(?:also\s+)?(?:has|have|comes?|offers?|gives?(?:\s+you)?|includes?|features?|gets?)\s+(?:with\s+)?)/i, "")
+        .replace(/^(?:and|with|that|which|also|plus|to|it)\s+/i, "")
+        .replace(/\s+(?:for|to)\s+(?:teams?|startups?|you|everyone|businesses)\b.*$/i, ""),
+    )
     .filter((c) => c && !/^[$€£]?\d[\d,.]*[kmb%x]?\+?(\s|$)/i.test(c) && !/^[\d\s.,%+$€£kmb]+$/i.test(c))
     .map((c) => cap(c.split(/\s+/).length > 6 ? shortenCopy(c, 6) : c))
     .filter((c) => c && c.split(/\s+/).length <= 6 && !/^(the|a|an|you|it|them|teams?)$/i.test(c));
@@ -472,7 +494,13 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const brand = parsed.brand ?? "Your product";
   const numbers = parsed.numbers;
   const tagline = parsed.pitch || `Meet ${brand}`;
-  const features = parsed.features.filter((f) => norm(f) !== norm(tagline));
+  const named = parsed.features.filter((f) => norm(f) !== norm(tagline));
+  // A prompt that names fewer than two features ("an intro for my bakery booking app") still gets
+  // feature cards: what a product of its kind typically offers, said plainly (no claims), and the
+  // film's director's note says so, so they can be edited to match.
+  const concept = detectConcept(`${brand} ${tagline} ${prompt}`);
+  const typical = named.length < 2 && concept.starter ? concept.starter.filter((f) => !named.some((n) => norm(n) === norm(f))).slice(0, 4 - named.length) : [];
+  const features = [...named, ...typical];
   // A prompt becomes a minimal site profile, so prompt films get the same concept-aware arc,
   // feature icons, chapters, pacing and CTA voice as website films.
   const site: SiteData = {
@@ -480,7 +508,11 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     domain: "",
     name: brand,
     tagline,
-    description: prompt,
+    // The prompt without its request ("Intro for …"), so it reads as the product's own description.
+    description: (() => {
+      const d = prompt.replace(LEAD_IN, "");
+      return d.charAt(0).toUpperCase() + d.slice(1);
+    })(),
     headlines: features.slice(0, 6),
     features: [],
     stats: numbers.map((n) => naturalCase(n, prompt)),
@@ -497,6 +529,12 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     themeColor: null,
   };
   const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas", variant: req.variant });
+  const shown = typical.filter((f) => plan.scenes.some((sc) => sc.items?.some((it) => norm(it.split(/\s+[—–]\s+/)[0]) === norm(f))));
+  if (shown.length) {
+    const why = named.length ? "the prompt named only one feature" : "the prompt didn't name any features";
+    const note = `The feature cards include what a typical ${concept.name.toLowerCase()} product offers (${shown.join(", ")}), because ${why}. Edit them to match yours, or list features in your prompt (e.g. “with X, Y and Z”).`;
+    plan.notes = [note, ...(plan.notes ?? [])].slice(0, 3);
+  }
   return { ...plan, title: brand };
 }
 
@@ -1328,7 +1366,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     demoScene = {
       role: "demo", skill: "ai-prompt", text: demo.title,
       subtext: said.answer,
-      items: [(said.firstPerson ? demo.items[0] : "Tell me about {name}").replace(/\{name\}/g, site.name), ...(points.length >= 2 ? points : spareFeatures.slice(0, 3))],
+      // (Without a real name, the placeholder isn't asked about by name.)
+      items: [site.name === "Your product" ? "What can you do?" : (said.firstPerson ? demo.items[0] : "Tell me about {name}").replace(/\{name\}/g, site.name), ...(points.length >= 2 ? points : spareFeatures.slice(0, 3))],
       eyebrow: demo.eyebrow, duration: beats(12), transition: "whip",
     };
   } else if (demo.skill === "code-deploy") {

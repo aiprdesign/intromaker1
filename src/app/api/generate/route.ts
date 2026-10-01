@@ -264,6 +264,32 @@ function momentBrief(c: Ctx) {
   );
 }
 
+/**
+ * Prompt-only films: one icon-card beat built from the features the prompt names, topped up with
+ * what a product of this kind typically offers when it names fewer than two (plain words, no
+ * claims; the film's note tells the user, see typicalNote).
+ */
+function featureCardBrief(c: Ctx) {
+  const starter = c.concept.starter;
+  return (
+    `\nFEATURE CARDS: include one icon-features scene (3-4 items, short "Title — one-line benefit"; each card's icon is picked from its wording) built from the features the prompt names.` +
+    (starter ? ` If the prompt names fewer than two, add what a ${c.concept.name.toLowerCase()} product typically offers, plainly worded, e.g. ${starter.map((x) => `"${x}"`).join(", ")}.` : "")
+  );
+}
+
+/** A note when a prompt film's cards include the category's typical features the prompt didn't name. */
+function typicalNote(c: Ctx, plan: VideoPlan): string | null {
+  if (c.site || !c.concept.starter) return null;
+  const said = (c.prompt ?? "").toLowerCase();
+  const n = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const shown = c.concept.starter.filter(
+    (f) => !said.includes(f.toLowerCase()) && plan.scenes.some((sc) => sc.items?.some((it) => n(it.split(/\s+[—–]\s+/)[0]) === n(f))),
+  );
+  return shown.length
+    ? `The feature cards include what a typical ${c.concept.name.toLowerCase()} product offers (${shown.join(", ")}). Edit them to match yours, or list features in your prompt (e.g. “with X, Y and Z”).`
+    : null;
+}
+
 /** Everything the AI director is sent: system prompt, brief, screenshots and output schema. */
 async function directorRequest(c: Ctx) {
   const schema = c.site ? SitePlanSchema : PlanSchema;
@@ -277,6 +303,7 @@ async function directorRequest(c: Ctx) {
     (c.wantSaas && c.concept.id !== "general"
       ? `\nPRODUCT CATEGORY: ${c.concept.name}. Follow this category's typical launch-film arc: ${c.concept.arc.filter((r) => r !== "bento" && r !== "stat" && !(c.safe && ["quote", "logos", "metric"].includes(r))).join(" → ")} (skip beats without material). Use icon-features for the key features (items "Title — one-line benefit"; icons are picked from the wording). CTA in this voice, e.g. "${(c.concept.cta.find((l) => !/free/i.test(l)) ?? c.concept.cta[0]).replace(/\{name\}/g, c.site?.name ?? "the product").replace(/\*/g, "")}".`
       : "") +
+    (c.wantSaas && !c.site ? featureCardBrief(c) : "") +
     (c.palette !== "auto" ? ` Use the "${c.palette}" palette.` : "") +
     (c.angle ? `\nCREATIVE ANGLE "${ANGLES.find((a) => a.id === c.angle)!.name}": ${ANGLES.find((a) => a.id === c.angle)!.brief}` : "") +
     (c.variant
@@ -315,6 +342,8 @@ function finishPlan(c: Ctx, raw: z.infer<typeof SitePlanSchema>) {
   const styled = c.wantSaas ? applyTemplate({ ...directed, brand: directed.brand }, c.template, { palette: c.palette !== "auto" ? c.palette : undefined }) : directed;
   // Any scene the AI left without a narrator line gets one from the built-in script writer.
   const voiced = writeVoiceover(styled);
+  const note = typicalNote(c, voiced);
+  if (note) voiced.notes = [note, ...(voiced.notes ?? [])].slice(0, 3);
   return c.safe ? safePlan(voiced) : healthPlan(voiced);
 }
 
