@@ -107,7 +107,9 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
 
   // ── Variety (15).
   for (let i = 1; i < sc.length; i++) {
-    if (sc[i].skill === sc[i - 1].skill) add("variety", 5, `${sc[i].skill} twice in a row`);
+    // (The product reveal and the product with its callouts are different shots.)
+    const shot = (x: (typeof sc)[number]) => (x.skill === "product-hero" && x.items?.length ? "product-callouts" : x.skill);
+    if (shot(sc[i]) === shot(sc[i - 1])) add("variety", 5, `${sc[i].skill} twice in a row`);
     // (Liquid is the Liquid Motion style's signature; each one flows from a different direction.)
     if (sc[i].transition === sc[i - 1].transition && sc[i].transition !== "cut" && sc[i].transition !== "liquid") add("variety", 1, `transition ${sc[i].transition} twice in a row`);
   }

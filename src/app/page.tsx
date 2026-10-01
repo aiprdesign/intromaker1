@@ -10,7 +10,7 @@ const STEPS = [
   {
     n: "01",
     title: "Enter your URL",
-    body: "Paste your website and we'll import your logo, product shots, UI, copy and colours. No website yet? Describe your product instead.",
+    body: "Paste your website and we'll import your logo, product shots, UI, copy and colours. Selling a product? Paste its Amazon, eBay, Etsy or Shopify listing, or upload photos. No website yet? Describe your product instead.",
   },
   {
     n: "02",
@@ -35,16 +35,7 @@ export default function Home() {
           <div className="hero-fade" />
         </div>
         <div className="hero-content">
-          <span className="eyebrow">✦ SaaS video from your URL</span>
-          <h1>
-            SaaS launch videos,
-            <br />
-            <span className="grad">from your URL.</span>
-          </h1>
-          <p className="lede">
-            Enter your website below. IntroMaker reads your logo, brand colours, screenshots, UI and copy, picks the scenes that suit your
-            product, and directs a beat-synced launch film you can edit and export in 1080p.
-          </p>
+          {/* The headline follows the chosen tab (launch film, or product video). */}
           <HeroPrompt />
         </div>
       </section>

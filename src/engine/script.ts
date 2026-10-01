@@ -57,7 +57,9 @@ function lineFor(s: Scene, plan: VideoPlan, i: number): string | undefined {
     if (s.role === "reveal") {
       const by = clean(s.subtext);
       const meet = head.split(/\s+/).length >= 3 ? `Meet the ${head}` : `Meet ${head}`;
-      return fit([by ? `${meet}, ${by.replace(/[.!]+$/, "")}.` : "", `${meet}.`], budget);
+      // "Meet the Aero Buds Pro, by Aero Audio." / "Meet the Aero Buds Pro. Wireless earbuds with noise cancelling."
+      const line = by ? (/^by\s/i.test(by) ? `${meet}, ${by.replace(/[.!]+$/, "")}.` : `${meet}. ${sentence(by)}`) : "";
+      return fit([line, `${meet}.`], budget);
     }
     if (s.role === "cta") {
       // The close names the product (its short name), and where to find it when there's an address.

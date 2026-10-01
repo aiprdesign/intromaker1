@@ -1725,22 +1725,37 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
     .filter((f) => f.title && !seen.has(norm(f.title)) && !!seen.add(norm(f.title)) && norm(f.title) !== norm(product));
   const firstLine = (site.description.split(/(?<=[.!?])\s+/)[0] ?? "").replace(/\.$/, "");
   const scenes: Scene[] = [];
-  // Hook: the listing's own first line when it's short, over a wall of the photos when there are several.
   // What it's called: a prompt names the product ("Aero Buds") and pitches it ("Wireless earbuds");
   // a listing's title already carries the brand ("Aero Buds Pro Wireless Earbuds").
   const fromPrompt = !site.url;
   const title = fromPrompt && site.name ? site.name : product;
   const nick = title.split(/\s+/).length > 4 ? title.split(/\s+/).slice(0, 3).join(" ") : title;
-  if (target >= 20 && angle !== "product") {
-    const own = firstLine && firstLine.split(/\s+/).length <= 9 && norm(firstLine) !== norm(product) ? firstLine : "";
-    const hook = angle === "proof" ? `Meet *${nick}*` : own || `Say hello to *${nick}*`;
+  // The product's main benefit in its own words: the listing's first line when it's short.
+  // (A long line is cut at its last natural break that fits: "Wireless earbuds with active noise
+  // cancelling and a pocket-size charging case" → "Wireless earbuds with active noise cancelling".)
+  const fitLine = (x: string) => {
+    const w = x.split(/\s+/).filter(Boolean);
+    if (w.length <= 9) return x;
+    const cut = w.slice(0, 10).reduce((at, word, i) => (i >= 3 && /^(and|with|for|that|so|while|plus|to)$/i.test(word) ? i : at), -1);
+    return cut > 0 ? w.slice(0, cut).join(" ").replace(/[,;:]$/, "") : "";
+  };
+  // ("Aero Buds: wireless earbuds…" → "Wireless earbuds…": the name is already on screen.)
+  const own = firstLine.replace(new RegExp(`^${site.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[:,—–-]\\s*`, "i"), "");
+  const short = own ? fitLine(own.charAt(0).toUpperCase() + own.slice(1)) : "";
+  const benefit = short && norm(short) !== norm(product) ? short : "";
+  // The proven product-ad format opens on the product itself, its benefit beneath it, within the
+  // first second (story, the default). Remakes try a hook line first (product angle) or open on
+  // the gallery (proof angle).
+  if (target >= 20 && angle !== "story") {
+    const hook = angle === "proof" ? `Meet *${nick}*` : benefit || `Say hello to *${nick}*`;
     scenes.push({ role: "hook", skill: photos >= 4 ? "tilt-wall" : "blur-reveal", text: hook, eyebrow: photos >= 4 ? undefined : "Introducing", duration: beats(7), transition: "cut" });
   }
   // The reveal: the product itself.
   const by = fromPrompt
     ? norm(product) !== norm(title) ? product : undefined
     : site.name && !norm(product).includes(norm(site.name)) ? `by ${site.name}` : undefined;
-  const reveal: Scene = { role: "reveal", skill: "product-hero", text: title, subtext: by, duration: beats(8), transition: "zoom", media: photo(0) };
+  const opener = angle === "story" || target < 20;
+  const reveal: Scene = { role: "reveal", skill: "product-hero", text: title, subtext: (opener && benefit) || by, duration: beats(8), transition: "zoom", media: photo(0) };
   const featuresTitle = concept.id !== "general" && concept.id !== "ecommerce" ? concept.featuresTitle : "Made for *everyday*";
   // A long film with five or more features gives the close-ups their own labels (the callouts
   // keep three); otherwise the lens shows the details on its own.
@@ -1749,7 +1764,7 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   const callouts: Scene | null =
     feats.length >= 2
       ? {
-          role: "features", skill: "product-hero", text: featuresTitle, eyebrow: "Features",
+          role: "features", skill: "product-hero", text: featuresTitle, eyebrow: "Why you'll love it",
           items: feats.slice(0, zoomLabels.length ? 3 : 4).map((f) => f.title),
           duration: beats(Math.min(4, feats.length) * 2 + 6), transition: "dolly",
           media: photo(photos > 1 ? 1 + (variant % Math.max(1, photos - 1)) : 0),
@@ -1776,15 +1791,20 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
     target >= 30
       ? { role: "gallery", skill: "product-zoom", text: "Every *detail*", eyebrow: "Details", items: zoomLabels, duration: beats(12), transition: "whip", media: photo(0), why: "A close look at the product's details" }
       : null;
+  // Product first, then why it's worth having (benefits as on-screen callouts, readable with the
+  // sound off), then every angle and the details, then one clear call to action.
   const order =
     target < 20
-      ? [reveal, icons]
+      ? [reveal, callouts ?? icons]
       : angle === "proof"
         ? [gallery, reveal, slides ?? (target >= 30 ? icons : null), callouts, closer]
-        : [reveal, gallery, callouts, slides ?? (target >= 30 ? icons : null), closer];
+        : angle === "product"
+          ? [reveal, gallery, callouts, slides ?? (target >= 30 ? icons : null), closer]
+          : [reveal, callouts, gallery, slides ?? (target >= 30 ? icons : null), closer];
   scenes.push(...order.filter((x): x is Scene => !!x));
-  // Never two product shots back to back: the second becomes icon cards.
-  for (let i = 1; i < scenes.length; i++) if (scenes[i].skill === "product-hero" && scenes[i - 1].skill === "product-hero" && icons) scenes[i] = { ...icons };
+  // Never the same product shot twice in a row (the reveal then its callouts is a different shot).
+  for (let i = 1; i < scenes.length; i++)
+    if (scenes[i].skill === "product-hero" && scenes[i - 1].skill === "product-hero" && !!scenes[i].items?.length === !!scenes[i - 1].items?.length && icons) scenes[i] = { ...icons };
   // The end card: the product's own pitch, and where to get it.
   scenes.push({
     role: "cta", skill: "product-end",

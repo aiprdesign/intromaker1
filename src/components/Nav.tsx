@@ -25,6 +25,7 @@ export default function Nav({ cta = true }: { cta?: boolean }) {
     <header className="nav">
       <Logo />
       <nav className="nav-links">
+        <Link href="/#product">Product videos</Link>
         <Link href="/skills">Skills</Link>
         <Link href="/#how">How it works</Link>
         <Link href="/#pricing">Pricing</Link>

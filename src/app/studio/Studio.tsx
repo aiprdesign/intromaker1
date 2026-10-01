@@ -14,6 +14,7 @@ import LoopCanvas from "@/components/LoopCanvas";
 import PaletteChooser, { type ColourChoice } from "@/components/PaletteChooser";
 import BackgroundPicker, { applyBackground, type BgChoice, BG_OPTIONS } from "@/components/BackgroundPicker";
 import { runBrowserDirector } from "@/lib/localai";
+import { MAX_PHOTOS, PHOTO_ID, uploadPhotos } from "@/lib/photos";
 import { isLocalProvider } from "@/lib/providers";
 import TemplatePicker from "@/components/TemplatePicker";
 import TextFxPicker, { TEXT_FX_OPTIONS } from "@/components/TextFxPicker";
@@ -269,31 +270,12 @@ export default function Studio() {
   const photoInput = useRef<HTMLInputElement | null>(null);
   /** Re-encode in the browser (at most 2000px, JPEG, no camera metadata such as location), then upload. */
   const addPhotos = async (files: FileList | File[] | null) => {
-    const list = Array.from(files ?? []).filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, 12 - photosRef.current.length));
-    if (!list.length) return;
+    if (!Array.from(files ?? []).some((f) => f.type.startsWith("image/"))) return;
     setPhotoBusy(true);
     setPhotoError(null);
     try {
-      const form = new FormData();
-      for (const f of list) {
-        const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
-        const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
-        const c = document.createElement("canvas");
-        c.width = Math.max(1, Math.round(bmp.width * k));
-        c.height = Math.max(1, Math.round(bmp.height * k));
-        const g = c.getContext("2d")!;
-        // Transparent PNGs land on white, like a studio product shot.
-        g.fillStyle = "#ffffff";
-        g.fillRect(0, 0, c.width, c.height);
-        g.drawImage(bmp, 0, 0, c.width, c.height);
-        bmp.close();
-        const blob = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("Couldn't read that photo."))), "image/jpeg", 0.9));
-        form.append("photo", blob, "photo.jpg");
-      }
-      const res = await fetch("/api/photos", { method: "POST", body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Couldn't upload the photos. Try again.");
-      setPhotos((cur) => [...cur, ...(data.photos as string[])].slice(0, 12));
+      const urls = await uploadPhotos(files, MAX_PHOTOS - photosRef.current.length);
+      setPhotos((cur) => [...cur, ...urls].slice(0, MAX_PHOTOS));
       setImportError((e) => (e?.code === "listing" ? null : e));
     } catch (e) {
       setPhotoError((e as Error).message || "Couldn't upload the photos.");
@@ -496,7 +478,7 @@ export default function Studio() {
   };
 
   /** Scrape a website, pull its brand colours, then storyboard an intro from it. */
-  const importSite = async (raw?: string) => {
+  const importSite = async (raw?: string, fmt: { aspect?: Aspect; length?: Length } = {}) => {
     const url = (raw ?? siteUrl).trim();
     if (!url) return;
     setImporting(true);
@@ -524,13 +506,14 @@ export default function Studio() {
       const fromLogo = (s.logo ? await extractLogoColors(assetUrl(s.logo)) : null) ?? undefined;
       setBrandColors(colors);
       setLogoColors(fromLogo);
-      // A full story arc needs room: websites default to the long cut.
-      const len = length === "standard" ? "long" : length;
+      // A full story arc needs room: websites default to the long cut. Product videos keep the
+      // length chosen for where they'll run (short-form social works best at 15–30s).
+      const len = fmt.length ?? (s.kind === "product" ? length : length === "standard" ? "long" : length);
       setLength(len);
       setImportStage(`Directing your ${s.name} film…`);
       const chosen = brandMode === "logo" ? fromLogo ?? colors : brandMode === "site" ? colors : undefined;
       if (brandMode === "logo" && !fromLogo) setBrandMode("site");
-      await generate({ site: s, colors: chosen, length: len });
+      await generate({ site: s, colors: chosen, length: len, aspect: fmt.aspect });
     } catch (e) {
       clearInterval(timer);
       const err = e as Error & { code?: string; suggestion?: string };
@@ -603,7 +586,7 @@ export default function Studio() {
         .catch((status) => setNote(status === 401 ? "Sign in to open your saved intros." : "That saved intro wasn't found."));
       return;
     }
-    const hasBootParams = hash.startsWith("#plan=") || ["skill", "url", "prompt"].some((k) => params.get(k));
+    const hasBootParams = hash.startsWith("#plan=") || ["skill", "url", "prompt", "photos"].some((k) => params.get(k));
     if (!hasBootParams) {
       bootingRef.current = false;
       saving.current = true;
@@ -659,13 +642,32 @@ export default function Studio() {
       );
       return;
     }
+    // The format chosen on the homepage (?aspect=9:16&length=standard), e.g. for Reels or Amazon.
+    const fa = params.get("aspect");
+    const fl = params.get("length");
+    const fmt = {
+      aspect: fa === "9:16" || fa === "1:1" || fa === "16:9" ? (fa as Aspect) : undefined,
+      length: fl === "short" || fl === "standard" || fl === "long" ? (fl as Length) : undefined,
+    };
+    if (fmt.aspect) setAspect(fmt.aspect);
+    if (fmt.length) setLength(fmt.length);
     const web = params.get("url");
     if (web) {
       setSiteUrl(web);
-      importSite(web);
+      importSite(web, fmt);
       return;
     }
+    // Product video from the homepage: photos uploaded there (?photos=id,id…) with a short description.
+    const shots = (params.get("photos") ?? "").split(",").filter((id) => PHOTO_ID.test(id)).slice(0, MAX_PHOTOS).map((id) => `/api/shot?id=${id}`);
     const q = params.get("prompt");
+    if (shots.length) {
+      photosRef.current = shots;
+      setPhotos(shots);
+      const text = q?.trim() || "Your product";
+      setPrompt(text);
+      generate({ prompt: text, palette: pal ?? "auto", ...fmt });
+      return;
+    }
     if (q) {
       setPrompt(q);
       generate({ prompt: q, palette: pal ?? "auto" });
@@ -1130,7 +1132,7 @@ export default function Studio() {
                 e.target.value = "";
               }}
             />
-            <button type="button" className="btn btn-ghost sm" onClick={() => photoInput.current?.click()} disabled={photoBusy || photos.length >= 12}>
+            <button type="button" className="btn btn-ghost sm" onClick={() => photoInput.current?.click()} disabled={photoBusy || photos.length >= MAX_PHOTOS}>
               {photoBusy ? "Adding photos…" : "＋ Add product photos"}
             </button>
             <span className="hint">
