@@ -246,7 +246,8 @@ export default function Studio() {
     }
   }, []);
   // Auto style (default): each new film takes the style suggested for its kind of product. Picking
-  // a style by hand turns it off; the Auto chip turns it back on.
+  // a style by hand turns it off for that film (its remakes and takes keep it); the next film made
+  // from another website or prompt picks its own best style again. The Auto chip turns it back on.
   const [autoStyle, setAutoStyle] = useState(true);
   const autoStyleRef = useRef(true);
   autoStyleRef.current = autoStyle;
@@ -264,6 +265,54 @@ export default function Studio() {
       localStorage.setItem("intromaker.style.auto", on ? "on" : "off");
     } catch {
       /* ignore */
+    }
+  };
+  /**
+   * Which film a hand-picked style (SaaS style or trailer style) belongs to: its website or prompt.
+   * A new film from anything else goes back to Auto. Kept with the film, so a reload remembers it.
+   */
+  const pickedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    try {
+      pickedForRef.current = localStorage.getItem("intromaker.style.for");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const subjectOf = (s: SiteData | null | undefined, p: string) => (s ? `site:${s.url}` : `prompt:${p.trim().toLowerCase()}`);
+  const markPicked = () => {
+    // The film being worked on: the website, else what's in the prompt box (a style picked before
+    // pressing Generate on a new prompt is meant for that film).
+    const key = subjectOf(site, prompt || promptRef.current);
+    pickedForRef.current = key;
+    try {
+      localStorage.setItem("intromaker.style.for", key);
+    } catch {
+      /* ignore */
+    }
+  };
+  /** A new film (another website or prompt): back to Auto, so it gets the best style for itself. */
+  const autoForNewFilm = (s: SiteData | null | undefined, p: string) => {
+    if (pickedForRef.current === subjectOf(s, p)) return;
+    pickedForRef.current = null;
+    try {
+      localStorage.removeItem("intromaker.style.for");
+    } catch {
+      /* ignore */
+    }
+    if (!autoStyleRef.current) {
+      setAuto(true);
+      setTemplate(DEFAULT_TEMPLATE);
+      templateRef.current = DEFAULT_TEMPLATE;
+    }
+    if (trailerStyleRef.current !== "auto") {
+      setTrailerStyle("auto");
+      trailerStyleRef.current = "auto";
+      try {
+        localStorage.setItem("intromaker.trailer-style", "auto");
+      } catch {
+        /* ignore */
+      }
     }
   };
   /** The style suggested for a plan's kind of product (when auto is on and it differs). */
@@ -287,7 +336,10 @@ export default function Studio() {
   };
   /** Switch template: restyles the current SaaS storyboard instantly (no regeneration). */
   const chooseTemplate = (id: string, auto = false) => {
-    if (!auto) setAuto(false);
+    if (!auto) {
+      setAuto(false);
+      markPicked();
+    }
     setTemplate(id);
     templateRef.current = id;
     try {
@@ -304,8 +356,9 @@ export default function Studio() {
     site
       ? detectTrailerStyle([site.name, site.tagline, site.description, ...site.headlines].join(" ").toLowerCase(), "tech").id
       : detectTrailerStyle(prompt.toLowerCase()).id;
-  /** Pick a trailer style: the trailer on screen restyles instantly, and new trailers use it. */
+  /** Pick a trailer style: the trailer on screen restyles instantly (and its remakes keep it). */
   const chooseTrailerStyle = (id: string) => {
+    if (id !== "auto") markPicked();
     setTrailerStyle(id);
     trailerStyleRef.current = id;
     try {
@@ -562,6 +615,8 @@ export default function Studio() {
 
   const generate = async (opts: GenOpts = {}) => {
     const { run, signal } = opts.signal ? { run: runRef.current, signal: opts.signal } : startRun();
+    // A film from another website or prompt picks its own best style; the same one keeps your pick.
+    autoForNewFilm(opts.site !== undefined ? opts.site : site, opts.prompt ?? prompt);
     setLoading(true);
     setNote(null);
     // The film on screen and its versions, so making a new one can be undone.
@@ -1670,7 +1725,7 @@ export default function Studio() {
                   const id = suggestedFor(plan);
                   if (id) chooseTemplate(id, true);
                 }}
-                title="Each new film takes the style suggested for its kind of product"
+                title="Each new film takes the style suggested for its kind of product. A style you pick applies to this film and its remakes; the next website or prompt gets its own best style."
               >
                 ✦ Auto: best style for your product
                 {autoStyle && suggestedFor(plan) ? ` (${TEMPLATE_MAP[suggestedFor(plan)!].name})` : ""}
