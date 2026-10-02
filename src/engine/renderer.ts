@@ -8,6 +8,7 @@ import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
 import { drawLogo, getImage } from "./media";
 import { withPlaceholders } from "./placeholders";
+import { isMovieStyle } from "./trailers";
 import { pairedSubFamily, setBrandFont, setSubFamily, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
@@ -75,6 +76,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   glow?: VideoPlan["glow"];
   textFx?: VideoPlan["textFx"];
   concept?: VideoPlan["concept"];
+  trailerStyle?: VideoPlan["trailerStyle"];
 };
 
 /** Renders exactly like an absent look (bokeh on, one beam set, full aurora, grid). */
@@ -127,6 +129,7 @@ function drawScene(
     concept: plan.concept,
     product: plan.product,
     music,
+    genre: plan.style === "trailer" ? plan.trailerStyle?.replace(/^film-/, "") : undefined,
   };
   resetCtx(target);
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
@@ -534,6 +537,14 @@ export function renderFrame(
     music: musicPulse(plan, time),
   });
   if (plan.style === "saas" && opts.grade !== false) epicPass(ctx, plan, at.local, at.index, time, musicPulse(plan, time), w, h);
+  // Movie trailers play in widescreen: black bars to 2.39:1 on landscape frames.
+  if (plan.style === "trailer" && isMovieStyle(plan.trailerStyle) && w > h * 1.2) {
+    resetCtx(ctx);
+    const bar = Math.max(0, (h - w / 2.39) / 2);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, bar);
+    ctx.fillRect(0, h - bar, w, bar);
+  }
   if (plan.style === "saas" && plan.look?.overlay) filmOverlay(ctx, plan, time, w, h, at.index);
   else brandBug(ctx, plan, time, w, h);
   drawCaptions(ctx, plan, time, w, h);

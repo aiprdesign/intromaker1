@@ -1,4 +1,7 @@
 export const SKILL_IDS = [
+  "studio-ident",
+  "intertitle",
+  "billing-block",
   "kinetic-slam",
   "glitch-reveal",
   "particle-assemble",
@@ -105,6 +108,10 @@ export const PALETTE_IDS = [
   "xeno",
   "ion",
   "nebula",
+  "steel",
+  "crimson",
+  "rose",
+  "sepia",
 ] as const;
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
@@ -374,6 +381,8 @@ export interface SkillContext {
   product?: boolean;
   /** The score at this moment, so motion can hit with the music (full-film renders only). */
   music?: MusicPulse;
+  /** A trailer's style id (e.g. a movie genre: "horror", "comedy"), so cards can play it their way. */
+  genre?: string;
 }
 
 export interface MusicPulse {

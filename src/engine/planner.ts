@@ -4,7 +4,7 @@ import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { writeVoiceover } from "./script";
 import { isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
-import { DEFAULT_TRAILER_STYLE, detectTrailerStyle, TRAILER_STYLE_MAP } from "./trailers";
+import { DEFAULT_TRAILER_STYLE, detectTrailerStyle, FILM_CUE, TRAILER_STYLE_MAP, type TrailerStyle } from "./trailers";
 import {
   FONTS,
   PALETTE_IDS,
@@ -191,7 +191,114 @@ const GENRE_LINES: Record<string, { hooks: string[]; beats: string[]; outro: str
   fun: { hooks: ["GUESS WHAT", "HERE WE GO", "GET READY"], beats: ["LET'S GO", "SAY HELLO", "MORE FUN", "JUST FOR YOU"], outro: ["Download now", "Join the fun", "Available now"] },
   editorial: { hooks: ["CHAPTER ONE", "IN FOCUS", "A STORY"], beats: ["LOOK CLOSER", "THE DETAILS", "BEHIND THE SCENES", "IN THEIR WORDS"], outro: ["Coming soon", "Read the story"] },
   hype: { hooks: ["ARE YOU READY", "IT'S HERE", "THE WAIT IS OVER"], beats: ["NO LIMITS", "LET'S GO", "ALL IN", "TURN IT UP"], outro: ["Out now", "Coming soon", "Join the movement"] },
+  // Movie trailers: title-card lines in each genre's voice.
+  "film-horror": { hooks: ["SOME DOORS STAY CLOSED", "IT KNOWS YOUR NAME", "DON'T LOOK BACK"], beats: ["NO ONE IS SAFE", "LISTEN", "THE NIGHT IS LONG", "IT'S STILL HERE"], outro: ["Coming soon"] },
+  "film-thriller": { hooks: ["ONE LAST JOB", "TRUST NO ONE", "EVERYONE HAS A SECRET"], beats: ["THE CLOCK IS RUNNING", "NOTHING IS WHAT IT SEEMS", "NO WAY OUT", "ONE CHANCE"], outro: ["Coming soon"] },
+  "film-action": { hooks: ["THIS SUMMER", "NO RULES", "ONE MISSION"], beats: ["NO RETREAT", "NO SURRENDER", "HOLD THE LINE", "FULL THROTTLE"], outro: ["Coming soon"] },
+  "film-scifi": { hooks: ["THE STARS ARE CALLING", "BEYOND THE EDGE", "ONE SIGNAL"], beats: ["NO WAY HOME", "THE FUTURE IS WATCHING", "FURTHER THAN EVER", "ONE LAST HOPE"], outro: ["Coming soon"] },
+  "film-fantasy": { hooks: ["AN AGE IS ENDING", "LEGENDS ARE FORGED", "BEYOND THE MOUNTAINS"], beats: ["ONE QUEST", "ONE CHOICE", "THE OLD MAGIC STIRS", "A KINGDOM WAITS"], outro: ["Coming soon"] },
+  "film-drama": { hooks: ["EVERY FAMILY HAS A STORY", "SOME MOMENTS CHANGE EVERYTHING", "THIS WINTER"], beats: ["WHAT WE KEEP", "WHAT WE LOSE", "WHO WE BECOME", "WHAT WE LEAVE BEHIND"], outro: ["Coming soon"] },
+  "film-comedy": { hooks: ["THIS SUMMER", "WHAT COULD GO WRONG?", "BAD IDEA. GREAT TIMING."], beats: ["NOTHING WENT TO PLAN", "EVERYTHING WENT WRONG", "AND THEN IT GOT WORSE", "THEY'RE BACK"], outro: ["Coming soon"] },
+  "film-romance": { hooks: ["SOME LOVE STORIES", "ONE SUMMER", "TWO STRANGERS"], beats: ["ONE CHANCE", "TWO HEARTS", "EVERY MOMENT", "ONE LAST DANCE"], outro: ["Coming soon"] },
+  "film-noir": { hooks: ["THE CITY NEVER SLEEPS", "EVERY CLUE HIDES A SECRET", "ONE NIGHT"], beats: ["SOMEONE IS LYING", "FOLLOW THE TRUTH", "NO ONE IS INNOCENT", "THE RAIN KEEPS FALLING"], outro: ["Coming soon"] },
+  "film-doc": { hooks: ["A STORY OF", "SEE IT AS IT IS", "LOOK CLOSER"], beats: ["THE PEOPLE", "THE PLACE", "THE MOMENT", "THE JOURNEY"], outro: ["Coming soon"] },
+  "film-family": { hooks: ["THIS HOLIDAY", "GET READY FOR", "THE BIGGEST LITTLE ADVENTURE"], beats: ["NEW FRIENDS", "BIG DREAMS", "ONE WILD RIDE", "HOME IS WHERE"], outro: ["Coming soon"] },
+  "film-western": { hooks: ["OUT WEST", "THE LAW ENDS HERE", "ONE TOWN"], beats: ["ONE SHERIFF", "NO MERCY", "A RECKONING", "AT SUNDOWN"], outro: ["Coming soon"] },
 };
+
+/**
+ * A movie trailer, the way trailers for films are cut: the studio's card (when the prompt names
+ * one), a title card in the genre's voice, then shots and title cards in turn (the prompt's own
+ * story beats as shots, the genre's lines as cards), the title, and the billing block with the
+ * credits the prompt gives (never invented names) and the release line.
+ */
+function movieTrailer(o: {
+  prompt: string;
+  look: TrailerStyle;
+  brand: string | null;
+  content: string[];
+  year: string | undefined;
+  target: number;
+  pick: <T>(arr: T[]) => T;
+  req: PlanRequest;
+  seed: number;
+  styleOnly: (p: string) => boolean;
+}): VideoPlan {
+  const { prompt, look, year, target, pick, req, seed } = o;
+  const mood = look.mood;
+  const lines = GENRE_LINES[look.id] ?? GENRE_LINES["film-drama"];
+  const beat = 60 / mood.bpm;
+  const secs = (n: number, min: number) => Math.max(n, Math.ceil(min / beat)) * beat;
+  const IDENT = secs(6, 3);
+  const CARD = secs(4, 2.3);
+  const SHOT = secs(4, 2.2);
+  const TITLE = secs(6, 3.2);
+  const END = secs(8, 4.2);
+  // Who made it: the studio, the director, the writer and the cast, as the prompt says them.
+  const name = String.raw`[A-Z][\w&.'-]*`;
+  const studio =
+    prompt.match(new RegExp(String.raw`\b(?:from|by)\s+((?:${name}\s+){0,3}(?:Pictures|Studios?|Films|Productions|Entertainment|Media))\b`))?.[1] ??
+    prompt.match(new RegExp(String.raw`\b((?:${name}\s+){1,3})presents\b`))?.[1]?.trim();
+  // (Names are capitalised words; only the cue itself may be in any case.)
+  const credit = (re: string) => prompt.match(new RegExp(String.raw`\b${re}\s+(${name}(?:\s+${name}){0,3})`))?.[1];
+  const director = credit("[Dd]irected [Bb]y");
+  const writer = credit("[Ww]ritten [Bb]y");
+  const starring = prompt.match(new RegExp(String.raw`\b[Ss]tarring\s+(${name}(?:\s+${name}){0,2}(?:\s*(?:,|and|&)\s*${name}(?:\s+${name}){0,2}){0,3})`))?.[1];
+  const credits = [
+    studio ? `${studio} presents` : "",
+    director ? `A film by ${director}` : "",
+    starring ? `Starring ${starring}` : "",
+    writer ? `Written by ${writer}` : "",
+  ].filter(Boolean);
+  // The release line, as the prompt puts it ("in cinemas December 12"), else its year, else soon.
+  const when = prompt.match(/\b(in (?:cinemas|theaters|theatres)(?: [A-Za-z]+ \d{1,2}| \d{4}| this [a-z]+)?|(?:this|next) (?:summer|winter|spring|autumn|fall|christmas|halloween)|coming (?:this|next) [a-z]+)/i)?.[1];
+  const release = when ? when.charAt(0).toUpperCase() + when.slice(1) : year ? `Coming ${year}` : pick(lines.outro);
+  // The story, line by line as a trailer's cards say it ("A YOUNG QUEEN", "A DRAGON", "A KINGDOM
+  // AT WAR"): the prompt's own clauses after the title, whole, minus credits and request words.
+  const creditWords = /\b(starring|directed|written|produced|presents|pictures|studios?|productions|entertainment|in cinemas|in theaters|in theatres|coming|trailer|teaser)\b/i;
+  const title = (o.brand ?? o.content[0] ?? "Untitled").toUpperCase();
+  const afterTitle = o.brand ? prompt.slice(prompt.indexOf(o.brand) + o.brand.length) : prompt;
+  let story = afterTitle
+    .replace(/["“”]/g, "")
+    .replace(/^\s*(?:[:,—–-]|is|about)\s*/i, "")
+    .replace(/\babout\s+/i, "")
+    .split(/[,;:.!?]|\s[—–-]\s|\s+and\s+(?=(?:a|an|the|one|two|three|his|her|their)\b)/i)
+    .map((x) => x.replace(/\s+(?:that|who|which)\s+/gi, " ").replace(/^\s*(?:and|with|then|but)\s+/i, "").trim())
+    .filter((x) => x && !creditWords.test(x) && !o.styleOnly(x) && x.split(/\s+/).length <= 8 && x.toUpperCase() !== title);
+  if (!story.length) story = o.content.filter((p) => !creditWords.test(p) && !o.styleOnly(p) && p.toUpperCase() !== title && !title.includes(p.toUpperCase()));
+  // A tagline only when the prompt gives one in quotes after the title ("…" — "Some doors stay closed").
+  const tagline = prompt.match(/["“][^"”]+["”][^"“]*["“]([^"”]{4,60})["”]/)?.[1];
+  const scenes: Scene[] = [];
+  let lastT: Transition = "cut";
+  const cut = (pool: Transition[]) => {
+    const t = pick(pool.filter((x) => x !== lastT).length ? pool.filter((x) => x !== lastT) : pool);
+    lastT = t;
+    return t;
+  };
+  if (studio) scenes.push({ skill: "studio-ident", text: studio, subtext: "presents", duration: IDENT, transition: "cut" });
+  const hook = pick(lines.hooks);
+  scenes.push({ skill: "intertitle", text: hook, duration: CARD, transition: "cut" });
+  // Shots and cards in turn, as many as the length allows.
+  const fixed = (studio ? IDENT : 0) + CARD + TITLE + END;
+  // (Trailers need room to breathe: a little over the requested length, two story beats at least.)
+  const pairs = Math.max(target >= 20 ? 2 : 1, Math.min(4, Math.floor((target * 1.15 - fixed + 1) / (SHOT + CARD))));
+  const beats = lines.beats.filter((b) => b !== hook);
+  const shotSkills = mood.body.filter((s) => s !== "intertitle");
+  let lastShot: SkillId | undefined;
+  for (let i = 0; i < pairs; i++) {
+    const words = story[i] ?? beats[(i + 1) % beats.length];
+    const pool = shotSkills.filter((s) => s !== lastShot);
+    const skill = (pool.length ? pick(pool) : shotSkills[0] ?? "kinetic-slam") as SkillId;
+    lastShot = skill;
+    scenes.push({ skill, text: words.toUpperCase(), duration: SHOT, transition: cut(mood.transitions) });
+    if (i < pairs - 1) scenes.push({ skill: "intertitle", text: beats[i % beats.length], duration: CARD, transition: "cut" });
+  }
+  const titleFx = mood.title.filter((x) => x !== lastShot);
+  scenes.push({ skill: pick(titleFx.length ? titleFx : mood.title) as SkillId, text: title, subtext: tagline, duration: TITLE, transition: cut(mood.transitions) });
+  scenes.push({ skill: "billing-block", text: title, items: credits, subtext: release, duration: END, transition: "cut" });
+  const palette = req.palette && req.palette !== "auto" ? req.palette : mood.palette;
+  return beatSync(sanitizePlan({ title, palette, font: mood.font, aspect: req.aspect, bpm: mood.bpm, seed, scenes, style: "trailer", trailerStyle: look.id }));
+}
 
 /** The closing call that fits what the trailer is for (a channel, a film, a launch, a collection). */
 function trailerCall(lower: string, lines: { outro: string[] }, pick: <T>(arr: T[]) => T, year?: string) {
@@ -296,6 +403,7 @@ export function isSaasPrompt(prompt: string) {
   const product = /\b(saas|apps?|platforms?|software|startups?|products?|dashboards?|b2b|apis?|crm|tools?|workspaces?|launch video|explainer|demo|systems?|teams|assistants?|automations?|analytics)\b/.test(l) ||
     Math.max(...CONCEPTS.map((c) => (l.match(c.keywords) ?? []).length)) >= 2;
   const outright = /\b(saas|product launch|launch video|explainer|b2b)\b/.test(l);
+  if (FILM_CUE.test(l) && !outright) return false;
   return product && (outright || !/\b(epic|trailer|cinematic|game|gaming|movie|film|hype|festival|documentary)\b/.test(l));
 }
 
@@ -548,7 +656,7 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
   const numbers = stats(prompt);
   // Drop phrases that only describe the video's style ("retro 80s synthwave", "hype gaming channel").
   const STYLE =
-    /^(hype|hyped|channel|documentary|opener|opening|playful|colorful|colourful|dark|bright|energetic|dramatic|dynamic|bold|sleek|clean|minimal|minimalist|vibrant|glowing|futuristic|aesthetic|themed|theme|looking|style|80s|90s|neon|retro|cyberpunk|synthwave|luxury|premium|gaming|sci-fi|scifi|gold|golden|silver|chrome|toxic|green|red|blue|purple|pink|orange|black|white|energy|vibe|vibes|glow|glitch|gritty|moody|elegant|cinematic|epic)$/i;
+    /^(hype|hyped|channel|documentary|opener|opening|playful|colorful|colourful|dark|bright|energetic|dramatic|dynamic|bold|sleek|clean|minimal|minimalist|vibrant|glowing|futuristic|aesthetic|themed|theme|looking|style|80s|90s|neon|retro|cyberpunk|synthwave|luxury|premium|gaming|sci-fi|scifi|gold|golden|silver|chrome|toxic|green|red|blue|purple|pink|orange|black|white|energy|vibe|vibes|glow|glitch|gritty|moody|elegant|cinematic|epic|film|movie|trailer|teaser|horror|thriller|comedy|romance|romantic|drama|western|noir|mystery|animated|fantasy|feature|series|indie|blockbuster|psychological|supernatural)$/i;
   const isStyle = (w: string) => STYLE.test(w);
   const styleOnly = (p: string) => {
     const words = p.split(" ");
@@ -587,6 +695,8 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
     return lastTransition;
   };
 
+  // A film or a series: the movie trailer's own grammar.
+  if (look.movie) return movieTrailer({ prompt, look, brand, content: body, year, target, pick, req, seed, styleOnly });
   const lines = GENRE_LINES[look.id] ?? { hooks: HOOKS, beats: ["GET READY", "STAY TUNED", "A NEW CHAPTER", "WATCH THIS SPACE"], outro: OUTRO_SUBS };
   const hookText = /\b(launch|release|drop|coming)/.test(lower) && look.id !== "luxury" && look.id !== "space" ? pick(["THE WAIT IS OVER", ...lines.hooks]) : pick(lines.hooks);
   scenes.push({ skill: pickSkill(mood.hook, null), text: hookText, duration: HOOK, transition: "cut" });

@@ -3,7 +3,7 @@ import type { Scene, VideoPlan } from "./types";
 
 /**
  * Sample films for the homepage: what IntroMaker makes for a SaaS launch, a physical product and a
- * trailer. The brands are imaginary (Lumetrik, Kelvo, VEKTORA) and the product photos are illustrations
+ * trailer. The brands are imaginary (Lumetrik, Kelvo, The Lantern Deep) and the product photos are illustrations
  * made for these samples (public/samples). Each one strings together the slides that show the
  * engine at its best for that kind of film.
  */
@@ -56,27 +56,29 @@ export const PRODUCT_SAMPLE: VideoPlan = inTemplate(
   ],
 );
 
-/** The cinematic trailer look (Future Tech): big type, particles, light and hard cuts. */
-const TRAILER_BEAT = 60 / 120;
-const trailerScene = (skill: Scene["skill"], text: string, subtext: string, beats: number, transition: Scene["transition"]): Scene => ({ skill, text, subtext, duration: beats * TRAILER_BEAT, transition });
+/** A movie trailer (Thriller genre): studio card, title cards between the shots, title, billing block. */
+const TRAILER_BEAT = 60 / 100;
+const trailerScene = (skill: Scene["skill"], text: string, beats: number, transition: Scene["transition"], extra: Partial<Scene> = {}): Scene => ({ skill, text, duration: beats * TRAILER_BEAT, transition, ...extra });
 
 export const TRAILER_SAMPLE: VideoPlan = {
-  title: "VEKTORA",
-  palette: "cosmos",
-  font: "grotesk",
+  title: "THE LANTERN DEEP",
+  palette: "steel",
+  font: "jost",
   aspect: "16:9",
-  bpm: 120,
+  bpm: 100,
   seed: 2026,
   style: "trailer",
-  trailerStyle: "tech",
-  brand: { name: "VEKTORA", images: [], videos: [] },
+  trailerStyle: "film-thriller",
+  brand: { name: "IntroMaker Pictures", images: [], videos: [] },
   scenes: [
-    trailerScene("hyperspace", "INTRODUCING", "A new kind of copilot", 7, "cut"),
-    trailerScene("kinetic-slam", "CODE FASTER", "Write, review, ship", 6, "whip"),
-    trailerScene("glitch-reveal", "SYSTEM ONLINE", "Reviews in seconds", 6, "glitch"),
-    trailerScene("orbit-rings", "EVERY LANGUAGE", "One assistant", 7, "dolly"),
-    trailerScene("particle-assemble", "VEKTORA", "Your AI copilot", 8, "leak"),
-    trailerScene("god-rays", "COMING SOON", "Join the waitlist", 8, "flash"),
+    trailerScene("studio-ident", "IntroMaker Pictures", 6, "cut", { subtext: "presents" }),
+    trailerScene("intertitle", "This winter", 5, "cut"),
+    trailerScene("split-wipe", "A lighthouse goes dark", 5, "shutter"),
+    trailerScene("intertitle", "Its keeper is gone", 5, "cut"),
+    trailerScene("glitch-reveal", "A storm is coming", 5, "flash"),
+    trailerScene("intertitle", "Nothing is what it seems", 5, "cut"),
+    trailerScene("cinematic-title", "The Lantern Deep", 7, "shutter"),
+    trailerScene("billing-block", "The Lantern Deep", 9, "cut", { subtext: "Coming soon", items: ["IntroMaker Pictures presents", "A film by IntroMaker Pictures"] }),
   ],
 };
 
@@ -99,7 +101,7 @@ export const SAMPLE_FILMS = [
     id: "trailer",
     label: "Trailer",
     plan: TRAILER_SAMPLE,
-    blurb: "VEKTORA is an imaginary AI copilot. Its teaser uses the cinematic trailer style: hyperspace, slams, a glitch reveal, particles and god rays, cut on the beat.",
-    prompt: 'Cinematic launch trailer for "VEKTORA AI", an AI copilot for developers. Code suggestions, reviews, launching 2026',
+    blurb: "The Lantern Deep is an imaginary thriller. Its trailer is cut like a film's: a studio card, title cards between the shots, the title and a billing block, in widescreen.",
+    prompt: 'Thriller film "THE LANTERN DEEP" from IntroMaker Pictures: a lighthouse goes dark, its keeper is gone, a storm is coming',
   },
 ] as const;

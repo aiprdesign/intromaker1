@@ -24,7 +24,109 @@ export interface TrailerStyle {
   /** Words that suggest it (matched against the prompt or site). */
   keys?: RegExp;
   mood: Mood;
+  /** A movie-genre trailer (studio card, title cards, billing block, widescreen) rather than a brand launch. */
+  movie?: boolean;
+  /** Text its preview card shows. */
+  preview?: string;
 }
+
+const card = "intertitle" as const;
+const billing = "billing-block" as const;
+/**
+ * Movie trailers by genre: each plays the trailer's own grammar (a studio card, title cards
+ * between the shots, the title, the billing block) in its genre's palette, title type, tempo and
+ * cutting, letterboxed to widescreen.
+ */
+export const MOVIE_STYLES: TrailerStyle[] = [
+  {
+    id: "film-horror", name: "Horror", movie: true, preview: "IT KNOWS",
+    description: "Black and blood red, an unsettled serif, cards that stutter and flicker, hard cuts and glitches on a slow, heavy pulse.",
+    keys: /\b(horror|scary|haunt\w*|ghosts?|zombies?|demons?|terror|slasher|creepy|nightmares?|possess\w*|curse[ds]?)\b/,
+    mood: { palette: "crimson", font: "serif", bpm: 84, hook: [card], title: ["glitch-reveal", "cinematic-title"], body: [card, "glitch-reveal"], outro: [billing], transitions: ["cut", "glitch", "flash"] },
+  },
+  {
+    id: "film-thriller", name: "Thriller", movie: true, preview: "TRUST NO ONE",
+    description: "Cold steel blue, thin wide-set type, a slit of light under each card, shutters and cuts on a heartbeat tempo.",
+    keys: /\b(thriller|heist|spy|espionage|detectives?|conspiracy|hostage|killer|crime|assassins?|fbi|manhunt)\b/,
+    mood: { palette: "steel", font: "jost", bpm: 100, hook: [card], title: ["glitch-reveal", "cinematic-title"], body: [card, "split-wipe", "glitch-reveal"], outro: [billing], transitions: ["cut", "shutter", "flash"] },
+  },
+  {
+    id: "film-action", name: "Action", movie: true, preview: "NO RETREAT",
+    description: "Orange and teal heat, tall condensed caps that slam in on a flash, shockwaves, whips and shutters at full tempo.",
+    keys: /\b(action|explosions?|fights?|fighting|chase|mercenar\w*|martial arts|revenge|blockbuster)\b/,
+    mood: { palette: "inferno", font: "bebas", bpm: 128, hook: [card], title: ["kinetic-slam", "shockwave"], body: [card, "kinetic-slam", "split-wipe", "shockwave"], outro: [billing], transitions: ["flash", "whip", "shutter"] },
+  },
+  {
+    id: "film-scifi", name: "Sci-Fi", movie: true, preview: "BEYOND THE EDGE",
+    description: "Electric blue, wide geometric type, hyperspace, orbit rings and warp tunnels, dolly moves and light leaks.",
+    keys: /\b(sci-?fi|science fiction|aliens?|spaceships?|galax\w*|robots?|androids?|time travel|planets?|mars|dystopi\w*|cyborgs?|starship)\b/,
+    mood: { palette: "ion", font: "jost", bpm: 112, hook: [card, "hyperspace"], title: ["cinematic-title", "particle-assemble"], body: [card, "orbit-rings", "hud-scan", "warp-tunnel"], outro: [billing], transitions: ["dolly", "flash", "leak"] },
+  },
+  {
+    id: "film-fantasy", name: "Fantasy Epic", movie: true, preview: "LEGENDS RISE",
+    description: "Gold and shadow, classic movie capitals, god rays and drifting embers, slow dissolves and light leaks.",
+    keys: /\b(fantasy|dragons?|wizards?|magic\w*|kingdoms?|quests?|elves|swords?|legends?|myths?|mythical|sorcer\w*)\b/,
+    mood: { palette: "gold", font: "cinzel", bpm: 92, hook: [card, "god-rays"], title: ["god-rays", "cinematic-title"], body: [card, "god-rays", "particle-assemble"], outro: [billing], transitions: ["dissolve", "leak", "dolly"] },
+  },
+  {
+    id: "film-drama", name: "Drama", movie: true, preview: "WHAT WE KEEP",
+    description: "Muted night tones, an editorial serif, long title cards that fade up warm, slow dissolves and light leaks.",
+    keys: /\b(drama|dramatic|true story|biopic|grief|coming of age|family saga)\b/,
+    mood: { palette: "midnight", font: "playfair", bpm: 84, hook: [card], title: ["cinematic-title"], body: [card, "cinematic-title"], outro: [billing], transitions: ["dissolve", "leak", "cut"] },
+  },
+  {
+    id: "film-comedy", name: "Comedy", movie: true, preview: "WHAT COULD GO WRONG?",
+    description: "Bright colour cards that pop on a bounce, friendly rounded type, shape bursts and flips, whip pans and quick cuts.",
+    keys: /\b(comedy|comedic|funny|hilarious|rom-?com|sitcom|parody|buddy)\b/,
+    mood: { palette: "sunset", font: "manrope", bpm: 120, hook: [card], title: ["kinetic-slam", "shape-burst"], body: [card, "shape-burst", "flip-3d"], outro: [billing], transitions: ["whip", "cut", "zoom"] },
+  },
+  {
+    id: "film-romance", name: "Romance", movie: true, preview: "ONE SUMMER",
+    description: "Rose and gold light, a graceful serif, soft cards and flowing colour, long dissolves and warm light leaks.",
+    keys: /\b(romance|romantic|love story|in love|wedding|rom-?com|lovers|sweethearts?)\b/,
+    mood: { palette: "rose", font: "playfair", bpm: 86, hook: [card], title: ["cinematic-title", "liquid-gradient"], body: [card, "liquid-gradient"], outro: [billing], transitions: ["dissolve", "leak"] },
+  },
+  {
+    id: "film-noir", name: "Mystery Noir", movie: true, preview: "SOMEONE IS LYING",
+    description: "Black and white, an editorial serif, split-wipe reveals, hard cuts, shutters and smoky dissolves.",
+    keys: /\b(noir|mystery|whodunit|murder mystery|1940s|private eye)\b/,
+    mood: { palette: "mono", font: "playfair", bpm: 92, hook: [card], title: ["cinematic-title", "split-wipe"], body: [card, "split-wipe"], outro: [billing], transitions: ["cut", "dissolve", "shutter"] },
+  },
+  {
+    id: "film-doc", name: "Documentary", movie: true, preview: "A STORY OF",
+    description: "Ink-black and clean, an understated geometric type, calm title cards and light, slow dissolves.",
+    keys: /\b(documentary|docuseries|docu-?series|wildlife|nature film|true events)\b/,
+    mood: { palette: "ink", font: "jost", bpm: 90, hook: [card], title: ["cinematic-title", "god-rays"], body: [card, "orbit-rings"], outro: [billing], transitions: ["dissolve", "cut"] },
+  },
+  {
+    id: "film-family", name: "Family & Animation", movie: true, preview: "ONE WILD RIDE",
+    description: "Bright, bouncy colour cards, rounded friendly type, shape bursts and flips, zooms and whips.",
+    keys: /\b(animated|animation|family film|for kids|cartoon|all ages|fairy tale)\b/,
+    mood: { palette: "aurora", font: "manrope", bpm: 116, hook: [card], title: ["shape-burst", "flip-3d"], body: [card, "shape-burst", "flip-3d"], outro: [billing], transitions: ["zoom", "whip", "cut"] },
+  },
+  {
+    id: "film-western", name: "Western", movie: true, preview: "OUT WEST",
+    description: "Sepia dust and sunset gold, classic movie capitals, god rays over the horizon, split wipes and slow dissolves.",
+    keys: /\b(western|cowboys?|outlaws?|frontier|sheriff|gunslingers?|wild west)\b/,
+    mood: { palette: "sepia", font: "cinzel", bpm: 84, hook: [card], title: ["cinematic-title", "god-rays"], body: [card, "split-wipe"], outro: [billing], transitions: ["dissolve", "cut", "leak"] },
+  },
+];
+
+/**
+ * Detection order for ties: what a film is (a documentary, a comedy) outranks what it's about
+ * (a documentary about Mars is a documentary; a rom-com is a comedy first).
+ */
+const MOVIE_PRIORITY = ["film-doc", "film-horror", "film-comedy", "film-family", "film-romance", "film-western", "film-noir", "film-thriller", "film-fantasy", "film-scifi", "film-action", "film-drama"].map(
+  (id) => MOVIE_STYLES.find((s) => s.id === id)!,
+);
+
+/** A movie-genre trailer style (letterboxed, with the trailer grammar). */
+export function isMovieStyle(id: string | undefined) {
+  return !!id && id.startsWith("film-");
+}
+
+/** Words that say the trailer is for a film or a series (not a product or a brand). */
+export const FILM_CUE = /\b(film|movie|feature film|short film|documentary|docuseries|series|episode|season|cinema|horror|thriller|comedy|rom-?com|romance|drama|western|noir|animated feature|fantasy epic|epic fantasy|tv show|web series|anime)\b/i;
 
 export const TRAILER_STYLES: TrailerStyle[] = [
   {
@@ -61,7 +163,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
   },
   {
     id: "action",
-    name: "Action Blast",
+    name: "High Energy",
     description: "Shockwaves, slamming type and shattering glass in fiery orange, whips and flashes at 140 bpm. Sport, fitness, cars and anything fast.",
     keys: /\b(fire|action|sport|fight|power|rage|beast|war|battle|gym|fitness|race|car|speed)/,
     mood: {
@@ -220,14 +322,20 @@ export const TRAILER_STYLES: TrailerStyle[] = [
   },
 ];
 
-export const TRAILER_STYLE_MAP = Object.fromEntries(TRAILER_STYLES.map((t) => [t.id, t])) as Record<string, TrailerStyle>;
+/** Brand and launch trailers (products, channels, events), apart from the movie genres. */
+export const BRAND_STYLES = TRAILER_STYLES;
+export const ALL_TRAILER_STYLES: TrailerStyle[] = [...MOVIE_STYLES, ...TRAILER_STYLES];
+export const TRAILER_STYLE_MAP = Object.fromEntries(ALL_TRAILER_STYLES.map((t) => [t.id, t])) as Record<string, TrailerStyle>;
 export const DEFAULT_TRAILER_STYLE = "hype";
 
 /** The style whose keywords the text hits most (earlier styles win ties), else the fallback. */
 export function detectTrailerStyle(text: string, fallback = DEFAULT_TRAILER_STYLE): TrailerStyle {
-  let best = TRAILER_STYLE_MAP[fallback] ?? TRAILER_STYLE_MAP[DEFAULT_TRAILER_STYLE];
+  // A film or a series gets a movie-genre trailer (drama when no genre is named); anything else a
+  // brand style.
+  const film = FILM_CUE.test(text);
+  let best = film ? TRAILER_STYLE_MAP["film-drama"] : TRAILER_STYLE_MAP[fallback] ?? TRAILER_STYLE_MAP[DEFAULT_TRAILER_STYLE];
   let hits = 0;
-  for (const s of TRAILER_STYLES) {
+  for (const s of film ? MOVIE_PRIORITY : TRAILER_STYLES) {
       if (!s.keys) continue;
       const n = text.match(new RegExp(s.keys.source, "g"))?.length ?? 0;
       if (n > hits) {
@@ -239,7 +347,7 @@ export function detectTrailerStyle(text: string, fallback = DEFAULT_TRAILER_STYL
 }
 
 /** Every effect some trailer style draws on: scenes using anything else (logo, photos, stats) keep it. */
-const TRAILER_FX = new Set<SkillId>(TRAILER_STYLES.flatMap((s) => [...s.mood.hook, ...s.mood.title, ...s.mood.body, ...s.mood.outro]));
+const TRAILER_FX = new Set<SkillId>(ALL_TRAILER_STYLES.flatMap((s) => [...s.mood.hook, ...s.mood.title, ...s.mood.body, ...s.mood.outro]));
 
 /**
  * Restyle a trailer film instantly: palette, type, tempo, transitions, and the effect each scene

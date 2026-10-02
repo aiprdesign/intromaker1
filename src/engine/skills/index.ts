@@ -6,6 +6,7 @@ import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
 import { gallerySkills } from "./gallery";
 import { mediaSkills } from "./media";
+import { movieSkills } from "./movie";
 import { productSkills } from "./product";
 import { momentSkills } from "./moments";
 import { slideSkills } from "./slides";
@@ -44,6 +45,7 @@ export const SKILLS: Skill[] = [
   signatureSkills[2],
   signatureSkills[3],
   ...mediaSkills,
+  ...movieSkills,
 ];
 
 export const SKILL_MAP = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Record<SkillId, Skill>;
@@ -56,6 +58,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Slides", skills: slideSkills },
   { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
+  { name: "Movie trailer", skills: movieSkills },
   { name: "Cinematic", skills: [...signatureSkills, ...energySkills, ...worldSkills] },
 ];
 

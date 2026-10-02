@@ -12,7 +12,7 @@ type Props =
   | { plan: VideoPlan; scene?: undefined; long?: number; fps?: number; className?: string }
   | {
       scene: Scene;
-      plan: Pick<VideoPlan, "palette" | "font" | "seed"> & Partial<Pick<VideoPlan, "style" | "look" | "bpm" | "brand" | "product" | "title">>;
+      plan: Pick<VideoPlan, "palette" | "font" | "seed"> & Partial<Pick<VideoPlan, "style" | "look" | "bpm" | "brand" | "product" | "title" | "trailerStyle">>;
       long?: number;
       fps?: number;
       className?: string;
