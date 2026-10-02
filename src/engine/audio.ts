@@ -14,16 +14,108 @@ const PROGRESSION = [
 const BASS = [45, 41, 36, 43];
 const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 
-/** Output ceiling: identity up to 0.89 (-1 dBFS), then a soft knee that never reaches 1. */
+/**
+ * Output ceiling: identity up to 0.8 (-2 dBFS), then a soft knee that never passes 0.89
+ * (-1 dBFS), so the AAC/Opus encoder has true-peak headroom and nothing clips after encoding.
+ */
 function ceilingCurve() {
   const n = 4096;
   const curve = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const x = (i * 2) / (n - 1) - 1;
     const a = Math.abs(x);
-    curve[i] = Math.sign(x) * (a < 0.89 ? a : 0.89 + 0.09 * Math.tanh((a - 0.89) / 0.09));
+    curve[i] = Math.sign(x) * (a < 0.8 ? a : 0.8 + 0.09 * Math.tanh((a - 0.8) / 0.09));
   }
   return curve;
+}
+
+/** Deterministic noise (the same score every render), -1..1. */
+function noiseGen(seed: number) {
+  let s = seed >>> 0;
+  return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296) * 2 - 1;
+}
+
+/**
+ * The metallic ring of a drum-machine hi-hat, synthesised once per context: six band-limited
+ * square waves at inharmonic pitches, band-passed around 10 kHz, with an exponential decay.
+ * Each hit then replays this short sample instead of running six oscillators.
+ */
+function metalHat(c: BaseAudioContext, decay: number) {
+  const sr = c.sampleRate;
+  const len = Math.floor(sr * (decay + 0.02));
+  const buf = c.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  const nyq = sr / 2 - 1000;
+  for (const f0 of [205.3, 304.4, 369.6, 522.7, 540, 800].map((f) => f * 1.6)) {
+    // Odd harmonics up to just under Nyquist: a square wave without aliasing.
+    for (let k = 1; k * f0 < nyq; k += 2) {
+      const w = (2 * Math.PI * k * f0) / sr;
+      const amp = 1 / k;
+      for (let i = 0; i < len; i++) d[i] += Math.sin(w * i) * amp;
+    }
+  }
+  // Band-pass at 10 kHz (RBJ biquad, Q 0.8), then a 7 kHz high-pass, then the decay envelope.
+  const biquad = (type: "bp" | "hp", f: number, q: number) => {
+    const w0 = (2 * Math.PI * f) / sr;
+    const alpha = Math.sin(w0) / (2 * q);
+    const cos = Math.cos(w0);
+    const [b0, b1, b2] = type === "bp" ? [alpha, 0, -alpha] : [(1 + cos) / 2, -(1 + cos), (1 + cos) / 2];
+    const [a0, a1, a2] = [1 + alpha, -2 * cos, 1 - alpha];
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < len; i++) {
+      const x = d[i];
+      const y = (b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+      x2 = x1;
+      x1 = x;
+      y2 = y1;
+      y1 = y;
+      d[i] = y;
+    }
+  };
+  biquad("bp", 10000, 0.8);
+  biquad("hp", 7000, 0.707);
+  let peak = 0;
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    d[i] *= Math.min(1, t / 0.0015) * Math.exp((-6.9 * t) / decay);
+    peak = Math.max(peak, Math.abs(d[i]));
+  }
+  for (let i = 0; i < len; i++) d[i] /= peak || 1;
+  return buf;
+}
+
+/**
+ * A stereo concert-hall impulse response: a short pre-delay, early reflections off the nearer
+ * walls (different on each side), then a dense diffuse tail that fades in smoothly and loses its
+ * highs faster than its lows, as a real room does. Left and right are decorrelated, so the
+ * reverb opens the mix out instead of sitting in the middle.
+ */
+function hallImpulse(c: BaseAudioContext, seconds = 2.6, preDelay = 0.02) {
+  const sr = c.sampleRate;
+  const len = Math.floor(sr * seconds);
+  const ir = c.createBuffer(2, len, sr);
+  const pre = Math.floor(sr * preDelay);
+  const rt60 = seconds * 0.82;
+  const taps = [0.006, 0.0105, 0.0155, 0.0215, 0.029, 0.0375, 0.047, 0.059, 0.072];
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    const rnd = noiseGen(ch ? 0x9e3779b9 : 0x85ebca6b);
+    taps.forEach((tt, k) => {
+      const i = pre + Math.floor(sr * tt * (ch ? 1.11 : 0.93));
+      if (i < len) d[i] += (k % 2 ? -1 : 1) * 0.16 * Math.pow(0.8, k);
+    });
+    let lp = 0;
+    for (let i = pre; i < len; i++) {
+      const tt = (i - pre) / sr;
+      const env = Math.exp((-6.9 * tt) / rt60) * Math.min(1, tt / 0.03);
+      // Air absorption: the tail darkens from ~10 kHz to ~1.5 kHz as it decays.
+      const fc = 1500 + 8500 * Math.exp(-tt / 0.5);
+      const a = 1 - Math.exp((-2 * Math.PI * fc) / sr);
+      lp += a * (rnd() - lp);
+      d[i] += lp * env;
+    }
+  }
+  return ir;
 }
 
 /** tanh soft-clip transfer curve (warmth and glue on the drum bus). */
@@ -52,6 +144,8 @@ export class Soundtrack {
   readonly stream: MediaStreamAudioDestinationNode | null;
   private nodes: AudioScheduledSourceNode[] = [];
   private noise: AudioBuffer;
+  /** Metallic hi-hat rings (closed, open), synthesised once. */
+  private metal: [AudioBuffer, AudioBuffer] | null = null;
   private reverb: ConvolverNode;
   private reverbSend: GainNode;
   /** Pads and bass route through here so kicks can duck them. */
@@ -88,7 +182,8 @@ export class Soundtrack {
     comp.attack.value = 0.008;
     comp.release.value = 0.2;
     const makeup = c.createGain();
-    makeup.gain.value = 2.4;
+    // Mastered to about -13 dB RMS: loud enough for the web, with room for transients.
+    makeup.gain.value = 1.85;
     const limiter = c.createDynamicsCompressor();
     limiter.threshold.value = -2;
     limiter.knee.value = 0;
@@ -98,7 +193,17 @@ export class Soundtrack {
     // Final safety stage: transparent below -1 dBFS, soft knee above, never clips.
     const safety = c.createWaveShaper();
     safety.curve = ceilingCurve();
-    this.out.connect(comp).connect(makeup).connect(limiter).connect(safety);
+    // Clean-up: a 24 dB/oct high-pass at 28 Hz takes out sub-sonic rumble and DC that eat
+    // headroom (and make small speakers flap) without touching the kick and bass.
+    const hp1 = c.createBiquadFilter();
+    hp1.type = "highpass";
+    hp1.frequency.value = 28;
+    hp1.Q.value = 0.54;
+    const hp2 = c.createBiquadFilter();
+    hp2.type = "highpass";
+    hp2.frequency.value = 28;
+    hp2.Q.value = 1.31;
+    this.out.connect(hp1).connect(hp2).connect(comp).connect(makeup).connect(limiter).connect(safety);
     safety.connect(c.destination);
     this.stream = c instanceof AudioContext ? c.createMediaStreamDestination() : null;
     if (this.stream) safety.connect(this.stream);
@@ -108,18 +213,21 @@ export class Soundtrack {
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
 
-    // Generated hall impulse response.
+    // Generated concert-hall impulse response; the return is EQ'd like a mix engineer would
+    // (no mud under 220 Hz, no fizz over 9 kHz), so the space is lush without clouding the mix.
     this.reverb = c.createConvolver();
-    const irLen = Math.floor(c.sampleRate * 2.8);
-    const ir = c.createBuffer(2, irLen, c.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const d = ir.getChannelData(ch);
-      for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3.2);
-    }
-    this.reverb.buffer = ir;
+    this.reverb.buffer = hallImpulse(c);
     this.reverbSend = c.createGain();
     this.reverbSend.gain.value = 0.35;
-    this.reverbSend.connect(this.reverb).connect(this.out);
+    const revHp = c.createBiquadFilter();
+    revHp.type = "highpass";
+    revHp.frequency.value = 220;
+    revHp.Q.value = 0.6;
+    const revLp = c.createBiquadFilter();
+    revLp.type = "lowpass";
+    revLp.frequency.value = 9000;
+    revLp.Q.value = 0.6;
+    this.reverbSend.connect(this.reverb).connect(revHp).connect(revLp).connect(this.out);
 
     this.musicFilter = c.createBiquadFilter();
     this.musicFilter.type = "lowpass";
@@ -132,6 +240,29 @@ export class Soundtrack {
     air.gain.value = 3;
     this.musicBus = c.createGain();
     this.musicFilter.connect(air).connect(this.musicBus).connect(this.out);
+    // Mid/side widener: extra side signal above 200 Hz (bass and kick stay centred, and the mix
+    // still sums cleanly to mono, since the added side cancels out there).
+    const split = c.createChannelSplitter(2);
+    this.musicBus.connect(split);
+    const side = c.createGain();
+    const halfL = c.createGain();
+    halfL.gain.value = 0.5;
+    const halfR = c.createGain();
+    halfR.gain.value = -0.5;
+    split.connect(halfL, 0).connect(side);
+    split.connect(halfR, 1).connect(side);
+    const sideHp = c.createBiquadFilter();
+    sideHp.type = "highpass";
+    sideHp.frequency.value = 200;
+    const width = c.createGain();
+    width.gain.value = 0.6;
+    const invert = c.createGain();
+    invert.gain.value = -1;
+    const merge = c.createChannelMerger(2);
+    side.connect(sideHp).connect(width);
+    width.connect(merge, 0, 0);
+    width.connect(invert).connect(merge, 0, 1);
+    merge.connect(this.out);
 
     this.duck = c.createGain();
     this.duck.connect(this.musicFilter);
@@ -351,17 +482,24 @@ export class Soundtrack {
     lp.frequency.linearRampToValueAtTime(1400, t + dur);
     lp.Q.value = 2;
     lp.connect(g).connect(this.duck);
-    for (const note of chord) {
-      for (const det of [-7, 7]) {
+    // Each note is a pair of detuned saws placed left and right: a wide, chorused pad.
+    const sides = [-0.55, 0.55].map((v) => {
+      const p = c.createStereoPanner();
+      p.pan.value = v;
+      p.connect(lp);
+      return p;
+    });
+    chord.forEach((note, n) => {
+      [-7, 7].forEach((det, j) => {
         const o = this.track(c.createOscillator());
         o.type = "sawtooth";
         o.frequency.value = hz(note);
-        o.detune.value = det;
-        o.connect(lp);
-        o.start(t);
+        o.detune.value = det + (n % 2 ? 2 : -2);
+        o.connect(sides[j]);
+        o.start(t + j * 0.0013 + n * 0.0007);
         o.stop(t + dur + fadeOut + 0.05);
-      }
-    }
+      });
+    });
   }
 
   private bass(t: number, dur: number, note: number) {
@@ -416,6 +554,10 @@ export class Soundtrack {
     n.stop(t + 0.03);
   }
 
+  /**
+   * Hi-hat: filtered noise for the sizzle plus the metallic ring of a real hat, made the way the
+   * classic drum machines did it (six square waves at inharmonic pitches, band-passed high).
+   */
   private hat(t: number, vel: number, open = false) {
     const c = this.ctx;
     const src = this.noiseSource();
@@ -425,13 +567,20 @@ export class Soundtrack {
     const g = c.createGain();
     const d = open ? 0.24 : 0.04;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vel, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(vel * 0.75, t + 0.002);
     g.gain.exponentialRampToValueAtTime(0.0001, t + d);
     const pan = c.createStereoPanner();
     pan.pan.value = 0.22;
     src.connect(hp).connect(g).connect(pan).connect(this.drums);
     src.start(t, Math.random());
     src.stop(t + d + 0.02);
+    const mg = c.createGain();
+    mg.gain.value = vel * 0.3;
+    this.metal ??= [metalHat(c, 0.05), metalHat(c, 0.3)];
+    const ring = this.track(c.createBufferSource());
+    ring.buffer = this.metal[open ? 1 : 0];
+    ring.connect(mg).connect(pan);
+    ring.start(t);
   }
 
   private impact(t: number, vel: number) {
@@ -477,18 +626,26 @@ export class Soundtrack {
     lp.connect(g);
     g.connect(this.out);
     g.connect(this.reverbSend);
-    for (const [note, det] of [
-      [33, -12],
-      [33, 12],
-      [45, -8],
-      [45, 8],
-      [52, 0],
+    // The low octave stays centred (it carries the weight); the detuned upper voices sit left
+    // and right, so the hit fills the width of the screen like a cinema brass section.
+    for (const [note, det, side] of [
+      [33, -12, 0],
+      [33, 12, 0],
+      [45, -8, -0.6],
+      [45, 8, 0.6],
+      [52, 0, 0],
+      [57, -6, -0.8],
+      [57, 6, 0.8],
     ]) {
       const o = this.track(c.createOscillator());
       o.type = "sawtooth";
       o.frequency.value = hz(note);
       o.detune.value = det;
-      o.connect(lp);
+      const p = c.createStereoPanner();
+      p.pan.value = side;
+      const v = c.createGain();
+      v.gain.value = note >= 57 ? 0.45 : 1;
+      o.connect(v).connect(p).connect(lp);
       o.start(t);
       o.stop(t + dur + 0.05);
     }
@@ -755,23 +912,29 @@ export class Soundtrack {
     lp.connect(g);
     g.connect(this.duck);
     g.connect(this.reverbSend);
-    const pans = [-0.6, 0, 0.6].map((v) => {
+    // Five saws per note, detuned and spread across the stereo field (the classic supersaw);
+    // their starts are staggered by a fraction of a millisecond so the phases don't line up
+    // into a flanged attack. The trim keeps the level where the three-voice version sat.
+    const DET = [-24, -11, 0, 11, 24];
+    const pans = [-0.85, -0.42, 0, 0.42, 0.85].map((v) => {
       const p = c.createStereoPanner();
       p.pan.value = v;
-      p.connect(lp);
-      return p;
+      const trim = c.createGain();
+      trim.gain.value = 0.78;
+      trim.connect(p).connect(lp);
+      return trim;
     });
-    for (const note of chord) {
-      [-14, 0, 14].forEach((det, j) => {
+    chord.forEach((note, n) => {
+      DET.forEach((det, j) => {
         const o = this.track(c.createOscillator());
         o.type = "sawtooth";
         o.frequency.value = hz(note);
         o.detune.value = det;
         o.connect(pans[j]);
-        o.start(t);
+        o.start(t + ((j * 7 + n * 3) % 11) * 0.00021);
         o.stop(t + dur + release + 0.03);
       });
-    }
+    });
   }
 
   /** Short filtered chord stab that echoes across the stereo delay. */

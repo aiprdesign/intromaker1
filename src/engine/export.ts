@@ -80,7 +80,8 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });
   const video = new CanvasSource(canvas, { codec: videoCodec, quality: QUALITY_HIGH, keyFrameInterval: 1 });
   output.addVideoTrack(video);
-  const audio = audioCodec ? new AudioBufferSource({ codec: audioCodec, quality: QUALITY_HIGH }) : null;
+  // 256 kbps stereo: transparent for AAC and Opus (the encoders' "high" preset is lower).
+  const audio = audioCodec ? new AudioBufferSource({ codec: audioCodec, bitrate: 256_000 }) : null;
   if (audio) output.addAudioTrack(audio);
 
   mediaState.exporting = true;
@@ -142,6 +143,7 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
   const recorder = new MediaRecorder(stream, {
     mimeType: mime,
     videoBitsPerSecond: opts.long >= 1900 ? 16_000_000 : 8_000_000,
+    audioBitsPerSecond: 256_000,
   });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
