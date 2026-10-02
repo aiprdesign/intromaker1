@@ -1131,7 +1131,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const tagline = sentenceCopy(site.tagline, 10) || shortenCopy(site.tagline, 9) || sentenceCopy(site.description, 12) || shortenCopy(site.description, 9) || `Meet ${site.name}`;
   // Best headlines first; each keeps its feature description from the page.
   const rewritten = REWRITTEN.get(site);
-  const allHeads = site.headlines.map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title) - (rewritten?.has(title) ? 1.2 : 0), i }));
+  // Section titles that only announce a part of the page (pricing, FAQ, testimonials, the closing
+  // banner) are never features: "Simple pricing" pinned to a chart reads as a random label.
+  const pageTitle = /\b(pricing|prices|plans?\b(?! (your|the|every|ahead))|questions|faq|frequently asked|testimonials?|what (our )?(customers|users|people) say|loved by|trusted by|our customers|get started|start (your |a )?(free )?trial|sign up|contact( us)?|ready to|join (us|thousands)|blog|news|careers|about us|footer|newsletter)\b/i;
+  const allHeads = site.headlines
+    .map((title, i) => ({ title, desc: site.features[i] ?? "", score: scoreHeadline(title) - (rewritten?.has(title) ? 1.2 : 0), i }))
+    .filter((f, _, all) => !pageTitle.test(f.title) || all.filter((g) => !pageTitle.test(g.title)).length < 2);
   // When the page's features come with descriptions (feature cards), headings without one are
   // section titles ("Start understanding your users today"), not features.
   const described = allHeads.filter((f) => f.desc.trim().split(/\s+/).length >= 4);

@@ -294,13 +294,36 @@ function uiTour(sc: SkillContext) {
     const ox = fx0 + (fw - iw * cs) * 0.5;
     const oy = fy0 + bar + (fh - ih * cs) * 0.2;
     const segs = segmentShot(media);
+    const onScreen = segs.map((g) => ({ x: ox + g.x * cs, y: oy + g.y * cs, w: g.w * cs, h: g.h * cs }));
     hot.forEach((p, i) => {
       const ix = (p.x - ox) / cs;
       const iy = (p.y - oy) / cs;
       const fit = segs
         .filter((g) => ix >= g.x && ix <= g.x + g.w && iy >= g.y && iy <= g.y + g.h && g.w * g.h >= iw * ih * 0.015 && g.w * g.h <= iw * ih * 0.4)
         .sort((a, b) => a.w * a.h - b.w * b.h)[0];
-      if (fit) comps[i] = { x: ox + fit.x * cs, y: oy + fit.y * cs, w: fit.w * cs, h: fit.h * cs };
+      if (!fit) return;
+      // The close-up takes in whole blocks only: any block the zoomed view would slice through
+      // (a card's edge, a chart, a headline row) joins the framing, so nothing is cut.
+      let c = { x: ox + fit.x * cs, y: oy + fit.y * cs, w: fit.w * cs, h: fit.h * cs };
+      for (let pass = 0; pass < 3; pass++) {
+        const zz = clamp(Math.min((ww * 0.8) / c.w, ((wh - bar) * 0.8) / c.h), 1.1, 1.9);
+        const vw = ww / zz;
+        const vh = (wh - bar) / zz;
+        const vx = c.x + c.w / 2 - vw / 2;
+        const vy = c.y + c.h / 2 - vh / 2;
+        const cut = onScreen.filter((g) => {
+          const ix2 = Math.min(g.x + g.w, vx + vw) - Math.max(g.x, vx);
+          const iy2 = Math.min(g.y + g.h, vy + vh) - Math.max(g.y, vy);
+          return ix2 > 0 && iy2 > 0 && !(ix2 >= g.w - 1 && iy2 >= g.h - 1) && (ix2 * iy2) / (g.w * g.h) > 0.08;
+        });
+        if (!cut.length) break;
+        const x0 = Math.min(c.x, ...cut.map((g) => g.x));
+        const y0 = Math.min(c.y, ...cut.map((g) => g.y));
+        const x1 = Math.max(c.x + c.w, ...cut.map((g) => g.x + g.w));
+        const y1 = Math.max(c.y + c.h, ...cut.map((g) => g.y + g.h));
+        c = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      }
+      comps[i] = c;
     });
   }
 
@@ -314,7 +337,7 @@ function uiTour(sc: SkillContext) {
   const stops = hot.map((p, i) => {
     const c = comps[i];
     if (!c) return { x: p.x, y: p.y, z: 1.5 };
-    return { x: c.x + c.w / 2, y: c.y + c.h / 2, z: clamp(Math.min((ww * 0.75) / c.w, ((wh - bar) * 0.75) / c.h), 1.15, Z + 0.35) };
+    return { x: c.x + c.w / 2, y: c.y + c.h / 2, z: clamp(Math.min((ww * 0.8) / c.w, ((wh - bar) * 0.8) / c.h), 1.1, 1.9) };
   });
   let focus = { x: lerp(center.x, stops[0].x, kA), y: lerp(center.y, stops[0].y, kA) };
   focus = { x: lerp(focus.x, stops[1].x, kB), y: lerp(focus.y, stops[1].y, kB) };
@@ -1576,7 +1599,11 @@ function sectionStops(d: number, n: number) {
 function stopSections(secs: { y: number; h: number }[], iw: number, d: number) {
   const K = Math.max(1, Math.min(3, Math.floor((d - 1.4) / 1.5)));
   const below = secs.map((x, i) => ({ ...x, i })).filter((x, i) => i > 0 && x.h >= iw * 0.12);
-  return below.slice(0, K);
+  // Sections that read well lifted out whole come first (a section taller than the page is wide
+  // would shrink to a sliver); in page order.
+  const good = below.filter((x) => x.h <= iw * 0.95);
+  const rest = below.filter((x) => x.h > iw * 0.95).sort((a, b) => a.h - b.h);
+  return [...good, ...rest].slice(0, K).sort((a, b) => a.y - b.y);
 }
 
 /**
@@ -1670,21 +1697,27 @@ function siteScroll(sc: SkillContext) {
   }
   ctx.restore();
   borderBeam(sc, x0, top, ww, wh, t * 0.3, { r: 16 * u, alpha: 0.7 * (1 - clamp(lift)) });
-  // The lifted section: its own crop of the screenshot (the part in view), as a bordered card.
+  // The lifted section: the whole section, top to bottom, as a bordered card (never just the
+  // slice that happens to be in the window, which cuts it off mid-content).
   if (cur >= 0 && lift > 0.001) {
     const sec = stops[cur];
-    const cropY = Math.max(sec.y, sy);
-    const cropH = Math.max(1, Math.min(sec.y + sec.h, sy + viewH) - cropY);
+    const cropY = sec.y;
+    const cropH = Math.max(1, Math.min(sec.h, ih - sec.y));
+    const inView = Math.max(1, Math.min(sec.y + sec.h, sy + viewH) - Math.max(sec.y, sy));
     const rx = vx;
-    const ry = vy + (cropY - sy) * s;
+    const ry = vy + (Math.max(sec.y, sy) - sy) * s;
     const rw = vw;
     const rh = cropH * s;
-    // Lifted forward, but always inside the frame (between the headline and the bottom edge).
+    // Lifted forward, but always inside the frame (between the headline and the bottom edge):
+    // a tall section is shown whole at a smaller size rather than cropped.
     const room = h - 18 * u - (top - 8 * u);
-    // Short sections grow a little; one that fills the window eases back so its border shows.
-    const grow = lerp(1, Math.min(1.1, (room * 0.84) / rh), clamp(lift));
+    const fits = Math.min(1.1, (room * 0.84) / rh, (w * 0.9) / rw);
+    // It rises from the part of the window it was in, so the lift reads as coming off the page.
+    const from = clamp((inView * s) / rh, 0.15, 1);
+    const grow = lerp(from, fits, clamp(lift));
     const cx = rx + rw / 2;
-    let cy = lerp(ry + rh / 2, vy + vh / 2, 0.35 * clamp(lift)) - 10 * u * lift;
+    // From the middle of its visible slice in the window to the middle of the free space.
+    let cy = lerp(ry + (inView * s) / 2, (top - 8 * u + h - 18 * u) / 2, clamp(lift)) - 10 * u * lift;
     cy = Math.min(cy, h - 18 * u - (rh * grow) / 2);
     cy = Math.max(cy, top - 8 * u + (rh * grow) / 2);
     const r = 14 * u;

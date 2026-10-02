@@ -12,7 +12,7 @@
  */
 import { exitT } from "../fx";
 import { clamp, ease, lerp, range, rgba, TAU } from "../math";
-import { getImage, getMedia, segmentShot } from "../media";
+import { getImage, getMedia, segmentShot, type Region } from "../media";
 import { glassCard, saasBackground, spring } from "../saasfx";
 import { subFont } from "../text";
 import type { Brand, Scene, SfxCue, Skill, SkillContext, SitePart } from "../types";
@@ -145,13 +145,44 @@ function layout(sc: SkillContext, base: HTMLImageElement, aspect: number) {
   return { frame, pieces, camera: true };
 }
 
-/** A view of the page centred on `b`, at the frame's aspect, zoomed at most 2.2×. */
-function viewOn(b: Box, frame: { x: number; y: number; w: number; h: number }, W: number, H: number) {
+/**
+ * A view of the page centred on `b`, at the frame's aspect, zoomed at most 1.8×. It never cuts
+ * through the page's blocks: any block the view would slice (a headline row, a card, a picture)
+ * is taken in whole, widening the view (less zoom) until nothing is cut, so a close-up always
+ * shows complete pieces of the page rather than a random crop.
+ */
+function viewOn(b: Box, frame: { x: number; y: number; w: number; h: number }, W: number, H: number, blocks: Region[] = []) {
   const aspect = frame.w / frame.h;
-  let w = Math.max(b.w * 1.35, (b.h * 1.35) * aspect, frame.w / 2.2);
-  w = Math.min(w, frame.w);
-  const h = w / aspect;
-  return { x: clamp(b.x + b.w / 2 - w / 2, 0, W - w), y: clamp(b.y + b.h / 2 - h / 2, 0, H - h), w, h };
+  const fit = (x0: number, y0: number, x1: number, y1: number) => {
+    let w = Math.max((x1 - x0) * 1.12, (y1 - y0) * 1.12 * aspect, frame.w / 1.8);
+    w = Math.min(w, frame.w);
+    const h = w / aspect;
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+    return { x: clamp(cx - w / 2, frame.x, frame.x + frame.w - w), y: clamp(cy - h / 2, frame.y, Math.max(frame.y, Math.min(H, frame.y + frame.h) - h)), w, h };
+  };
+  let box = { x0: b.x, y0: b.y, x1: b.x + b.w, y1: b.y + b.h };
+  let v = fit(box.x0, box.y0, box.x1, box.y1);
+  for (let pass = 0; pass < 4; pass++) {
+    // Blocks the view only partly shows (but noticeably: more than a sliver of them is in it).
+    const cut = blocks.filter((g) => {
+      const ix = Math.min(g.x + g.w, v.x + v.w) - Math.max(g.x, v.x);
+      const iy = Math.min(g.y + g.h, v.y + v.h) - Math.max(g.y, v.y);
+      if (ix <= 0 || iy <= 0) return false;
+      const whole = ix >= g.w - 2 && iy >= g.h - 2;
+      return !whole && (ix * iy) / (g.w * g.h) > 0.08;
+    });
+    if (!cut.length) break;
+    box = {
+      x0: Math.min(box.x0, ...cut.map((g) => g.x)),
+      y0: Math.min(box.y0, ...cut.map((g) => g.y)),
+      x1: Math.max(box.x1, ...cut.map((g) => g.x + g.w)),
+      y1: Math.max(box.y1, ...cut.map((g) => g.y + g.h)),
+    };
+    v = fit(box.x0, box.y0, box.x1, box.y1);
+    if (v.w >= frame.w - 1) break;
+  }
+  return v;
 }
 
 /** How many close-ups the scene shows (sound design runs before images load). */
@@ -271,8 +302,9 @@ function uiAssemble(sc: SkillContext) {
     if (blur > 0.4) ctx.filter = `blur(${blur.toFixed(1)}px)`;
     let view = frame;
     if (camera) {
+      const blocks = segmentShot(base);
       shown.forEach((p, i) => {
-        const v = viewOn(p, frame, base.naturalWidth, base.naturalHeight);
+        const v = viewOn(p, frame, base.naturalWidth, base.naturalHeight, blocks);
         const m = pulled[i];
         view = { x: lerp(view.x, v.x, m), y: lerp(view.y, v.y, m), w: lerp(view.w, v.w, m), h: lerp(view.h, v.h, m) };
       });
