@@ -409,7 +409,11 @@ function carousel3D(sc: SkillContext) {
     // A tight ring, camera close: the front card fills about half the stage, its neighbours in view.
     const R = 2.2;
     const stepA = (Math.PI * 2) / n;
-    st.camera.position.set(0, 0.38, R + (portrait ? 3.4 : 1.55) + (1 - intro) * 0.8);
+    const camZ = R + (portrait ? 4.3 : 1.55) + (1 - intro) * 0.8;
+    st.camera.position.set(0, 0.38, camZ);
+    // Half the visible width at a given depth (vertical fov 30°): cards whose edge would pass the
+    // frame's side fade out, so a turning card never shows cut off.
+    const halfW = (z: number) => Math.tan((15 * Math.PI) / 180) * (camZ - z) * (gw / gh);
     st.camera.lookAt([0, 0.02, 0]);
     const edge = hex3(palette.primary);
     st.cards.forEach((c, i) => {
@@ -423,7 +427,11 @@ function carousel3D(sc: SkillContext) {
       u2.tMap.value = textureOf(r, img);
       u2.uUv.value = coverUv(img, cardW / cardH, "top");
       u2.uShade.value = 0.35 + 0.65 * Math.max(0, facing) ** 1.5;
-      u2.uAlpha.value = clamp((facing + 0.35) / 0.5) * intro;
+      const x = Math.sin(a) * R;
+      const z = Math.cos(a) * R - R;
+      const outer = Math.abs(x) + (cardW / 2) * Math.abs(Math.cos(a));
+      const inFrame = 1 - clamp((outer - halfW(z) * 0.86) / (halfW(z) * 0.12));
+      u2.uAlpha.value = clamp((facing + 0.35) / 0.5) * intro * inFrame;
       u2.uEdge.value = Math.round(pos) % n === i % n ? edge : [1, 1, 1];
     });
     r.render({ scene: st.scene, camera: st.camera });

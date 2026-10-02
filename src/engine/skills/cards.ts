@@ -94,13 +94,29 @@ function photoFan(sc: SkillContext) {
   const capRoom = items.length ? 80 * u : 0;
   const top = head ? head.ys[head.ys.length - 1] + head.size * 0.9 : g.safe.top;
   const avail = h - g.safe.bottom - capRoom - top;
-  const ch = Math.min(avail * 0.86, portrait ? (w * 0.5) / CARD_ASPECT : h * 0.58);
-  const cw = ch * CARD_ASPECT;
+  // The cards at rest that must sit wholly inside the frame (vertical shows one each side).
+  const visible = portrait ? 1 : 2;
+  const margin = g.safe.left * 0.6;
+  // The arc: a circle whose centre sits well below the cards; its size scales with the card.
+  const geom = (ch: number) => {
+    const cw = ch * CARD_ASPECT;
+    const R = ch * (portrait ? 1.9 : 1.75);
+    const stepA = (cw * (portrait ? 0.74 : 0.8)) / R;
+    return { cw, R, stepA };
+  };
+  // How far the outermost resting card reaches from the centre line (its rotated half-width included).
+  const reachOf = (ch: number) => {
+    const { cw, R, stepA } = geom(ch);
+    const th = visible * stepA * (1 - 0.06 * visible);
+    const s = 1 - 0.2 * visible;
+    return R * Math.sin(th) + s * ((cw / 2) * Math.cos(th) + (ch / 2) * Math.sin(th));
+  };
+  // Largest card for which the arc fits between the frame's edges.
+  let ch = Math.min(avail * 0.86, portrait ? (w * 0.56) / CARD_ASPECT : h * 0.58);
+  for (let i = 0; i < 30 && reachOf(ch) > w / 2 - margin; i++) ch *= 0.96;
+  const { cw, R, stepA } = geom(ch);
   const cy = top + avail * 0.5;
-  // The arc: a circle whose centre sits well below the cards.
-  const R = ch * (portrait ? 1.9 : 1.75);
   const pivotY = cy + R;
-  const stepA = (cw * (portrait ? 0.74 : 0.8)) / R;
   // Motion: a step every period, eased; continuous, so the arc always has cards on both sides.
   const P = fanPeriod(scene, sc.beat);
   const t0 = 1.1;
@@ -119,7 +135,7 @@ function photoFan(sc: SkillContext) {
   ctx.globalAlpha = open * (1 - ex);
   ctx.fillRect(0, cy - ch, w, ch * 2);
   ctx.restore();
-  const reach = portrait ? 2 : 3;
+  const reach = visible + 1;
   const slots: { rel: number; idx: number }[] = [];
   for (let j = -reach; j <= reach + 1; j++) {
     const idx = j + k;
@@ -134,7 +150,8 @@ function photoFan(sc: SkillContext) {
     const s = 1 - 0.2 * Math.min(ar, 2.6);
     const x = w / 2 + R * Math.sin(theta);
     const y = pivotY - R * Math.cos(theta) + (1 - open) * h * 0.25 + ex * h * 0.2;
-    const a = (1 - range(ar, reach - 0.2, reach + 0.6)) * clamp(open * 1.4) * (1 - ex);
+    // Cards beyond the resting set fade as they leave, so none shows cut off at the frame's edge.
+    const a = (1 - range(ar, visible + 0.02, visible + 0.7)) * clamp(open * 1.4) * (1 - ex);
     if (a <= 0.01) continue;
     ctx.save();
     ctx.globalAlpha = a;

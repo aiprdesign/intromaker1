@@ -454,9 +454,13 @@ function showreel(sc: SkillContext) {
   for (const i of order) {
     const dist = Math.abs(i - pos);
     if (dist > 2.6) continue;
-    const x = w / 2 + (i - pos) * (cw + gap) - cw / 2;
+    // Vertical frames: the next card slides only a short way in as the last fades, so neither
+    // runs off the frame's sides.
+    const x = w / 2 + (i - pos) * (cw + gap) * (portrait ? 0.22 : 1) - cw / 2;
     const s = 1 - 0.12 * Math.min(1, dist);
-    const a = (1 - 0.5 * Math.min(1, dist)) * (1 - range(dist, 1.8, 2.6)) * (1 - ex);
+    // Vertical frames show the card in focus only: neighbours fade as they slide out instead of
+    // peeking in cut off at the edges.
+    const a = (1 - 0.5 * Math.min(1, dist)) * (portrait ? 1 - range(dist, 0.2, 0.75) : 1 - range(dist, 1.8, 2.6)) * (1 - ex);
     if (a <= 0) continue;
     ctx.save();
     ctx.globalAlpha = a;
