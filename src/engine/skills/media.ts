@@ -1,5 +1,5 @@
 import { revealHit } from "../arrange";
-import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
+import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, lightSweep, noGlow, subline } from "../fx";
 import { brandGlyph, iconConstellation, imageless, saasBackground, saasFont } from "../saasfx";
 import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { fitSafeTop, tokens } from "../grid";
@@ -169,15 +169,8 @@ function logoReveal(sc: SkillContext) {
     const buf = scratch("logo", Math.ceil((lw + pad * 2) * res), Math.ceil((lh + pad * 2) * res));
     buf.ctx.setTransform(res, 0, 0, res, 0, 0);
     (asIcon ? drawAppIcon : drawLogo)(buf.ctx, logo, !!palette.light, pad, pad, lw, lh);
-    const gx = lerp(-lw * 0.6, lw * 1.6, range(t, hit + 0.3, hit + 1.2));
-    const glint = buf.ctx.createLinearGradient(gx - lw * 0.25, 0, gx + lw * 0.25, lh);
-    glint.addColorStop(0, "rgba(255,255,255,0)");
-    glint.addColorStop(0.5, "rgba(255,255,255,0.85)");
-    glint.addColorStop(1, "rgba(255,255,255,0)");
-    buf.ctx.globalCompositeOperation = "source-atop";
-    buf.ctx.fillStyle = glint;
-    buf.ctx.fillRect(0, 0, lw + pad * 2, lh + pad * 2);
-    buf.ctx.globalCompositeOperation = "source-over";
+    // One glint across the mark after it lands; it leaves fully and doesn't linger on a corner.
+    lightSweep(buf.ctx, 0, 0, lw + pad * 2, lh + pad * 2, ease.inOutCubic(range(t, hit + 0.3, hit + 1.2)), { alpha: 0.85, width: 0.2, op: "source-atop" });
     buf.ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.save();
@@ -288,13 +281,7 @@ function productShowcase(sc: SkillContext) {
   if (media) drawCover(ctx, media, x0, y0 + bar, ww, wh - bar, 1.02 + t * 0.01, 0.5, clamp(t / d) * 0.3);
   else mockUi(sc, x0, y0 + bar, ww, wh - bar);
   // Glare sweep.
-  const gx = lerp(x0 - ww * 0.5, x0 + ww * 1.5, range(t, 0.9, 2.2));
-  const glare = ctx.createLinearGradient(gx - ww * 0.15, y0, gx + ww * 0.15, y0 + wh);
-  glare.addColorStop(0, "rgba(255,255,255,0)");
-  glare.addColorStop(0.5, "rgba(255,255,255,0.16)");
-  glare.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = glare;
-  ctx.fillRect(x0, y0, ww, wh);
+  lightSweep(ctx, x0, y0, ww, wh, range(t, 0.9, 2.2), { alpha: 0.16, width: 0.15 });
   ctx.restore();
   ctx.strokeStyle = rgba(palette.text, 0.18);
   ctx.lineWidth = 1.5 * u;

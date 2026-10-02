@@ -222,7 +222,7 @@ export default function Studio() {
   };
   // Every storyboard (new takes, template switches, shared links) follows the switch.
   useEffect(() => {
-    if ((plan.glow !== false) !== glow) setPlan((p) => ({ ...p, glow: glow ? undefined : false }));
+    if ((plan.glow === true) !== glow) setPlan((p) => ({ ...p, glow: glow ? true : undefined }));
   }, [plan, glow]);
   const [bg, setBg] = useState<BgChoice>("template");
   const bgRef = useRef(bg);

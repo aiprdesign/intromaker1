@@ -404,9 +404,10 @@ export function renderScene(
   setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
   // Trailers pair their title face with a contrasting subtitle face.
   setSubFamily(pairedSubFamily(plan.font, plan.style));
-  // Glow off: halo-free type and no highlight bloom.
-  setCrispText(plan.glow === false);
-  if (plan.glow === false) opts = { ...opts, bloom: false };
+  // Glow is off unless the film turns it on: halo-free type and no highlight bloom.
+  const glowOn = plan.glow === true;
+  setCrispText(!glowOn);
+  if (!glowOn) opts = { ...opts, bloom: false };
   const d = context.extendSelf ? scene.duration + OVERLAP_EXTEND : scene.duration;
   const overlapping = !!context.prev && t < TRANSITION_LEN && OVERLAP.has(scene.transition);
   let sc: SkillContext;

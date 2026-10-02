@@ -4,7 +4,7 @@
  * reflection, a light sweep across it, and its features called out around it one by one.
  * Everything stays level: the product rises and floats straight, it never tilts.
  */
-import { exitT } from "../fx";
+import { exitT, lightSweep } from "../fx";
 import { clamp, ease, mixHex, range, rgba } from "../math";
 import { getImage } from "../media";
 import { backLight, blurInLayout, drawIcon, glassCard, iconsFor, saasBackground, sentence, spring } from "../saasfx";
@@ -597,15 +597,7 @@ function drawProduct(sc: SkillContext, cx: number, cy: number, boxW: number, box
   }
   const sweep = ((sc.t - 0.5) / 2.6) % 1.4;
   if (sweep > 0 && sweep < 1.2) {
-    const sx = -pw * 0.4 + sweep * pw * 1.6;
-    lc.globalCompositeOperation = "source-atop";
-    const gr = lc.createLinearGradient(sx - pw * 0.18, 0, sx + pw * 0.18, ph * 0.25);
-    gr.addColorStop(0, "rgba(255,255,255,0)");
-    gr.addColorStop(0.5, "rgba(255,255,255,0.32)");
-    gr.addColorStop(1, "rgba(255,255,255,0)");
-    lc.fillStyle = gr;
-    lc.fillRect(0, 0, pw, ph);
-    lc.globalCompositeOperation = "source-over";
+    lightSweep(lc, 0, 0, pw, ph, sweep / 1.2, { alpha: 0.32, width: 0.18, op: "source-atop" });
   }
   ctx.translate(cx, cy + rise + bob);
   ctx.rotate(lean);

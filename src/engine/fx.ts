@@ -252,3 +252,45 @@ export function bevel(sc: SkillContext, layout: HeadlineLayout, alpha = 0.55) {
   drawLayout(sc, layout);
   ctx.restore();
 }
+
+/**
+ * A diagonal band of light that sweeps once across a box. It starts fully off one side and ends
+ * fully off the other, and draws nothing before or after, so it never parks on a corner. `p`
+ * (0..1) is the sweep's progress; the band travels along a direction tilted `slant` radians below
+ * horizontal, `width` is its half-width as a fraction of the box's longer side.
+ */
+export function lightSweep(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  p: number,
+  opts: { alpha?: number; width?: number; slant?: number; op?: GlobalCompositeOperation; color?: string } = {},
+) {
+  if (p <= 0 || p >= 1 || w <= 0 || h <= 0) return;
+  const slant = opts.slant ?? 0.35;
+  const dx = Math.cos(slant);
+  const dy = Math.sin(slant);
+  const band = (opts.width ?? 0.18) * Math.max(w, h);
+  // Where the box's corners fall along the travel axis: the band runs from before the first to past the last.
+  const along = [
+    [x, y],
+    [x + w, y],
+    [x, y + h],
+    [x + w, y + h],
+  ].map(([px, py]) => px * dx + py * dy);
+  const lo = Math.min(...along) - band;
+  const hi = Math.max(...along) + band;
+  const c = lo + (hi - lo) * p;
+  const g = ctx.createLinearGradient((c - band) * dx, (c - band) * dy, (c + band) * dx, (c + band) * dy);
+  const col = opts.color ?? "255,255,255";
+  g.addColorStop(0, `rgba(${col},0)`);
+  g.addColorStop(0.5, `rgba(${col},${opts.alpha ?? 0.6})`);
+  g.addColorStop(1, `rgba(${col},0)`);
+  ctx.save();
+  if (opts.op) ctx.globalCompositeOperation = opts.op;
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}

@@ -305,7 +305,7 @@ export interface VideoPlan {
   concept?: string;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */
   scheme?: "60-30-10" | "vibrant";
-  /** Glow on type and the highlight bloom (default on). Off gives crisp, halo-free text. */
+  /** Glow on type and the highlight bloom. Off by default (crisp, halo-free text); true turns it on. */
   glow?: boolean;
   /** Headline text effect chosen in the studio; overrides the template's (look.text). */
   textFx?: TextFx;
