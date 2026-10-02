@@ -112,7 +112,7 @@ export type PaletteId = (typeof PALETTE_IDS)[number];
 export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid", "cube"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
-export const FONTS = ["anton", "grotesk", "inter", "serif", "mono"] as const;
+export const FONTS = ["anton", "grotesk", "inter", "serif", "mono", "cinzel", "bebas", "playfair", "manrope", "jost"] as const;
 export type FontId = (typeof FONTS)[number];
 
 export type Aspect = "16:9" | "9:16" | "1:1";

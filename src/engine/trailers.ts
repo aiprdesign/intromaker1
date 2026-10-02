@@ -34,7 +34,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(cyber|hack|matrix|glitch|security|code|dev|crypto|web3|blockchain)/,
     mood: {
       palette: "cyber",
-      font: "grotesk",
+      font: "bebas",
       bpm: 128,
       hook: ["glitch-reveal", "hyperspace", "warp-tunnel"],
       title: ["particle-assemble", "glitch-reveal", "glass-shatter"],
@@ -50,7 +50,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(ai|tech|futur|saas|app|platform|software|startup|data|cloud|robot|quantum)/,
     mood: {
       palette: "cosmos",
-      font: "grotesk",
+      font: "cinzel",
       bpm: 120,
       hook: ["hyperspace", "shockwave", "warp-tunnel"],
       title: ["particle-assemble", "orbit-rings", "god-rays", "flip-3d"],
@@ -66,7 +66,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(fire|action|sport|fight|power|rage|beast|war|battle|gym|fitness|race|car|speed)/,
     mood: {
       palette: "inferno",
-      font: "anton",
+      font: "bebas",
       bpm: 140,
       hook: ["shockwave", "hyperspace", "glass-shatter"],
       title: ["shockwave", "kinetic-slam", "glass-shatter"],
@@ -82,7 +82,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(space|galax|cosmic|star|planet|orbit|astro|universe|nasa|rocket)/,
     mood: {
       palette: "cosmos",
-      font: "anton",
+      font: "cinzel",
       bpm: 110,
       hook: ["hyperspace", "warp-tunnel"],
       title: ["particle-assemble", "shockwave", "god-rays"],
@@ -98,7 +98,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(luxury|gold|premium|elegant|fashion|jewel|perfume|watch|royal|vip|hotel|wedding)/,
     mood: {
       palette: "gold",
-      font: "grotesk",
+      font: "cinzel",
       bpm: 96,
       hook: ["cinematic-title", "god-rays"],
       title: ["particle-assemble", "cinematic-title", "god-rays"],
@@ -130,7 +130,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(music|dj|party|club|night|festival|concert|neon|rave|edm|beat)/,
     mood: {
       palette: "synthwave",
-      font: "anton",
+      font: "bebas",
       bpm: 128,
       hook: ["neon-draw", "shockwave", "warp-tunnel"],
       title: ["neon-draw", "shockwave", "warp-tunnel"],
@@ -162,7 +162,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(nature|eco|green|organic|health|wellness|calm|yoga|travel|ocean|aurora)/,
     mood: {
       palette: "aurora",
-      font: "grotesk",
+      font: "cinzel",
       bpm: 92,
       hook: ["liquid-gradient", "god-rays"],
       title: ["particle-assemble", "liquid-gradient", "god-rays"],
@@ -194,7 +194,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     keys: /\b(news|editorial|podcast|documentary|corporate|business|finance|report|minimal)/,
     mood: {
       palette: "mono",
-      font: "grotesk",
+      font: "playfair",
       bpm: 100,
       hook: ["type-cascade", "split-wipe", "glass-shatter"],
       title: ["cinematic-title", "type-cascade", "flip-3d"],
@@ -209,7 +209,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
     description: "The all-rounder: hyperspace, shockwaves and glass shatter in neon cyan with condensed type, flash and whip cuts.",
     mood: {
       palette: "cyber",
-      font: "anton",
+      font: "bebas",
       bpm: 124,
       hook: ["hyperspace", "shockwave", "warp-tunnel"],
       title: ["particle-assemble", "shockwave", "god-rays", "glass-shatter"],

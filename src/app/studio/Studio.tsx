@@ -18,6 +18,8 @@ import { MAX_PHOTOS, PHOTO_ID, uploadPhotos } from "@/lib/photos";
 import { isLocalProvider } from "@/lib/providers";
 import TemplatePicker from "@/components/TemplatePicker";
 import TextFxPicker, { TEXT_FX_OPTIONS } from "@/components/TextFxPicker";
+import FontPicker, { SAAS_FONTS, TRAILER_FONTS } from "@/components/FontPicker";
+import { FONT_LABELS } from "@/engine/text";
 import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/templates";
 import { applyTrailerStyle, detectTrailerStyle, TRAILER_STYLE_MAP } from "@/engine/trailers";
 import TrailerStylePicker from "@/components/TrailerStylePicker";
@@ -36,7 +38,7 @@ import { qrTarget } from "@/engine/skills/endings";
 import SlideMedia from "@/components/SlideMedia";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
-import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 const FILM_KEY = "intromaker.film";
@@ -170,6 +172,37 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.textFx ?? null) !== textFx) setPlan((p) => ({ ...p, textFx: textFx ?? undefined }));
   }, [plan, textFx]);
+  // Heading font: null keeps the style's own; a choice (kept separately for SaaS films and
+  // trailers, and remembered) applies to every film of that kind, across styles and remakes.
+  const [fonts, setFonts] = useState<{ saas: FontId | null; trailer: FontId | null }>({ saas: null, trailer: null });
+  useEffect(() => {
+    try {
+      const sv = localStorage.getItem("intromaker.font.saas") as FontId | null;
+      const tv = localStorage.getItem("intromaker.font.trailer") as FontId | null;
+      setFonts({ saas: sv && SAAS_FONTS.includes(sv) ? sv : null, trailer: tv && TRAILER_FONTS.includes(tv) ? tv : null });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const fontKind: "saas" | "trailer" = plan.style === "trailer" ? "trailer" : "saas";
+  const chooseFont = (f: FontId | null) => {
+    setFonts((x) => ({ ...x, [fontKind]: f }));
+    try {
+      if (f) localStorage.setItem(`intromaker.font.${fontKind}`, f);
+      else localStorage.removeItem(`intromaker.font.${fontKind}`);
+    } catch {
+      /* ignore */
+    }
+    // Back to the style's own face: re-apply the current style.
+    if (!f) {
+      if (plan.style === "trailer" && plan.trailerStyle) setPlan((p) => applyTrailerStyle(p, p.trailerStyle!, { palette: palette !== "auto" ? palette : undefined }));
+      else if (plan.style === "saas") setPlan((p) => ({ ...p, font: TEMPLATE_MAP[p.template ?? template]?.font ?? p.font }));
+    }
+  };
+  const fontChoice = fonts[fontKind];
+  useEffect(() => {
+    if (fontChoice && plan.font !== fontChoice) setPlan((p) => ({ ...p, font: fontChoice }));
+  }, [plan, fontChoice]);
   // Glow on type and the highlight bloom. Off by default: crisp, halo-free text.
   const [glow, setGlow] = useState(false);
   useEffect(() => {
@@ -1608,6 +1641,13 @@ export default function Studio() {
             </>
           )}
 
+          <details className="fold">
+            <summary>
+              <span className="field-label inline">Heading font</span> <span className="tpl-desc">{fontChoice ? FONT_LABELS[fontChoice].name : "Style default"}</span>
+            </summary>
+            <FontPicker value={fontChoice} onChange={chooseFont} kind={fontKind} current={fontChoice ? (plan.style === "trailer" ? TRAILER_STYLE_MAP[plan.trailerStyle ?? ""]?.mood.font ?? plan.font : TEMPLATE_MAP[plan.template ?? template]?.font ?? plan.font) : plan.font} />
+            <p className="hint">{fontKind === "trailer" ? "Movie-title faces, each paired with its own subtitle face." : "Applies to every headline; subtitles stay in a clean sans."}</p>
+          </details>
           <label className="field-label">
             Text glow <span className="tpl-desc">{glow ? "On" : "Off"}</span>
           </label>

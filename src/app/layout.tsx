@@ -10,6 +10,14 @@ import "@fontsource/inter/800.css";
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/800.css";
+import "@fontsource/cinzel/700.css";
+import "@fontsource/bebas-neue/400.css";
+import "@fontsource/playfair-display/800.css";
+import "@fontsource/manrope/800.css";
+import "@fontsource/jost/400.css";
+import "@fontsource/jost/500.css";
+import "@fontsource/jost/600.css";
+import "@fontsource/jost/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

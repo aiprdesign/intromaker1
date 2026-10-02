@@ -8,7 +8,7 @@ import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
 import { drawLogo, getImage } from "./media";
 import { withPlaceholders } from "./placeholders";
-import { setBrandFont, subFont } from "./text";
+import { pairedSubFamily, setBrandFont, setSubFamily, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { saasBackground } from "./saasfx";
 import { setCrispText } from "./fx";
@@ -399,6 +399,8 @@ export function renderScene(
 ) {
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
+  // Trailers pair their title face with a contrasting subtitle face.
+  setSubFamily(pairedSubFamily(plan.font, plan.style));
   // Glow off: halo-free type and no highlight bloom.
   setCrispText(plan.glow === false);
   if (plan.glow === false) opts = { ...opts, bloom: false };

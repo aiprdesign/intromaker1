@@ -4113,3 +4113,57 @@ code.secret {
 .claim-note {
   margin-top: 14px;
 }
+
+/* ───────── Heading font picker (studio, Style tab) ───────── */
+
+.font-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+.font-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.font-opt:hover {
+  background: var(--panel-2);
+}
+.font-opt.active {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, var(--panel));
+}
+.font-sample {
+  font-size: 22px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.font-sub {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.font-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.font-note {
+  font-size: 11px;
+  color: var(--muted);
+}

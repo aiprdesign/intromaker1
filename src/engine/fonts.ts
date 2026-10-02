@@ -49,6 +49,13 @@ export function ensureFonts() {
     document.fonts.load('400 100px "Instrument Serif"'),
     document.fonts.load('800 100px "JetBrains Mono"'),
     document.fonts.load('500 40px "JetBrains Mono"'),
+    document.fonts.load('700 100px "Cinzel"'),
+    document.fonts.load('400 100px "Bebas Neue"'),
+    document.fonts.load('800 100px "Playfair Display"'),
+    document.fonts.load('800 100px "Manrope"'),
+    document.fonts.load('600 100px "Jost"'),
+    document.fonts.load('400 40px "Jost"'),
+    document.fonts.load('500 40px "Jost"'),
     ensureShaderAssets(),
   ])
     .then(() => undefined)

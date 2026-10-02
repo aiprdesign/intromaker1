@@ -6,9 +6,55 @@ export const FONT_FAMILY: Record<FontId, { display: string; weight: number; trac
   inter: { display: "Inter", weight: 800, tracking: -0.045 },
   serif: { display: "Instrument Serif", weight: 400, tracking: -0.01 },
   mono: { display: "JetBrains Mono", weight: 800, tracking: -0.03 },
+  // Classic movie-poster capitals (the Trajan look), set wide like a film title.
+  cinzel: { display: "Cinzel", weight: 700, tracking: 0.1 },
+  // Tall condensed trailer type.
+  bebas: { display: "Bebas Neue", weight: 400, tracking: 0.04 },
+  playfair: { display: "Playfair Display", weight: 800, tracking: -0.01 },
+  manrope: { display: "Manrope", weight: 800, tracking: -0.035 },
+  jost: { display: "Jost", weight: 600, tracking: -0.01 },
+};
+
+/** Names shown in the font picker, with what each face is for. */
+export const FONT_LABELS: Record<FontId, { name: string; note: string }> = {
+  inter: { name: "Inter", note: "Clean product sans" },
+  manrope: { name: "Manrope", note: "Rounded modern sans" },
+  grotesk: { name: "Space Grotesk", note: "Techy grotesk" },
+  jost: { name: "Jost", note: "Geometric (Futura-like)" },
+  playfair: { name: "Playfair Display", note: "Editorial serif" },
+  serif: { name: "Instrument Serif", note: "Elegant light serif" },
+  mono: { name: "JetBrains Mono", note: "Developer mono" },
+  cinzel: { name: "Cinzel", note: "Classic movie title" },
+  bebas: { name: "Bebas Neue", note: "Condensed trailer caps" },
+  anton: { name: "Anton", note: "Heavy impact caps" },
 };
 
 export const SUB_FONT = "Inter";
+
+/**
+ * The supporting type (subtitles, labels) paired with the headline face. SaaS films keep Inter;
+ * trailers pair their display face with a contrasting family, like a film poster: movie capitals
+ * over a light geometric sans, a condensed title over wide-set sans, and so on.
+ */
+let subFamily = SUB_FONT;
+export function setSubFamily(name: string | null) {
+  subFamily = name || SUB_FONT;
+}
+const TRAILER_PAIR: Partial<Record<FontId, string>> = {
+  cinzel: "Jost",
+  bebas: "Jost",
+  anton: "Jost",
+  playfair: "Jost",
+  serif: "Jost",
+  grotesk: "Inter",
+  jost: "Inter",
+};
+/** Title faces that always take their poster pair, whatever kind of film they're in. */
+const TITLE_FACES = new Set<FontId>(["cinzel", "bebas", "anton", "playfair"]);
+/** The subtitle family for a film: the poster pair of its headline face, else Inter. */
+export function pairedSubFamily(font: FontId, style: "saas" | "trailer" | undefined) {
+  return style === "trailer" || TITLE_FACES.has(font) ? TRAILER_PAIR[font] ?? SUB_FONT : SUB_FONT;
+}
 
 /** The website's own headline font, used in place of Inter when it has loaded. */
 let brandFont: string | null = null;
@@ -28,7 +74,7 @@ export function displayFont(font: FontId, size: number) {
 }
 
 export function subFont(size: number, weight = 500) {
-  return `${weight} ${Math.round(size)}px "${SUB_FONT}", system-ui, sans-serif`;
+  return `${weight} ${Math.round(size)}px "${subFamily}", "${SUB_FONT}", system-ui, sans-serif`;
 }
 
 /** Largest font size (<= maxSize) at which `text` fits within maxWidth. */
@@ -149,7 +195,7 @@ export function layoutHeadline(
     }
     if (s >= opts.maxSize * 0.97) break;
   }
-  const lineHeight = size * (font === "anton" ? 1.05 : font === "inter" ? 1.08 : 1.0);
+  const lineHeight = size * (font === "anton" || font === "bebas" ? 1.02 : font === "inter" || font === "manrope" ? 1.08 : font === "cinzel" || font === "playfair" ? 1.12 : 1.0);
   const top = opts.cy - ((lines.length - 1) * lineHeight) / 2;
   return {
     lines,
