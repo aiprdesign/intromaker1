@@ -4077,3 +4077,21 @@ code.secret {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* The director's Stop button: shown in place of Generate / Remake / Import while it works. */
+.stop-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 90, 110, 0.12);
+  border: 1px solid rgba(255, 90, 110, 0.55);
+  color: var(--text);
+}
+.stop-btn:hover {
+  background: rgba(255, 90, 110, 0.22);
+}
+.stop-btn .stop-label {
+  font-weight: 700;
+  color: #ff8a98;
+}

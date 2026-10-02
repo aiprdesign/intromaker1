@@ -458,7 +458,25 @@ export default function Studio() {
     angle?: Angle;
     /** Remake number: other slides for each section (0 = the director's best fit). */
     variant?: number;
+    /** Cancels the request (the Stop button). */
+    signal?: AbortSignal;
   };
+
+  /**
+   * Stop: every director run (generate, remake, takes, import) carries the run number it started
+   * with; Stop moves the number on and aborts the request in flight, so a late answer is ignored
+   * and the film on screen stays as it was.
+   */
+  const runRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const startRun = () => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    return { run: ++runRef.current, signal: ac.signal };
+  };
+  const stillRunning = (run: number) => run === runRef.current;
+  const stopped = (e: unknown) => (e as Error)?.name === "AbortError";
 
   /** One storyboard from the director (server AI or built-in; falls back to in-browser). */
   const direct = async (opts: GenOpts): Promise<Take> => {
@@ -480,12 +498,15 @@ export default function Studio() {
     if (isLocalProvider(aiCfg.provider) && !localViaServerRef.current) {
       try {
         const data = await runBrowserDirector(body, aiCfg);
+        if (opts.signal?.aborted) throw new DOMException("Stopped", "AbortError");
         return { plan: sanitizePlan(data.plan as VideoPlan), engine: data.engine as Engine, engineLabel: data.engineLabel ?? "", note: data.note, label };
       } catch (e) {
+        if (opts.signal?.aborted) throw new DOMException("Stopped", "AbortError");
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...body, ai: { provider: "builtin" } }),
+          signal: opts.signal,
         }).catch(() => null);
         const data = res?.ok ? await res.json() : null;
         if (data) return { plan: sanitizePlan(data.plan), engine: "builtin", engineLabel: "", note: `Local AI: ${(e as Error).message} Used the built-in director.`, label };
@@ -496,11 +517,14 @@ export default function Studio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: opts.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       return { plan: sanitizePlan(data.plan), engine: data.engine, engineLabel: data.engineLabel ?? "", note: data.note, label };
-    } catch {
+    } catch (e) {
+      // Stopped: no fallback, the run is over.
+      if (opts.signal?.aborted || stopped(e)) throw new DOMException("Stopped", "AbortError");
       // Offline or API unavailable: the director also runs in the browser.
       const plan = s
         ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, trailerStyle, template, angle: opts.angle, safe: safeCopy, variant: opts.variant, direction: p })
@@ -537,12 +561,14 @@ export default function Studio() {
   };
 
   const generate = async (opts: GenOpts = {}) => {
+    const { run, signal } = opts.signal ? { run: runRef.current, signal: opts.signal } : startRun();
     setLoading(true);
     setNote(null);
     // The film on screen and its versions, so making a new one can be undone.
     const before = { plan: planRef.current, takes, current, engine, engineLabel, prompt: promptRef.current };
     try {
-      const take = await direct(opts);
+      const take = await direct({ ...opts, signal });
+      if (!stillRunning(run)) return;
       show(take, 0);
       setSavedId(null);
       promptRef.current = (opts.prompt ?? prompt).trim();
@@ -563,8 +589,10 @@ export default function Studio() {
         });
       bootingRef.current = false;
       if (take.note || take.plan.notes?.length) setNote([take.note, ...(take.plan.notes ?? [])].filter(Boolean).join(" "));
+    } catch (e) {
+      if (!stopped(e)) throw e;
     } finally {
-      setLoading(false);
+      if (stillRunning(run)) setLoading(false);
     }
   };
 
@@ -575,18 +603,22 @@ export default function Studio() {
    */
   const [remaking, setRemaking] = useState(false);
   const remake = async () => {
+    const { run, signal } = startRun();
     setRemaking(true);
     setNote(null);
     try {
       const n = takes.filter((t) => t.label.startsWith("Remake")).length + 1;
-      const take = await direct({ seed: Math.floor(Math.random() * 1e9), variant: n });
+      const take = await direct({ seed: Math.floor(Math.random() * 1e9), variant: n, signal });
+      if (!stillRunning(run)) return;
       const base = takes.length ? takes : [{ plan, engine, engineLabel, label: "Original" }];
       const next = [...base, { ...take, label: `Remake ${n}` }];
       setTakes(next);
       show(take, next.length - 1);
       if (take.note) setNote(take.note);
+    } catch (e) {
+      if (!stopped(e)) throw e;
     } finally {
-      setRemaking(false);
+      if (stillRunning(run)) setRemaking(false);
     }
   };
   const undo = () => {
@@ -598,16 +630,20 @@ export default function Studio() {
 
   /** Three alternative cuts (different story angles / creative seeds) to choose from. */
   const moreTakes = async () => {
+    const { run, signal } = startRun();
     setTakesLoading(true);
     try {
       const angles: (Angle | undefined)[] = site ? ["product", "proof", "story"] : [undefined, undefined, undefined];
-      const results = await Promise.all(angles.map((angle) => direct({ angle, seed: Math.floor(Math.random() * 1e9) })));
+      const results = await Promise.all(angles.map((angle) => direct({ angle, seed: Math.floor(Math.random() * 1e9), signal })));
+      if (!stillRunning(run)) return;
       setTakes((prev) => {
         const base = prev.length ? prev : [{ plan, engine, engineLabel, label: "Original" }];
         return [...base, ...results.map((r, i) => ({ ...r, label: `Take ${base.length + i + 1}${r.label !== "Take" ? ` · ${r.label}` : ""}` }))].slice(-8);
       });
+    } catch (e) {
+      if (!stopped(e)) throw e;
     } finally {
-      setTakesLoading(false);
+      if (stillRunning(run)) setTakesLoading(false);
     }
   };
 
@@ -615,6 +651,7 @@ export default function Studio() {
   const importSite = async (raw?: string, fmt: { aspect?: Aspect; length?: Length } = {}) => {
     const url = (raw ?? siteUrl).trim();
     if (!url) return;
+    const { run, signal } = startRun();
     setImporting(true);
     // Narrate what's happening while the site is captured and read.
     const stages = ["Opening the site in a real browser…", "Capturing screenshots…", "Reading copy, features and proof…"];
@@ -627,9 +664,11 @@ export default function Studio() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
+        signal,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error(data.error ?? `The import failed (${res.status}). Try again.`), { code: data.code, suggestion: data.suggestion });
+      if (!stillRunning(run)) return;
       const s: SiteData = data.site;
       setSite(s);
       setSiteUrl(s.url);
@@ -638,6 +677,7 @@ export default function Studio() {
       setImportStage("Detecting brand colours…");
       const colors = (await extractBrandColors(colorSources, s.themeColor)) ?? undefined;
       const fromLogo = (s.logo ? await extractLogoColors(assetUrl(s.logo)) : null) ?? undefined;
+      if (!stillRunning(run)) return;
       setBrandColors(colors);
       setLogoColors(fromLogo);
       // A full story arc needs room: websites default to the long cut. Product videos keep the
@@ -647,15 +687,32 @@ export default function Studio() {
       setImportStage(`Directing your ${s.name} film…`);
       const chosen = brandMode === "logo" ? fromLogo ?? colors : brandMode === "site" ? colors : undefined;
       if (brandMode === "logo" && !fromLogo) setBrandMode("site");
-      await generate({ site: s, colors: chosen, length: len, aspect: fmt.aspect });
+      await generate({ site: s, colors: chosen, length: len, aspect: fmt.aspect, signal });
     } catch (e) {
       clearInterval(timer);
+      if (stopped(e) || !stillRunning(run)) return;
       const err = e as Error & { code?: string; suggestion?: string };
       setImportError({ message: err.name === "TypeError" ? "Couldn't reach IntroMaker's server. Check your connection and try again." : err.message, code: err.code, suggestion: err.suggestion, url });
     } finally {
-      setImporting(false);
-      setImportStage(null);
+      clearInterval(timer);
+      if (stillRunning(run)) {
+        setImporting(false);
+        setImportStage(null);
+      }
     }
+  };
+
+  /** Stop the director: the request is cancelled and every button goes back to its default. */
+  const stopDirecting = () => {
+    runRef.current++;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setRemaking(false);
+    setTakesLoading(false);
+    setImporting(false);
+    setImportStage(null);
+    setToast({ text: "Stopped. The film on screen is unchanged.", key: Date.now() });
   };
 
   const clearSite = () => {
@@ -1304,9 +1361,15 @@ export default function Studio() {
               aria-label="Website or listing URL"
               inputMode="url"
             />
-            <button className="btn btn-ghost" type="submit" disabled={importing || loading}>
-              {importing ? "Importing…" : "Import"}
-            </button>
+            {importing ? (
+              <button className="btn stop-btn" type="button" onClick={stopDirecting} title="Stop the import. The film on screen stays as it is.">
+                ■ Stop
+              </button>
+            ) : (
+              <button className="btn btn-ghost" type="submit" disabled={loading}>
+                Import
+              </button>
+            )}
           </form>
           {importStage && (
             <p className="hint import-stage">
@@ -1704,12 +1767,24 @@ export default function Studio() {
           </div>
           <div className="panel-foot">
           <div className="gen-row">
-            <button className="btn btn-primary btn-lg grow" onClick={() => generate()} disabled={loading}>
-              {loading ? "Directing…" : "Generate ✦"}
-            </button>
-            <button className="btn btn-ghost btn-lg" onClick={remake} disabled={loading || remaking} title="A new version with different slides for each section. Undo or Original brings back earlier versions.">
-              {remaking ? "Remaking…" : "Remake ↻"}
-            </button>
+            {loading || importing ? (
+              <button className="btn btn-lg grow stop-btn" onClick={stopDirecting} title="Stop the director. The film on screen stays as it is.">
+                <span className="spinner sm" /> {importing && !loading ? "Importing…" : "Directing…"} <span className="stop-label">■ Stop</span>
+              </button>
+            ) : (
+              <button className="btn btn-primary btn-lg grow" onClick={() => generate()} disabled={remaking || takesLoading}>
+                Generate ✦
+              </button>
+            )}
+            {remaking ? (
+              <button className="btn btn-lg stop-btn" onClick={stopDirecting} title="Stop the remake. The film on screen stays as it is.">
+                <span className="spinner sm" /> Remaking… <span className="stop-label">■ Stop</span>
+              </button>
+            ) : (
+              <button className="btn btn-ghost btn-lg" onClick={remake} disabled={loading || importing || takesLoading} title="A new version with different slides for each section. Undo or Original brings back earlier versions.">
+                Remake ↻
+              </button>
+            )}
           </div>
           {takes.length > 1 && (
             <div className="version-row">
@@ -1853,8 +1928,13 @@ export default function Studio() {
                   <span className="take-name">{t.label}</span>
                 </button>
               ))}
-              <button className="take-card more" onClick={moreTakes} disabled={takesLoading || loading}>
-                <span>{takesLoading ? "Directing 3 takes…" : "✦ 3 more takes"}</span>
+              <button
+                className="take-card more"
+                onClick={takesLoading ? stopDirecting : moreTakes}
+                disabled={!takesLoading && (loading || remaking || importing)}
+                title={takesLoading ? "Stop: the takes you have stay as they are." : undefined}
+              >
+                <span>{takesLoading ? "Directing 3 takes… ■ Stop" : "✦ 3 more takes"}</span>
               </button>
             </div>
           </div>
