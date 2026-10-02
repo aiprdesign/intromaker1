@@ -447,7 +447,7 @@ function cardStack(sc: SkillContext) {
   const enter = ease.outExpo(range(t, 0.15, 1.1));
   const ex = ease.inCubic(exitT(sc, 0.5));
   const images = imageless(sc) ? [] : [scene.media?.src, ...(sc.brand?.images ?? [])].filter((s): s is string => !!s);
-  const icons = iconsFor(items.map(titleOf), sc);
+  const icons = iconsFor(items, sc);
   for (let i = n - 1; i >= Math.max(0, Math.floor(pos)); i--) {
     const rel = i - pos;
     let x = w / 2 - cw / 2;
@@ -563,7 +563,7 @@ function contactSheet(sc: SkillContext) {
   const ex = ease.inCubic(exitT(sc, 0.45));
   const focusOn = range(t, landed - 0.2, landed + 0.2) * (1 - ex);
   const images = imageless(sc) ? [] : [scene.media?.src, ...(sc.brand?.images ?? [])].filter((s): s is string => !!s);
-  const icons = iconsFor(items.map(titleOf), sc);
+  const icons = iconsFor(items, sc);
   items.forEach((it, i) => {
     const [x, y] = at(i);
     const k = cardIn(t, 0.4 + i * step);

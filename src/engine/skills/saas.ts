@@ -33,6 +33,7 @@ import {
   type IconKind,
 } from "../saasfx";
 import { autoAccent, displayFont, subFont } from "../text";
+import { drawLucide } from "../icons";
 import { ctaClickAt } from "../arrange";
 import { CONCEPT_MAP } from "../concepts";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -498,6 +499,33 @@ function bentoTiming(scene: Scene, beat: number) {
   return Array.from({ length: n }, (_, i) => 0.45 + i * st);
 }
 
+/**
+ * The small live visual in each bento tile, chosen for what the tile is about: bars or a sparkline
+ * for analytics and growth, teammates for collaboration, a checklist for tasks and approvals, a
+ * switch for settings, access and automation, a progress ring for goals, uploads and launches.
+ * Two tiles don't show the same visual while another one is free.
+ */
+const MICRO: [RegExp, number[]][] = [
+  [/\b(invoice|expense|cash|money|spend|budget|payment|billing|receipt|payroll|finance|accounting)/, [4, 0]],
+  [/\b(analytic|insight|report|metric|kpi|dashboard|chart|stats|forecast|growth|revenue|sales|conversion|traffic|trend)/, [0, 4]],
+  [/\b(team|collab|together|people|member|share|shared|customer|client|user|candidate|hire|community|guest)/, [3]],
+  [/\b(task|todo|to-do|checklist|project|approv|onboard|review|workflow|step|process|compliance|audit)/, [5]],
+  [/\b(automat|setting|config|control|toggle|access|permission|role|privacy|secur|integrat|sync|alert|notif|switch)/, [1]],
+  [/\b(goal|target|progress|upload|backup|storage|deploy|launch|release|ship(?!p)|build|speed|performance|uptime|budget|plan)/, [2]],
+];
+
+function microKinds(items: string[]) {
+  const used = new Set<number>();
+  return items.map((it, i) => {
+    const text = it.toLowerCase();
+    const want = MICRO.filter(([re]) => re.test(text)).flatMap(([, k]) => k);
+    // Nothing specific: the neutral visuals (ring, checklist) before the ones that imply a meaning.
+    const pick = want.find((k) => !used.has(k)) ?? [2, 5, 3, 1, 0, 4].find((k) => !used.has(k)) ?? want[0] ?? i % 6;
+    used.add(pick);
+    return pick;
+  });
+}
+
 function microVisual(sc: SkillContext, kind: number, x: number, y: number, mw: number, mh: number, lt: number) {
   const { ctx, u, palette } = sc;
   const g = ctx.createLinearGradient(x, y + mh, x + mw, y);
@@ -540,10 +568,11 @@ function microVisual(sc: SkillContext, kind: number, x: number, y: number, mw: n
       const rr = Math.min(mw, mh) * 0.42;
       const cx = x + mw - rr - 4 * u;
       const cy = y + mh / 2;
-      const p = 0.78 * ease.outExpo(range(lt, 0.3, 1.5));
+      // It fills all the way and ticks: no percentage, so the tile never shows a made-up number.
+      const p = ease.inOutCubic(range(lt, 0.3, 1.5));
       ctx.lineWidth = 9 * u;
       ctx.lineCap = "round";
-      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.strokeStyle = palette.light ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)";
       ctx.beginPath();
       ctx.arc(cx, cy, rr, 0, TAU);
       ctx.stroke();
@@ -551,11 +580,8 @@ function microVisual(sc: SkillContext, kind: number, x: number, y: number, mw: n
       ctx.beginPath();
       ctx.arc(cx, cy, rr, -Math.PI / 2, -Math.PI / 2 + TAU * p);
       ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.font = subFont(rr * 0.5, 700);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${Math.round(p * 100)}%`, cx, cy);
+      const tick = clamp(spring(lt - 1.5, 12, 6.5), 0, 1.15);
+      if (tick > 0) drawLucide(ctx, "Check", cx, cy, rr * 0.9 * tick, palette.primary, { progress: Math.min(1, tick) });
       break;
     }
     case 3: {
@@ -656,6 +682,9 @@ function bento(sc: SkillContext) {
     .filter((p) => p.kind !== "button" && !titles.some((tt) => tt && norm(p.text ?? "").includes(tt)))
     .sort((a, b) => b.w * b.h - a.w * a.h);
   const byArea = cells.map((cell, i) => ({ i, a: cell[2] * cell[3] })).sort((a, b) => b.a - a.a || a.i - b.i);
+  // Each tile's icon and visual come from its own words (title and description).
+  const icons = iconsFor(items, sc);
+  const micros = microKinds(items);
   const partFor = new Map(byArea.slice(0, ui.length).map((c, k) => [c.i, ui[k]]));
   cells.forEach(([c, r, cs, rs], i) => {
     const x = gx0 + c * (cw + gap);
@@ -684,7 +713,7 @@ function bento(sc: SkillContext) {
     ctx.roundRect(x + 22 * u, y + 22 * u, it, it, 14 * u);
     ctx.fill();
     const [title, desc] = items[i].split(/\s+[—–]\s+/);
-    drawIcon(ctx, iconsFor(items.map((x) => x.split(/\s+[—–]\s+/)[0]), sc)[i], x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.56, "#fff", ease.outCubic(range(lt, 0.15, 0.9)));
+    drawIcon(ctx, icons[i], x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.56, "#fff", ease.outCubic(range(lt, 0.15, 0.9)));
     // Label, with the feature's one-line description under it in roomy cells.
     const fs = portrait ? Math.min(46 * u, bw / 14) : Math.min(30 * u, bw / 11);
     const wrap = (text: string, font: string) => {
@@ -750,7 +779,7 @@ function bento(sc: SkillContext) {
       ctx.clip();
       ctx.drawImage(pimg, px0, py0, pw, phh);
       ctx.restore();
-    } else microVisual(sc, i, mx, my, mw, Math.min(mh, bh * 0.55), lt);
+    } else microVisual(sc, micros[i], mx, my, mw, Math.min(mh, bh * 0.55), lt);
     ctx.restore();
   });
 }
@@ -857,7 +886,7 @@ function iconFeatures(sc: SkillContext) {
     ctx.shadowBlur = 24 * u;
     ctx.fill();
     ctx.shadowBlur = 0;
-    drawIcon(ctx, iconsFor(items.map((x) => x.split(/\s+[—–]\s+/)[0]), sc)[i], tx, ty, ts * 0.56, palette.light ? "#ffffff" : palette.bg0, ease.outCubic(range(lt, 0.15, 1)));
+    drawIcon(ctx, iconsFor(items, sc)[i], tx, ty, ts * 0.56, palette.light ? "#ffffff" : palette.bg0, ease.outCubic(range(lt, 0.15, 1)));
     // Title (wrapped to two lines, shrinking if needed) + optional description.
     const wrapLines = (text: string, font: string, maxW: number) => {
       ctx.font = font;

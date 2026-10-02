@@ -449,7 +449,7 @@ function featureSlides(sc: SkillContext) {
   const ex = ease.inCubic(exitT(sc, 0.4));
   const items = slideItems(scene);
   const { n, slot, starts } = slidesTiming(scene);
-  const icons = iconsFor(items.map(titleOf), sc);
+  const icons = iconsFor(items, sc);
   const va = portrait ? 1.35 : 1.5;
   const imgs = gallery(sc, n, va);
   ctx.save();

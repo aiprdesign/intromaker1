@@ -449,7 +449,7 @@ function showreel(sc: SkillContext) {
   pos += ex * 1.6;
   const focus = clamp(Math.round(pos), 0, n - 1);
   const images = imageless(sc) ? [] : [scene.media?.src, ...(sc.brand?.images ?? [])].filter((s): s is string => !!s);
-  const icons = iconsFor(items.map(titleOf), sc);
+  const icons = iconsFor(items, sc);
   const order = items.map((_, i) => i).sort((a, b) => Math.abs(b - pos) - Math.abs(a - pos));
   for (const i of order) {
     const dist = Math.abs(i - pos);
