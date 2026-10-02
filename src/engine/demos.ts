@@ -41,8 +41,8 @@ export const HOME_BACKDROP: VideoPlan = {
 };
 
 export const EXAMPLE_PROMPTS = [
-  'Launch video for "Pulse", an analytics app for product teams. Dashboards, AI insights, team sharing',
-  'Cyberpunk launch trailer for "NOVA AI", an AI copilot for developers. Code suggestions, reviews, launching 2026',
+  'Launch video for "Lumetrik", an analytics app for product teams. Dashboards, AI insights, team sharing',
+  'Cyberpunk launch trailer for "VEKTORA AI", an AI copilot for developers. Code suggestions, reviews, launching 2026',
   'Gold intro for a watch brand called "AURUM" — craftsmanship, Swiss made',
   "Gaming channel intro for SHADOWSTRIKE with toxic green energy, headshots and victory",
   "Retro 80s synthwave music festival teaser for NEON NIGHTS, live DJs all night",

@@ -95,6 +95,18 @@ const RUNTIME: Entry[] = [
   { name: "Google Fonts (brand fonts)", version: "—", licence: "OFL-1.1 / Apache-2.0", scope: "runtime", installed: false, optional: true, homepage: "https://fonts.google.com/", note: "When a captured site uses a Google font, it is loaded from Google Fonts to match the brand." },
 ];
 
+/**
+ * Every file the app serves from public/ (images, media, documents), with where it came from and
+ * its licence. The check fails on any file not listed here, so nothing of unknown origin ships.
+ */
+const ASSETS: { path: string; licence: string; source: string }[] = [
+  ...["kelvo-front.jpg", "kelvo-angle.jpg", "kelvo-back.jpg"].map((f) => ({
+    path: `public/samples/${f}`,
+    licence: "Original work (IntroMaker's own licence)",
+    source: "The imaginary Kelvo bottle for the homepage's sample product video, drawn from plain SVG shapes by scripts/sample-art.mjs; no third-party images (its lettering is set in the system sans-serif).",
+  })),
+];
+
 /* ───────── check ───────── */
 
 const problems: string[] = [];
@@ -118,6 +130,15 @@ function judge(e: Entry) {
   problems.push(`${e.scope} ${e.name}@${e.version}: ${e.licence}`);
 }
 for (const e of [...entries, ...RUNTIME]) judge(e);
+
+// Served files: each one listed with its origin and licence.
+const walk = (dir: string): string[] =>
+  existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? walk(join(dir, d.name)) : [join(dir, d.name)])) : [];
+for (const f of walk(join(ROOT, "public"))) {
+  const rel = f.slice(ROOT.length + 1);
+  if (!ASSETS.some((a) => a.path === rel)) problems.push(`asset ${rel}: not listed in ASSETS (scripts/licenses.ts) with its source and licence`);
+}
+for (const a of ASSETS) if (!existsSync(join(ROOT, a.path))) problems.push(`asset ${a.path}: listed but missing`);
 
 const prod = entries.filter((e) => e.scope === "prod");
 const dev = entries.filter((e) => e.scope === "dev");
@@ -151,6 +172,12 @@ if (WRITE) {
     "|---|---|---|",
     ...RUNTIME.map((e) => `| [${e.name}](${e.homepage}) ${e.version} | ${e.licence} | ${e.note ?? ""} |`),
     "",
+    "## Images and media served by the app",
+    "",
+    "| File | Licence | Source |",
+    "|---|---|---|",
+    ...ASSETS.map((a) => `| ${a.path} | ${a.licence} | ${a.source} |`),
+    "",
     "## Not shipped",
     "",
     ...EXCEPTIONS.map((x) => `- \`${x.match.source.replace(/\\\//g, "/").replace(/^\^/, "")}*\`: ${x.why}`),
@@ -177,6 +204,7 @@ if (WRITE) {
     runtime: RUNTIME.map(({ name, version, licence, homepage, note }) => ({ name, version, licence, homepage, note })),
     packages: sorted.map(({ name, version, licence, homepage, note, text, notice }) => ({ name, version, licence, homepage, note, text, notice })),
     conditions: CONDITIONAL,
+    assets: ASSETS,
   };
   mkdirSync(join(ROOT, "src/app/licenses"), { recursive: true });
   writeFileSync(join(ROOT, "src/app/licenses/notices.json"), JSON.stringify(data));

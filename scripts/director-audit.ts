@@ -11,7 +11,7 @@ import { planFromPrompt, planFromSite, productFromPrompt, type Length } from "..
 import type { VideoPlan } from "../src/engine/types";
 
 const SAAS = [
-  'Launch video for "Pulse", an analytics app for product teams. Dashboards, AI insights, team sharing',
+  'Launch video for "Lumetrik", an analytics app for product teams. Dashboards, AI insights, team sharing',
   "Nimbus is a developer platform with instant rollbacks, preview URLs and edge functions",
   "Ledgerly: business banking, corporate cards and automated expenses for startups",
   "Meet Harbor, the AI assistant that writes your emails and summarises your meetings",
@@ -21,12 +21,12 @@ const SAAS = [
   "Frame: a design tool for teams to prototype, comment and hand off to developers",
 ];
 const PRODUCT: [string, number][] = [
-  ["Halo smart water bottle with a temperature display on the cap. Screw-top lid, carry loop, brushed steel cap, keeps drinks cold", 3],
+  ["Kelvo smart water bottle with a temperature display on the cap. Screw-top lid, carry loop, brushed steel cap, keeps drinks cold", 3],
   ["Aero Buds wireless earbuds with noise cancelling, all-day battery, water resistant and a pocket charging case", 0],
   ["Ember ceramic mug that keeps coffee at your chosen temperature, app control, 80 minute battery", 0],
 ];
 const TRAILER = [
-  'Cyberpunk launch trailer for "NOVA AI", an AI copilot for developers. Code suggestions, reviews, launching 2026',
+  'Cyberpunk launch trailer for "VEKTORA AI", an AI copilot for developers. Code suggestions, reviews, launching 2026',
   "Gaming channel intro for SHADOWSTRIKE with toxic green energy, headshots and victory",
   'Space documentary opener "BEYOND ORBIT" about a mission to Mars',
   'Gold intro for a watch brand called "AURUM" — craftsmanship, Swiss made',

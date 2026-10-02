@@ -22,6 +22,14 @@ IntroMaker is built on open-source software. Every component below is open sourc
 | [Chromium (headless shell)](https://www.chromium.org/) Playwright build | BSD-3-Clause | Installed into the Docker image by Playwright to capture websites; runs as a separate program. Chromium bundles third-party components under their own permissive and weak-copyleft licences (see chrome://credits). |
 | [Google Fonts (brand fonts)](https://fonts.google.com/) — | OFL-1.1 / Apache-2.0 | When a captured site uses a Google font, it is loaded from Google Fonts to match the brand. |
 
+## Images and media served by the app
+
+| File | Licence | Source |
+|---|---|---|
+| public/samples/kelvo-front.jpg | Original work (IntroMaker's own licence) | The imaginary Kelvo bottle for the homepage's sample product video, drawn from plain SVG shapes by scripts/sample-art.mjs; no third-party images (its lettering is set in the system sans-serif). |
+| public/samples/kelvo-angle.jpg | Original work (IntroMaker's own licence) | The imaginary Kelvo bottle for the homepage's sample product video, drawn from plain SVG shapes by scripts/sample-art.mjs; no third-party images (its lettering is set in the system sans-serif). |
+| public/samples/kelvo-back.jpg | Original work (IntroMaker's own licence) | The imaginary Kelvo bottle for the homepage's sample product video, drawn from plain SVG shapes by scripts/sample-art.mjs; no third-party images (its lettering is set in the system sans-serif). |
+
 ## Not shipped
 
 - `@img/sharp*`: Optional image optimiser installed by Next.js (libvips, LGPL-3.0). IntroMaker turns image optimisation off (next.config: images.unoptimized), so it is never loaded, and the Docker build deletes it from the production server. LGPL-3.0 permits commercial use of an unmodified, separately linked library.

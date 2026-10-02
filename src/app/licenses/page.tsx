@@ -45,6 +45,15 @@ export default function Licenses() {
           ))}
         </ul>
 
+        <h2>Images and media</h2>
+        <ul>
+          {(notices.assets as { path: string; licence: string; source: string }[]).map((a) => (
+            <li key={a.path}>
+              <code>{a.path.replace(/^public\//, "/")}</code> ({a.licence}): {a.source}
+            </li>
+          ))}
+        </ul>
+
         <h2>Packages ({packages.length})</h2>
         {packages.map((p) => (
           <details key={`${p.name}@${p.version}`} className="licence">
