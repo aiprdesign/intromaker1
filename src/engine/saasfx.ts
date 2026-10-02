@@ -9,6 +9,7 @@ import { CONCEPT_MAP, ROLE_ICONS, type ConceptRole } from "./concepts";
 import { liquidText } from "./gl";
 import { drawLucide, iconFor as lucideFor, iconsFor as lucideIconsFor } from "./icons";
 import { scratch } from "./scratch";
+import { planetStage, plexusStage, rainStage, warpStage, wormholeStage } from "./scifi";
 import { renderShaderBg } from "./shaderbg";
 import { subFont, type HeadlineLayout } from "./text";
 import type { FontId, SkillContext, TextFx } from "./types";
@@ -211,6 +212,11 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   else if (backdrop === "ribbon") ribbonStage(sc);
   else if (backdrop === "beam") beamStage(sc, glowOp);
   else if (backdrop === "bloom") bloomStage(sc, glowOp);
+  else if (backdrop === "warp") warpStage(sc, glowOp);
+  else if (backdrop === "planet") planetStage(sc, glowOp);
+  else if (backdrop === "wormhole") wormholeStage(sc, glowOp);
+  else if (backdrop === "rain") rainStage(sc, glowOp);
+  else if (backdrop === "plexus") plexusStage(sc, glowOp);
 
   if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
     // Over a shader stage the grid lives on its own layer, masked to fade at the edges;

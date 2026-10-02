@@ -46,7 +46,7 @@ IntroMaker is a portfolio project: a SaaS-style web app that turns a text prompt
 
 ### What makes the SaaS films look pro
 
-- **39 style templates**, modelled on the most popular SaaS intro looks and grouped in the picker:
+- **45 style templates**, modelled on the most popular SaaS intro looks and grouped in the picker:
   - **Clean & Epic** (clean and modern, with a cinematic lift, each on its own signature stage):
     - *Eclipse*: a planet's glowing rim rising at the foot of the frame on near-black (the Linear look).
     - *Studio White*: a bright seamless studio with a soft key-light pool, huge crisp type (the Apple keynote look).
@@ -61,7 +61,15 @@ IntroMaker is a portfolio project: a SaaS-style web app that turns a text prompt
     - *Blockbuster*: fiery orange light and smoke, big condensed type, whips, flashes and light leaks.
     - *Neon Drop*: neon on black, glitch and flash cuts, chromatic type (gadgets, gaming, tech accessories).
   - **Modern**: Midnight Grid, Aurora Gradient, Mono Pro, AI Glow, Liquid Motion (the logo pours in as a Liquid Logo sting, headlines pour in as glossy liquid and every scene rises in on a liquid wave).
-  - **3D & Sci-Fi**: 3D Spatial (content on an orbiting 3D plane over glowing 3D panels), 3D Turntable, 3D Glass Slab, Sci-Fi HUD (brackets, timecode, readouts, scan lines), Synthwave 3D (neon grid floor to the horizon), Deep Space (parallax starfield and nebula), Holographic, Liquid Chrome, Neon Tech, Dev Terminal.
+  - **Sci-Fi** (each new one on a stage drawn for it, in its own palette):
+    - *Warp Drive*: streaks of starlight rushing out of a glowing vanishing point, headlines flying in on motion streaks (Ion Drive blue).
+    - *Planetfall*: a ringed planet rising at the foot of the frame, its atmosphere lit and a moon on its orbit, with the cinematic score (Red Planet rust and amber).
+    - *Wormhole*: a twisting tunnel of light rings rushing towards the camera, type converging out of an RGB split (Nebula violet and pink).
+    - *Data Rain*: columns of glyphs streaming down behind flat terminal cards, headlines decoding out of scrambled characters (Xeno acid green).
+    - *Quantum Mesh*: a cloud of glowing nodes turning in 3D, linked by threads of light, words lighting up one by one.
+    - *Starship Bridge*: stars at warp behind a mission HUD of brackets, timecode and readouts, with typed system text.
+    - Sci-Fi HUD (brackets, timecode, readouts, scan lines), Synthwave 3D (neon grid floor to the horizon), Deep Space (parallax starfield and nebula), Neon Tech, Dev Terminal.
+  - **3D**: 3D Spatial (content on an orbiting 3D plane over glowing 3D panels), 3D Turntable, 3D Glass Slab, Holographic, Liquid Chrome.
   - **Clean & Light**: Minimal Light, Swiss Clean (hairline layout frame), Enterprise Clean, Frosted Glass.
   - **Bold & Playful**: Bold Pop, Kinetic Type, Neo-Brutalist, Clay 3D (puffy claymorphism cards and gooey metaballs), Retro Dither.
   - **Premium**: Cinematic Keynote, Editorial Serif, Epic Launch, Luxe Noir.
@@ -164,7 +172,7 @@ IntroMaker is a portfolio project: a SaaS-style web app that turns a text prompt
 
 ## Quality: Kaizen scorecard
 
-`npm run kaizen` generates the storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 10 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site, a wordy site and an Amazon product listing) and 8 prompts, across 3 lengths, 3 story angles and all 39 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**; with every style and slide added since, the corpus (now 2,976 storyboards) averages **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
+`npm run kaizen` generates the storyboards and scores each out of 100 (including whether each narrator line fits its scene). The corpus covers 10 websites (sales, developer tool, AI, fintech, security, e-commerce, a live capture with UI components, a sparse site, a wordy site and an Amazon product listing) and 8 prompts, across 3 lengths, 3 story angles and all 45 styles. Films are scored on story arc (including a product-in-action moment), length accuracy, copy (length, repeats, filler endings, placeholders), variety, pacing, chapter labels, icon uniqueness, CTA and use of the site's material. It then reports the most frequent issues, so every improvement can be measured. Five cycles took the average from **88.1 to 99.0**: perfect films rose from 2 to 504 and the lowest score from 57 to 93. Adding the interaction moments and component scenes, with a stricter scorecard, took it to **99.6**; with every style and slide added since, the corpus (now 3,408 storyboards) averages **99.6**. The remaining misses are inputs with no feature material, which get an honest shorter cut and a director's note instead of invented content.
 
 `npm run audit:director` prints the storyboards themselves (every line on screen and the narration) for a set of SaaS, product and trailer prompts, because a saturated score can't show what reads badly. Reading them led to a round of fixes the scorecard couldn't see:
 - **Names**: a name leading straight into its description is recognised ("Halo smart water bottle…" → *Halo*, not "Halo smart water").
