@@ -19,7 +19,7 @@ import { topHeadline } from "./saas";
 
 /* ───────────────────────── The system ───────────────────────── */
 
-interface System {
+export interface System {
   /** The one card surface. */
   surface: string;
   /** Hairlines: 1 frames, 2 dividers and rules, 3 the background grid. */
@@ -32,7 +32,7 @@ interface System {
   px: number;
 }
 
-function system(sc: SkillContext): System {
+export function system(sc: SkillContext): System {
   const { palette, u } = sc;
   const light = !!palette.light;
   return {
@@ -46,7 +46,7 @@ function system(sc: SkillContext): System {
 }
 
 /** Flat stage with a faint dot grid on the 64pt rhythm (no glow: the type and lines carry it). */
-function stage(sc: SkillContext, sys: System) {
+export function stage(sc: SkillContext, sys: System) {
   if (sc.noStage) return;
   const { ctx, w, h, u, palette } = sc;
   ctx.fillStyle = palette.bg0;
@@ -62,10 +62,10 @@ function stage(sc: SkillContext, sys: System) {
   for (let y = step / 2; y < h; y += step) for (let x = step / 2; x < w; x += step) ctx.fillRect(x - r / 2, y - r / 2, r, r);
 }
 
-const MONO = (size: number, weight = 500) => `${weight} ${Math.round(size)}px "JetBrains Mono", ui-monospace, monospace`;
+export const MONO = (size: number, weight = 500) => `${weight} ${Math.round(size)}px "JetBrains Mono", ui-monospace, monospace`;
 
 /** A small tracked mono label (the system's meta type). */
-function meta(sc: SkillContext, text: string, x: number, y: number, k: number, opts: { align?: CanvasTextAlign; color?: string; size?: number } = {}) {
+export function meta(sc: SkillContext, text: string, x: number, y: number, k: number, opts: { align?: CanvasTextAlign; color?: string; size?: number } = {}) {
   if (k <= 0 || !text) return;
   const { ctx, u } = sc;
   ctx.save();
@@ -80,7 +80,7 @@ function meta(sc: SkillContext, text: string, x: number, y: number, k: number, o
 }
 
 /** A hairline drawn on from its start: p 0..1. */
-function rule(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, p: number, color: string, width: number) {
+export function rule(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, p: number, color: string, width: number) {
   if (p <= 0) return;
   ctx.save();
   ctx.strokeStyle = color;
@@ -93,7 +93,7 @@ function rule(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number,
 }
 
 /** A rounded frame whose outline draws itself around from the top-left: p 0..1. */
-function frameDraw(ctx: CanvasRenderingContext2D, x: number, y: number, fw: number, fh: number, r: number, p: number, color: string, width: number) {
+export function frameDraw(ctx: CanvasRenderingContext2D, x: number, y: number, fw: number, fh: number, r: number, p: number, color: string, width: number) {
   if (p <= 0) return;
   const len = 2 * (fw + fh);
   ctx.save();
@@ -107,7 +107,7 @@ function frameDraw(ctx: CanvasRenderingContext2D, x: number, y: number, fw: numb
 }
 
 /** Copy as words, each knowing whether it sits in the *accent*. */
-function accentWords(text: string) {
+export function accentWords(text: string) {
   const out: { w: string; a: boolean }[] = [];
   let on = false;
   for (const raw of autoAccent(text).split(/\s+/).filter(Boolean)) {
@@ -120,24 +120,24 @@ function accentWords(text: string) {
   return out;
 }
 
-const titleOf = (item: string) => item.split(/\s+[—–]\s+/)[0];
-const descOf = (item: string) => item.split(/\s+[—–]\s+/)[1] ?? "";
+export const titleOf = (item: string) => item.split(/\s+[—–]\s+/)[0];
+export const descOf = (item: string) => item.split(/\s+[—–]\s+/)[1] ?? "";
 
-function itemsOr(scene: Scene, min: number, fallback: string[]) {
+export function itemsOr(scene: Scene, min: number, fallback: string[]) {
   const items = (scene.items ?? []).filter(Boolean);
   return items.length >= min ? items : fallback;
 }
 
 /* ───────────────────────── Kinetic Poster ───────────────────────── */
 
-type Word = { w: string; a: boolean };
+export type Word = { w: string; a: boolean };
 
 /** The face for a word: the film's display face, with the accent set in an italic serif for contrast. */
-function wordFont(sc: SkillContext, word: Word, size: number) {
+export function wordFont(sc: SkillContext, word: Word, size: number) {
   return word.a ? `italic 400 ${Math.round(size * 1.08)}px "Instrument Serif", Georgia, serif` : displayFont(saasFont(sc), size);
 }
 
-function lineWidth(sc: SkillContext, line: Word[], size: number) {
+export function lineWidth(sc: SkillContext, line: Word[], size: number) {
   const { ctx } = sc;
   let wsum = 0;
   line.forEach((wd, i) => {
@@ -148,7 +148,7 @@ function lineWidth(sc: SkillContext, line: Word[], size: number) {
 }
 
 /** Stack the words like a poster: a few balanced lines, set as big as the block allows. */
-function posterLines(sc: SkillContext, words: Word[], maxW: number, maxH: number, maxLines: number) {
+export function posterLines(sc: SkillContext, words: Word[], maxW: number, maxH: number, maxLines: number) {
   const chars = words.reduce((a, w) => a + w.w.length, 0) + words.length - 1;
   const n = Math.max(1, Math.min(maxLines, words.length, words.length <= 3 ? words.length : Math.round(chars / 9)));
   const per = chars / n;
@@ -173,14 +173,19 @@ function posterLines(sc: SkillContext, words: Word[], maxW: number, maxH: number
   return { lines, size };
 }
 
-function drawWords(sc: SkillContext, line: Word[], x: number, y: number, size: number) {
+export function drawWords(sc: SkillContext, line: Word[], x: number, y: number, size: number, stroke?: string) {
   const { ctx, palette } = sc;
   let cx = x;
   line.forEach((wd, i) => {
     if (i) cx += size * 0.24;
     ctx.font = wordFont(sc, wd, size);
-    ctx.fillStyle = wd.a ? palette.primary : palette.text;
-    ctx.fillText(wd.w, cx, y);
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.strokeText(wd.w, cx, y);
+    } else {
+      ctx.fillStyle = wd.a ? palette.primary : palette.text;
+      ctx.fillText(wd.w, cx, y);
+    }
     cx += ctx.measureText(wd.w).width;
   });
 }
@@ -313,12 +318,103 @@ function typePoster(sc: SkillContext) {
 
 /* ───────────────────────── Showreel ───────────────────────── */
 
-const REEL_FALLBACK = ["Plan — Map the work in one place", "Build — Ship it together", "Review — Comments where the work is", "Launch — Go live in a click"];
+export const REEL_FALLBACK = ["Plan — Map the work in one place", "Build — Ship it together", "Review — Comments where the work is", "Launch — Go live in a click"];
 
 /** The pause on each card, fitted to the scene. */
-function reelPeriod(scene: Scene) {
+export function reelPeriod(scene: Scene) {
   const n = itemsOr(scene, 2, REEL_FALLBACK).slice(0, 6).length;
   return Math.max(0.9, (scene.duration - 1.7) / n);
+}
+
+/** One framed card of the reel family: a photo (or the feature's icon on a gridded field) over a strip with its index and title. `on` 0..1 is how much it's in focus. */
+export function reelCard(
+  sc: SkillContext,
+  sys: System,
+  o: { x: number; top: number; cw: number; visH: number; stripH: number; index: number; title: string; icon: string; img?: string; on: number; r?: number },
+) {
+  const { ctx, u, palette } = sc;
+  const { x, top, cw, visH, stripH, on } = o;
+  const ch = visH + stripH;
+  const r = o.r ?? 18 * u;
+  ctx.save();
+  ctx.shadowColor = palette.light ? "rgba(15,30,60,0.12)" : "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 40 * u;
+  ctx.shadowOffsetY = 16 * u;
+  ctx.fillStyle = sys.surface;
+  ctx.beginPath();
+  ctx.roundRect(x, top, cw, ch, r);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.save();
+  const vx = x + 8 * u;
+  const vy = top + 8 * u;
+  const vw = cw - 16 * u;
+  const vh = visH - 8 * u;
+  ctx.beginPath();
+  ctx.roundRect(vx, vy, vw, vh, r * 0.6);
+  ctx.clip();
+  const img = o.img ? getImage(o.img) : null;
+  if (img?.naturalWidth) {
+    drawCover(ctx, img, vx, vy, vw, vh, 1.06 - 0.06 * on, 0.5, 0.3);
+  } else {
+    const field = ctx.createLinearGradient(vx, vy, vx + vw, vy + vh);
+    field.addColorStop(0, rgba(palette.primary, palette.light ? 0.16 : 0.3));
+    field.addColorStop(1, rgba(palette.secondary, palette.light ? 0.08 : 0.14));
+    ctx.fillStyle = palette.bg0;
+    ctx.fillRect(vx, vy, vw, vh);
+    ctx.fillStyle = field;
+    ctx.fillRect(vx, vy, vw, vh);
+    // Inner grid (tier 3) and the icon, large, centred.
+    ctx.strokeStyle = sys.line3;
+    ctx.lineWidth = sys.px;
+    const step = 40 * u;
+    ctx.beginPath();
+    for (let gx = vx + step; gx < vx + vw; gx += step) {
+      ctx.moveTo(gx, vy);
+      ctx.lineTo(gx, vy + vh);
+    }
+    for (let gy = vy + step; gy < vy + vh; gy += step) {
+      ctx.moveTo(vx, gy);
+      ctx.lineTo(vx + vw, gy);
+    }
+    ctx.stroke();
+    drawIcon(ctx, o.icon, vx + vw / 2, vy + vh / 2 - on * 4 * u, Math.min(vw, vh) * (0.3 + 0.04 * on), palette.text, 0.35 + 0.65 * on);
+  }
+  ctx.restore();
+  ctx.strokeStyle = on > 0.5 ? sys.line1 : sys.line2;
+  ctx.lineWidth = sys.px;
+  ctx.beginPath();
+  ctx.roundRect(x, top, cw, ch, r);
+  ctx.stroke();
+  // The strip: index and title.
+  const sy = top + visH + stripH / 2;
+  meta(sc, String(o.index + 1).padStart(2, "0"), x + 22 * u, sy, 1, { color: palette.primary, size: Math.min(17 * u, cw / 16) });
+  ctx.font = `650 ${Math.round(Math.min(26 * u, cw / 14))}px Inter, sans-serif`;
+  ctx.fillStyle = palette.text;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(o.title, x + Math.min(66 * u, cw * 0.2), sy, cw - Math.min(66 * u, cw * 0.2) - 22 * u);
+  ctx.restore();
+}
+
+/** Four corner marks just outside a box: the system's focus indicator. */
+export function focusTicks(sc: SkillContext, x: number, top: number, cw: number, ch: number, k: number) {
+  if (k <= 0) return;
+  const { ctx, u, palette } = sc;
+  ctx.save();
+  ctx.strokeStyle = palette.primary;
+  ctx.globalAlpha *= k;
+  ctx.lineWidth = Math.max(1.5, 2 * u);
+  const o = 12 * u;
+  const L = 18 * u;
+  for (const [cx2, cy2, sx, sy2] of [[x - o, top - o, 1, 1], [x + cw + o, top - o, -1, 1], [x - o, top + ch + o, 1, -1], [x + cw + o, top + ch + o, -1, -1]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(cx2, cy2 + sy2 * L);
+    ctx.lineTo(cx2, cy2);
+    ctx.lineTo(cx2 + sx * L, cy2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /**
@@ -327,7 +423,7 @@ function reelPeriod(scene: Scene) {
  * progress hairline run underneath, the focused card's line beside them.
  */
 function showreel(sc: SkillContext) {
-  const { ctx, w, h, t, d, u, palette, scene } = sc;
+  const { ctx, w, h, t, u, palette, scene } = sc;
   const sys = system(sc);
   stage(sc, sys);
   const portrait = h > w;
@@ -367,86 +463,10 @@ function showreel(sc: SkillContext) {
     ctx.translate(x + cw / 2, cy);
     ctx.scale(s, s);
     ctx.translate(-(x + cw / 2), -cy);
-    const r = 18 * u;
-    // Surface and its frame.
-    ctx.shadowColor = palette.light ? "rgba(15,30,60,0.12)" : "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = 40 * u;
-    ctx.shadowOffsetY = 16 * u;
-    ctx.fillStyle = sys.surface;
-    ctx.beginPath();
-    ctx.roundRect(x, top, cw, ch, r);
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    // The visual: a photo of the product when there is one, else the feature's icon on a field.
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(x + 8 * u, top + 8 * u, cw - 16 * u, visH - 8 * u, r * 0.6);
-    ctx.clip();
-    const img = images.length ? getImage(images[i % images.length]) : null;
-    const vx = x + 8 * u;
-    const vy = top + 8 * u;
-    const vw = cw - 16 * u;
-    const vh = visH - 8 * u;
-    if (img?.naturalWidth) {
-      drawCover(ctx, img, vx, vy, vw, vh, 1.06 - 0.06 * (1 - Math.min(1, dist)), 0.5, 0.3);
-    } else {
-      const field = ctx.createLinearGradient(vx, vy, vx + vw, vy + vh);
-      field.addColorStop(0, rgba(palette.primary, palette.light ? 0.16 : 0.3));
-      field.addColorStop(1, rgba(palette.secondary, palette.light ? 0.08 : 0.14));
-      ctx.fillStyle = palette.bg0;
-      ctx.fillRect(vx, vy, vw, vh);
-      ctx.fillStyle = field;
-      ctx.fillRect(vx, vy, vw, vh);
-      // Inner grid (tier 3) and the icon, large, centred.
-      ctx.strokeStyle = sys.line3;
-      ctx.lineWidth = sys.px;
-      const step = 40 * u;
-      ctx.beginPath();
-      for (let gx = vx + step; gx < vx + vw; gx += step) {
-        ctx.moveTo(gx, vy);
-        ctx.lineTo(gx, vy + vh);
-      }
-      for (let gy = vy + step; gy < vy + vh; gy += step) {
-        ctx.moveTo(vx, gy);
-        ctx.lineTo(vx + vw, gy);
-      }
-      ctx.stroke();
-      const on = 1 - Math.min(1, dist);
-      drawIcon(ctx, icons[i], vx + vw / 2, vy + vh / 2 - on * 4 * u, Math.min(vw, vh) * (0.3 + 0.04 * on), palette.text, 0.35 + 0.65 * on);
-    }
-    ctx.restore();
-    ctx.strokeStyle = dist < 0.5 ? sys.line1 : sys.line2;
-    ctx.lineWidth = sys.px;
-    ctx.beginPath();
-    ctx.roundRect(x, top, cw, ch, r);
-    ctx.stroke();
-    // The strip: index and title.
-    const sy = top + visH + stripH / 2;
-    meta(sc, String(i + 1).padStart(2, "0"), x + 22 * u, sy, 1, { color: palette.primary });
-    ctx.font = `650 ${Math.round(Math.min(26 * u, cw / 14))}px Inter, sans-serif`;
-    ctx.fillStyle = palette.text;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(titleOf(items[i]), x + 66 * u, sy, cw - 88 * u);
+    reelCard(sc, sys, { x, top, cw, visH, stripH, index: i, title: titleOf(items[i]), icon: icons[i], img: images.length ? images[i % images.length] : undefined, on: 1 - Math.min(1, dist) });
     ctx.restore();
     // Focus ticks: four corner marks just outside the focused card.
-    const fk = (1 - Math.min(1, dist * 2.5)) * (1 - ex) * range(t, 0.9, 1.3);
-    if (fk > 0) {
-      ctx.save();
-      ctx.strokeStyle = palette.primary;
-      ctx.globalAlpha = fk;
-      ctx.lineWidth = Math.max(1.5, 2 * u);
-      const o = 12 * u;
-      const L = 18 * u;
-      for (const [cx2, cy2, sx, sy2] of [[x - o, top - o, 1, 1], [x + cw + o, top - o, -1, 1], [x - o, top + ch + o, 1, -1], [x + cw + o, top + ch + o, -1, -1]] as const) {
-        ctx.beginPath();
-        ctx.moveTo(cx2, cy2 + sy2 * L);
-        ctx.lineTo(cx2, cy2);
-        ctx.lineTo(cx2 + sx * L, cy2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
+    focusTicks(sc, x, top, cw, ch, (1 - Math.min(1, dist * 2.5)) * (1 - ex) * range(t, 0.9, 1.3));
   }
   // The counter, the progress hairline and the focused card's line.
   const by = Math.min(top + ch + 64 * u, h - g.safe.bottom - 10 * u);

@@ -1423,7 +1423,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     ...(featureItems.length >= 2 ? ["icons"] : []),
     ...(featureItems.length === 3 || featureItems.length === 4 ? ["bento"] : []),
     // Editorial system layouts: a showreel of the features, or the card system.
-    ...(featureItems.length >= 3 ? ["reel", "system"] : []),
+    ...(featureItems.length >= 3 ? ["reel", "system", "stack", "sheet", "contact", "widgets"] : []),
   ];
   const featureKind = featureKinds.length ? featureKinds[variant % featureKinds.length] : null;
   const featureSlides = featureKind === "slides";
@@ -1465,6 +1465,27 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: Math.max(5, beats(12)),
       transition: "dolly",
     });
+  } else if (featureKind === "stack" || featureKind === "contact") {
+    const set = featureItems.slice(0, featureKind === "stack" ? 5 : 6);
+    add(valuePriority, {
+      role: "features", skill: featureKind === "stack" ? "card-stack" : "contact-sheet",
+      text: concept.featuresTitle,
+      items: set,
+      eyebrow: "Features",
+      duration: Math.max(5.2, (featureKind === "stack" ? 1.8 : 2.4) + set.length * 1.1, beats(12)),
+      transition: "dolly",
+    });
+  } else if (featureKind === "sheet" || featureKind === "widgets") {
+    // The spec sheet reads best with each feature's one-line detail.
+    const rows = featureKind === "sheet" && withBenefit.length >= 3 ? withBenefit.slice(0, 5) : featureItems.slice(0, featureKind === "sheet" ? 5 : 4);
+    add(valuePriority, {
+      role: "bento", skill: featureKind === "sheet" ? "spec-sheet" : "widget-set",
+      text: `Inside *${site.name}*`,
+      items: rows,
+      eyebrow: "All-in-one",
+      duration: Math.max(5, beats(12)),
+      transition: "dolly",
+    });
   } else if (featureKind === "icons") {
     add(valuePriority, {
       role: "features", skill: "icon-features",
@@ -1479,7 +1500,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
   // Products that lead with AI get the AI moment whatever their category.
   const aiLed = concept.id !== "ai" && [site.tagline, ...site.headlines.slice(0, 4)].some((x) => /\b(ai|assistant|copilot|gpt)\b/i.test(x ?? ""));
-  const shownTitles = new Set([...(featureSlides ? withBenefit.slice(0, 3) : featureItems.slice(0, featureKind === "bento" ? 6 : featureKind === "reel" ? 5 : 4)), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
+  const shownTitles = new Set([...(featureSlides ? withBenefit.slice(0, 3) : featureItems.slice(0, featureKind === "bento" ? 6 : featureKind === "reel" || featureKind === "stack" || featureKind === "sheet" ? 5 : featureKind === "contact" ? 6 : 4)), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
   const spareFeatures = shortFeatures.filter((f) => !shownTitles.has(norm(f)));
   // The moment that suits this product best, scored on the site's own words, its category and its
   // material (see rankMoments): a dev platform that talks about deploys gets code → deploy, a
@@ -1618,7 +1639,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
   // between the reveal and the product that needs no media and makes no claims.
   // Remakes set the same line as an editorial type moment: bands of kinetic type, or a poster.
-  const promiseKind = (["word-swap", "type-rows", "type-poster"] as const)[variant % 3];
+  const promiseKind = (["word-swap", "type-rows", "type-poster", "type-echo", "poster-split", "type-slots", "poster-grid"] as const)[variant % 7];
   const [swapLead, swapWords = ""] = concept.swap.split(/,\s*(?=[^,]*$)/);
   const swapList = swapWords.split("|").filter(Boolean);
   const promiseLine = swapList.length ? `${swapLead}, *${swapList[swapList.length - 1]}*` : concept.swap;
@@ -1635,7 +1656,13 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     : {
         role: "promise", skill: promiseKind,
         text: promiseLine,
-        items: promiseKind === "type-rows" ? (shortFeatures.length >= 3 ? shortFeatures.slice(0, 5) : swapList.map(cap)) : shortFeatures.slice(0, 3),
+        items:
+          promiseKind === "type-echo"
+            ? undefined
+            : promiseKind === "type-rows" || promiseKind === "type-slots"
+              ? shortFeatures.length >= 3 ? shortFeatures.slice(0, 5) : swapList.map(cap)
+              : shortFeatures.slice(0, 3),
+        subtext: promiseKind === "poster-split" ? sentenceCopy(site.description, 10) || undefined : undefined,
         eyebrow: `Why ${site.name}`,
         duration: Math.max(4.6, beats(9)),
         transition: "whip",

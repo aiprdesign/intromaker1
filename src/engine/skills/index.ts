@@ -2,6 +2,7 @@ import type { Skill, SkillId } from "../types";
 import { componentSkills } from "./components";
 import { endingSkills } from "./endings";
 import { editorialSkills } from "./editorial";
+import { editorialMoreSkills } from "./editorial2";
 import { energySkills } from "./energy";
 import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
@@ -21,6 +22,7 @@ export const SKILLS: Skill[] = [
   ...saasSkills,
   ...endingSkills,
   ...editorialSkills,
+  ...editorialMoreSkills,
   ...interactionSkills,
   ...momentSkills,
   ...slideSkills,
@@ -56,7 +58,7 @@ export const SKILL_MAP = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Rec
 export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "SaaS essentials", skills: saasSkills },
   { name: "Openers & end cards", skills: endingSkills },
-  { name: "Editorial system", skills: editorialSkills },
+  { name: "Editorial system", skills: [...editorialSkills, ...editorialMoreSkills] },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills] },
   { name: "Slides", skills: slideSkills },
   { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...componentSkills, ...mediaSkills] },
@@ -85,4 +87,6 @@ export const MEDIA_SKILLS = new Set<SkillId>([
   "product-zoom",
   "product-teaser",
   "showreel",
+  "card-stack",
+  "contact-sheet",
 ]);

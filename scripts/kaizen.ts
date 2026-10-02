@@ -130,7 +130,7 @@ function score(plan: VideoPlan, requested: number, site: SiteData | null, safe =
 
   // ── Icons (5): feature scenes use distinct icons.
   const family = CONCEPT_MAP[plan.concept ?? "general"]?.icons;
-  for (const s of sc.filter((x) => ["icon-features", "bento", "showreel"].includes(x.skill))) {
+  for (const s of sc.filter((x) => ["icon-features", "bento", "showreel", "card-stack", "contact-sheet"].includes(x.skill))) {
     const icons = iconsFor((s.items ?? []).map((it) => it.split(/\s+[—–]\s+/)[0]), family);
     if (new Set(icons).size < icons.length) add("icons", 3, `${s.role} repeats an icon (${icons.join(",")})`);
   }

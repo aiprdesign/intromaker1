@@ -764,7 +764,7 @@ const BUG_SKIP = new Set(["hook", "pain", "reveal", "cta"]);
  * Persistent brand bug: a small logo lock-up in the top-left corner through the body of a
  * SaaS film (after the brand reveal, before the end card), like a broadcast network bug.
  */
-const BUG_ASIDE = new Set<string>(["type-poster", "type-rows"]);
+const BUG_ASIDE = new Set<string>(["type-poster", "type-rows", "poster-grid", "poster-split", "type-echo"]);
 
 function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, w: number, h: number) {
   const brand = plan.brand;

@@ -314,7 +314,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.5, backdrop: "dots", card: "flat", text: "mask", bokeh: false, grain: 0.2, shader: "grain", shaderStrength: 0.85 },
     transitions: ["push", "dissolve", "cut"],
     pace: 1.05,
-    roles: {},
+    roles: { bento: "spec-sheet" },
     revealNoLogo: "logo-reveal",
     sample: sample("Revenue, *finally in sync*."),
   },
@@ -368,7 +368,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0, backdrop: "dots", card: "brutal", text: "pop", textScale: 1.1, bokeh: false, grain: 0.2, vignette: 0.4 },
     transitions: ["cut", "push", "zoom"],
     pace: 0.9,
-    roles: {},
+    roles: { promise: "poster-grid" },
     revealNoLogo: "flip-3d",
     sample: sample("No fluff. *Just results.*"),
   },
@@ -992,6 +992,14 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "type-poster": "promise",
   showreel: "features",
   "card-system": "bento",
+  "poster-grid": "promise",
+  "poster-split": "promise",
+  "type-echo": "promise",
+  "type-slots": "promise",
+  "card-stack": "features",
+  "contact-sheet": "features",
+  "spec-sheet": "bento",
+  "widget-set": "bento",
   testimonial: "quote",
   "logo-marquee": "logos",
   "number-ticker": "stat",
@@ -1100,7 +1108,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
