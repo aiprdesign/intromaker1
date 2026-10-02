@@ -596,7 +596,7 @@ function aiPrompt(sc: SkillContext) {
 
 function flowItems(scene: Scene) {
   const items = (scene.items ?? []).map(titleOf).filter(Boolean).slice(0, 5);
-  return items.length >= 2 ? items : ["Sync your data", "Update every record", "Notify the team", "Generate the report"];
+  return items.length >= 2 ? items : ["Sync your data", "Update your records", "Notify the team", "Generate the report"];
 }
 
 function flowTiming(scene: Scene, beat: number) {
@@ -1059,7 +1059,7 @@ export const interactionSkills: Skill[] = [
     id: "click-flow",
     name: "One-Click Flow",
     tagline: "A cursor glides to the primary button behind a micro-zoom; one click and every task ticks off in a fast cascade.",
-    bestFor: "Automation and 'it just works' moments. Headline = the outcome; subtext = the button label ('Run', 'Deploy', 'Approve all'); items = 3–5 tasks it completes (real features).",
+    bestFor: "Automation and 'it just works' moments. Headline = the outcome; subtext = the button label ('Run', 'Deploy', 'Approve'); items = 3–5 tasks it completes (real features).",
     sample: { text: "Busywork, *handled*", subtext: "Run", items: ["Match receipts", "Categorise expenses", "Sync to accounting", "Notify finance"] },
     itemsHint: "3–5 tasks it completes",
     render: clickFlow,

@@ -1159,7 +1159,7 @@ export const productSkills: Skill[] = [
     tagline: "Your product photo cut out of its white background, rising onto the stage with a floor shadow and light sweep; features called out around it one by one.",
     bestFor:
       "Physical products (marketplace listings, uploaded product photos). Without items: the product reveal (headline = product name, subtext = a short line). With items: 2-4 short feature callouts around the product (titles of 1-4 words).",
-    sample: { text: "Meet *Aero Buds*", items: ["Noise cancelling", "All-day battery", "Water resistant"] },
+    sample: { text: "Meet *Aero Buds*", items: ["Noise cancelling", "USB-C charging", "Water resistant"] },
     itemsHint: "Feature callouts around the product (1-4 words each)",
     render: productHero,
     sfx: (scene, beat) => {
@@ -1183,8 +1183,8 @@ export const productSkills: Skill[] = [
     id: "product-spin",
     name: "Every Angle",
     tagline: "The product's photos take turns on the stage, each sliding off level as the next glides in, with dots counting the angles.",
-    bestFor: "Physical products with 2+ photos from different angles. Headline = a short line ('From every *angle*'); the photos come from the product images.",
-    sample: { text: "From every *angle*" },
+    bestFor: "Physical products with 2+ photos from different angles. Headline = a short line ('From each *angle*'); the photos come from the product images.",
+    sample: { text: "From each *angle*" },
     render: productSpin,
     sfx: (scene) => {
       const n = 4;
@@ -1196,8 +1196,8 @@ export const productSkills: Skill[] = [
     id: "product-zoom",
     name: "Detail Zoom",
     tagline: "A magnifying lens glides over the product to its most detailed parts, enlarging each, with the feature it shows called out beside it.",
-    bestFor: "Physical products: the close-up moment. Headline = a short line ('Every *detail*'); items = up to 3 short feature titles, one per stop (optional).",
-    sample: { text: "Every *detail*", items: ["Soft-touch finish", "Magnetic case", "Charging light"] },
+    bestFor: "Physical products: the close-up moment. Headline = a short line ('The *details*'); items = up to 3 short feature titles, one per stop (optional).",
+    sample: { text: "The *details*", items: ["Soft-touch finish", "Magnetic case", "Charging light"] },
     itemsHint: "One short feature per close-up (optional)",
     render: productZoom,
     sfx: (scene) => {
@@ -1210,8 +1210,8 @@ export const productSkills: Skill[] = [
     name: "Trailer Cold Open",
     tagline: "Hard cuts on the beat between tight close-ups of the product, one big word on each, with flashes and cinema bars, then a white flash into the reveal.",
     bestFor:
-      "The opening of a product trailer (trailer styles). Items = 2-3 punchy feature words, one per shot ('Noise cancelling', 'All-day battery'); headline = a fallback line. Put the product reveal right after it.",
-    sample: { text: "Introducing", items: ["Noise cancelling", "All-day battery", "Pocket case"] },
+      "The opening of a product trailer (trailer styles). Items = 2-3 punchy feature words, one per shot ('Noise cancelling', 'USB-C charging'); headline = a fallback line. Put the product reveal right after it.",
+    sample: { text: "Introducing", items: ["Noise cancelling", "USB-C charging", "Pocket case"] },
     itemsHint: "One punchy word or two per shot (2-3 shots)",
     render: productTeaser,
     sfx: (scene, beat) => {

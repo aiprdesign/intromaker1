@@ -333,100 +333,6 @@ textarea {
   cursor: pointer;
 }
 /* Product video tab: a listing link, or uploaded photos with a short description. */
-.format-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.format-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px 8px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: rgba(10, 8, 20, 0.6);
-  color: var(--muted);
-  text-align: left;
-  cursor: pointer;
-  backdrop-filter: blur(12px);
-}
-.format-chip strong {
-  display: block;
-  font: 600 13px var(--body);
-  color: var(--text);
-}
-.format-chip small {
-  font-size: 11px;
-}
-.format-chip .short {
-  display: none;
-}
-.format-chip.active {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 1px var(--cyan) inset;
-}
-/* The cut: clean product ad or epic trailer. */
-.cut-row {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin: -4px 0 14px;
-}
-.cut-chip {
-  padding: 7px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(10, 8, 20, 0.6);
-  color: var(--muted);
-  cursor: pointer;
-  text-align: center;
-  backdrop-filter: blur(12px);
-}
-.cut-chip strong {
-  font: 600 13px var(--body);
-  color: var(--text);
-}
-.cut-chip small {
-  display: block;
-  font-size: 11px;
-}
-.cut-chip.active {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 1px var(--cyan) inset;
-}
-@media (max-width: 640px) {
-  .cut-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-  .cut-chip {
-    border-radius: 14px;
-    padding: 7px 8px;
-  }
-}
-.format-shape {
-  flex: none;
-  border: 2px solid currentColor;
-  border-radius: 3px;
-}
-.format-chip.active .format-shape {
-  color: var(--cyan);
-}
-.format-shape.s-9x16 {
-  width: 12px;
-  height: 20px;
-}
-.format-shape.s-16x9 {
-  width: 22px;
-  height: 13px;
-}
-.format-shape.s-1x1 {
-  width: 17px;
-  height: 17px;
-}
 .product-or {
   display: flex;
   align-items: center;
@@ -1256,6 +1162,28 @@ textarea {
 .view-size button + button {
   border-left: 1px solid var(--line);
 }
+.aspect-pick button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.aspect-shape {
+  display: inline-block;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+.aspect-shape.s-9x16 {
+  width: 7px;
+  height: 12px;
+}
+.aspect-shape.s-16x9 {
+  width: 14px;
+  height: 8px;
+}
+.aspect-shape.s-1x1 {
+  width: 10px;
+  height: 10px;
+}
 .view-size button.active,
 .view-size button:hover {
   color: var(--text);
@@ -1519,24 +1447,6 @@ textarea {
   }
   .mode-tabs button {
     padding: 8px 10px;
-  }
-  .format-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-  .format-chip {
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 6px;
-    text-align: center;
-  }
-  .format-chip .long {
-    display: none;
-  }
-  .format-chip .short {
-    display: block;
-    font-size: 12px;
   }
   .prompt-bar input {
     padding: 12px;

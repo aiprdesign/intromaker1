@@ -776,7 +776,7 @@ export default function Studio() {
       );
       return;
     }
-    // The format chosen on the homepage (?aspect=9:16&length=standard), e.g. for Reels or Amazon.
+    // A format carried by the link (?aspect=9:16&length=standard), e.g. from a shared or bookmarked link.
     const fa = params.get("aspect");
     const fl = params.get("length");
     const fmt = {
@@ -785,7 +785,7 @@ export default function Studio() {
     };
     if (fmt.aspect) setAspect(fmt.aspect);
     if (fmt.length) setLength(fmt.length);
-    // ?look=trailer: the product video cut as a trailer (the homepage's Trailer choice).
+    // ?look=trailer: the product video cut as a trailer.
     if (params.get("look") === "trailer") {
       styleRef.current = "trailer";
       setStyle("trailer");
@@ -1521,24 +1521,8 @@ export default function Studio() {
             </details>
           )}
 
+          {/* The format (9:16, 16:9, 1:1) is picked in the player's toolbar, under the video. */}
           <div className="field-pair">
-            <div>
-          <label className="field-label">Format</label>
-          <div className="seg-control">
-            {(["16:9", "9:16", "1:1"] as Aspect[]).map((a) => (
-              <button
-                key={a}
-                className={aspect === a ? "active" : ""}
-                onClick={() => {
-                  setAspect(a);
-                  setGlobal({ aspect: a });
-                }}
-              >
-                {a === "16:9" ? "16:9" : a === "9:16" ? "9:16" : "1:1"}
-              </button>
-            ))}
-          </div>
-            </div>
             <div>
           <label className="field-label">Length</label>
           <div className="seg-control">
@@ -1773,6 +1757,10 @@ export default function Studio() {
               seek={seek}
               onScene={setActiveScene}
               limits={account?.limits}
+              onAspect={(a) => {
+                setAspect(a);
+                setGlobal({ aspect: a });
+              }}
               beforeExport={async () => {
                 // Slides still showing a placeholder instead of your picture.
                 const waiting = plan.scenes.map((x, k) => (needsPicture(x, plan) ? k + 1 : 0)).filter(Boolean);

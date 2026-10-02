@@ -463,7 +463,7 @@ export const mediaSkills: Skill[] = [
     name: "Photo Montage",
     tagline: "Full-bleed imagery with Ken Burns motion, a brand-colour grade and masked type.",
     bestFor: "Feature beats over real photos or screenshots. Headline = 1–4 words.",
-    sample: { text: "MADE FOR TEAMS", subtext: "Collaborate anywhere" },
+    sample: { text: "MADE FOR TEAMS", subtext: "Collaborate remotely" },
     render: photoMontage,
   },
   {

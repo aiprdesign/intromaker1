@@ -32,7 +32,7 @@ export const SAAS_SAMPLE: VideoPlan = inTemplate(
   [
     [{ role: "hook", skill: "blur-reveal", text: "Your metrics, *finally clear*.", eyebrow: "Introducing Lumetrik", subtext: "Analytics for product teams", transition: "cut" }, 8],
     [{ role: "problem", skill: "pain-strike", text: "There's a *better* way.", items: ["Scattered dashboards", "Weekly CSV exports", "Guesswork"], transition: "dolly" }, 10],
-    [{ role: "demo", skill: "ui-tour", text: "Every metric, *one view*", eyebrow: "The product", items: ["Live funnels", "Shared reports"], transition: "whip" }, 12],
+    [{ role: "demo", skill: "ui-tour", text: "Your metrics, *one view*", eyebrow: "The product", items: ["Live funnels", "Shared reports"], transition: "whip" }, 12],
     [{ role: "features", skill: "ai-prompt", text: "Just *ask*.", subtext: "Here's what changed:", items: ["Why did signups dip on Tuesday?", "Mobile checkout errors rose after Monday's release", "Fix shipped, checkout back to normal", "A summary is ready for your team"], transition: "dolly" }, 12],
     [{ role: "features", skill: "chart-grow", text: "Growth you can *see*", subtext: "12,480 weekly active users", transition: "push" }, 9],
     [{ role: "features", skill: "live-cursors", text: "Built for *teams*", subtext: "Looks great, let's ship it", items: ["Q3 roadmap", "Funnel review", "Launch metrics", "Release notes"], transition: "dolly" }, 10],
@@ -49,9 +49,9 @@ export const PRODUCT_SAMPLE: VideoPlan = inTemplate(
   "studio",
   [
     [{ role: "reveal", skill: "product-hero", text: "Kelvo", subtext: "The smart bottle with a temperature display", media: photo(0), transition: "cut" }, 8],
-    [{ role: "features", skill: "product-hero", text: "Made for *every day*", eyebrow: "Why you'll love it", items: ["Temperature display", "Screw-top lid", "Carry loop"], media: photo(1), transition: "dolly" }, 14],
-    [{ role: "gallery", skill: "product-spin", text: "From every *angle*", eyebrow: "Gallery", transition: "dolly" }, 12],
-    [{ role: "gallery", skill: "product-zoom", text: "Every *detail*", eyebrow: "Details", items: ["Glanceable display", "Brushed steel cap", "Matte finish"], media: photo(0), transition: "whip" }, 12],
+    [{ role: "features", skill: "product-hero", text: "Made for *daily use*", eyebrow: "Why you'll love it", items: ["Temperature display", "Screw-top lid", "Carry loop"], media: photo(1), transition: "dolly" }, 14],
+    [{ role: "gallery", skill: "product-spin", text: "From each *angle*", eyebrow: "Gallery", transition: "dolly" }, 12],
+    [{ role: "gallery", skill: "product-zoom", text: "The *details*", eyebrow: "Details", items: ["Glanceable display", "Brushed steel cap", "Matte finish"], media: photo(0), transition: "whip" }, 12],
     [{ role: "cta", skill: "product-end", text: "Get yours *today*", subtext: "Shop now", media: photo(0), transition: "flash" }, 8],
   ],
 );
@@ -94,7 +94,7 @@ export const SAMPLE_FILMS = [
     id: "product",
     label: "Product video",
     plan: PRODUCT_SAMPLE,
-    blurb: "Kelvo is an imaginary smart bottle. From three photos the film builds the reveal, feature callouts, every angle, close-ups and an end card.",
+    blurb: "Kelvo is an imaginary smart bottle. From three photos the film builds the reveal, feature callouts, each angle, close-ups and an end card.",
     prompt: 'Product video for "Kelvo", a smart water bottle with a temperature display on the cap. Screw-top lid, carry loop, brushed steel cap',
   },
   {

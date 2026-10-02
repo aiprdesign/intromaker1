@@ -9,7 +9,7 @@ import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
 import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
 import { SKILL_MAP } from "@/engine/skills";
-import type { VideoPlan } from "@/engine/types";
+import type { Aspect, VideoPlan } from "@/engine/types";
 import { WATERMARK, type PlanLimits } from "@/lib/plans";
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
@@ -24,6 +24,13 @@ const VIEWS: [ViewSize, string, string][] = [
 /** How tall the preview may be, per size (Fit has no height limit). */
 const VIEW_HEIGHT: Record<ViewSize, string> = { s: "40vh", m: "62vh", l: "82vh", fit: "none" };
 
+/** Video formats offered in the toolbar, with where each one runs. */
+const ASPECTS: [Aspect, string][] = [
+  ["9:16", "Vertical 9:16: Reels, TikTok, Shorts"],
+  ["16:9", "Widescreen 16:9: websites, YouTube, Amazon listings"],
+  ["1:1", "Square 1:1: Instagram and Facebook feed"],
+];
+
 export default function Player({
   plan,
   autoPlay = true,
@@ -33,6 +40,7 @@ export default function Player({
   onExported,
   beforeExport,
   limits,
+  onAspect,
 }: {
   plan: VideoPlan;
   autoPlay?: boolean;
@@ -51,6 +59,8 @@ export default function Player({
   beforeExport?: () => boolean | VideoPlan | null | Promise<boolean | VideoPlan | null>;
   /** The viewer's plan: largest export, frame rate and watermark. */
   limits?: PlanLimits;
+  /** Shows the frame picker (9:16, 16:9, 1:1) in the toolbar; called with the chosen format. */
+  onAspect?: (aspect: Aspect) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playing, setPlaying] = useState(autoPlay);
@@ -375,6 +385,24 @@ export default function Player({
           })}
           <div className="playhead" style={{ left: `${(time / duration) * 100}%` }} />
         </div>
+        {onAspect && (
+          <div className="view-size aspect-pick" role="radiogroup" aria-label="Video format">
+            {ASPECTS.map(([a, title]) => (
+              <button
+                key={a}
+                role="radio"
+                aria-checked={plan.aspect === a}
+                className={plan.aspect === a ? "active" : ""}
+                onClick={() => plan.aspect !== a && onAspect(a)}
+                disabled={exporting !== null}
+                title={title}
+              >
+                <span className={`aspect-shape s-${a.replace(":", "x")}`} aria-hidden />
+                {a}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="view-size" role="radiogroup" aria-label="Preview size">
           {VIEWS.map(([id, label, title]) => (
             <button key={id} role="radio" aria-checked={view === id} className={view === id ? "active" : ""} onClick={() => chooseView(id)} title={title}>

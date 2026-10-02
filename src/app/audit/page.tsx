@@ -4,7 +4,7 @@ import LayoutAudit from "./LayoutAudit";
 
 export const metadata: Metadata = {
   title: "Layout audit · IntroMaker",
-  description: "Every skill checked against IntroMaker's design system: title-safe areas, clipping and overlapping text.",
+  description: "Each skill checked against IntroMaker's design system: title-safe areas, clipping and overlapping text.",
   robots: { index: false },
 };
 

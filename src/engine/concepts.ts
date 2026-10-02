@@ -166,7 +166,7 @@ export const CONCEPTS: Concept[] = [
     icons: ["Users", "SquareKanban", "ListChecks", "MessagesSquare", "CalendarCheck", "FileText"],
     orbit: ["MessagesSquare", "CalendarCheck", "FileText", "Mail", "Video", "Folder", "GitBranch", "PenTool"],
     arc: ["hook", "pain", "reveal", "meet", "tour", "features", "how", "integrations", "quote", "logos", "cards", "bento", "cta"],
-    eyebrows: { features: "All in one place", integrations: "Works with your tools" },
+    eyebrows: { features: "In one place", integrations: "Works with your tools" },
     featuresTitle: "Your work, *in one place*",
     cta: ["Get started *free*", "Try it with your *team*", "Work with *{name}*"],
     template: "eclipse",
@@ -250,8 +250,8 @@ export const CONCEPTS: Concept[] = [
     icons: ["MessagesSquare", "Headset", "Phone", "Video", "Mail", "Bell"],
     orbit: ["Mail", "Phone", "MessagesSquare", "Smartphone", "Globe", "Database", "Bot", "CalendarCheck"],
     arc: ["pain", "hook", "reveal", "tour", "features", "how", "integrations", "quote", "logos", "cards", "bento", "meet", "cta"],
-    eyebrows: { features: "Every conversation", integrations: "Every channel" },
-    featuresTitle: "Every conversation, *one inbox*",
+    eyebrows: { features: "Conversations", integrations: "Channels" },
+    featuresTitle: "Your conversations, *one inbox*",
     cta: ["Try it *free*", "Support customers with *{name}*", "Get *started*"],
     template: "neon",
     swap: "Your inbox, sorted|routed|answered",
@@ -307,7 +307,7 @@ export const CONCEPTS: Concept[] = [
     orbit: ["Plane", "Hotel", "MapPin", "CreditCard", "CalendarCheck", "Camera", "Globe", "Smartphone"],
     arc: ["hook", "reveal", "tour", "features", "how", "reach", "quote", "cards", "logos", "integrations", "bento", "meet", "cta"],
     eyebrows: { features: "Plan your trip", how: "How it works", tour: "Take a look" },
-    featuresTitle: "Every trip, *sorted*",
+    featuresTitle: "Your trips, *sorted*",
     cta: ["Plan your *trip*", "Start *exploring*", "Travel with *{name}*"],
     template: "aurora",
     swap: "Your trip, planned|booked|shared",
@@ -377,7 +377,7 @@ export const CONCEPTS: Concept[] = [
     orbit: ["Truck", "Package", "MapPin", "Smartphone", "Warehouse", "Receipt", "Bell", "Database"],
     arc: ["pain", "hook", "reveal", "tour", "features", "how", "reach", "cards", "quote", "logos", "integrations", "bento", "meet", "cta"],
     eyebrows: { features: "Built for operations", how: "How it works" },
-    featuresTitle: "Every delivery, *on track*",
+    featuresTitle: "Your deliveries, *on track*",
     cta: ["Book a *demo*", "Start *shipping*", "Deliver with *{name}*"],
     template: "midnight",
     swap: "Your deliveries, planned|tracked|done",
@@ -404,7 +404,7 @@ export const CONCEPTS: Concept[] = [
     icons: ["PawPrint", "Dog", "Cat", "Bone", "Heart", "CalendarCheck"],
     orbit: ["PawPrint", "CalendarCheck", "MapPin", "Camera", "MessagesSquare", "CreditCard", "Bell", "Smartphone"],
     arc: ["hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "pain", "bento", "meet", "cta"],
-    eyebrows: { features: "For every pet", how: "How it works" },
+    eyebrows: { features: "For your pets", how: "How it works" },
     featuresTitle: "Happy pets, *happy owners*",
     cta: ["Book *now*", "Get *started*", "Care with *{name}*"],
     template: "clay",
@@ -496,7 +496,7 @@ export const DEMOS: Record<string, DemoSpec> = {
   productivity: { skill: "command-k", title: "Your tools, one *keystroke* away", eyebrow: "Keyboard-first", items: PALETTE_CMDS },
   ai: { skill: "ai-prompt", title: "Just *ask*.", eyebrow: "AI built in", items: ["What can you do, {name}?"] },
   fintech: {
-    skill: "click-flow", title: "Month-end, *handled*", eyebrow: "Automations", action: "Approve all",
+    skill: "click-flow", title: "Month-end, *handled*", eyebrow: "Automations", action: "Approve",
     items: ["Match receipts", "Categorise spend", "Sync to accounting", "Notify finance"],
   },
   analytics: {
@@ -540,7 +540,7 @@ export const DEMOS: Record<string, DemoSpec> = {
     items: ["Alert raised — Unusual login flagged", "Device verified — Access granted", "Evidence collected — Control checked", "Report ready — Weekly summary"],
   },
   communication: {
-    skill: "notify-stack", title: "Every conversation, *one place*", eyebrow: "Live",
+    skill: "notify-stack", title: "Your conversations, *one place*", eyebrow: "Live",
     items: ["New message — The team replied", "You were mentioned — In #launch", "Call starting — The team is joining", "Thread resolved — Marked done"],
   },
   pets: {
@@ -572,15 +572,15 @@ export const DEMOS: Record<string, DemoSpec> = {
     items: ["New order — Two mains, one dessert", "Order ready — Out to the table", "Reservation — Party of four, 7:30", "New review — From a guest"],
   },
   realestate: {
-    skill: "notify-stack", title: "Every listing, *live*", eyebrow: "Live",
-    items: ["New enquiry — About a two-bed flat", "Viewing booked — Saturday, 11:00", "Offer received — Ready to review", "Documents signed — All parties done"],
+    skill: "notify-stack", title: "Your listings, *live*", eyebrow: "Live",
+    items: ["New enquiry — About a two-bed flat", "Viewing booked — Saturday, 11:00", "Offer received — Ready to review", "Documents signed — Ready to file"],
   },
   events: {
     skill: "notify-stack", title: "Your event, *live*", eyebrow: "Live",
     items: ["Ticket sold — General admission", "Guest checked in — At the door", "Schedule updated — Sent to attendees", "Feedback in — From a guest"],
   },
   logistics: {
-    skill: "notify-stack", title: "Every delivery, *tracked*", eyebrow: "Live",
+    skill: "notify-stack", title: "Your deliveries, *tracked*", eyebrow: "Live",
     items: ["Order picked — Packed and ready", "Out for delivery — Driver on the way", "Delivered — Signed for at the door", "Route updated — Traffic avoided"],
   },
   nonprofit: {
@@ -596,14 +596,14 @@ export const DEMO_ALTS: Record<string, DemoSpec[]> = {
     { skill: "kanban", title: "Work that *moves*", eyebrow: "In action", action: "To do / In progress / Done", items: ["Plan the launch", "Design the homepage", "Write release notes", "Review with the team"] },
   ],
   sales: [
-    { skill: "kanban", title: "Every deal, *moving forward*", eyebrow: "Pipeline", action: "Lead / Demo / Won", items: ["New inbound lead", "Discovery call", "Proposal sent", "Contract review"] },
+    { skill: "kanban", title: "Your deals, *moving forward*", eyebrow: "Pipeline", action: "Lead / Demo / Won", items: ["New inbound lead", "Discovery call", "Proposal sent", "Contract review"] },
   ],
   hr: [
     { skill: "kanban", title: "Hiring, *in one view*", eyebrow: "Pipeline", action: "Applied / Interview / Hired", items: ["Product designer", "Frontend engineer", "Account executive", "Support lead"] },
   ],
   communication: [
     {
-      skill: "chat-thread", title: "Every conversation, *one place*", eyebrow: "In action", action: "Launch checklist — All tasks complete",
+      skill: "chat-thread", title: "Your conversations, *one place*", eyebrow: "In action", action: "Launch checklist — Tasks complete",
       items: ["Is the launch page ready to go?", "Final copy is in, checking the visuals now", "Looks great, let's ship it"],
     },
   ],
@@ -642,14 +642,14 @@ const GENERIC_MOMENT: Record<MomentSkill, DemoSpec> = {
   "ai-prompt": { skill: "ai-prompt", title: "Just *ask*.", eyebrow: "AI built in", items: ["What can you do, {name}?"] },
   "click-flow": { skill: "click-flow", title: "Busywork, *handled*", eyebrow: "In action", action: "Run", items: ["Sync your data", "Update the records", "Notify the team", "Share the summary"] },
   "notify-stack": {
-    skill: "notify-stack", title: "Everything, *as it happens*", eyebrow: "Live",
+    skill: "notify-stack", title: "Updates, *as they happen*", eyebrow: "Live",
     items: ["New update — The team made changes", "Task completed — Marked done", "Report ready — This week's summary", "You were mentioned — In a comment"],
   },
   "code-deploy": { skill: "code-deploy", title: "From commit to *live*", eyebrow: "Ship it", items: ["Build started", "Checks passed", "Preview ready", "Deployed to production"] },
   kanban: { skill: "kanban", title: "Work that *moves*", eyebrow: "In action", action: "To do / In progress / Done", items: ["Plan the launch", "Design the homepage", "Write release notes", "Review with the team"] },
   "live-cursors": COLLAB_DEMO,
   "chat-thread": {
-    skill: "chat-thread", title: "Every conversation, *one place*", eyebrow: "In action", action: "Update — All tasks complete",
+    skill: "chat-thread", title: "Your conversations, *one place*", eyebrow: "In action", action: "Update — Tasks complete",
     items: ["Is the launch page ready to go?", "Final copy is in, checking the visuals now", "Looks great, let's ship it"],
   },
 };

@@ -1442,7 +1442,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       role: "bento", skill: "bento",
       text: `Inside *${site.name}*`,
       items: featureItems.slice(0, 6),
-      eyebrow: "All-in-one",
+      eyebrow: "Overview",
       duration: Math.max(4.4, beats(10)),
       transition: "dolly",
     });
@@ -1461,7 +1461,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       role: "bento", skill: "card-system",
       text: `Inside *${site.name}*`,
       items: featureItems.slice(0, 4),
-      eyebrow: "All-in-one",
+      eyebrow: "Overview",
       duration: Math.max(5, beats(12)),
       transition: "dolly",
     });
@@ -1482,7 +1482,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       role: "bento", skill: featureKind === "sheet" ? "spec-sheet" : "widget-set",
       text: `Inside *${site.name}*`,
       items: rows,
-      eyebrow: "All-in-one",
+      eyebrow: "Overview",
       duration: Math.max(5, beats(12)),
       transition: "dolly",
     });
@@ -1944,11 +1944,11 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   const galleryKinds = ["product-spin", "gallery-flow", "carousel-3d"] as const;
   const gallery: Scene | null =
     photos >= 2 && target >= 20
-      ? { role: "gallery", skill: galleryKinds[variant % 3], text: "From every *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
+      ? { role: "gallery", skill: galleryKinds[variant % 3], text: "From each *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
       : null;
   const closer: Scene | null =
     target >= 30
-      ? { role: "gallery", skill: "product-zoom", text: "Every *detail*", eyebrow: "Details", items: zoomLabels, duration: beats(12), transition: "whip", media: photo(0), why: "A close look at the product's details" }
+      ? { role: "gallery", skill: "product-zoom", text: "The *details*", eyebrow: "Details", items: zoomLabels, duration: beats(12), transition: "whip", media: photo(0), why: "A close look at the product's details" }
       : null;
   // Product first, then why it's worth having (benefits as on-screen callouts, readable with the
   // sound off), then every angle and the details, then one clear call to action.

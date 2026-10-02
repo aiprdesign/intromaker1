@@ -29,7 +29,7 @@ export default function PricingCards() {
           $0<small>unlimited, for now</small>
         </div>
         <ul>
-          {["All 79 motion skills", "Generated soundtrack and voice-over", ...describeLimits(plans.free), "For personal and non-commercial use"].map((f) => (
+          {["79 motion skills", "Generated soundtrack and voice-over", ...describeLimits(plans.free), "For personal and non-commercial use"].map((f) => (
             <li key={f}>{f}</li>
           ))}
         </ul>
@@ -44,7 +44,7 @@ export default function PricingCards() {
           Contact us<small></small>
         </div>
         <ul>
-          {["Use IntroMaker for a business, a client or an agency", "Run it on your own servers or in your product", "Everything in Free, with no limits", "Available on request"].map((f) => (
+          {["Use IntroMaker for a business, a client or an agency", "Run it on your own servers or in your product", "The Free features, for commercial work", "Available on request"].map((f) => (
             <li key={f}>{f}</li>
           ))}
         </ul>

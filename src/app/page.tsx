@@ -53,8 +53,8 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>64 pro motion skills. All rendered live.</h2>
-          <p>Every card below is real-time output of the engine — the same frames you export.</p>
+          <h2>79 motion skills, rendered live.</h2>
+          <p>The cards below are real-time output of the engine: the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />
         <div className="center">
@@ -84,7 +84,7 @@ export default function Home() {
         <div className="section-head">
           <span className="eyebrow">Pricing</span>
           <h2>Free and unlimited, for now.</h2>
-          <p className="lead">IntroMaker is a portfolio project: try everything, free and unlimited, for personal and non-commercial use. Want to use it commercially? Contact us for a licence.</p>
+          <p className="lead">IntroMaker is a portfolio project: try it free and unlimited, for personal and non-commercial use. Want to use it commercially? Contact us for a licence.</p>
         </div>
         <PricingCards />
       </section>

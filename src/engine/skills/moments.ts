@@ -1006,7 +1006,7 @@ function kanban(sc: SkillContext) {
   ctx.restore();
   ctx.save();
   ctx.globalAlpha = 1 - ex;
-  doneBadge(sc, "✓  All done", w / 2, wy + wh + (portrait ? 70 : 48) * u, t - end, S);
+  doneBadge(sc, "✓  Done", w / 2, wy + wh + (portrait ? 70 : 48) * u, t - end, S);
   ctx.restore();
 }
 
@@ -1199,7 +1199,7 @@ function chatThread(sc: SkillContext) {
   const ex = ease.inCubic(exitT(sc, 0.4));
   const msgs = chatMessages(scene);
   const T = chatTiming(scene);
-  const [cardTitle, cardDetail] = (scene.subtext ?? "Update — All tasks complete").split(/\s+[—–]\s+/);
+  const [cardTitle, cardDetail] = (scene.subtext ?? "Update — Tasks complete").split(/\s+[—–]\s+/);
   const name = brand?.name ?? "App";
   const ww = portrait ? tokens(w, h).safe.width : Math.min(w * 0.66, 1240 * u);
   const side = portrait ? 0 : ww * 0.24;
@@ -1463,7 +1463,7 @@ export const momentSkills: Skill[] = [
     name: "Chat Thread",
     tagline: "Teammates message in a channel with typing indicators and a reaction, then the product posts its update card (Slack / Intercom style).",
     bestFor: "Messaging, support, community and any product that posts updates into chat. items = 2–4 short messages (generic, no names); subtext = the product's card 'Title — detail'.",
-    sample: { text: "Every conversation, *one place*", subtext: "Launch checklist — All tasks complete", items: ["Is the launch page ready to go?", "Final copy is in, checking the visuals now", "Looks great, let's ship it"] },
+    sample: { text: "Your conversations, *one place*", subtext: "Launch checklist — Tasks complete", items: ["Is the launch page ready to go?", "Final copy is in, checking the visuals now", "Looks great, let's ship it"] },
     itemsHint: "2–4 messages; subtext: 'Card title — detail'",
     render: chatThread,
     sfx: (scene) => {

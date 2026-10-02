@@ -936,7 +936,7 @@ export const editorialSkills: Skill[] = [
     name: "Showreel",
     tagline: "Framed cards glide in and snap to centre one by one, corner ticks on the card in focus, a counter and progress hairline beneath.",
     bestFor: "Walking through 3–6 features or use cases one at a time (items as 'Title — one line'); uses the brand's photos when there are any.",
-    sample: { text: "Everything in *one reel*", items: REEL_FALLBACK },
+    sample: { text: "Features in *one reel*", items: REEL_FALLBACK },
     itemsHint: "Feature title — one line, per card",
     render: showreel,
     sfx: (scene, beat) => {
@@ -951,7 +951,7 @@ export const editorialSkills: Skill[] = [
     name: "Card System",
     tagline: "A poster tile, a live chart card, a checklist and a brand card, built from the same hairlines and surface: outlines draw, surfaces fill, content arrives.",
     bestFor: "Showing a product as one coherent system: 3–5 short feature names (the first leads the poster tile, the second titles the chart). No numbers are shown.",
-    sample: { text: "One system, *every surface*", items: SYSTEM_FALLBACK },
+    sample: { text: "One system, *many surfaces*", items: SYSTEM_FALLBACK },
     itemsHint: "3–5 short feature names",
     render: cardSystem,
     sfx: () => [

@@ -403,7 +403,7 @@ export const typographySkills: Skill[] = [
     name: "Neon Ignite",
     tagline: "Glowing tubes trace your letters, flicker on and reflect on the floor.",
     bestFor: "Nightlife, gaming, retro, music events. 1–2 words.",
-    sample: { text: "NIGHT SHIFT", subtext: "Live every friday" },
+    sample: { text: "NIGHT SHIFT", subtext: "Live on Fridays" },
     render: neonDraw,
   },
   {

@@ -3,7 +3,8 @@
  * (the FTC's standard; the FDA's for anything health-related). The words on screen and in the
  * voice-over stay generic and descriptive:
  * - no superlatives ("the best", "#1", "world's fastest"), absolutes or guarantees ("100%",
- *   "guaranteed", "never miss"), speed or multiplier claims ("in seconds", "10x faster") and no
+ *   "guaranteed", "never miss", "forever", "always"), totality words ("all", "every",
+ *   "everything", "everyone", "anywhere", "unlimited", "all-in-one"), speed or multiplier claims ("in seconds", "10x faster") and no
  *   social-proof numbers ("trusted by 12,000+ teams");
  * - no efficacy or outcome promises ("stops every threat", "boost your revenue", "clinically
  *   proven"), health or medical claims (treats, cures, prevents a disease; FDA approved),
@@ -22,6 +23,13 @@ const SUPERLATIVE =
   "state[- ]of[- ]the[- ]art|perfect|flawless|premier|no\\. ?1|#1|number[- ]one";
 
 type Rule = [RegExp, string | ((...m: string[]) => string)];
+
+/** "metric" → "metrics", "delivery" → "deliveries", "inbox" → "inboxes". */
+function plural(w: string) {
+  if (/[^aeiou]y$/i.test(w)) return `${w.slice(0, -1)}ies`;
+  if (/(?:s|x|z|ch|sh)$/i.test(w)) return `${w}es`;
+  return `${w}s`;
+}
 
 const RULES: Rule[] = [
   // Social proof with a number or a boast: "Trusted by 12,000+ teams", "Loved by thousands".
@@ -50,7 +58,35 @@ const RULES: Rule[] = [
   [/\b(?:exactly|precisely|perfectly|completely|totally|fully)\s+(?=[a-z])/gi, ""],
   [/\beffortless(?:ly)?\b/gi, (m) => (m.toLowerCase().endsWith("ly") ? "simply" : "simple")],
   [/\beverything you need\b/gi, "the tools you need"],
-  [/\beverything\b/gi, "it all"],
+  // Totality words ("All", "Every", "Everything", "Everyone", "Anywhere", "Unlimited"): the line
+  // keeps its meaning without promising the whole of anything.
+  [/\beverything(\*?)\s+(\*?)(?:is\s+)?included\b/gi, "what's$1 $2included"],
+  [/\beverything\b/gi, "what matters"],
+  [/\bfor\s+everyone\b/gi, "for you"],
+  [/\beveryone\b/gi, "your team"],
+  [/\b(?:work|collaborate|learn|access it|join)\s+from\s+(?:anywhere|everywhere)\b/gi, (m) => `${m.split(/\s+from\s+/i)[0]} remotely`],
+  [/\b(collaborate|work|learn)\s+(?:anywhere|everywhere)\b/gi, "$1 remotely"],
+  [/\b(sell|shop|ship|deliver|get paid|accept payments|book|stream|publish)\s+(?:anywhere|everywhere)\b/gi, "$1 online"],
+  [/\b(grow|expand|scale)\s+(?:anywhere|everywhere)\b/gi, "$1 your reach"],
+  [/\b(?:everywhere|anywhere)\b/gi, "on the go"],
+  [/\bask\s+anything\b/gi, "ask questions"],
+  [/\banything\b/gi, "more"],
+  [/\ball[- ]in[- ]one\b/gi, "connected"],
+  [/\ball[- ]day\s+/gi, ""],
+  [/\b(?:unlimited|limitless|infinite)\s+/gi, ""],
+  [/\bthe\s+only\s+(?=[a-z*])/gi, "a "],
+  [/\b(?:total|complete)\s+(?=(?:\*)?(?:control|visibility|security|privacy|peace of mind|solution|platform|toolkit|suite|package)\b)/gi, ""],
+  [/\beach\s+and\s+every\b/gi, "each"],
+  [/\bfor\s+(\*?)every\s*day\b/gi, "for $1daily use"],
+  [/\bevery\s*day\b/gi, "daily"],
+  [/\bevery\s+(\*?)detail(s?)\b/gi, "the $1details"],
+  [/\bevery\s+(\*?)(angle|step|shot|scene|time|moment)\b/gi, "each $1$2"],
+  [/\bevery\s+(\*?)([a-z]+)\b/gi, (_m, star: string, w: string) => `your ${star}${plural(w)}`],
+  [/\bany\s+(\*?)(device|tool|app|platform|browser|screen|stack|workflow|format|channel|language)\b/gi, (_m, star: string, w: string) => `your ${star}${plural(w)}`],
+  [/\bof\s+(?:all|any)\s+sizes?\b/gi, "of different sizes"],
+  [/\ball\s+of\s+(?=your|the|our|my)\b/gi, ""],
+  [/\ball\s+(?=(?:\*)?(?:your|the|our|my|these|those)\b)/gi, ""],
+  [/\ball\s+(?!(?:night|set|good|right|along|around|over|about|but|at once|of a sudden|ears)\b)(?=(?:\*)?[a-z])/gi, ""],
   [/\bno more\b/gi, "less time on"],
   [/\s+again\b(?=[.!?]?$)/gi, ""],
   // Efficacy: "Sentinel stops cyber threats" → "Sentinel helps you monitor cyber threats".

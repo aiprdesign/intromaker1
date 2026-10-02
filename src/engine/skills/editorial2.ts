@@ -608,7 +608,7 @@ function contactSheet(sc: SkillContext) {
 
 /* ───────────────────────── Spec Sheet ───────────────────────── */
 
-const SPEC_FALLBACK = ["Live dashboards — Every metric, updated as it happens", "Shared reports — One link for the whole team", "Smart alerts — Know when something changes", "Team spaces — A home for every project"];
+const SPEC_FALLBACK = ["Live dashboards — Your metrics, updated as they happen", "Shared reports — One link for the whole team", "Smart alerts — Know when something changes", "Team spaces — A home for your projects"];
 
 /**
  * A ruled spec sheet: one large card whose header and row rules draw on, then each feature arrives
@@ -888,8 +888,10 @@ function widgetSet(sc: SkillContext) {
 /* ───────────────────────── Type Echo ───────────────────────── */
 
 /**
- * The line and its echoes: outlined copies fan out above and below the filled line, fainter the
- * further they go, breathe while it holds, and fold back into it before it rises out.
+ * The line and its echoes, on a loop: outlined copies of the line run as endless marquees above
+ * and below it (each row sliding the other way), and the whole stack scrolls upward without end,
+ * fading as it nears the filled line, which holds still in the middle. The echoes open out from
+ * the line at the start and fold back into it before it rises out.
  */
 function typeEcho(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene } = sc;
@@ -901,31 +903,62 @@ function typeEcho(sc: SkillContext) {
   const lead = size * 1.0;
   const blockH = lines.length * lead;
   const top = h / 2 - blockH / 2;
-  const E = portrait ? 4 : 3;
-  const spread = ease.outExpo(range(t, 0.55, 1.6));
+  // The echo rows: the whole line on one row, smaller when the main line wraps.
+  const flat = lines.flat();
+  const es = size * (lines.length > 1 ? 0.5 : 0.62);
+  const sep = es * 0.9;
+  const rowW = lineWidth(sc, flat, es) + sep;
+  const stepY = es * 1.08;
+  const spread = ease.outExpo(range(t, 0.45, 1.5));
   const fold = ease.inCubic(range(t, d - 0.9, d - 0.45));
-  const breathe = 1 + 0.04 * Math.sin((sc.globalT ?? t) * 1.6) * range(t, 1.6, 2.2);
-  const stepY = (blockH + size * 0.08) * spread * (1 - fold) * breathe;
+  const open = spread * (1 - fold);
+  // Endless motion: the stack climbs, each row slides; both run on film time, so they never stop.
+  const T = sc.globalT ?? t;
+  const climb = T * es * 0.32;
+  const base = Math.floor(climb / stepY);
+  const frac = climb - base * stepY;
+  const reach = Math.ceil(h / 2 / stepY) + 2;
+  const clear = blockH / 2 + es * 0.15;
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.lineWidth = Math.max(1, 1.4 * u);
-  for (let e = E; e >= 1; e--) {
-    for (const dir of [-1, 1]) {
-      const a = (0.55 - (e - 1) * (0.4 / E)) * range(t, 0.5, 0.8) * (1 - fold);
-      if (a <= 0) continue;
-      ctx.globalAlpha = a;
-      lines.forEach((line, i) => {
-        const lw = lineWidth(sc, line, size);
-        const y = top + size * 0.82 + i * lead + dir * e * stepY;
-        drawWords(sc, line, w / 2 - lw / 2, y, size, e === 1 ? rgba(palette.primary, 0.9) : sys.line1);
-      });
+  for (let k = -reach; k <= reach; k++) {
+    const id = k + base;
+    const cy = h / 2 + (k * stepY - frac) * open;
+    const off = Math.abs(cy - h / 2);
+    // Rows give way around the filled line, and fade towards the edges.
+    const nearK = clamp((off - clear) / (stepY * 0.6));
+    const farK = 1 - 0.75 * clamp(off / (h * 0.6));
+    const a = nearK * farK * range(t, 0.4, 0.8) * (1 - fold);
+    if (a <= 0.01) continue;
+    const dir = id % 2 === 0 ? 1 : -1;
+    const speed = w * (0.03 + 0.012 * (((id % 3) + 3) % 3));
+    const shift = (((T * speed * dir + id * rowW * 0.37) % rowW) + rowW) % rowW;
+    const close = off < clear + stepY * 1.2;
+    // Rows alternate: outlined (the nearest in the accent), then a soft fill.
+    const filled = ((id % 3) + 3) % 3 === 2;
+    ctx.globalAlpha = a * (filled ? 1 : 0.9);
+    for (let x = shift - rowW; x < w; x += rowW) {
+      if (filled) {
+        ctx.save();
+        ctx.globalAlpha *= palette.light ? 0.12 : 0.1;
+        const fill = palette.text;
+        let cx = x;
+        flat.forEach((wd, i) => {
+          if (i) cx += es * 0.24;
+          ctx.font = wordFont(sc, wd, es);
+          ctx.fillStyle = fill;
+          ctx.fillText(wd.w, cx, cy + es * 0.34);
+          cx += ctx.measureText(wd.w).width;
+        });
+        ctx.restore();
+      } else drawWords(sc, flat, x, cy + es * 0.34, es, close ? rgba(palette.primary, 0.95) : sys.line1);
     }
   }
   ctx.restore();
-  // The line itself, rising in and out of its mask.
-  const lx = w / 2;
-  riseLines(sc, lines, size, lx, top + size * 0.82, { start: 0.1, lead, align: "center", drift: 0 });
+  // The line itself, still in the middle, rising in and out of its mask.
+  riseLines(sc, lines, size, w / 2, top + size * 0.82, { start: 0.1, lead, align: "center", drift: 0 });
   meta(sc, scene.eyebrow ?? "", w / 2, tokens(w, h).safe.top + 10 * u, range(t, 0.9, 1.3) * (1 - fold), { align: "center", color: palette.primary });
   meta(sc, scene.subtext ?? "", w / 2, top + blockH + 40 * u, range(t, 1.1, 1.5) * (1 - fold), { align: "center" });
 }
@@ -1032,7 +1065,7 @@ export const editorialMoreSkills: Skill[] = [
     name: "Split Poster",
     tagline: "An accent panel wipes up with the brand's monogram rising huge inside; beside it the headline stacks over feature chips and a running ruler.",
     bestFor: "A brand statement with a line under it (subtext) and up to 4 feature chips (items). Strong after the reveal.",
-    sample: { text: "Built with *intent*", subtext: "Every detail, considered.", items: ["Fast", "Private", "Simple"] },
+    sample: { text: "Built with *intent*", subtext: "Details, considered.", items: ["Fast", "Private", "Simple"] },
     itemsHint: "Up to 4 short features as chips",
     render: posterSplit,
     sfx: () => [
@@ -1060,7 +1093,7 @@ export const editorialMoreSkills: Skill[] = [
     name: "Contact Sheet",
     tagline: "Every feature as a framed card on one sheet, outlines first; a focus frame then moves card to card on the beat, lifting each in turn.",
     bestFor: "Showing 3–6 features (or product shots) at once, then each in turn (items as 'Title — one line').",
-    sample: { text: "The whole *picture*", items: [...REEL_FALLBACK, "Share — One link for everyone", "Grow — Built to scale with you"] },
+    sample: { text: "The whole *picture*", items: [...REEL_FALLBACK, "Share — One link for your team", "Grow — Built to scale with you"] },
     itemsHint: "Feature title — one line, per card",
     render: contactSheet,
     sfx: (scene, beat) => {
@@ -1073,7 +1106,7 @@ export const editorialMoreSkills: Skill[] = [
     name: "Spec Sheet",
     tagline: "A ruled spec sheet: the rules draw on, each feature lands on its row with its detail and a tick, and a highlight walks the rows.",
     bestFor: "Listing 3–5 features with a one-line detail each (items as 'Title — detail'). Calm and precise.",
-    sample: { text: "Everything *included*", items: SPEC_FALLBACK },
+    sample: { text: "What's *included*", items: SPEC_FALLBACK },
     itemsHint: "Feature title — detail, per row",
     render: specSheet,
     sfx: (scene, beat) => {
@@ -1101,7 +1134,7 @@ export const editorialMoreSkills: Skill[] = [
   {
     id: "type-echo",
     name: "Type Echo",
-    tagline: "The line with outlined echoes fanning out above and below it, fainter as they go; they breathe while it holds and fold back in before it leaves.",
+    tagline: "The line holds still while outlined echoes of it run as endless marquees above and below, sliding in turn, the stack scrolling upward on a loop.",
     bestFor: "A short, confident line (2–6 words) that should land hard: a positioning line or the moment before the call to action.",
     sample: { text: "Built to *last*", subtext: "" },
     render: typeEcho,

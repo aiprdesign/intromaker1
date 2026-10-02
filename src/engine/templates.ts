@@ -586,7 +586,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.02,
     roles: {},
     revealNoLogo: "logo-reveal",
-    sample: sample("Everything, *connected*.", "blur-reveal", { eyebrow: "Introducing" }),
+    sample: sample("Your work, *connected*.", "blur-reveal", { eyebrow: "Introducing" }),
   },
   {
     id: "bridge",
