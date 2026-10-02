@@ -1562,9 +1562,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     // Visual products (stores, templates, creative work) turn on a 3D carousel; product UI flows
     // through the framed gallery.
     const carousel = (concept.id === "creative" || concept.id === "ecommerce") !== alt;
+    // Image-led products show their photos as cards; remakes rotate through the card layouts.
+    const photoLed = concept.id === "creative" || concept.id === "ecommerce" || images.length >= 4;
+    const cardKinds = ["carousel-3d", "photo-fan", "card-spread", "photo-drop"] as const;
     add(target >= 30 ? (wall ? 4.5 : 3) : 5, {
       role: "gallery",
-      skill: carousel ? "carousel-3d" : "gallery-flow",
+      skill: carousel ? (photoLed ? cardKinds[variant % cardKinds.length] : "carousel-3d") : "gallery-flow",
       text: carousel ? `Made with *${site.name}*` : `A closer look at *${site.name}*`,
       items: spareFeatures.slice(1, 5).length >= 2 ? spareFeatures.slice(1, 5) : undefined,
       eyebrow: "Gallery",
@@ -1941,10 +1944,10 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
       : null;
   // Every angle: the photos take turns on the stage (remakes try the gallery and carousel), and
   // long films close in on the details with a magnifying lens.
-  const galleryKinds = ["product-spin", "gallery-flow", "carousel-3d"] as const;
+  const galleryKinds = ["product-spin", "photo-fan", "gallery-flow", "card-spread", "carousel-3d", "photo-drop"] as const;
   const gallery: Scene | null =
     photos >= 2 && target >= 20
-      ? { role: "gallery", skill: galleryKinds[variant % 3], text: "From each *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
+      ? { role: "gallery", skill: galleryKinds[variant % galleryKinds.length], text: "From each *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
       : null;
   const closer: Scene | null =
     target >= 30

@@ -1,4 +1,5 @@
 import type { Skill, SkillId } from "../types";
+import { cardSkills } from "./cards";
 import { componentSkills } from "./components";
 import { endingSkills } from "./endings";
 import { editorialSkills } from "./editorial";
@@ -29,6 +30,7 @@ export const SKILLS: Skill[] = [
   ...productSkills,
   ...typeFxSkills,
   ...gallerySkills,
+  ...cardSkills,
   ...componentSkills,
   signatureSkills[0],
   signatureSkills[1],
@@ -61,7 +63,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Editorial system", skills: [...editorialSkills, ...editorialMoreSkills] },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills] },
   { name: "Slides", skills: slideSkills },
-  { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...componentSkills, ...mediaSkills] },
+  { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Movie trailer", skills: movieSkills },
   { name: "Cinematic", skills: [...signatureSkills, ...energySkills, ...worldSkills] },
@@ -89,4 +91,7 @@ export const MEDIA_SKILLS = new Set<SkillId>([
   "showreel",
   "card-stack",
   "contact-sheet",
+  "photo-fan",
+  "card-spread",
+  "photo-drop",
 ]);

@@ -1012,6 +1012,9 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "ui-assemble": "meet",
   "gallery-flow": "gallery",
   "carousel-3d": "gallery",
+  "photo-fan": "gallery",
+  "card-spread": "gallery",
+  "photo-drop": "gallery",
   "tilt-wall": "hook",
   "code-deploy": "demo",
   kanban: "demo",
@@ -1108,7 +1111,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

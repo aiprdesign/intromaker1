@@ -103,7 +103,7 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
   const promise = role === "promise" ? scenes.find((s) => s.skill === "word-swap") : undefined;
   if (promise && skill !== "word-swap") return { text: swapAsLine(promise.text), eyebrow: promise.eyebrow, items: k.itemsHint !== undefined ? itemsLike(skill, features) ?? k.sample.items : undefined, role };
   const headline =
-    role === "cta" ? `Get started with *${name}*` : role === "reveal" ? name : role === "hook" ? `Introducing *${name}*` : role === "features" || role === "bento" || role === "cards" ? `Inside *${name}*` : role === "promise" ? `This is *${name}*` : `See *${name}* in action`;
+    role === "cta" ? `Get started with *${name}*` : role === "reveal" ? name : role === "hook" ? `Introducing *${name}*` : role === "features" || role === "bento" || role === "cards" ? `Inside *${name}*` : role === "promise" ? `This is *${name}*` : role === "gallery" ? `A closer look at *${name}*` : `See *${name}* in action`;
   return {
     text: name ? headline : k.sample.text,
     subtext: k.sample.subtext,
