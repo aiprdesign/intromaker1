@@ -48,7 +48,7 @@ IntroMaker is a portfolio project: a SaaS-style web app that turns a text prompt
   The narration goes through a voice chain (rumble filter, presence lift, compression), and the music ducks under every line. Scenes stretch to the next beat when a line needs more time. Captions sit on a frosted pill that reads over any layout, with the spoken word lit in the accent colour. Voice and captions are included in every export.
 - **Beat-synced direction**: scene lengths snap to whole beats, so every cut lands on the kick. The picture and the score share one arrangement: the camera punches on the kicks the music actually plays, holds still in the breakdown and hits harder on each drop. Component entrances land on the eighth-note grid.
 - **Cinematic finishing**: two-scale highlight bloom, a colour grade, light leaks, lens bokeh, extruded 3D type, vignette and film grain. Text glow is off by default everywhere (the studio, the homepage samples, previews and shared links) for crisp type; switch *Glow* on in the studio for halos and highlight bloom. Light sweeps (the glint across a logo, the glare across a screenshot or product) cross once from edge to edge and leave fully, so no shine lingers on a corner.
-- **Export presets**: YouTube 1080p60, Reels/TikTok/Shorts 9:16, LinkedIn/Instagram 1:1 and web 720p. The same storyboard re-lays itself out for each format, so nothing is cropped. There's also a one-click PNG thumbnail of the end card. Output is MP4 where the browser supports it (WebM otherwise) with the soundtrack mixed in, rendered entirely in the browser.
+- **Export what you're watching**: *Export video* saves the format on screen (picked in the player's toolbar) at 1080p: 16:9 at 1920×1080 and 60 fps, 9:16 at 1080×1920 and 30 fps (Reels, TikTok, Shorts), 1:1 at 1080×1080 and 30 fps (feeds). There's no separate preset menu. The same storyboard re-lays itself out for each format, so nothing is cropped. There's also a one-click PNG thumbnail of the end card. Output is MP4 where the browser supports it (WebM otherwise) with the soundtrack mixed in, rendered entirely in the browser.
 
 ### What makes the SaaS films look pro
 
@@ -328,7 +328,7 @@ src/engine/
   shaderbg.ts     WebGL2 runner for Paper Shaders gradients (frame-exact, shared context)
   gl.ts           shared OGL renderer, image textures and gl-transitions for the gallery skills
   templates.ts    style templates (look, motion, music, pacing, role → skill)
-  export.ts       WebCodecs offline export, export presets, PNG thumbnail
+  export.ts       WebCodecs offline export, the export format for each aspect, PNG thumbnail
 src/app/api/generate/route.ts   Claude AI Director (structured output), falls back to planner.ts
 src/lib/providers.ts            provider registry (endpoint, auth, key prefix, suggested models, vision)
 src/lib/ai.ts                   AI director over 3 protocols (Anthropic SDK, OpenAI-compatible, Gemini) + model listing

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Soundtrack } from "@/engine/audio";
-import { canExport, EXPORT_PRESETS, exportThumbnail, exportVideo, planForPreset } from "@/engine/export";
+import { canExport, exportFormat, exportThumbnail, exportVideo } from "@/engine/export";
 import { ensureFonts } from "@/engine/fonts";
 import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
@@ -92,27 +92,10 @@ export default function Player({
     else void el.requestFullscreen?.().catch(() => {});
   };
   const [exporting, setExporting] = useState<number | null>(null);
-  const [presetId, setPresetId] = useState<string>("current");
   // Designer's grid overlay: preview only, never part of an export.
   const [grid, setGrid] = useState(false);
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("intromaker.preset");
-      if (saved && EXPORT_PRESETS.some((p) => p.id === saved)) setPresetId(saved);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-  const chosen = EXPORT_PRESETS.find((p) => p.id === presetId) ?? EXPORT_PRESETS[0];
-  const preset = limits && chosen.long > limits.maxLong ? EXPORT_PRESETS[0] : chosen;
-  const choosePreset = (id: string) => {
-    setPresetId(id);
-    try {
-      localStorage.setItem("intromaker.preset", id);
-    } catch {
-      /* ignore */
-    }
-  };
+  // Export what's being watched: the format on screen, at 1080p.
+  const preset = exportFormat(plan.aspect);
   const fileBase = (p: VideoPlan) => `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "intro"}-${p.aspect.replace(":", "x")}`;
   const download = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -299,9 +282,9 @@ export default function Player({
     abortRef.current = ac;
     setExporting(0);
     try {
-      const out = planForPreset(film, preset);
+      const out = film;
       const { blob, ext } = await exportVideo(out, {
-        long: preset.long,
+        long: Math.min(preset.long, limits?.maxLong ?? preset.long),
         fps: Math.min(preset.fps, limits?.maxFps ?? preset.fps),
         watermark: limits?.watermark ? WATERMARK : undefined,
         audio: !muted,
@@ -429,22 +412,11 @@ export default function Player({
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="M9.5 3.5v17M14.5 3.5v17M3.5 9.5h17M3.5 14.5h17" /></svg>
         </button>
-        <select value={preset.id} onChange={(e) => choosePreset(e.target.value)} className="select sm" disabled={exporting !== null} title="Export preset: the film re-frames itself for each platform">
-          {EXPORT_PRESETS.map((p) => {
-            const locked = !!limits && p.long > limits.maxLong;
-            return (
-              <option key={p.id} value={p.id} disabled={locked}>
-                {p.name}
-                {locked ? " · Pro" : limits && p.fps > limits.maxFps ? ` · ${limits.maxFps} fps` : ""}
-              </option>
-            );
-          })}
-        </select>
         <button
           className="btn btn-ghost"
           onClick={async () => {
             try {
-              const out = planForPreset(plan, preset);
+              const out = plan;
               download(await exportThumbnail(out, Math.min(preset.long, limits?.maxLong ?? preset.long), limits?.watermark ? WATERMARK : undefined), `${fileBase(out)}-thumbnail.png`);
             } catch (e) {
               setError((e as Error).message);
@@ -455,7 +427,7 @@ export default function Player({
         >
           PNG
         </button>
-        <button className="btn btn-primary" onClick={onExport} disabled={exporting !== null || preparing || !canRecord} title={canRecord ? "" : "Recording not supported in this browser"}>
+        <button className="btn btn-primary" onClick={onExport} disabled={exporting !== null || preparing || !canRecord} title={canRecord ? `Exports what you're watching: ${preset.name}` : "Recording not supported in this browser"}>
           Export video
         </button>
       </div>

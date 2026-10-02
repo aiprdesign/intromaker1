@@ -179,19 +179,15 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
 }
 
 /** Export presets: one storyboard, re-framed for each platform. */
-export const EXPORT_PRESETS = [
-  { id: "youtube", name: "YouTube · 1080p", aspect: "16:9", long: 1920, fps: 60 },
-  { id: "youtube4k", name: "YouTube · 4K", aspect: "16:9", long: 3840, fps: 60 },
-  { id: "reels", name: "Reels / TikTok / Shorts · 9:16", aspect: "9:16", long: 1920, fps: 30 },
-  { id: "square", name: "LinkedIn / Instagram · 1:1", aspect: "1:1", long: 1080, fps: 30 },
-  { id: "web", name: "Website / X · 720p", aspect: "16:9", long: 1280, fps: 30 },
-  { id: "current", name: "Current frame · 1080p", aspect: null, long: 1920, fps: 60 },
-] as const;
-export type ExportPreset = (typeof EXPORT_PRESETS)[number];
-
-/** The plan re-framed for a preset (aspect changes re-layout every scene; nothing is cropped). */
-export function planForPreset(plan: VideoPlan, preset: ExportPreset): VideoPlan {
-  return preset.aspect ? { ...plan, aspect: preset.aspect } : plan;
+/**
+ * The export takes the format being watched (chosen in the player's toolbar) at 1080p:
+ * 1920×1080 at 60 fps for 16:9, 1080×1920 at 30 fps for 9:16 (Reels, TikTok, Shorts) and
+ * 1080×1080 at 30 fps for 1:1 (feeds).
+ */
+export function exportFormat(aspect: VideoPlan["aspect"]) {
+  if (aspect === "9:16") return { name: "9:16 · 1080×1920", long: 1920, fps: 30 };
+  if (aspect === "1:1") return { name: "1:1 · 1080×1080", long: 1080, fps: 30 };
+  return { name: "16:9 · 1920×1080", long: 1920, fps: 60 };
 }
 
 /** PNG thumbnail/poster: the held end card (logo, closing line and button). */
