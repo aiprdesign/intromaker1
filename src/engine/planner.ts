@@ -1422,6 +1422,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     ...(featureItems.length >= 5 ? ["bento"] : []),
     ...(featureItems.length >= 2 ? ["icons"] : []),
     ...(featureItems.length === 3 || featureItems.length === 4 ? ["bento"] : []),
+    // Editorial system layouts: a showreel of the features, or the card system.
+    ...(featureItems.length >= 3 ? ["reel", "system"] : []),
   ];
   const featureKind = featureKinds.length ? featureKinds[variant % featureKinds.length] : null;
   const featureSlides = featureKind === "slides";
@@ -1444,6 +1446,25 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: Math.max(4.4, beats(10)),
       transition: "dolly",
     });
+  } else if (featureKind === "reel") {
+    const reel = featureItems.slice(0, 5);
+    add(valuePriority, {
+      role: "features", skill: "showreel",
+      text: concept.featuresTitle,
+      items: reel,
+      eyebrow: "Features",
+      duration: Math.max(5.2, 1.7 + reel.length * 1.15, beats(12)),
+      transition: "dolly",
+    });
+  } else if (featureKind === "system") {
+    add(valuePriority, {
+      role: "bento", skill: "card-system",
+      text: `Inside *${site.name}*`,
+      items: featureItems.slice(0, 4),
+      eyebrow: "All-in-one",
+      duration: Math.max(5, beats(12)),
+      transition: "dolly",
+    });
   } else if (featureKind === "icons") {
     add(valuePriority, {
       role: "features", skill: "icon-features",
@@ -1458,7 +1479,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
   // Products that lead with AI get the AI moment whatever their category.
   const aiLed = concept.id !== "ai" && [site.tagline, ...site.headlines.slice(0, 4)].some((x) => /\b(ai|assistant|copilot|gpt)\b/i.test(x ?? ""));
-  const shownTitles = new Set([...(featureSlides ? withBenefit.slice(0, 3) : featureItems.slice(0, featureKind === "bento" ? 6 : 4)), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
+  const shownTitles = new Set([...(featureSlides ? withBenefit.slice(0, 3) : featureItems.slice(0, featureKind === "bento" ? 6 : featureKind === "reel" ? 5 : 4)), ...(tourMedia ? [tourHead, ...tourCallouts] : [])].map((x) => norm(x.split(/\s+[—–]\s+/)[0])));
   const spareFeatures = shortFeatures.filter((f) => !shownTitles.has(norm(f)));
   // The moment that suits this product best, scored on the site's own words, its category and its
   // material (see rankMoments): a dev platform that talks about deploys gets code → deploy, a
@@ -1596,14 +1617,29 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 6. Proof — only real quotes, logos and numbers.
   // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
   // between the reveal and the product that needs no media and makes no claims.
-  add(target >= 20 && !tourMedia && !shots.full && !valueFirst ? 3 : 6, {
-    role: "promise", skill: "word-swap",
-    text: concept.swap,
-    subtext: sentenceCopy(site.description, 12) || undefined,
-    eyebrow: `Why ${site.name}`,
-    duration: beats(8),
-    transition: "whip",
-  });
+  // Remakes set the same line as an editorial type moment: bands of kinetic type, or a poster.
+  const promiseKind = (["word-swap", "type-rows", "type-poster"] as const)[variant % 3];
+  const [swapLead, swapWords = ""] = concept.swap.split(/,\s*(?=[^,]*$)/);
+  const swapList = swapWords.split("|").filter(Boolean);
+  const promiseLine = swapList.length ? `${swapLead}, *${swapList[swapList.length - 1]}*` : concept.swap;
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  add(target >= 20 && !tourMedia && !shots.full && !valueFirst ? 3 : 6, promiseKind === "word-swap"
+    ? {
+        role: "promise", skill: "word-swap",
+        text: concept.swap,
+        subtext: sentenceCopy(site.description, 12) || undefined,
+        eyebrow: `Why ${site.name}`,
+        duration: beats(8),
+        transition: "whip",
+      }
+    : {
+        role: "promise", skill: promiseKind,
+        text: promiseLine,
+        items: promiseKind === "type-rows" ? (shortFeatures.length >= 3 ? shortFeatures.slice(0, 5) : swapList.map(cap)) : shortFeatures.slice(0, 3),
+        eyebrow: `Why ${site.name}`,
+        duration: Math.max(4.6, beats(9)),
+        transition: "whip",
+      });
   // The strongest proof we have (a real quote, else customer logos, else numbers) is kept.
   const proofKind = quote ? "quote" : brand.clientLogos && brand.clientLogos.length >= 4 ? "logos" : site.stats.length ? "cards" : null;
   const proofPriority = (kind: string, normal: number) => (proofKind === kind && target >= 20 ? 2 : normal);

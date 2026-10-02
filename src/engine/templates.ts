@@ -350,7 +350,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.2, backdrop: "plain", card: "flat", text: "pop", textScale: 1.35, bokeh: false, grain: 0.8, shader: "grain", shaderStrength: 0.55 },
     transitions: ["cut", "whip", "zoom"],
     pace: 0.8,
-    roles: {},
+    roles: { promise: "type-rows" },
     revealNoLogo: "logo-reveal",
     sample: sample("Design. Ship. *Repeat.*"),
   },
@@ -386,7 +386,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.35, backdrop: "plain", card: "flat", text: "mask", textScale: 1.12, bokeh: false, grain: 0.7, vignette: 0.6, shader: "grain", shaderStrength: 0.9 },
     transitions: ["dissolve", "leak", "push"],
     pace: 1.15,
-    roles: {},
+    roles: { promise: "type-poster" },
     revealNoLogo: "logo-reveal",
     sample: sample("Crafted for the *curious*."),
   },
@@ -620,7 +620,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0, backdrop: "plain", card: "flat", text: "mask", textScale: 1.2, grain: 0.2, vignette: 0.3, overlay: "frame" },
     transitions: ["cut", "push"],
     pace: 0.95,
-    roles: {},
+    roles: { bento: "card-system" },
     revealNoLogo: "logo-reveal",
     sample: sample("Less, but *considered*."),
   },
@@ -988,6 +988,10 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "ui-cards": "cards",
   "icon-features": "features",
   "word-swap": "promise",
+  "type-rows": "promise",
+  "type-poster": "promise",
+  showreel: "features",
+  "card-system": "bento",
   testimonial: "quote",
   "logo-marquee": "logos",
   "number-ticker": "stat",
@@ -1096,7 +1100,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

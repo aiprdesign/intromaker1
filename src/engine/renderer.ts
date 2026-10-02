@@ -764,6 +764,8 @@ const BUG_SKIP = new Set(["hook", "pain", "reveal", "cta"]);
  * Persistent brand bug: a small logo lock-up in the top-left corner through the body of a
  * SaaS film (after the brand reveal, before the end card), like a broadcast network bug.
  */
+const BUG_ASIDE = new Set<string>(["type-poster", "type-rows"]);
+
 function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, w: number, h: number) {
   const brand = plan.brand;
   if (plan.style !== "saas" || !brand || (!brand.logo && !brand.name)) return;
@@ -780,7 +782,16 @@ function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, 
     acc += s.duration;
   });
   if (start < 0) return;
-  const a = ease.inOutCubic(range(time, start + 0.35, start + 0.95)) * (1 - ease.inCubic(range(time, end - 0.45, end - 0.05)));
+  let a = ease.inOutCubic(range(time, start + 0.35, start + 0.95)) * (1 - ease.inCubic(range(time, end - 0.45, end - 0.05)));
+  // Full-frame type layouts carry their own header: the bug steps aside while they play.
+  let t0 = 0;
+  for (const s of plan.scenes) {
+    if (time < t0 + s.duration) {
+      if (BUG_ASIDE.has(s.skill)) a *= 1 - ease.inOutCubic(range(time - t0, 0, 0.3)) * (1 - ease.inOutCubic(range(time - t0, s.duration - 0.3, s.duration)));
+      break;
+    }
+    t0 += s.duration;
+  }
   if (a <= 0) return;
   const palette = brandPalette(plan.palette, brand, schemeOf(plan));
   const u = Math.min(w, h) / 1080;

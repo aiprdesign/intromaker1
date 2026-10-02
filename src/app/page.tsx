@@ -59,7 +59,7 @@ export default function Home() {
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See all 67 skills →
+            See all 71 skills →
           </Link>
         </div>
       </section>

@@ -1,4 +1,8 @@
 export const SKILL_IDS = [
+  "type-poster",
+  "showreel",
+  "card-system",
+  "type-rows",
   "studio-ident",
   "intertitle",
   "billing-block",

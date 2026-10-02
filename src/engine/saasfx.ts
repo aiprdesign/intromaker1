@@ -1351,7 +1351,7 @@ const FX_PACE: Partial<Record<TextFx, { stagger: number; dur: number }>> = {
   shine: { stagger: 1, dur: 0.6 },
 };
 
-function luminance(hex: string) {
+export function luminance(hex: string) {
   const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
   const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
     const x = v / 255;

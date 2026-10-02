@@ -39,6 +39,14 @@ function itemsLike(skill: SkillId, from: string[]) {
   return from.slice(0, Math.max(3, sample.length)).map((x) => x.split(/\s+[—–]\s+/)[0]);
 }
 
+/** A word-swap line ("Your code, built|tested|shipped") as one line for other slides ("Your code, *shipped*"). */
+function swapAsLine(text: string) {
+  if (!text.includes("|")) return text;
+  const [lead, words = ""] = text.split(/,\s*(?=[^,]*$)/);
+  const last = words.split("|").filter(Boolean).pop();
+  return last ? `${lead}, *${last}*` : text.replace(/\|/g, " ");
+}
+
 /**
  * Content for a slide added to a film, written from the film's own material rather than the
  * slide's sample: the built-in director is run again on the same website, listing or prompt (a
@@ -78,7 +86,7 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
   const lend = kin.find(fresh) ?? kin[0];
   if (lend) {
     return {
-      text: lend.text,
+      text: skill === "word-swap" ? lend.text : swapAsLine(lend.text),
       eyebrow: lend.eyebrow,
       subtext: k.sample.subtext !== undefined ? lend.subtext ?? k.sample.subtext : undefined,
       items: k.itemsHint !== undefined ? itemsLike(skill, lend.items?.length ? lend.items : features) ?? itemsLike(skill, features) ?? k.sample.items : undefined,
@@ -92,6 +100,8 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
   if (skill === "word-swap" && titles.length >= 2)
     return { text: plan.product ? `${name}:` : "One place for", items: titles.slice(0, 4).map((x) => (plan.product ? x : x.toLowerCase())), role };
   if (skill === "steps" && plan.product) return { text: `Get started with *${name}*`, items: ["Unbox it", "Set it up", "Make it yours"], role };
+  const promise = role === "promise" ? scenes.find((s) => s.skill === "word-swap") : undefined;
+  if (promise && skill !== "word-swap") return { text: swapAsLine(promise.text), eyebrow: promise.eyebrow, items: k.itemsHint !== undefined ? itemsLike(skill, features) ?? k.sample.items : undefined, role };
   const headline =
     role === "cta" ? `Get started with *${name}*` : role === "reveal" ? name : role === "hook" ? `Introducing *${name}*` : role === "features" || role === "bento" || role === "cards" ? `Inside *${name}*` : `See *${name}* in action`;
   return {
