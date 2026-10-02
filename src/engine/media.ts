@@ -11,6 +11,18 @@ export type Drawable = HTMLImageElement | HTMLVideoElement;
 const images = new Map<string, HTMLImageElement>();
 const videos = new Map<string, HTMLVideoElement>();
 const pending = new Map<string, Promise<void>>();
+const failed = new Set<string>();
+let failures = 0;
+
+/** Whether this picture failed to load. */
+export function imageFailed(src: string | undefined) {
+  return !!src && failed.has(src);
+}
+
+/** Bumps whenever a picture fails to load (so cached decisions about it can be redone). */
+export function imageFailures() {
+  return failures;
+}
 
 /** When true (offline export), skills must not touch video playback; syncVideos drives it. */
 export const mediaState = { exporting: false };
@@ -36,7 +48,14 @@ function loadImage(src: string) {
   const p = new Promise<void>((resolve) => {
     const img = new Image();
     img.decoding = "async";
-    img.onerror = () => resolve();
+    img.onerror = () => {
+      // A picture that can't load (a dead link, an expired upload) is remembered, so its slide
+      // shows a placeholder instead of an empty stage.
+      failed.add(src);
+      failures++;
+      resolve();
+      notifyReady();
+    };
     const shot = shotKey(src);
     if (shot) {
       // Website captures come from this browser's own copy when it has one (the server may have

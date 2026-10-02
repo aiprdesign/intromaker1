@@ -628,10 +628,11 @@ const MOMENT_SIGNALS: Record<MomentSkill, RegExp> = {
   "ai-prompt": /\b(ai|a\.i\.|artificial intelligence|assistants?|copilots?|gpt|llms?|chatbots?|ask (it )?(anything|questions?)|prompts?|generative)\b/gi,
   "click-flow": /\b(automat\w*|autopilot|workflows?|one[- ]click|busywork|reconcil\w*|approvals?|approve|scheduling|no[- ]code|hands[- ]free)\b/gi,
   "notify-stack": /\b(alerts?|notifications?|notify|real[- ]time|monitor\w*|orders?|incidents?|instant(ly)?|as it happens|stay on top)\b/gi,
-  "code-deploy": /\b(deploy\w*|git(hub|lab)?|commits?|ci\/cd|build (logs|pipelines?)|preview (urls?|deployments?)|hosting|serverless|edge functions?|rollbacks?|apis?|sdks?|cli|developers?|repos?|codebase)\b/gi,
+  // (Not "developers": that's who a product is for, and a design tool hands off to developers.)
+  "code-deploy": /\b(deploy\w*|git(hub|lab)?|commits?|ci\/cd|build (logs|pipelines?)|preview (urls?|deployments?)|hosting|serverless|edge functions?|rollbacks?|apis?|sdks?|cli|repos?|codebase)\b/gi,
   // (Bare "deals" and "stages" aren't boards: "hotel deals", "early-stage".)
   kanban: /\b(kanban|boards?|tasks?|to-?dos?|projects?|sprints?|roadmaps?|backlogs?|issues?|tickets?|pipelines?|deal (flow|stages?)|candidates?|applicants?|hiring|recruit\w*)\b/gi,
-  "live-cursors": /\b(collaborat\w*|multiplayer|whiteboards?|canvas(es)?|co-?edit\w*|brainstorm\w*|together|design files?|mood ?boards?)\b/gi,
+  "live-cursors": /\b(collaborat\w*|multiplayer|whiteboards?|canvas(es)?|co-?edit\w*|brainstorm\w*|together|design (files?|tools?|teams?)|mood ?boards?|prototyp\w*|comment(s|ing)?|feedback|hand ?off|figma|wireframes?)\b/gi,
   "chat-thread": /\b(chat|messag\w*|channels?|conversations?|threads?|dms?|inbox(es)?|help ?desk|live chat|team communication|support tickets?)\b/gi,
 };
 
@@ -654,7 +655,7 @@ const GENERIC_MOMENT: Record<MomentSkill, DemoSpec> = {
 };
 
 const CHAT_SUPPORT: DemoSpec = {
-  skill: "chat-thread", title: "Every customer, *one inbox*", eyebrow: "In action", action: "Conversation resolved — Marked done",
+  skill: "chat-thread", title: "Questions in, *answers out*", eyebrow: "In action", action: "Conversation resolved — Marked done",
   items: ["Hi, where can I find my invoice?", "It's in Billing, I've sent you the link", "Found it, thank you!"],
 };
 const CHAT_CARE: DemoSpec = {

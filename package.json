@@ -12,7 +12,8 @@
     "check:hosting": "tsx scripts/hosting-check.ts",
     "check:licenses": "tsx scripts/licenses.ts",
     "check:copy": "tsx scripts/copy-check.ts",
-    "licenses": "tsx scripts/licenses.ts --write"
+    "licenses": "tsx scripts/licenses.ts --write",
+    "audit:director": "tsx scripts/director-audit.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

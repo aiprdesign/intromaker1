@@ -1,3 +1,4 @@
+import { imageFailed, imageFailures } from "./media";
 import type { Brand, Media, Scene, SkillId, VideoPlan } from "./types";
 
 /**
@@ -248,13 +249,14 @@ export function placeholderSources() {
  * A preview's scene and plan with stand-in pictures, when the slide shows media and there's none
  * of its own (no media on the slide, no images in the brand). Anything real is left alone.
  */
-const memo = new WeakMap<Scene, { plan: object; out: { scene: Scene; plan: object } }>();
+const memo = new WeakMap<Scene, { plan: object; out: { scene: Scene; plan: object }; v: number }>();
 export function withPlaceholders<P extends Partial<VideoPlan>>(scene: Scene, plan: P): { scene: Scene; plan: P } {
   if (typeof document === "undefined") return { scene, plan };
   const hit = memo.get(scene);
-  if (hit && hit.plan === plan) return hit.out as { scene: Scene; plan: P };
+  const v = imageFailures();
+  if (hit && hit.plan === plan && hit.v === v) return hit.out as { scene: Scene; plan: P };
   const out = placeholdersFor(scene, plan);
-  memo.set(scene, { plan, out });
+  memo.set(scene, { plan, out, v });
   return out;
 }
 
@@ -266,7 +268,18 @@ export function needsPicture(scene: Scene, plan: Partial<VideoPlan>) {
 function placeholdersFor<P extends Partial<VideoPlan>>(scene: Scene, plan: P): { scene: Scene; plan: P } {
   const isProduct = PRODUCT.includes(scene.skill);
   const kind = isProduct ? "product" : PICTURE[scene.skill];
-  if (!kind || scene.media || plan.brand?.images?.length) return { scene, plan };
+  if (!kind) return { scene, plan };
+  // Pictures that failed to load count as none: a slide whose own picture broke borrows one of
+  // the film's pictures that works, and placeholders stand in only when none do.
+  const ownBroken = !!scene.media && imageFailed(scene.media.src);
+  if (scene.media && !ownBroken) return { scene, plan };
+  const all = plan.brand?.images ?? [];
+  const good = all.filter((x) => !imageFailed(x));
+  if (good.length) {
+    if (!ownBroken && good.length === all.length) return { scene, plan };
+    const brand = { ...plan.brand!, images: good };
+    return { scene: ownBroken ? { ...scene, media: { src: good[0], kind: "image" } } : scene, plan: { ...plan, brand } };
+  }
   const images = isProduct ? [placeholder("product"), placeholder("product2")] : [placeholder("ui"), placeholder("photo"), placeholder("page")];
   const media: Media = { src: placeholder(kind), kind: "image" };
   const brand: Brand = { name: plan.brand?.name ?? plan.title ?? "Acme", ...(plan.brand ?? {}), images, videos: plan.brand?.videos ?? [] };

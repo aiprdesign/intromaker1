@@ -173,6 +173,36 @@ const STOP = new Set([...FILLER, ...GLUE]);
 const HOOKS = ["GET READY", "INTRODUCING", "ARE YOU READY", "THE WAIT IS OVER", "IT BEGINS NOW", "LEGENDS RISE"];
 const OUTRO_SUBS = ["Coming soon", "Available now", "Join the movement", "Start today", "Experience it"];
 
+/**
+ * Trailer lines in each style's own voice: the opening line, the beats that pad a short prompt,
+ * and the closing call. (A space documentary shouldn't say "Join the movement", nor a watch
+ * brand "Look closer".)
+ */
+const GENRE_LINES: Record<string, { hooks: string[]; beats: string[]; outro: string[] }> = {
+  cyber: { hooks: ["SYSTEM ONLINE", "ACCESS GRANTED", "THE CODE HAS CHANGED"], beats: ["ENTER THE GRID", "NO LIMITS", "UPLOAD COMPLETE", "BREAK THE SYSTEM"], outro: ["Access now", "Coming soon", "Join the network"] },
+  tech: { hooks: ["THE FUTURE IS HERE", "INTRODUCING", "A NEW ERA BEGINS"], beats: ["BUILT FOR WHAT'S NEXT", "THINK BIGGER", "SEE WHAT'S POSSIBLE", "SMARTER BY DESIGN"], outro: ["Coming soon", "Available now", "Start today"] },
+  action: { hooks: ["NO TURNING BACK", "BRACE YOURSELF", "IT BEGINS NOW"], beats: ["NO LIMITS", "NO FEAR", "HOLD ON", "ALL OR NOTHING"], outro: ["Coming soon", "Out now"] },
+  space: { hooks: ["THE JOURNEY BEGINS", "LOOK UP", "BEYOND THE STARS"], beats: ["INTO THE UNKNOWN", "FURTHER THAN EVER", "ONE SMALL STEP", "THE FINAL FRONTIER"], outro: ["Coming soon", "Premieres soon"] },
+  luxury: { hooks: ["TIMELESS", "CRAFTED WITH CARE", "BEAUTY IN DETAIL"], beats: ["EVERY DETAIL", "PURE ELEGANCE", "TIME, REFINED", "QUIET CONFIDENCE"], outro: ["Discover the collection", "Available now", "Experience it"] },
+  retro: { hooks: ["PRESS PLAY", "TONIGHT", "TURN IT UP"], beats: ["ALL NIGHT LONG", "FEEL THE BEAT", "NEON DREAMS", "BACK IN TIME"], outro: ["Get your tickets", "Coming soon", "See you there"] },
+  music: { hooks: ["TURN IT UP", "PRESS PLAY", "FEEL IT"], beats: ["LIVE", "LOUDER", "ALL NIGHT", "ONE MORE SONG"], outro: ["Listen now", "Out now", "Get your tickets"] },
+  gaming: { hooks: ["GAME ON", "PLAYER ONE READY", "LET THE GAMES BEGIN"], beats: ["NO MERCY", "LEVEL UP", "LOCK AND LOAD", "ONE MORE ROUND"], outro: ["Subscribe now", "Play now", "Join the squad"] },
+  nature: { hooks: ["LISTEN CLOSELY", "WILD AT HEART", "WHERE IT BEGINS"], beats: ["UNTAMED", "BREATHE IN", "FIND YOUR PATH", "STILL WATERS"], outro: ["Coming soon", "Explore now"] },
+  fun: { hooks: ["GUESS WHAT", "HERE WE GO", "GET READY"], beats: ["LET'S GO", "SAY HELLO", "MORE FUN", "JUST FOR YOU"], outro: ["Download now", "Join the fun", "Available now"] },
+  editorial: { hooks: ["CHAPTER ONE", "IN FOCUS", "A STORY"], beats: ["LOOK CLOSER", "THE DETAILS", "BEHIND THE SCENES", "IN THEIR WORDS"], outro: ["Coming soon", "Read the story"] },
+  hype: { hooks: ["ARE YOU READY", "IT'S HERE", "THE WAIT IS OVER"], beats: ["NO LIMITS", "LET'S GO", "ALL IN", "TURN IT UP"], outro: ["Out now", "Coming soon", "Join the movement"] },
+};
+
+/** The closing call that fits what the trailer is for (a channel, a film, a launch, a collection). */
+function trailerCall(lower: string, lines: { outro: string[] }, pick: <T>(arr: T[]) => T, year?: string) {
+  if (/\b(channel|youtube|twitch|stream(er|ing)?|vlog|podcast)\b/.test(lower)) return "Subscribe now";
+  if (/\b(documentary|series|film|movie|episode|season|opener)\b/.test(lower)) return year ? `Premieres ${year}` : "Coming soon";
+  if (/\b(festival|concert|tour|party|night|gig|event)\b/.test(lower)) return year ? `Get your tickets · ${year}` : "Get your tickets";
+  if (/\b(watch|watches|jewel(le)?ry|fragrance|perfume|collection|couture|fashion)\b/.test(lower)) return "Discover the collection";
+  const line = pick(lines.outro);
+  return year ? `${/soon|now/i.test(line) ? "Launching" : line} · ${year}` : line;
+}
+
 function extractBrand(prompt: string): string | null {
   const quoted = prompt.match(/["“'‘]([^"”'’]{2,32})["”'’]/);
   if (quoted) return quoted[1].trim();
@@ -192,8 +222,23 @@ function extractBrand(prompt: string): string | null {
   if (caps) return caps[1].trim();
   const inner = prompt.match(/(?:^|[.!?]\s+)([A-Z][a-z][\w.&-]{1,24})\s+(?:is|helps|lets|makes)\b/);
   if (inner) return inner[1].trim();
+  // "Halo smart water bottle with…" / "Aero Buds wireless earbuds…": a capitalised name leading
+  // straight into what the product is (its lower-case description).
+  const named2 = prompt.match(/^\s*((?:[A-Z][\w.&'-]*\s+){0,2}[A-Z][\w.&'-]*)\s+[a-z]/);
+  if (named2 && !named2[1].split(/\s+/).some((w) => NOT_A_NAME.has(w.toLowerCase()))) return named2[1].trim();
   return null;
 }
+
+/** Opening words that describe the request or its look, never the product's name. */
+const NOT_A_NAME = new Set(
+  (
+    "a an the my our your this that i we me please make create build generate design launch need want new " +
+    "modern epic cinematic playful retro gold golden dark light minimal minimalist clean simple sleek bold fun cyberpunk " +
+    "gaming space luxury luxurious futuristic corporate professional elegant premium cool neon vibrant colourful colorful " +
+    "short quick animated video intro outro promo teaser trailer explainer product brand logo summer winter holiday " +
+    "christmas black white red blue green purple pink orange yellow 80s 90s"
+  ).split(" "),
+);
 
 function phrases(prompt: string, brand: string | null): string[] {
   let p = prompt;
@@ -282,8 +327,15 @@ export function parseSaasPrompt(prompt: string) {
   // Real stats have magnitude ("10,000+ teams", "99.9% uptime"), not "SOC 2" or "3 steps".
   const numbers = stats(prompt).filter((n) => /\d{2,}|\d[kmbx%]|\+/i.test(n.split(" ")[0]));
   const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-  // Pitch: the leading noun phrase, up to the first list or clause marker.
-  const pitchRaw = body.split(/\s(?:with|that|which|who|featuring|including)\s|:|;|\.|,\s(?=\w+\s)/i)[0].trim();
+  // Pitch: the leading noun phrase, up to the first list or clause marker. A list of what it
+  // lets you do ("a design tool for teams to prototype, comment and hand off…") starts at "to":
+  // "prototype" is the first feature, not part of the pitch.
+  let pitchRaw = body.split(/\s(?:with|that|which|who|featuring|including)\s|:|;|\.|,\s(?=\w+\s)/i)[0].trim();
+  const toList = pitchRaw.match(/^(.{6,}?)\s+to\s+((?:[\w-]+\s?){1,3})$/i);
+  if (toList && new RegExp(`^${pitchRaw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*,`).test(body)) {
+    pitchRaw = toList[1].trim();
+    body = body.replace(/^(.*?)\s+to\s+/i, "$1, ");
+  }
   const pitchWords = pitchRaw.split(/\s+/).filter(Boolean);
   // A one-word pitch ("studio") reads as the brand's own: "Sunrise Yoga studio".
   const pitch =
@@ -299,7 +351,8 @@ export function parseSaasPrompt(prompt: string) {
   let pitchOut = pitch;
   const clause = rest.match(/^\s+(that|which|who)\s+([^,;.]+?)(?=\s+and\s|[,;.]|$)/i);
   // Only when at least two other features remain for the feature row.
-  const clauseCount = rest.split(/,|\sand\s|;/).filter((c) => c.trim()).length;
+  // (Number clauses don't count: "80 minute battery" is screened out later as a spec claim.)
+  const clauseCount = rest.split(/,|\sand\s|;/).filter((c) => c.trim() && !/^\s*\d/.test(c)).length;
   if (clause && clauseCount >= 3 && pitchWords.length <= 4 && pitchWords.length + 1 + clause[2].split(/\s+/).length <= 9) {
     pitchOut = `${pitch} ${clause[1].toLowerCase()} ${clause[2].trim()}`;
     rest = rest.slice(clause[0].length);
@@ -314,12 +367,43 @@ export function parseSaasPrompt(prompt: string) {
         .trim()
         .replace(/^(?:(?:it|they|we|you)\s+(?:also\s+)?(?:has|have|comes?|offers?|gives?(?:\s+you)?|includes?|features?|gets?)\s+(?:with\s+)?)/i, "")
         .replace(/^(?:and|with|that|which|also|plus|to|it)\s+/i, "")
+        // ("a help center" → "Help center": a feature is a label.)
+        .replace(/^(?:an?|the)\s+(?=\S+\s)/i, "")
         .replace(/\s+(?:for|to)\s+(?:teams?|startups?|you|everyone|businesses)\b.*$/i, ""),
     )
     .filter((c) => c && !/^[$€£]?\d[\d,.]*[kmb%x]?\+?(\s|$)/i.test(c) && !/^[\d\s.,%+$€£kmb]+$/i.test(c))
     .map((c) => cap(c.split(/\s+/).length > 6 ? shortenCopy(c, 6) : c))
     .filter((c) => c && c.split(/\s+/).length <= 6 && !/^(the|a|an|you|it|them|teams?)$/i.test(c));
+  // Positioning reads better than a bare verb clause: "Helps brands sell online" → "For brands
+  // that sell online"; and a pitch says who it's for when the prompt does ("…and automated
+  // expenses for startups" → "Business banking for startups").
+  const helps = pitchOut.match(/^(?:helps|lets|enables|allows)\s+([\w-]+(?:\s+[\w-]+)??)\s+(?:to\s+)?([a-z].*)$/i);
+  if (helps && /s$/i.test(helps[1])) pitchOut = `For ${helps[1].toLowerCase()} that ${helps[2]}`;
+  const audience = prompt.match(/\bfor\s+((?:(?:fast-growing|small|growing|remote|modern|busy|independent|creative)\s+)?(?:startups|teams|businesses|freelancers|creators|agencies|founders|families|students|enterprises|shops|merchants|restaurants|clinics|developers))\b/i);
+  if (audience && !/\bfor\b/i.test(pitchOut) && pitchOut.split(/\s+/).length <= 5 && !features.some((f) => f.toLowerCase().includes(audience[1].toLowerCase())))
+    pitchOut = `${pitchOut} for ${audience[1].toLowerCase()}`;
   return { brand, pitch: pitchOut, features: [...new Set(features)], numbers };
+}
+
+/** A phrase that opens on what something does ("writes your emails", "helps brands sell"). */
+const VERB_LEAD = /^(helps|lets|makes|keeps|turns|gives|brings|writes|runs|stops|puts|connects|automates|finds|builds|ships|tracks|sends|shares|plans|books|manages|summari[sz]es|creates|generates|answers|handles|syncs|organi[sz]es|schedules|monitors|protects|saves|shows|tells|learns|records|edits|designs|delivers|collects|replaces|cuts|removes|captures|routes|matches|converts|predicts|detects|translates|transcribes|drafts|reviews|deploys|scales|hosts|stores|backs)\b/i;
+
+/** "Pulse" + "The analytics app for product teams" + features → one plain sentence about it. */
+function promptDescription(brand: string | null, pitch: string, features: string[]) {
+  const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}` : xs[0] ?? "");
+  // Feature names keep their own capitals ("AI insights") but read as part of the sentence.
+  const lower = (x: string) => (/^[A-Z][a-z]/.test(x) && !/^[A-Z][a-z]+[A-Z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x);
+  const what = /^(the|an?)\s/i.test(pitch) ? pitch.charAt(0).toLowerCase() + pitch.slice(1) : lower(pitch);
+  // A pitch that's already a clause ("helps brands sell online") follows the name directly.
+  const verbal = VERB_LEAD.test(what);
+  const head = brand ? `${brand} ${verbal ? "" : "is "}${what}` : `${what.charAt(0).toUpperCase()}${what.slice(1)}`;
+  const feats = features.slice(0, 4).map(lower);
+  if (!feats.length) return `${head}.`;
+  // Verb features ("writes your emails") join with "that"; things it has, with "with".
+  const doing = feats.filter((f) => VERB_LEAD.test(f));
+  const having = feats.filter((f) => !VERB_LEAD.test(f));
+  const parts = [doing.length ? ` that ${list(doing)}` : "", having.length ? `${doing.length ? "," : ""} with ${list(having)}` : ""];
+  return `${head}${doing.length ? "" : ","}${parts.join("")}.`.replace(/,\s*,/g, ",");
 }
 
 function planFromPromptSaas(req: PlanRequest): VideoPlan {
@@ -343,11 +427,10 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     domain: "",
     name: brand,
     tagline,
-    // The prompt without its request ("Intro for …"), so it reads as the product's own description.
-    description: (() => {
-      const d = prompt.replace(LEAD_IN, "");
-      return d.charAt(0).toUpperCase() + d.slice(1);
-    })(),
+    // The product described in a clean sentence of its own ("Pulse is the analytics app for
+    // product teams, with dashboards, AI insights and team sharing."), never the prompt as typed:
+    // slides quote it (the AI answer, a subtitle).
+    description: promptDescription(parsed.brand, tagline, named),
     headlines: features.slice(0, 6),
     features: [],
     stats: numbers.map((n) => naturalCase(n, prompt)),
@@ -370,7 +453,27 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     const note = `The feature cards include what a typical ${concept.name.toLowerCase()} product offers (${shown.join(", ")}), because ${why}. Edit them to match yours, or list features in your prompt (e.g. “with X, Y and Z”).`;
     plan.notes = [note, ...(plan.notes ?? [])].slice(0, 3);
   }
-  return { ...plan, title: brand };
+  if (!parsed.brand) {
+    // No name in the prompt: the film never says "Your product" as if it were one. The reveal
+    // names what it is ("Your productivity app"), eyebrows lose the name, the close becomes a
+    // plain call, and a note says where to add the name.
+    const kind = tagline.replace(/^(the|an?|your)\s+/i, "").replace(/\.$/, "");
+    const reveal = kind && kind.split(/\s+/).length <= 4 ? `Your ${kind.charAt(0).toLowerCase()}${kind.slice(1)}` : brand;
+    plan.scenes = plan.scenes.map((s) => ({
+      ...s,
+      eyebrow: s.eyebrow?.replace(/^(Introducing|Why|Meet)\s+Your product$/, (_, w: string) => (w === "Why" ? "Why it works" : w)),
+      text:
+        s.role === "reveal"
+          ? s.text.replace(/Your product/, reveal)
+          : s.role === "cta" && /Your product/.test(s.text)
+            ? "Get started *today*"
+            : s.text.replace(/\*?Your product\*?/g, "*the product*"),
+    }));
+    // (The narrator and the end card's lock-up use the same words.)
+    if (plan.brand) plan.brand = { ...plan.brand, name: reveal };
+    plan.notes = [`No product name was found in the prompt, so the reveal says “${reveal}”. Type the name on that slide, or start the prompt with it (e.g. “Acme is a …”).`, ...(plan.notes ?? [])].slice(0, 3);
+  }
+  return { ...plan, title: plan.brand?.name ?? brand };
 }
 
 /**
@@ -379,7 +482,14 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
  */
 export function productFromPrompt(prompt: string, photos: string[]): SiteData {
   const parsed = parseSaasPrompt(prompt);
-  const description = prompt.replace(LEAD_IN, "").trim();
+  // The product's own description, without its name in front ("Halo smart water bottle with…" →
+  // "Smart water bottle with…"): the name is on screen already, so the subtitle shouldn't repeat it.
+  let description = prompt.replace(LEAD_IN, "").replace(/["“”]/g, "").trim();
+  if (parsed.brand) {
+    const lead = new RegExp(`^(?:meet\\s+|introducing\\s+)?${parsed.brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(?:[:,—–-]\\s*|(?:is|are)\\s+(?:an?\\s+|the\\s+)?)?`, "i");
+    const rest = description.replace(lead, "").trim();
+    if (rest.split(/\s+/).length >= 2) description = rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
   const tagline = parsed.pitch || description.split(/\s+/).slice(0, 6).join(" ");
   return {
     url: "",
@@ -438,14 +548,16 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
   const numbers = stats(prompt);
   // Drop phrases that only describe the video's style ("retro 80s synthwave", "hype gaming channel").
   const STYLE =
-    /^(hype|hyped|channel|documentary|opener|opening|playful|colorful|colourful|dark|bright|energetic|dramatic|dynamic|bold|sleek|clean|minimal|minimalist|vibrant|glowing|futuristic|aesthetic|themed|theme|looking|style|80s|90s|neon|retro|cyberpunk|synthwave|luxury|premium|gaming|sci-fi|scifi)$/i;
+    /^(hype|hyped|channel|documentary|opener|opening|playful|colorful|colourful|dark|bright|energetic|dramatic|dynamic|bold|sleek|clean|minimal|minimalist|vibrant|glowing|futuristic|aesthetic|themed|theme|looking|style|80s|90s|neon|retro|cyberpunk|synthwave|luxury|premium|gaming|sci-fi|scifi|gold|golden|silver|chrome|toxic|green|red|blue|purple|pink|orange|black|white|energy|vibe|vibes|glow|glitch|gritty|moody|elegant|cinematic|epic)$/i;
   const isStyle = (w: string) => STYLE.test(w);
   const styleOnly = (p: string) => {
     const words = p.split(" ");
     return words.filter(isStyle).length * 2 >= words.length;
   };
   const allPhrases = phrases(prompt, brand).filter((p) => !numbers.some((n) => n.includes(p)));
-  const content = allPhrases.filter((p) => !styleOnly(p));
+  // "a watch brand called AURUM": the kind of brand describes the request, it isn't a beat.
+  const metaOnly = (p: string) => /\b(brand|company|business|channel|startup|label|agency|studio|organi[sz]ation)$/i.test(p) && p.split(" ").length <= 3;
+  const content = allPhrases.filter((p) => !styleOnly(p) && !metaOnly(p));
   let body = content.length ? content : allPhrases;
   const target = LENGTH_SECONDS[req.length];
   const year = prompt.match(/\b(19|20)\d\d\b/)?.[0];
@@ -475,18 +587,20 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
     return lastTransition;
   };
 
-  const hookText = /\blaunch|release|drop|coming/.test(lower) ? "THE WAIT IS OVER" : pick(HOOKS);
+  const lines = GENRE_LINES[look.id] ?? { hooks: HOOKS, beats: ["GET READY", "STAY TUNED", "A NEW CHAPTER", "WATCH THIS SPACE"], outro: OUTRO_SUBS };
+  const hookText = /\b(launch|release|drop|coming)/.test(lower) && look.id !== "luxury" && look.id !== "space" ? pick(["THE WAIT IS OVER", ...lines.hooks]) : pick(lines.hooks);
   scenes.push({ skill: pickSkill(mood.hook, null), text: hookText, duration: HOOK, transition: "cut" });
 
   // The phrase right after the brand usually describes it ("NOVA AI, an AI copilot for…").
-  const afterBrand = brand ? phrases(prompt.slice(prompt.indexOf(brand) + brand.length), null)[0] : undefined;
+  const afterBrand = brand ? phrases(prompt.slice(prompt.indexOf(brand) + brand.length), null).find((p) => !styleOnly(p)) : undefined;
   const title = (brand ?? body.shift() ?? "YOUR BRAND").toUpperCase();
   const tagline = afterBrand ?? body[0];
   body = body.filter((b) => b !== tagline);
   scenes.push({
     skill: pickSkill(mood.title, scenes[0].skill),
     text: title,
-    subtext: tagline ? tagline.toLowerCase() : undefined,
+    // (Its own capitals kept: "AI copilot for developers", not "ai copilot…".)
+    subtext: tagline ? tagline.charAt(0).toUpperCase() + tagline.slice(1) : undefined,
     duration: TITLE,
     transition: nextTransition(mood.transitions),
   });
@@ -507,7 +621,7 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
     used += dur;
   }
   // Pad short prompts with brand-flavoured beats.
-  const fillers = ["GET READY", "STAY TUNED", "A NEW CHAPTER", "LOOK CLOSER", "WATCH THIS SPACE", "COMING SOON"];
+  const fillers = lines.beats.filter((x) => x !== hookText);
   while (used + BEAT <= target + 0.5 && fillers.length) {
     const skill = pickSkill(bodyPool, last);
     const text = fillers.splice(Math.floor(r() * fillers.length), 1)[0];
@@ -519,7 +633,7 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
   scenes.push({
     skill: pickSkill(mood.outro, last),
     text: title,
-    subtext: year ? `${pick(OUTRO_SUBS)} · ${year}` : pick(OUTRO_SUBS),
+    subtext: trailerCall(lower, lines, pick, year),
     duration: OUTRO,
     transition: nextTransition(["leak", "dolly", "shutter"]),
   });
@@ -693,6 +807,8 @@ export function contextCta(site: Pick<SiteData, "cta" | "name" | "tagline" | "de
     ["Book a demo", count(/\b(book|schedule|request|get) (a )?(demo|call)\b|\btalk to (sales|us)\b/g) * 4 + count(/\benterprise\b/g)],
     ["Download the app", count(/\b(app store|google play|ios and android|iphone and android|mobile app|download (the|our) app)\b/g) * 4 + count(/\b(ios|android)\b/g)],
     ["Book now", count(/\b(book (an |your )?(appointment|table|session|stay|room)|online booking|appointments?|reservations?)\b/g) * 3 + count(/\b(salon|clinic|dentist|spa|studio visit|restaurant|hotel)\b/g)],
+    // A tool for sellers (a store builder, a checkout) invites them to sell, not to shop.
+    ["Start selling", count(/\b(sell (online|anywhere|your products?)|selling online|merchants?|storefronts?|store builder|your (online )?store|helps (brands|businesses|creators) sell|commerce platform)\b/g) * 3],
     ["Shop now", count(/\b(shop (now|the|our)|add to cart|free shipping|order online|our collection|new arrivals|online store|shop)\b/g) * 2 + count(/\b(products? line|apparel|jewelry|jewellery|skincare|clothing)\b/g)],
     ["Start learning", count(/\b(online courses?|lessons?|tutoring|bootcamp|curriculum|certification|learn to|students?)\b/g) * 2 + count(/\bcourses?\b/g)],
     ["Start building", count(/\b(api|sdk|cli|developers?|open source)\b/g) * 2 + count(/\b(deploy|git|framework|library|code)\b/g)],
@@ -1063,7 +1179,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // it opens on the positioning line and leads with the product doing its job.
   const hasProof = !!teamStat || site.testimonials.length > 0 || (brand.clientLogos?.length ?? 0) >= 4 || site.stats.length > 0;
   const valueFirst = angle === "proof" && !hasProof;
-  const descClause = sentenceCopy(site.description.split(/\s(?:so|because|that|which|to help)\s|\s[—–]\s/)[0], 10);
+  // (Without its own name in front: "Harbor is the AI assistant" → "The AI assistant"; the
+  // logo says the name a beat later.)
+  const descClause = sentenceCopy(
+    site.description
+      .split(/\s(?:so|because|that|which|to help)\s|\s[—–]\s/)[0]
+      .replace(new RegExp(`^${site.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+(?:is|are)\\s+(?=\\S)`, "i"), "")
+      .replace(/^./, (c) => c.toUpperCase()),
+    // (A hook's length: the old limit of 10 counted the "Name is" this now leaves out.)
+    8,
+  );
   // Product-first opens on what the product does (its description) and keeps the tagline for the logo.
   // (Without a description, a feature line the tour doesn't use.)
   const usable = (x: string | undefined): x is string => !!x && norm(x) !== norm(tagline) && x.split(" ").length >= 3;
@@ -1527,11 +1652,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
  * ("IPX5 water resistant", "Works with Alexa").
  */
 export function calloutTitle(raw: string, prose = ""): string {
-  const words = raw.replace(/[.!:;,]+$/, "").trim().split(/\s+/).filter(Boolean);
+  // ("A temperature display" → "Temperature display": a callout is a label, not a sentence.)
+  const words = raw.replace(/[.!:;,]+$/, "").trim().replace(/^(?:an?|the)\s+(?=\S+\s)/i, "").split(/\s+/).filter(Boolean);
   const join = words.findIndex((w, i) => i >= 2 && /^(with|and|for|that|to|in|on|so|from)$/i.test(w));
   let out = join > 0 ? words.slice(0, join) : words;
+  // Too long for a label: lose the possessives and articles inside it, then a leading verb
+  // ("Keeps coffee at your chosen temperature" → "Coffee at chosen temperature"), rather than
+  // cutting it off mid-phrase ("Keeps coffee at").
+  if (out.length > 4) out = out.filter((w, i) => i === 0 || !/^(your|their|its|our|the|a|an)$/i.test(w));
+  if (out.length > 4 && /^[A-Z]?[a-z]+s$/.test(out[0]) && !/ss$/.test(out[0])) {
+    out = out.slice(1);
+    out[0] = out[0].charAt(0).toUpperCase() + out[0].slice(1);
+  }
   if (out.length > 4) out = out.slice(0, 4);
-  while (out.length > 1 && /^(for|and|with|to|of|the|a|an|in|on|or|your|by)$/i.test(out[out.length - 1])) out.pop();
+  while (out.length > 1 && /^(for|and|with|to|of|the|a|an|in|on|at|or|your|by|from|into)$/i.test(out[out.length - 1])) out.pop();
+  if (out[0]) out[0] = out[0].charAt(0).toUpperCase() + out[0].slice(1);
   const proper = new Set([...prose.matchAll(/(?<![.!?]\s|^)\b([A-Z][a-z]+)\b/g)].map((m) => m[1]));
   // "All-Day battery" → "All-day battery".
   if (out[0] && !/^[A-Z]{2,}/.test(out[0])) out[0] = out[0].replace(/-([A-Z])(?=[a-z]{2,}\b)/g, (_, c: string) => `-${c.toLowerCase()}`);
@@ -1647,7 +1782,18 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
         : angle === "product"
           ? [reveal, gallery, callouts, slides ?? (target >= 30 ? icons : null), closer]
           : [reveal, callouts, gallery, slides ?? (target >= 30 ? icons : null), closer];
-  scenes.push(...order.filter((x): x is Scene => !!x));
+  // The feature cards only when they add something: cards repeating the callouts' own list
+  // (a prompt with four features) would tell the viewer the same thing twice in a row. The
+  // other shots hold longer instead.
+  const fresh = (icons?.items ?? []).filter((it) => !callouts?.items?.some((c) => norm(c) === norm(it)));
+  const repeat = !!callouts && !!icons && order.includes(callouts) && order.includes(icons) && fresh.length < 2;
+  const kept = order.filter((x): x is Scene => !!x && !(repeat && x === icons));
+  if (repeat) {
+    const gap = icons!.duration;
+    const room = kept.filter((x) => x !== reveal);
+    for (const x of room) x.duration += gap / Math.max(1, room.length);
+  } else if (icons && fresh.length >= 2 && callouts && order.includes(callouts)) icons.items = fresh.slice(0, 4);
+  scenes.push(...kept);
   // Never the same product shot twice in a row (the reveal then its callouts is a different shot).
   for (let i = 1; i < scenes.length; i++)
     if (scenes[i].skill === "product-hero" && scenes[i - 1].skill === "product-hero" && !!scenes[i].items?.length === !!scenes[i - 1].items?.length && icons) scenes[i] = { ...icons };
@@ -1663,9 +1809,12 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   const plan = sanitizePlan({ title, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target, product: true });
   const styled = applyTemplate(plan, req.template ?? "studio", { palette: req.palette && req.palette !== "auto" ? req.palette : undefined });
   if (!feats.length || photos < 2) {
+    const runs = styled.scenes.reduce((a, s) => a + s.duration, 0);
     styled.notes = [
-      `${photos < 2 ? "Only one product photo was found" : "The listing has no bullet points"}, so this is a short product film. ${photos < 2 ? "Add more photos" : "Add features in your prompt"} for galleries and feature callouts.`,
+      `${photos < 2 ? (photos ? "Only one product photo was found" : "No product photos were added") : "The listing has no bullet points"}, so this is a short product film${runs < target * 0.9 ? ` (${Math.round(runs)}s rather than ${target}s, so nothing is padded or shown twice)` : ""}. ${photos < 2 ? "Add more photos" : "Add features in your prompt"} for galleries and feature callouts.`,
     ];
+    // Judged (and fitted later) on the length its material supports.
+    if (runs < target * 0.9) styled.target = Math.round(runs);
   }
   return styled;
 }
