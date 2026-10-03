@@ -1642,11 +1642,13 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Positioning line in the category's voice ("Ship faster|safer|together"): a rhythm change
   // between the reveal and the product that needs no media and makes no claims.
   // Remakes set the same line as an editorial type moment: bands of kinetic type, or a poster.
-  const promiseKind = (["word-swap", "type-rows", "type-poster", "type-echo", "poster-split", "type-slots", "poster-grid"] as const)[variant % 7];
+  // Fast type joins the rotation: words switching on the half-beat before the line lands.
+  const promiseKind = (["word-swap", "type-rows", "type-poster", "type-echo", "poster-split", "type-slots", "poster-grid", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap"] as const)[variant % 13];
   const [swapLead, swapWords = ""] = concept.swap.split(/,\s*(?=[^,]*$)/);
   const swapList = swapWords.split("|").filter(Boolean);
   const promiseLine = swapList.length ? `${swapLead}, *${swapList[swapList.length - 1]}*` : concept.swap;
   const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  const snappy = shortFeatures.filter((f) => f.length <= 18 && f.split(/\s+/).length <= 2);
   add(target >= 20 && !tourMedia && !shots.full && !valueFirst ? 3 : 6, promiseKind === "word-swap"
     ? {
         role: "promise", skill: "word-swap",
@@ -1660,11 +1662,18 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
         role: "promise", skill: promiseKind,
         text: promiseLine,
         items:
-          promiseKind === "type-echo"
+          promiseKind === "type-echo" || promiseKind === "style-shuffle"
             ? undefined
-            : promiseKind === "type-rows" || promiseKind === "type-slots"
-              ? shortFeatures.length >= 3 ? shortFeatures.slice(0, 5) : swapList.map(cap)
-              : shortFeatures.slice(0, 3),
+            : promiseKind === "flip-switch"
+              ? swapList.length >= 3 ? swapList.slice(0, -1).map(cap) : shortFeatures.slice(0, 4)
+              : promiseKind === "split-flap"
+                ? snappy.filter((f) => f.length <= 12).slice(0, 2)
+                : promiseKind === "rapid-fire" || promiseKind === "zoom-through" || promiseKind === "slice-switch"
+                  ? // Fast type switches words every half-beat, so only short ones (else the category's swap words).
+                    snappy.length >= 3 ? snappy.slice(0, 5) : swapList.length >= 2 ? swapList.map(cap) : snappy
+                  : promiseKind === "type-rows" || promiseKind === "type-slots"
+                    ? shortFeatures.length >= 3 ? shortFeatures.slice(0, 5) : swapList.map(cap)
+                    : shortFeatures.slice(0, 3),
         subtext: promiseKind === "poster-split" ? sentenceCopy(site.description, 10) || undefined : undefined,
         eyebrow: `Why ${site.name}`,
         duration: Math.max(4.6, beats(9)),

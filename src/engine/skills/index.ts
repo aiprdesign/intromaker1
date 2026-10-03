@@ -5,6 +5,7 @@ import { endingSkills } from "./endings";
 import { editorialSkills } from "./editorial";
 import { editorialMoreSkills } from "./editorial2";
 import { energySkills } from "./energy";
+import { fastTypeSkills } from "./fastype";
 import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
 import { gallerySkills } from "./gallery";
@@ -24,6 +25,7 @@ export const SKILLS: Skill[] = [
   ...endingSkills,
   ...editorialSkills,
   ...editorialMoreSkills,
+  ...fastTypeSkills,
   ...interactionSkills,
   ...momentSkills,
   ...slideSkills,
@@ -61,6 +63,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "SaaS essentials", skills: saasSkills },
   { name: "Openers & end cards", skills: endingSkills },
   { name: "Editorial system", skills: [...editorialSkills, ...editorialMoreSkills] },
+  { name: "Fast type", skills: fastTypeSkills },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills] },
   { name: "Slides", skills: slideSkills },
   { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },

@@ -224,7 +224,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: true, beams: 2, aurora: 0.25, text: "mask", bokeh: false, grain: 1.4, vignette: 1.2, shader: "grain", shaderStrength: 0.55 },
     transitions: ["cut", "shutter", "push"],
     pace: 0.9,
-    roles: {},
+    roles: { promise: "slice-switch" },
     revealNoLogo: "logo-reveal",
     sample: sample("Ship it. *Scale it.*"),
   },
@@ -242,7 +242,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 1.4, text: "pop", grain: 0.5, shader: "mesh", shaderStrength: 1 },
     transitions: ["whip", "push", "zoom"],
     pace: 0.85,
-    roles: {},
+    roles: { promise: "rapid-fire" },
     revealNoLogo: "flip-3d",
     sample: sample("Plans with friends, *sorted*."),
   },
@@ -332,7 +332,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.3, backdrop: "scanlines", card: "flat", text: "type", bokeh: false, grain: 1.2, vignette: 1.4 },
     transitions: ["cut", "glitch", "shutter"],
     pace: 0.95,
-    roles: {},
+    roles: { promise: "split-flap" },
     revealNoLogo: "logo-reveal",
     sample: sample("npm install *speed*"),
   },
@@ -967,7 +967,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 1.5, aurora: 0.8, card: "glass", text: "chroma", textScale: 1.1, grain: 1, vignette: 1.4, shader: "neuro", shaderStrength: 0.6, depth: 6 },
     transitions: ["glitch", "flash", "whip"],
     pace: 0.9,
-    roles: {},
+    roles: { promise: "zoom-through" },
     revealNoLogo: "logo-reveal",
     sample: sample("Level *up*.", "blur-reveal", { eyebrow: "Next gen" }),
   },
@@ -996,6 +996,12 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "poster-split": "promise",
   "type-echo": "promise",
   "type-slots": "promise",
+  "rapid-fire": "promise",
+  "flip-switch": "promise",
+  "zoom-through": "promise",
+  "slice-switch": "promise",
+  "style-shuffle": "promise",
+  "split-flap": "promise",
   "card-stack": "features",
   "contact-sheet": "features",
   "spec-sheet": "bento",
@@ -1111,7 +1117,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
