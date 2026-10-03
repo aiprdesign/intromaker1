@@ -258,7 +258,7 @@ export function streaks(sc: SkillContext, intensity: number, color: string, opts
   for (let i = 0; i < n; i++) {
     const hsh = hashString(`${seed}:streak:${i}`);
     const r1 = (hsh % 997) / 997;
-    const r2 = ((hsh >> 10) % 991) / 991;
+    const r2 = ((hsh >>> 10) % 991) / 991;
     const speed = 0.9 + r2 * 1.4;
     const q = (t * speed + r1) % 1;
     ctx.globalAlpha = intensity * (0.25 + 0.55 * r2) * Math.sin(q * Math.PI);

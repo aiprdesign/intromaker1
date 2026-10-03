@@ -29,7 +29,7 @@ export default function PricingCards() {
           $0<small>unlimited, for now</small>
         </div>
         <ul>
-          {["98 motion skills", "Generated soundtrack and voice-over", ...describeLimits(plans.free), "For personal and non-commercial use"].map((f) => (
+          {["108 motion skills", "Generated soundtrack and voice-over", ...describeLimits(plans.free), "For personal and non-commercial use"].map((f) => (
             <li key={f}>{f}</li>
           ))}
         </ul>
