@@ -22,6 +22,20 @@ export function stripeLink(v: unknown, kind: "pay" | "portal"): string | undefin
   }
 }
 
+/** The webhook events IntroMaker handles: select these on the Stripe endpoint. */
+export const STRIPE_EVENTS = [
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.paid",
+  "invoice.payment_failed",
+  "charge.refunded",
+  "charge.dispute.created",
+];
+
 export const isTestLink = (link?: string) => !!link && /\/test_/.test(link);
 
 /** The payment link for this account: its id comes back on the webhook, its email is prefilled. */

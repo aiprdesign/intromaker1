@@ -34,8 +34,9 @@ export const PLAN_NAMES: Record<PlanId, string> = { free: "Free", pro: "Pro" };
 export const WATERMARK = "Made with IntroMaker";
 
 /**
- * The defaults before plans went unlimited. Admin → Plans saves the whole table, so a saved plan
- * that still equals these was never customised: it gets today's (unlimited) defaults.
+ * The defaults before plans went unlimited. A settings file from before then (no plansVersion)
+ * saved the whole table, so a plan that still equals these was never customised: it gets today's
+ * (unlimited) defaults. Limits saved since are kept exactly, these values included.
  */
 const OLD_DEFAULTS: Record<PlanId, PlanLimits> = {
   free: { savedFilms: 3, aiPerMonth: 0, importsPerDay: 3, watermark: true, maxLong: 1920, maxFps: 30 },
@@ -43,10 +44,13 @@ const OLD_DEFAULTS: Record<PlanId, PlanLimits> = {
 };
 const sameLimits = (a: Partial<PlanLimits>, b: PlanLimits) => (Object.keys(b) as (keyof PlanLimits)[]).every((k) => a[k] === b[k]);
 
+/** Saved plan tables carry this version; older files get the one-time migration above. */
+export const PLANS_VERSION = 2;
+
 /** Merge saved overrides onto the defaults, clamping each number to a sane range. */
-export function readLimits(raw: unknown): Record<PlanId, PlanLimits> {
+export function readLimits(raw: unknown, { legacy = false }: { legacy?: boolean } = {}): Record<PlanId, PlanLimits> {
   const saved = (raw ?? {}) as Partial<Record<PlanId, Partial<PlanLimits>>>;
-  const r = Object.fromEntries(PLAN_IDS.map((id) => [id, saved[id] && sameLimits(saved[id]!, OLD_DEFAULTS[id]) ? {} : saved[id]])) as Partial<Record<PlanId, Partial<PlanLimits>>>;
+  const r = Object.fromEntries(PLAN_IDS.map((id) => [id, legacy && saved[id] && sameLimits(saved[id]!, OLD_DEFAULTS[id]) ? {} : saved[id]])) as Partial<Record<PlanId, Partial<PlanLimits>>>;
   const num = (v: unknown, d: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : d);
   const one = (id: PlanId): PlanLimits => {
     const d = DEFAULT_LIMITS[id];

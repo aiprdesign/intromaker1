@@ -19,6 +19,8 @@ type AdminUser = {
   billingStatus?: "active" | "past_due" | "canceling" | "canceled";
   periodEnd?: number;
   stripeCustomerId?: string;
+  stripeLive?: boolean;
+  billingFlag?: "refunded" | "disputed";
   /** Intros made (from the film log): how many, when last, and their latest prompts or sites. */
   made: { made: number; lastAt: number; recent: string[] };
 };
@@ -40,6 +42,8 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
   const [only, setOnly] = useState<"" | "requests" | "pro" | "stripe">("");
   const [sort, setSort] = useState<keyof typeof SORTS>("new");
   const [temp, setTemp] = useState<{ email: string; pw: string } | null>(null);
+  // Linking a Stripe payment that reached no account: which account, and the customer id typed.
+  const [linking, setLinking] = useState<{ id: string; cus: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     try {
@@ -78,23 +82,44 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
     setTemp({ email: u.email, pw: r.tempPassword });
     void load();
   };
+  const paying = (u: AdminUser) => u.planSource === "stripe" && (u.billingStatus === "active" || u.billingStatus === "past_due" || u.billingStatus === "canceling");
   const toggle = async (u: AdminUser) => {
-    if (!u.disabled && !(await confirm({ title: `Disable ${u.email}?`, body: "They're signed out and can't sign in until you enable the account again. Their data is kept.", confirm: "Disable", danger: true }))) return;
+    const body = `They're signed out and can't sign in until you enable the account again. Their data is kept.${paying(u) ? " They still pay through Stripe: cancel or pause their subscription in Stripe too." : ""}`;
+    if (!u.disabled && !(await confirm({ title: `Disable ${u.email}?`, body, confirm: "Disable", danger: true }))) return;
     await api(`/api/admin/users/${u.id}`, { method: "PATCH", body: JSON.stringify({ disabled: !u.disabled }) });
     notify(u.disabled ? `${u.email} enabled` : `${u.email} disabled`);
     void load();
   };
   const remove = async (u: AdminUser) => {
+    const live = paying(u);
     const ok = await confirm({
       title: `Delete ${u.email}?`,
-      body: `The account and its ${u.films} saved intro${u.films === 1 ? "" : "s"} are removed for good.${u.planSource === "stripe" && u.billingStatus !== "canceled" ? " Cancel their Stripe subscription as well." : ""}`,
+      body: live
+        ? `They have a live Stripe subscription. Cancel it in Stripe first, or it keeps charging after the account is gone. Then type CANCELLED to delete the account and its ${u.films} saved intro${u.films === 1 ? "" : "s"}.`
+        : `The account and its ${u.films} saved intro${u.films === 1 ? "" : "s"} are removed for good.`,
       confirm: "Delete account",
       danger: true,
-      typed: u.email,
+      typed: live ? "CANCELLED" : u.email,
     });
     if (!ok) return;
-    await api(`/api/admin/users/${u.id}`, { method: "DELETE" });
+    await api(`/api/admin/users/${u.id}${live ? "?stripeCancelled=1" : ""}`, { method: "DELETE" });
     notify("Account deleted");
+    void load();
+  };
+
+  const link = async () => {
+    if (!linking) return;
+    try {
+      await api(`/api/admin/users/${linking.id}`, { method: "PATCH", body: JSON.stringify({ stripeCustomerId: linking.cus.trim() }) });
+      notify("Stripe customer linked: the account is on Pro, and Stripe runs its plan from now on");
+      setLinking(null);
+      void load();
+    } catch (e) {
+      notify((e as Error).message, "error");
+    }
+  };
+  const clearFlag = async (u: AdminUser) => {
+    await api(`/api/admin/users/${u.id}`, { method: "PATCH", body: JSON.stringify({ clearFlag: true }) });
     void load();
   };
 
@@ -107,13 +132,13 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
         (only === "" || (only === "pro" ? u.plan === "pro" : only === "stripe" ? u.planSource === "stripe" : !!u.upgradeRequestedAt && u.plan !== "pro")),
     )
     .sort(SORTS[sort].fn);
-  const paying = data.users.filter((u) => u.planSource === "stripe" && (u.billingStatus === "active" || u.billingStatus === "canceling" || u.billingStatus === "past_due")).length;
+  const payingCount = data.users.filter(paying).length;
   return (
     <>
       <section className="admin-kpis">
         <Kpi label="Accounts" value={data.counts.total} />
         <Kpi label="Pro" value={data.counts.pro} />
-        <Kpi label="Paying via Stripe" value={paying} />
+        <Kpi label="Paying via Stripe" value={payingCount} />
         <Kpi label="Asking for Pro" value={data.counts.requests} />
       </section>
       {temp && (
@@ -183,9 +208,14 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
                   </span>
                 )}
                 {u.stripeCustomerId && (
-                  <a className="tag link" href={`https://dashboard.stripe.com/customers/${u.stripeCustomerId}`} target="_blank" rel="noopener noreferrer">
-                    Open in Stripe ↗
+                  <a className="tag link" href={`https://dashboard.stripe.com/${u.stripeLive === false ? "test/" : ""}customers/${u.stripeCustomerId}`} target="_blank" rel="noopener noreferrer">
+                    Open in Stripe{u.stripeLive === false ? " (test)" : ""} ↗
                   </a>
+                )}
+                {u.billingFlag && (
+                  <button className="tag warn" onClick={() => clearFlag(u)} title="Looked at it: clear the flag">
+                    Payment {u.billingFlag} ×
+                  </button>
                 )}
                 {u.upgradeRequestedAt && u.plan !== "pro" && (
                   <span className="tag remake">
@@ -220,6 +250,11 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
               ))}
             </div>
             <div className="user-actions">
+              {!u.stripeCustomerId && (
+                <button className="btn btn-ghost sm" onClick={() => setLinking(linking?.id === u.id ? null : { id: u.id, cus: "" })} title="A payment in Stripe that reached no account">
+                  Link Stripe customer
+                </button>
+              )}
               <button className="btn btn-ghost sm" onClick={() => reset(u)}>
                 Reset password
               </button>
@@ -230,6 +265,26 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
                 Delete
               </button>
             </div>
+            {linking?.id === u.id && (
+              <form
+                className="link-customer"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void link();
+                }}
+              >
+                <label className="fld">
+                  <span className="fld-cap">Stripe customer id (from the payment in Stripe → Customers)</span>
+                  <input className="input" autoFocus placeholder="cus_…" value={linking.cus} spellCheck={false} onChange={(e) => setLinking({ ...linking, cus: e.target.value })} />
+                </label>
+                <button className="btn btn-primary sm" disabled={!/^cus_[A-Za-z0-9]{6,}$/.test(linking.cus.trim())}>
+                  Link and switch to Pro
+                </button>
+                <button type="button" className="btn btn-ghost sm" onClick={() => setLinking(null)}>
+                  Cancel
+                </button>
+              </form>
+            )}
           </div>
         ))}
       </div>

@@ -161,7 +161,8 @@ async function main() {
   check(Object.values(plansLib.DEFAULT_LIMITS).every((l) => l.savedFilms >= 100_000 && l.importsPerDay >= 100_000 && !l.watermark && l.maxLong === 3840), "every plan is unlimited by default, for now");
   const oldFree = { savedFilms: 3, aiPerMonth: 0, importsPerDay: 3, watermark: true, maxLong: 1920, maxFps: 30 };
   const oldPro = { savedFilms: 200, aiPerMonth: 100, importsPerDay: 50, watermark: false, maxLong: 3840, maxFps: 60 };
-  check(plansLib.readLimits({ free: oldFree, pro: oldPro }).free.savedFilms >= 100_000, "plans saved with the old defaults (never customised) become unlimited too");
+  check(plansLib.readLimits({ free: oldFree, pro: oldPro }, { legacy: true }).free.savedFilms >= 100_000, "plans saved with the old defaults (never customised) become unlimited too");
+  check(plansLib.readLimits({ free: oldFree, pro: oldPro }).free.savedFilms === 3, "limits saved today are kept exactly, even the old default numbers");
   check(plansLib.readLimits({ free: { ...oldFree, savedFilms: 5 } }).free.savedFilms === 5, "limits the owner changed are kept");
   // (Customised, so they're enforced: one value differs from the old defaults.)
   await admin.writeSettings({ plans: { free: { ...oldFree, maxLong: 1280 }, pro: { ...oldPro, maxFps: 30 } } });
@@ -250,6 +251,41 @@ async function main() {
   await acc.updateUser(anaId, (x) => void (x.stripeCustomerId = "cus_ana"));
   await hook({ id: "evt_ana", type: "customer.subscription.deleted", data: { object: { id: "sub_ana", customer: "cus_ana", status: "canceled" } } });
   check((await acc.getUser(anaId))!.plan === "pro", "Stripe never takes back a plan the owner set by hand");
+  // A plan set by hand also isn't re-granted by a later subscription event (a renewal).
+  await acc.updateUser(anaId, (x) => void ((x.plan = "free"), (x.planSource = "admin")));
+  await hook({ id: "evt_ana_renew", type: "customer.subscription.updated", data: { object: { id: "sub_ana", customer: "cus_ana", status: "active" } } });
+  check((await acc.getUser(anaId))!.plan === "free", "a renewal doesn't undo a plan the owner set by hand");
+  // A bank debit completes the checkout before the money arrives: no Pro until it does.
+  const cyId = (await acc.createUser("cy@example.com", "cy-password-1")).id;
+  await hook({ id: "evt_cy_pending", type: "checkout.session.completed", created: 1000, data: { object: { client_reference_id: cyId, customer: "cus_cy", status: "complete", payment_status: "unpaid" } } });
+  check((await acc.getUser(cyId))!.plan === "free", "an unpaid (pending bank) checkout doesn't grant Pro");
+  await hook({ id: "evt_cy_paid", type: "checkout.session.async_payment_succeeded", created: 1100, data: { object: { client_reference_id: cyId, customer: "cus_cy", payment_status: "paid" } } });
+  check((await acc.getUser(cyId))!.plan === "pro", "the bank payment arriving grants Pro");
+  await hook({ id: "evt_cy_del", type: "customer.subscription.deleted", created: 1300, data: { object: { id: "sub_cy", customer: "cus_cy", status: "canceled" } } });
+  await hook({ id: "evt_cy_old", type: "customer.subscription.updated", created: 1200, data: { object: { id: "sub_cy", customer: "cus_cy", status: "active" } } });
+  check((await acc.getUser(cyId))!.plan === "free", "an older event arriving late (a retry) doesn't re-grant Pro");
+  await hook({ id: "evt_cy_buy2", type: "checkout.session.completed", created: 1400, data: { object: { client_reference_id: cyId, customer: "cus_cy", payment_status: "paid" } } });
+  await hook({ id: "evt_cy_fail", type: "invoice.payment_failed", created: 1500, data: { object: { customer: "cus_cy" } } });
+  await hook({ id: "evt_cy_inv", type: "invoice.paid", created: 1600, data: { object: { customer: "cus_cy", amount_paid: 900 } } });
+  check((await acc.getUser(cyId))!.billingStatus === "active", "a paid invoice clears a failed payment");
+  // Money that reaches no account is flagged for the owner, who links it.
+  await hook({ id: "evt_orphan", type: "checkout.session.completed", data: { object: { customer: "cus_orphan", customer_details: { email: "nobody@example.com" }, payment_status: "paid" } } });
+  const st = await billing.billingStatus();
+  check(st.recent[0].attention === true && /no account matches/.test(st.recent[0].result), "a payment that matches no account is flagged in Billing");
+  const linkRoute = await import("../src/app/api/admin/users/[id]/route");
+  const linked = await linkRoute.PATCH(areq(`/api/admin/users/${boId}`, { method: "PATCH", cookie: adminCookie, body: JSON.stringify({ stripeCustomerId: "cus_orphan" }) }), { params: Promise.resolve({ id: boId }) });
+  const boNow = (await acc.getUser(boId))!;
+  check(linked.status === 200 && boNow.plan === "pro" && boNow.planSource === "stripe" && boNow.stripeCustomerId === "cus_orphan", "the owner links an unmatched payment to its account");
+  check((await linkRoute.PATCH(areq(`/api/admin/users/${cyId}`, { method: "PATCH", cookie: adminCookie, body: JSON.stringify({ stripeCustomerId: "cus_orphan" }) }), { params: Promise.resolve({ id: cyId }) })).status === 409, "a Stripe customer can't be linked to two accounts");
+  // A live subscription keeps charging, so the account can't simply be deleted.
+  const cyCookie = (await accSession.POST(ureq("/api/account/session", { method: "POST", ip: "203.0.113.70", body: JSON.stringify({ email: "cy@example.com", password: "cy-password-1" }) }))).headers.get("set-cookie")!.split(";")[0];
+  const selfDel = await accountRoute.DELETE(ureq("/api/account", { method: "DELETE", cookie: cyCookie, body: JSON.stringify({ password: "cy-password-1" }) }));
+  check(selfDel.status === 409 && !!(await acc.getUser(cyId)), "a subscriber is asked to cancel before deleting their account");
+  check((await linkRoute.DELETE(areq(`/api/admin/users/${cyId}`, { method: "DELETE", cookie: adminCookie }), { params: Promise.resolve({ id: cyId }) })).status === 409, "the owner can't delete a paying account without confirming it was cancelled");
+  check((await linkRoute.DELETE(areq(`/api/admin/users/${cyId}?stripeCancelled=1`, { method: "DELETE", cookie: adminCookie }), { params: Promise.resolve({ id: cyId }) })).status === 204, "after cancelling in Stripe, the owner can delete it");
+  const rejectedBefore = (await billing.billingStatus()).rejected;
+  await hook(paid, () => "t=1,v1=00");
+  check((await billing.billingStatus()).rejected === rejectedBefore + 1, "refused deliveries are counted for the owner (secret or mode mismatch)");
   check(!billing.stripeLink("https://evil.example/pay", "pay") && !billing.stripeLink("http://buy.stripe.com/x", "pay") && !billing.stripeLink("https://buy.stripe.com/x", "portal"), "only Stripe-hosted https links are accepted");
   const link = billing.checkoutUrl(billing.stripeLink("https://buy.stripe.com/test_abc", "pay")!, { id: boId, email: "bo@example.com" });
   check(new URL(link).searchParams.get("client_reference_id") === boId && billing.isTestLink(link), "payment links carry the account id and are recognised as test links");

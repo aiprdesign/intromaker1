@@ -95,11 +95,6 @@ export default function Home() {
       </section>
 
       <section className="section" id="pricing">
-        <div className="section-head">
-          <span className="eyebrow">Pricing</span>
-          <h2>Free and unlimited, for now.</h2>
-          <p className="lead">IntroMaker is a portfolio project: try it free and unlimited, for personal and non-commercial use. Want to use it commercially? Contact us for a licence.</p>
-        </div>
         <PricingCards />
       </section>
 

@@ -35,7 +35,20 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 /** Only same-site paths are followed after signing in. */
-const safeNext = (n: string | null) => (n && n.startsWith("/") && !n.startsWith("//") ? n : null);
+/** A path on this site only (browsers read "/\\evil.com" as another site, so backslashes are refused). */
+const safeNext = (n: string | null) => {
+  if (!n || !n.startsWith("/") || n.startsWith("//") || n.includes("\\")) return null;
+  try {
+    return new URL(n, location.origin).origin === location.origin ? n : null;
+  } catch {
+    return null;
+  }
+};
+/** Came to buy Pro (from the pricing page): after signing in, go straight to the plans. */
+const wantsPro = () => typeof location !== "undefined" && new URLSearchParams(location.search).get("plan") === "pro";
+const showPlans = () => setTimeout(() => document.getElementById("plan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+/** Big limits read as unlimited. */
+const amount = (n: number) => (n >= 100_000 ? "unlimited" : String(n));
 
 export default function AccountApp() {
   const [me, setMe] = useState<Me | null>(null);
@@ -84,7 +97,7 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
               Sign in
             </button>
           </div>
-          <h1>{mode === "up" ? "Save your intros" : "Welcome back"}</h1>
+          <h1>{wantsPro() ? (mode === "up" ? "Create an account to get Pro" : "Sign in to get Pro") : mode === "up" ? "Save your intros" : "Welcome back"}</h1>
           <label className="fld">
             <span className="fld-cap">Email</span>
             <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -125,13 +138,15 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
 }
 
 function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: PlanId; onRequest?: () => void; requested?: boolean }) {
+  // No checkout while Pro unlocks nothing over Free: nobody should pay for the same limits.
+  const proWorth = JSON.stringify(me.plans.free) !== JSON.stringify(me.plans.pro);
   return (
     <div className="plan-cards">
       {(["free", "pro"] as PlanId[]).map((id) => (
         <div key={id} className={`account-card plan-card ${id}${current === id ? " current" : ""}`}>
           <header>
             <h2>{PLAN_NAMES[id]}</h2>
-            <span className="price">{id === "free" ? "$0" : me.proPrice || "Ask us"}</span>
+            <span className="price">{id === "free" ? "$0" : me.proPrice || (me.billing.online ? "" : "Ask us")}</span>
           </header>
           <ul>
             {describeLimits(me.plans[id]).map((l) => (
@@ -139,7 +154,7 @@ function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: Pl
             ))}
           </ul>
           {current === id && <span className="plan-badge current">Your plan</span>}
-          {id === "pro" && current === "free" && (me.billing.monthly || me.billing.yearly) && (
+          {id === "pro" && current === "free" && proWorth && (me.billing.monthly || me.billing.yearly) && (
             <div className="plan-buy">
               {me.billing.monthly && (
                 <a className="btn btn-primary" href={me.billing.monthly}>
@@ -151,15 +166,16 @@ function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: Pl
                   Yearly{me.billing.yearlyPrice ? ` · ${me.billing.yearlyPrice}` : ""}
                 </a>
               )}
-              <span className="hint">Secure checkout by Stripe. Cancel any time.</span>
+              <span className="hint">Secure checkout by Stripe. Cancel from Manage billing.</span>
             </div>
           )}
-          {id === "pro" && current === "free" && !me.billing.monthly && !me.billing.yearly && onRequest && (
+          {id === "pro" && current === "free" && proWorth && !me.billing.monthly && !me.billing.yearly && onRequest && (
             <button className="btn btn-primary" onClick={onRequest} disabled={requested}>
               {requested ? "Requested ✓" : "Request Pro"}
             </button>
           )}
-          {id === "pro" && !current && me.billing.online && <span className="hint">Sign in to upgrade with Stripe.</span>}
+          {id === "pro" && !current && me.billing.online && proWorth && <span className="hint">Create an account or sign in, then upgrade with Stripe.</span>}
+          {id === "pro" && !proWorth && <span className="hint">Pro has the same limits as Free for now, so there&apos;s nothing to upgrade.</span>}
         </div>
       ))}
     </div>
@@ -168,6 +184,10 @@ function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: Pl
 
 function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Promise<void> }) {
   const [films, setFilms] = useState<Film[] | null>(null);
+  // Arrived to buy Pro (from the pricing page): the plans are what they came for.
+  useEffect(() => {
+    if (wantsPro()) showPlans();
+  }, []);
   const [limit, setLimit] = useState(me.limits.savedFilms);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -272,7 +292,7 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
       <section>
         <p className="hint">
           {films ? `${films.length} of ${limit >= 100_000 ? "unlimited" : limit} saved` : "Loading…"}
-          {films && films.length >= limit && u.plan === "free" ? " · Your Free plan is full: delete one or request Pro to keep more." : ""}
+          {films && films.length >= limit && u.plan === "free" ? ` · Your Free plan is full: delete one or ${me.billing.online ? "upgrade to Pro" : "request Pro"} to keep more.` : ""}
         </p>
         {films && !films.length && (
           <div className="account-card empty">
@@ -326,24 +346,28 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
         </div>
       </section>
 
-      <section className="account-plan">
+      <section className="account-plan" id="plan">
         <h2>Plan</h2>
         <div className="account-card usage">
           <span>
-            AI films this month: <strong>{me.usage.ai}</strong> / {me.limits.aiPerMonth}
+            AI films this month: <strong>{me.usage.ai}</strong> / {amount(me.limits.aiPerMonth)}
           </span>
           <span>
-            Website imports today: <strong>{me.usage.imports}</strong> / {me.limits.importsPerDay}
+            Website imports today: <strong>{me.usage.imports}</strong> / {amount(me.limits.importsPerDay)}
           </span>
         </div>
-        {u.plan === "pro" && (u.billingStatus || me.billing.portal) && (
+        {(u.plan === "pro" || me.billing.portal) && (u.billingStatus || me.billing.portal) && (
           <div className="account-card billing-row">
             <span>
-              {u.billingStatus === "canceling" && u.periodEnd
-                ? `Pro until ${new Date(u.periodEnd).toLocaleDateString()} (cancelled; renew any time).`
-                : u.periodEnd
-                  ? `Pro subscription · renews ${new Date(u.periodEnd).toLocaleDateString()}`
-                  : "Pro subscription"}
+              {u.plan !== "pro"
+                ? "Your Pro subscription has ended. Invoices and receipts are in Manage billing."
+                : u.planSource !== "stripe"
+                  ? "Pro, set by the site owner"
+                  : u.billingStatus === "canceling" && u.periodEnd
+                    ? `Pro until ${new Date(u.periodEnd).toLocaleDateString()} (cancelled; renew any time).`
+                    : u.periodEnd && u.periodEnd > Date.now()
+                      ? `Pro subscription · renews ${new Date(u.periodEnd).toLocaleDateString()}`
+                      : "Pro subscription"}
             </span>
             {me.billing.portal && (
               <a className="btn btn-ghost sm" href={me.billing.portal}>

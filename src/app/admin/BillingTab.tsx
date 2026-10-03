@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { STRIPE_EVENTS } from "@/lib/stripe-links";
 import { api, CopyButton, SaveBar, Skeleton, useAdminUi, useDirty, When } from "./ui";
 
 type Form = { monthlyLink: string; yearlyLink: string; portalLink: string; yearlyPrice: string };
@@ -10,11 +11,16 @@ type View = Form & {
   successUrl: string;
   webhookSecretSet: boolean;
   mode: "test" | "live" | "mixed" | null;
-  last: { id: string; type: string; at: number; result: string; livemode?: boolean } | null;
+  last: EventRow | null;
+  recent: EventRow[];
   count: number;
+  rejected: number;
+  lastRejectedAt: number | null;
+  checks: { proUnlocksMore: boolean; proPriceSet: boolean; contactEmailSet: boolean; persistent: boolean; modeMatches: boolean; testPassed: boolean };
 };
+type EventRow = { id: string; type: string; at: number; result: string; livemode?: boolean; attention?: boolean; email?: string; customer?: string };
 
-const EVENTS = ["checkout.session.completed", "customer.subscription.updated", "customer.subscription.deleted", "invoice.payment_failed"];
+const EVENTS = STRIPE_EVENTS;
 const MODE: Record<string, { label: string; tone: string }> = {
   test: { label: "Test mode", tone: "warn" },
   live: { label: "Live", tone: "exported" },
@@ -37,7 +43,7 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
     setView(v);
     setSaved(f);
     setForm(f);
-    onChange(!!v.monthlyLink);
+    onChange(!!(v.monthlyLink || v.yearlyLink));
   };
   useEffect(() => {
     api<View>("/api/admin/billing")
@@ -75,7 +81,44 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
       {!ok ? <span className="error sm">{key === "portalLink" ? "Use the https://billing.stripe.com/p/login/… link." : "Use a https://buy.stripe.com/… Payment Link."}</span> : hint}
     </label>
   );
-  const linksOn = !!view.monthlyLink;
+  // Either link turns the Upgrade buttons on.
+  const linksOn = !!(view.monthlyLink || view.yearlyLink);
+  const c = view.checks;
+  // What still stands between the plumbing and selling Pro.
+  const gaps: { key: string; text: React.ReactNode; fix?: React.ReactNode }[] = [];
+  if (linksOn && !c.proUnlocksMore)
+    gaps.push({
+      key: "same",
+      text: "Pro unlocks nothing over Free: both plans have the same limits, so a buyer would pay for nothing.",
+      fix: (
+        <button className="link-btn" onClick={onOpenPlans}>
+          Set what Pro unlocks in Plans
+        </button>
+      ),
+    });
+  if (linksOn && !c.proPriceSet) gaps.push({ key: "price", text: "No Pro price label: the Pro card shows “Ask us” next to the Upgrade button.", fix: <button className="link-btn" onClick={onOpenPlans}>Add the price in Plans</button> });
+  if (linksOn && !c.contactEmailSet) gaps.push({ key: "contact", text: "No contact email: paying customers have no way to reach you about billing or refunds.", fix: <button className="link-btn" onClick={onOpenPlans}>Add it in Plans</button> });
+  if (!c.persistent)
+    gaps.push({
+      key: "volume",
+      text: (
+        <>
+          Accounts and Pro status are kept in a temporary folder: a redeploy (setting <code>STRIPE_WEBHOOK_SECRET</code> causes one) wipes them while customers keep paying. Mount a volume at{" "}
+          <code>/data</code> with <code>INTROMAKER_DATA_DIR=/data</code>.
+        </>
+      ),
+    });
+  if (!c.modeMatches) gaps.push({ key: "mode", text: "The events received are from the other Stripe mode than your links (test vs live): use the signing secret and links from the same mode." });
+  if (view.rejected)
+    gaps.push({
+      key: "sig",
+      text: (
+        <>
+          {view.rejected} webhook deliver{view.rejected === 1 ? "y was" : "ies were"} refused for a bad signature{view.lastRejectedAt ? <> (latest <When t={view.lastRejectedAt} />)</> : null}: the
+          signing secret doesn&apos;t match this endpoint, or it&apos;s from the other mode.
+        </>
+      ),
+    });
   const ready = linksOn && view.webhookSecretSet;
   const steps: { done: boolean; title: string; body: React.ReactNode }[] = [
     {
@@ -123,7 +166,7 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
       ),
     },
     {
-      done: view.count > 0,
+      done: c.testPassed,
       title: "Test it",
       body: (
         <>
@@ -143,7 +186,9 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
             <strong>{ready ? "Stripe is connected" : linksOn || view.webhookSecretSet ? "Stripe is half set up" : "Stripe isn't set up"}</strong>
             <span className="hint">
               {ready
-                ? "Visitors can pay for Pro and it switches on by itself."
+                ? gaps.length
+                  ? "Payments switch Pro on by themselves. See Before you sell Pro below for what's still missing."
+                  : "Visitors can pay for Pro and it switches on by itself."
                 : linksOn
                   ? "Payment links are live but the webhook secret is missing, so payments won't switch plans on."
                   : "Visitors ask for Pro and you switch them in Users. Follow the steps below to take payments."}
@@ -164,6 +209,38 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
           </p>
         )}
       </div>
+
+      {gaps.length > 0 && (
+        <div className="admin-card billing-gaps">
+          <h2>Before you sell Pro</h2>
+          <ul>
+            {gaps.map((g) => (
+              <li key={g.key}>
+                {g.text} {g.fix}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {view.recent.length > 0 && (
+        <div className="admin-card">
+          <h2>Recent Stripe events</h2>
+          <ul className="event-list">
+            {view.recent.map((e) => (
+              <li key={e.id} className={e.attention ? "attention" : ""}>
+                <span className="hint">
+                  <When t={e.at} />
+                  {e.livemode === false ? " · test" : ""}
+                </span>
+                <code>{e.type}</code>
+                <span>{e.result}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="hint">Highlighted: money arrived for no account, or a refund or dispute. Link a payment to its account in Users → Link Stripe customer.</p>
+        </div>
+      )}
 
       <ol className="setup-steps">
         {steps.map((s, i) => (
@@ -200,7 +277,7 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
           <button className="link-btn" onClick={onOpenPlans}>
             Plans
           </button>
-          , with the limits Pro unlocks. Only Stripe-hosted links are accepted. Clear the monthly link to switch payments off.
+          , with the limits Pro unlocks. Only Stripe-hosted links are accepted. Clear both payment links to switch payments off.
         </p>
         <div className="admin-row actions">
           <button className="btn btn-primary" onClick={save} disabled={!dirty || busy || invalid}>

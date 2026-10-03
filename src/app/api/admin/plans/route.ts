@@ -1,5 +1,5 @@
 import { noStore, planLimits, readSettings, requireAdmin, writeSettings } from "@/lib/admin";
-import { DEFAULT_LIMITS, readLimits } from "@/lib/plans";
+import { DEFAULT_LIMITS, PLANS_VERSION, readLimits } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export async function PUT(req: Request) {
   const body = (await req.json().catch(() => null)) as { plans?: unknown; proPrice?: unknown; contactEmail?: unknown } | null;
   if (!body) return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   const str = (v: unknown, n: number) => (typeof v === "string" ? v.trim().slice(0, n) || undefined : undefined);
-  await writeSettings({ plans: readLimits(body.plans), proPrice: str(body.proPrice, 40), contactEmail: str(body.contactEmail, 120) });
+  // Saved exactly as entered (the old Free and Pro numbers included), marked with the version.
+  await writeSettings({ plans: readLimits(body.plans), plansVersion: PLANS_VERSION, proPrice: str(body.proPrice, 40), contactEmail: str(body.contactEmail, 120) });
   return Response.json(await view(), { headers: noStore });
 }

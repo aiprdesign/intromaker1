@@ -1,4 +1,4 @@
-import { AccountError, createUser, currentUser, deleteUser, limitsFor, login, publicUser, requireUser, sessionFor, usageOf, userCookie } from "@/lib/accounts";
+import { AccountError, createUser, currentUser, deleteUser, limitsFor, login, publicUser, requireUser, sessionFor, subscribed, usageOf, userCookie } from "@/lib/accounts";
 import { planLimits, readSettings } from "@/lib/admin";
 import { noStore, sameOrigin } from "@/lib/http";
 import { checkoutUrl, portalUrl, type BillingLinks } from "@/lib/stripe-links";
@@ -66,6 +66,10 @@ export async function DELETE(req: Request) {
     await login(u.email, body?.password);
   } catch {
     return Response.json({ error: "Your password is wrong." }, { status: 401 });
+  }
+  // A live subscription would keep charging an account that no longer exists.
+  if (subscribed(u)) {
+    return Response.json({ error: "Cancel your Pro subscription first (Manage billing), then delete the account.", code: "subscribed" }, { status: 409 });
   }
   await deleteUser(u.id);
   return new Response(null, { status: 204, headers: { ...noStore, "Set-Cookie": userCookie(req, "", 0) } });

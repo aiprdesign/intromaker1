@@ -6,7 +6,7 @@ import type { VideoPlan } from "@/engine/types";
 import { readAiConfig, type AiConfig } from "./ai";
 import { cookieOf, isHttps, noStore, sameOrigin } from "./http";
 import { stripeLink, type BillingLinks } from "./stripe-links";
-import { DEFAULT_LIMITS, readLimits, type PlanId, type PlanLimits } from "./plans";
+import { DEFAULT_LIMITS, PLANS_VERSION, readLimits, type PlanId, type PlanLimits } from "./plans";
 import { clientKey } from "./ratelimit";
 
 /**
@@ -335,6 +335,8 @@ export interface AdminSettings {
   perVisitor?: number;
   /** Plan limits (overrides of DEFAULT_LIMITS). */
   plans?: Record<PlanId, PlanLimits>;
+  /** Set when the owner saved the plans (PLANS_VERSION), so they're read exactly as saved. */
+  plansVersion?: number;
   /** How the Pro price reads on the pricing page, e.g. "$9 / month". */
   proPrice?: string;
   /** Where visitors reach the owner (upgrades, password resets). */
@@ -355,7 +357,8 @@ export async function readSettings(): Promise<AdminSettings> {
       ai: readAiConfig(raw.ai) ?? undefined,
       dailyBudget: Number.isFinite(raw.dailyBudget) ? raw.dailyBudget : undefined,
       perVisitor: Number.isFinite(raw.perVisitor) ? raw.perVisitor : undefined,
-      plans: raw.plans ? readLimits(raw.plans) : undefined,
+      plans: raw.plans ? readLimits(raw.plans, { legacy: raw.plansVersion !== PLANS_VERSION }) : undefined,
+      plansVersion: raw.plans && raw.plansVersion === PLANS_VERSION ? PLANS_VERSION : undefined,
       proPrice: typeof raw.proPrice === "string" ? raw.proPrice.slice(0, 40) : undefined,
       contactEmail: typeof raw.contactEmail === "string" ? raw.contactEmail.slice(0, 120) : undefined,
       billing: raw.billing

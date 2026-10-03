@@ -56,6 +56,12 @@ export interface User {
   billingStatus?: "active" | "past_due" | "canceling" | "canceled";
   /** When the paid period ends (ms). */
   periodEnd?: number;
+  /** The newest Stripe event applied (seconds), so a late retry of an older one is skipped. */
+  stripeEventAt?: number;
+  /** Whether their Stripe customer is in live mode (false: test mode), for the dashboard link. */
+  stripeLive?: boolean;
+  /** A payment of theirs was refunded or disputed: for the owner to look at. */
+  billingFlag?: "refunded" | "disputed";
 }
 
 export interface SavedFilm {
@@ -174,21 +180,21 @@ export async function login(emailRaw: unknown, password: unknown): Promise<User>
   const ok = await verifyPassword(typeof password === "string" ? password : "", u?.pass ?? dummy);
   if (!u || !ok) throw new AccountError("Wrong email or password.", 401);
   if (u.disabled) throw new AccountError("This account is disabled. Contact the site owner.", 403);
-  u.lastLoginAt = Date.now();
-  await serial(() => saveUser(u));
-  return u;
+  // Saved through updateUser, so a webhook landing during the password check isn't undone.
+  return (await updateUser(u.id, (x) => void (x.lastLoginAt = Date.now()))) ?? u;
 }
 
 export async function changePassword(u: User, current: unknown, next: unknown) {
   if (!u.mustChangePassword && !(await verifyPassword(typeof current === "string" ? current : "", u.pass))) throw new AccountError("Your current password is wrong.", 401);
   const problem = passwordProblem(next);
   if (problem) throw new AccountError(problem);
-  const fresh = await getUser(u.id);
+  const pass = await hashPassword(next as string);
+  const fresh = await updateUser(u.id, (x) => {
+    x.pass = pass;
+    x.sv += 1;
+    x.mustChangePassword = false;
+  });
   if (!fresh) throw new AccountError("Account not found.", 404);
-  fresh.pass = await hashPassword(next as string);
-  fresh.sv += 1;
-  fresh.mustChangePassword = false;
-  await serial(() => saveUser(fresh));
   return fresh;
 }
 
@@ -205,6 +211,9 @@ export async function deleteUser(id: string) {
   await forgetAccount(id);
   return true;
 }
+
+/** A Stripe subscription that still charges (active, retrying a failed payment, or cancelling at period end). */
+export const subscribed = (u: User) => u.planSource === "stripe" && (u.billingStatus === "active" || u.billingStatus === "past_due" || u.billingStatus === "canceling");
 
 /** Update an account (owner actions, usage counters). */
 export async function updateUser(id: string, fn: (u: User) => void) {
@@ -259,7 +268,7 @@ export function publicUser(u: User) {
 
 /** For the owner's view: also the Stripe customer, to open it in the Stripe dashboard. */
 export function adminUser(u: User) {
-  return { ...publicUser(u), stripeCustomerId: u.stripeCustomerId };
+  return { ...publicUser(u), stripeCustomerId: u.stripeCustomerId, stripeLive: u.stripeLive, billingFlag: u.billingFlag };
 }
 
 export async function findUserByEmail(email: string) {

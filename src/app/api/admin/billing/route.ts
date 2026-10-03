@@ -1,4 +1,5 @@
-import { noStore, readSettings, requireAdmin, writeSettings } from "@/lib/admin";
+import { noStore, planLimits, readSettings, requireAdmin, writeSettings } from "@/lib/admin";
+import { dataIsPersistent } from "@/lib/storage";
 import { billingStatus, isTestLink, stripeLink, webhookConfigured } from "@/lib/billing";
 
 export const runtime = "nodejs";
@@ -10,6 +11,8 @@ async function view(req: Request) {
   const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? new URL(req.url).host;
   const links = [b.monthlyLink, b.yearlyLink].filter(Boolean) as string[];
+  const status = await billingStatus();
+  const plans = await planLimits();
   return {
     monthlyLink: b.monthlyLink ?? "",
     yearlyLink: b.yearlyLink ?? "",
@@ -20,7 +23,20 @@ async function view(req: Request) {
     successUrl: `${proto}://${host}/account?upgraded=1`,
     webhookSecretSet: webhookConfigured(),
     mode: !links.length ? null : links.every(isTestLink) ? "test" : links.some(isTestLink) ? "mixed" : "live",
-    ...(await billingStatus()),
+    ...status,
+    // What a real paid plan needs besides the plumbing.
+    checks: {
+      // Pro has to unlock something Free doesn't, or buyers pay for nothing.
+      proUnlocksMore: JSON.stringify(plans.free) !== JSON.stringify(plans.pro),
+      proPriceSet: !!s.proPrice?.trim(),
+      contactEmailSet: !!s.contactEmail?.trim(),
+      // Accounts and Pro status are kept on the data volume; without one a redeploy wipes them.
+      persistent: dataIsPersistent(),
+      // Test links with live events (or the reverse) mean the secret is from the other mode.
+      modeMatches: !status.last || status.last.livemode === undefined || !links.length || (links.every(isTestLink) ? status.last.livemode === false : links.some(isTestLink) ? true : status.last.livemode === true),
+      // A paid checkout reached an account.
+      testPassed: status.recent.some((r) => /→ Pro$/.test(r.result)),
+    },
   };
 }
 
