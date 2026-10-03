@@ -4,7 +4,7 @@ import { drawLucide } from "../icons";
 import { clamp, ease, lerp, mixHex, range, rgba, rng } from "../math";
 import { getImage, drawLogo, logoMaxWidth } from "../media";
 import { brandGlyph, iconsFor, drawIcon, imageless, luminance, saasFont, spring } from "../saasfx";
-import { autoAccent, displayFont } from "../text";
+import { autoAccent, displayFont, fillTextFit } from "../text";
 import type { Scene, Skill, SkillContext } from "../types";
 import { drawCover } from "./media";
 import { topHeadline } from "./saas";
@@ -282,7 +282,7 @@ function typePoster(sc: SkillContext) {
       ctx.fillStyle = palette.text;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(titleOf(it), lx + pad + 44 * u, ly + rowH / 2 + (1 - ease.outCubic(k)) * 10 * u, listW - pad * 2 - 44 * u);
+      fillTextFit(ctx, titleOf(it), lx + pad + 44 * u, ly + rowH / 2 + (1 - ease.outCubic(k)) * 10 * u, listW - pad * 2 - 44 * u, { lineHeight: 1.05, minScale: 0.75 });
       ctx.restore();
       ly += rowH;
     });
@@ -393,7 +393,7 @@ export function reelCard(
   ctx.fillStyle = palette.text;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(o.title, x + Math.min(66 * u, cw * 0.2), sy, cw - Math.min(66 * u, cw * 0.2) - 22 * u);
+  fillTextFit(ctx, o.title, x + Math.min(66 * u, cw * 0.2), sy, cw - Math.min(66 * u, cw * 0.2) - 22 * u, { lineHeight: 1.08, minScale: 0.72 });
   ctx.restore();
 }
 
@@ -495,7 +495,7 @@ function showreel(sc: SkillContext) {
       ctx.fillStyle = sys.muted;
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
-      ctx.fillText(desc, x1, by, x1 - lx1 - 40 * u);
+      fillTextFit(ctx, desc, x1, by, x1 - lx1 - 40 * u, { lineHeight: 1.15 });
       ctx.restore();
     }
   }
@@ -785,7 +785,7 @@ function cardSystem(sc: SkillContext) {
       ctx.fillStyle = lit ? palette.text : rgba(palette.text, 0.8);
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(it, x + pad + 36 * u + (1 - rk) * 10 * u, ry + rowH / 2, bw - pad * 2 - 40 * u);
+      fillTextFit(ctx, it, x + pad + 36 * u + (1 - rk) * 10 * u, ry + rowH / 2, bw - pad * 2 - 40 * u, { lineHeight: 1.05, minScale: 0.72 });
       ctx.restore();
     });
   }
@@ -817,7 +817,7 @@ function cardSystem(sc: SkillContext) {
         ctx.fillStyle = palette.text;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(name, mcx, y + bh * 0.76, bw - pad * 2);
+        fillTextFit(ctx, name, mcx, y + bh * 0.76, bw - pad * 2, { lineHeight: 1.08 });
         ctx.restore();
       }
       meta(sc, sc.brand?.domain ?? "", mcx, y + bh * 0.76 + 30 * u, ck, { align: "center", size: 14 * u });

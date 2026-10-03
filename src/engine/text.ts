@@ -295,3 +295,113 @@ export function autoAccent(text: string) {
   out[from] = `*${out[from]}`;
   return out.join(" ");
 }
+
+/**
+ * How text that has to stay inside a box of width `maxW` should be set with the context's current
+ * font: on one line when it fits; otherwise on up to `maxLines` lines (two lines split where they
+ * balance best), shrinking the type a little (down to `minScale`) only when a line still won't fit,
+ * and only as a last resort shortening the last line with "…". Returns the lines, the font size
+ * to use, the widest line's width and the font string at that size.
+ */
+export function fitTextLines(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  text: string,
+  maxW: number,
+  opts: { maxLines?: number; minScale?: number } = {},
+): { lines: string[]; size: number; width: number; font: string } {
+  const maxLines = opts.maxLines ?? 2;
+  const minScale = opts.minScale ?? 0.8;
+  const font0 = ctx.font;
+  const m = /(\d+(?:\.\d+)?)px/.exec(font0);
+  const size0 = m ? parseFloat(m[1]) : 16;
+  const fontAt = (s: number) => font0.replace(/(\d+(?:\.\d+)?)px/, `${s.toFixed(1)}px`);
+  const width = (s: string) => ctx.measureText(s).width;
+  const clean = text.replace(/\s+/g, " ").trim();
+  const words = clean.split(" ");
+  const greedy = () => {
+    const out: string[] = [];
+    let line = "";
+    for (const wd of words) {
+      const next = line ? `${line} ${wd}` : wd;
+      if (width(next) > maxW && line) {
+        out.push(line);
+        line = wd;
+      } else line = next;
+    }
+    out.push(line);
+    return out;
+  };
+  // The best way to lay the words into at most n lines at the current size, or null if none fits.
+  const layout = (n: number): string[] | null => {
+    if (width(clean) <= maxW) return [clean];
+    if (n < 2 || words.length < 2) return null;
+    if (n === 2) {
+      let best: string[] | null = null;
+      let bestW = Infinity;
+      for (let i = 1; i < words.length; i++) {
+        const a = words.slice(0, i).join(" ");
+        const b = words.slice(i).join(" ");
+        const wmax = Math.max(width(a), width(b));
+        if (wmax <= maxW && wmax < bestW) {
+          bestW = wmax;
+          best = [a, b];
+        }
+      }
+      return best;
+    }
+    const out = greedy();
+    return out.length <= n && out.every((l) => width(l) <= maxW) ? out : null;
+  };
+  let lines: string[] | null = null;
+  let size = size0;
+  for (let k = 1; k >= minScale - 1e-6 && !lines; k -= 0.05) {
+    size = size0 * k;
+    ctx.font = fontAt(size);
+    lines = layout(maxLines);
+  }
+  if (!lines) {
+    // Still too long at the smallest size: wrap greedily and shorten the last line.
+    const out = greedy();
+    lines = out.slice(0, maxLines);
+    if (out.length > maxLines || width(lines[lines.length - 1]) > maxW) {
+      let last = lines[lines.length - 1];
+      while (last.length > 1 && width(`${last}…`) > maxW) last = last.slice(0, -1);
+      lines[lines.length - 1] = `${last.replace(/[\s,.;:—–-]+$/, "")}…`;
+    }
+  }
+  const widest = Math.min(maxW, Math.max(...lines.map(width)));
+  const font = ctx.font;
+  ctx.font = font0;
+  return { lines, size, width: widest, font };
+}
+
+/**
+ * Draw text that has to stay inside its container (a card, a row, a strip), set as fitTextLines
+ * lays it out: wrapped onto up to `maxLines` lines rather than squeezed or cut. It follows the
+ * context's current font, alignment and baseline like fillText: a "middle" baseline centres the
+ * block on `y`, "top"/"hanging" stacks it down from `y`, other baselines stack it up so the last
+ * line sits on `y`. Returns how many lines it used.
+ */
+export function fillTextFit(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxW: number,
+  opts: { maxLines?: number; lineHeight?: number; minScale?: number } = {},
+): number {
+  const font0 = ctx.font;
+  const fit = fitTextLines(ctx, text, maxW, opts);
+  const step = fit.size * (opts.lineHeight ?? 1.18);
+  const n = fit.lines.length;
+  const base = ctx.textBaseline;
+  ctx.font = fit.font;
+  fit.lines.forEach((l, i) => {
+    const ly = base === "middle" ? y + (i - (n - 1) / 2) * step : base === "top" || base === "hanging" ? y + i * step : y - (n - 1 - i) * step;
+    // A single word longer than the box is the one case left: draw it at the box's width.
+    if (ctx.measureText(l).width > maxW) ctx.fillText(l, x, ly, maxW);
+    else ctx.fillText(l, x, ly);
+  });
+  ctx.font = font0;
+  return n;
+}

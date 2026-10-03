@@ -32,7 +32,7 @@ import {
   spring,
   type IconKind,
 } from "../saasfx";
-import { autoAccent, displayFont, subFont } from "../text";
+import { autoAccent, displayFont, fillTextFit, fitTextLines, subFont } from "../text";
 import { drawLucide } from "../icons";
 import { ctaClickAt } from "../arrange";
 import { CONCEPT_MAP } from "../concepts";
@@ -918,21 +918,10 @@ function iconFeatures(sc: SkillContext) {
     if (desc && ch > 150 * u) {
       ctx.font = `500 ${Math.round(fs * 0.66)}px Inter, sans-serif`;
       ctx.fillStyle = rgba(palette.text, 0.62);
-      const words = desc.split(" ");
-      const lines: string[] = [];
-      let line = "";
-      for (const wd of words) {
-        const next = line ? `${line} ${wd}` : wd;
-        if (ctx.measureText(next).width > cw - 44 * u && line) {
-          lines.push(line);
-          line = wd;
-        } else line = next;
-      }
-      lines.push(line);
-      lines.slice(0, 2).forEach((l, li, arr) => {
-        const txt = li === 1 && arr.length < lines.length ? `${l.replace(/[\s,.;:]+$/, "")}…` : l;
-        ctx.fillText(txt, tx, descTop + fs * 1.1 + li * fs * 0.9);
-      });
+      // Two lines; a longer description sets a touch smaller before anything is shortened.
+      const dfit = fitTextLines(ctx, desc, cw - 44 * u, { maxLines: 2, minScale: 0.8 });
+      ctx.font = dfit.font;
+      dfit.lines.forEach((l, li) => ctx.fillText(l, tx, descTop + fs * 1.1 + li * fs * 0.9));
     }
     ctx.restore();
   });
@@ -981,11 +970,15 @@ function uiCards(sc: SkillContext) {
   const times = cardsTiming(sc.beat);
   const items = scene.items ?? [];
   const stat = parseStat(items[1] ?? scene.subtext ?? "");
+  // The avatars widget widens (within reason) so its label's longest word fits.
+  ctx.font = subFont(17 * u, 700);
+  const longest = Math.max(...(items[3] ?? "Your whole team").split(/\s+/).map((wd) => ctx.measureText(wd).width));
+  const avW = clamp(150 * u + longest / 0.8 + 6 * u, 250 * u, 340 * u);
   const widgets = [
     { x: scx - sw * 0.72, y: scy - sh * 0.46, w: 300 * u, h: 86 * u, kind: "toast" },
     { x: scx + sw * 0.36, y: scy + sh * 0.12, w: 250 * u, h: 150 * u, kind: "metric" },
     { x: scx - sw * 0.66, y: scy + sh * 0.2, w: 220 * u, h: 130 * u, kind: "chart" },
-    { x: scx + sw * 0.32, y: scy - sh * 0.56, w: 250 * u, h: 80 * u, kind: "avatars" },
+    { x: scx + sw * 0.32, y: scy - sh * 0.56, w: avW, h: 80 * u, kind: "avatars" },
   ];
   const WS = portrait ? 1.25 : 1.4;
   if (portrait) {
@@ -1022,10 +1015,13 @@ function uiCards(sc: SkillContext) {
       ctx.fillStyle = palette.text;
       ctx.font = subFont(19 * u, 700);
       const title = items[0] ?? "Updated just now";
-      ctx.fillText(title.length > 26 ? `${title.slice(0, 25)}…` : title, 74 * u, wd.h / 2 - 11 * u);
+      // A long title takes two lines; the time line moves down to make room.
+      const tfit = fitTextLines(ctx, title, wd.w - 90 * u, { maxLines: 2, minScale: 0.8 });
+      const extra = (tfit.lines.length - 1) * tfit.size * 0.55;
+      fillTextFit(ctx, title, 74 * u, wd.h / 2 - 11 * u - extra, wd.w - 90 * u, { maxLines: 2, lineHeight: 1.08, minScale: 0.8 });
       ctx.fillStyle = rgba(palette.text, 0.55);
       ctx.font = subFont(15 * u, 500);
-      ctx.fillText(brand?.name ? `${brand.name} · now` : "just now", 74 * u, wd.h / 2 + 14 * u);
+      fillTextFit(ctx, brand?.name ? `${brand.name} · now` : "just now", 74 * u, wd.h / 2 + 14 * u + extra, wd.w - 90 * u, { maxLines: 1, minScale: 0.8 });
     } else if (wd.kind === "metric") {
       const count = ease.outExpo(range(lt, 0.1, 1.4));
       const v = stat.value * count;
@@ -1035,18 +1031,22 @@ function uiCards(sc: SkillContext) {
       ctx.fillText(txt, 20 * u, 50 * u);
       ctx.fillStyle = rgba(palette.text, 0.6);
       ctx.font = subFont(16 * u, 500);
-      ctx.fillText((stat.label || "growth").slice(0, 24), 20 * u, 88 * u);
+      fillTextFit(ctx, stat.label || "growth", 20 * u, 88 * u, wd.w - 40 * u, { maxLines: 1, minScale: 0.75 });
       microVisual(sc, 4, 20 * u, 100 * u, wd.w - 40 * u, wd.h - 112 * u, lt);
     } else if (wd.kind === "chart") {
       ctx.fillStyle = rgba(palette.text, 0.6);
       ctx.font = subFont(15 * u, 600);
-      ctx.fillText(items[2] ?? "This week", 18 * u, 24 * u);
-      microVisual(sc, 0, 18 * u, 42 * u, wd.w - 36 * u, wd.h - 58 * u, lt);
+      // The label wraps onto a second line when it needs to; the chart sits below it.
+      ctx.textBaseline = "top";
+      const n = fillTextFit(ctx, items[2] ?? "This week", 18 * u, 15 * u, wd.w - 36 * u, { maxLines: 2, lineHeight: 1.1, minScale: 0.85 });
+      ctx.textBaseline = "middle";
+      const dy = (n - 1) * 16 * u;
+      microVisual(sc, 0, 18 * u, 42 * u + dy, wd.w - 36 * u, wd.h - 58 * u - dy, lt);
     } else {
       microVisual(sc, 3, 12 * u, 10 * u, 120 * u, wd.h - 20 * u, lt);
       ctx.fillStyle = palette.text;
       ctx.font = subFont(17 * u, 700);
-      ctx.fillText((items[3] ?? "Your whole team").slice(0, 18), 138 * u, wd.h / 2);
+      fillTextFit(ctx, items[3] ?? "Your whole team", 138 * u, wd.h / 2, wd.w - 150 * u, { maxLines: 3, lineHeight: 1.08, minScale: 0.8 });
     }
     ctx.restore();
   });

@@ -22,10 +22,10 @@ import { clamp, ease, hashString, lerp, mixHex, noise1, range, rgba, rng, TAU } 
 import { tokens } from "../grid";
 import { getImage, getMedia } from "../media";
 import { borderBeam, clickRipple, drawCursor, drawIcon, glassCard, iconsFor, pill, pillWidth, saasBackground, spring } from "../saasfx";
-import { subFont } from "../text";
+import { fillTextFit, fitTextLines, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { coverDraw, fitted, mockShot } from "./gallery";
-import { checkBadge, cursorPath, ellipsize, focus, iconTile, windowChrome, wrap } from "./interactions";
+import { checkBadge, cursorPath, ellipsize, focus, iconTile, windowChrome, wrap, wrapClamp } from "./interactions";
 import { topHeadline } from "./saas";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
@@ -264,7 +264,7 @@ function codeDeploy(sc: SkillContext) {
       } else spinner(sc, tx + r * 0.7, y, r * 0.8, "#67e8f9");
       ctx.font = mono(fs * 0.95);
       ctx.fillStyle = done ? ink : "rgba(226,232,240,0.6)";
-      ctx.fillText(ellipsize(ctx, step, ww - 110 * u * S), tx + 32 * u * S, y);
+      fillTextFit(ctx, step, tx + 32 * u * S, y, ww - 110 * u * S, { maxLines: 1, minScale: 0.72 });
       ctx.restore();
     });
     ctx.restore();
@@ -511,9 +511,10 @@ function globe(sc: SkillContext) {
     const s = clamp(spring(l.k, 13, 7), 0, 1.08);
     ctx.save();
     ctx.font = subFont(19 * u * S, 600);
-    const text = ellipsize(ctx, items[l.i], 320 * u * S);
-    const cw = ctx.measureText(text).width + 78 * u * S;
-    const ch = 50 * u * S;
+    // Long event names wrap onto two lines; the card grows to fit them.
+    const fit = fitTextLines(ctx, items[l.i], 320 * u * S, { maxLines: 2, minScale: 0.85 });
+    const cw = fit.width + 78 * u * S;
+    const ch = Math.max(50 * u * S, fit.lines.length * fit.size * 1.12 + 24 * u * S);
     const bx = clamp(l.x - cw / 2, 16 * u, w - cw - 16 * u);
     const by = l.y - ch - 22 * u * S;
     ctx.globalAlpha *= life * clamp(l.k / 0.12);
@@ -526,7 +527,7 @@ function globe(sc: SkillContext) {
     ctx.font = subFont(19 * u * S, 600);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, bx + 54 * u * S, by + ch / 2 + 1 * u);
+    fillTextFit(ctx, items[l.i], bx + 54 * u * S, by + ch / 2 + 1 * u, fit.width + 2, { maxLines: 2, lineHeight: 1.12, minScale: 0.85 });
     ctx.restore();
   }
   ctx.restore();
@@ -683,7 +684,7 @@ function liveCursors(sc: SkillContext) {
     ctx.font = subFont(19 * u * S, 650);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(ellipsize(ctx, cards[i], b.w - 90 * u * S), b.x + 64 * u * S, b.y + 46 * u * S);
+    fillTextFit(ctx, cards[i], b.x + 64 * u * S, b.y + 46 * u * S, b.w - 90 * u * S, { maxLines: 2, lineHeight: 1.05, minScale: 0.75 });
     ctx.fillStyle = rgba(palette.text, 0.12);
     const lines = Math.max(1, Math.min(3, Math.floor((b.h - 84 * u * S) / (22 * u * S))));
     for (let l = 0; l < lines; l++) ctx.fillRect(b.x + 20 * u * S, b.y + 84 * u * S + l * 22 * u * S, (b.w - 40 * u * S) * (l === lines - 1 ? 0.55 : 0.9), 9 * u * S);
@@ -728,7 +729,7 @@ function liveCursors(sc: SkillContext) {
   // Priya's comment on card 2: a pin, then a bubble that types in.
   const cb = box(Math.min(1, n - 1));
   const pin = { x: cb.x + cb.w - 20 * u * S, y: cb.y + cb.h - 14 * u * S };
-  const note = (scene.subtext ?? "Looks great, let's ship it").slice(0, 48);
+  const note = scene.subtext ?? "Looks great, let's ship it";
   if (t > T.comment) {
     const k = clamp(spring(t - T.comment, 14, 7), 0, 1.1);
     ctx.save();
@@ -739,8 +740,10 @@ function liveCursors(sc: SkillContext) {
     const bk = clamp(spring(t - T.comment - 0.15, 12, 7), 0, 1.06);
     ctx.save();
     ctx.font = subFont(18 * u * S, 500);
-    const bw = Math.min(ww * 0.52, ctx.measureText(note).width + 40 * u * S);
-    const bh = 64 * u * S;
+    // Long comments wrap onto a second line; the bubble grows to hold them.
+    const nfit = fitTextLines(ctx, note, ww * 0.52 - 40 * u * S, { maxLines: 2, minScale: 0.8 });
+    const bw = Math.min(ww * 0.52, nfit.width + 40 * u * S);
+    const bh = 64 * u * S + (nfit.lines.length - 1) * nfit.size * 1.15;
     const bx = Math.min(pin.x + 26 * u * S, wx + ww - bw - 12 * u);
     const by = pin.y - 4 * u;
     ctx.globalAlpha *= clamp((t - T.comment - 0.15) / 0.15);
@@ -768,7 +771,10 @@ function liveCursors(sc: SkillContext) {
         ctx.arc(24 * u * S + k2 * 14 * u * S, 43 * u * S, 4 * u * S, 0, TAU);
         ctx.fill();
       }
-    } else ctx.fillText(ellipsize(ctx, note, bw - 36 * u * S), 18 * u * S, 43 * u * S);
+    } else {
+      ctx.textBaseline = "top";
+      fillTextFit(ctx, note, 18 * u * S, 33 * u * S, bw - 36 * u * S, { maxLines: 2, lineHeight: 1.15, minScale: 0.8 });
+    }
     ctx.restore();
   }
 
@@ -888,7 +894,9 @@ function kanban(sc: SkillContext) {
     ctx.font = subFont(18 * u * S, 650);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    const label = ellipsize(ctx, colNames[c], colW - 80 * u * S);
+    const lfit = fitTextLines(ctx, colNames[c], colW - 80 * u * S, { maxLines: 1, minScale: 0.75 });
+    ctx.font = lfit.font;
+    const label = lfit.lines[0];
     ctx.fillText(label, x + 28 * u * S, hy);
     const lw = ctx.measureText(label).width;
     pill(sc, String(now[c].length), x + 28 * u * S + lw + 22 * u * S, hy, { size: 13 * u * S, padX: 9 * u * S, color: rgba(palette.text, 0.7) });
@@ -932,12 +940,11 @@ function kanban(sc: SkillContext) {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     if (portrait) {
-      const lines = wrap(ctx, cards[i], colW - 72 * u * S).slice(0, 2);
-      if (lines.length === 2) lines[1] = ellipsize(ctx, lines[1], colW - 72 * u * S);
-      lines.forEach((ln, j) => ctx.fillText(ln, x + 26 * u * S, y + cardH / 2 + (j - (lines.length - 1) / 2) * 22 * u * S));
+      // Narrow portrait columns: the card name takes up to three lines rather than losing words.
+      fillTextFit(ctx, cards[i], x + 26 * u * S, y + cardH / 2, colW - 72 * u * S, { maxLines: 3, lineHeight: 1.18, minScale: 0.8 });
     } else {
       drawIcon(ctx, icons[i], x + 36 * u * S, y + cardH / 2, 22 * u * S, rgba(palette.text, 0.7));
-      ctx.fillText(ellipsize(ctx, cards[i], colW - 104 * u * S), x + 56 * u * S, y + cardH / 2 + 1 * u);
+      fillTextFit(ctx, cards[i], x + 56 * u * S, y + cardH / 2 + 1 * u, colW - 104 * u * S, { maxLines: 2, lineHeight: 1.05, minScale: 0.75 });
     }
     ctx.restore();
     if (done) checkBadge(sc, x + colW - 24 * u * S, y + cardH / 2, 12 * u * S, 1);
@@ -1109,7 +1116,7 @@ function beforeAfter(sc: SkillContext) {
     const y = fy + fh * spots[i][1];
     ctx.save();
     ctx.font = subFont(19 * u * S, 600);
-    const lines = wrap(ctx, txt, noteW - 74 * u * S).slice(0, 2);
+    const lines = wrapClamp(ctx, txt, noteW - 74 * u * S, 3);
     const nh = 36 * u * S + lines.length * 26 * u * S;
     ctx.translate(x + noteW / 2, y + nh / 2);
     ctx.rotate((i % 2 ? 1 : -1) * (0.04 + 0.02 * i) + Math.sin(t * 1.4 + i) * 0.012);
@@ -1206,7 +1213,8 @@ function chatThread(sc: SkillContext) {
   const mainW = ww - side;
   const lineH = 27 * u * S;
   ctx.font = subFont(19 * u * S, 400);
-  const bodies = msgs.map((m) => wrap(ctx, m, mainW - 130 * u * S).slice(0, 2));
+  // Up to three lines per message, so longer messages are never cut short.
+  const bodies = msgs.map((m) => wrapClamp(ctx, m, mainW - 130 * u * S, 3));
   const msgH = bodies.map((b) => 34 * u * S + b.length * lineH + 16 * u * S);
   const cardH = 112 * u * S;
   const headH = 58 * u * S;
@@ -1341,11 +1349,16 @@ function chatThread(sc: SkillContext) {
     checkBadge(sc, tx + 34 * u * S, cy + 30 * u * S, 12 * u * S, (t - T.app - 0.1) / 0.45);
     ctx.fillStyle = palette.text;
     ctx.font = subFont(18 * u * S, 700);
-    ctx.fillText(ellipsize(ctx, cardTitle ?? "Update", cw - 180 * u * S), tx + 56 * u * S, cy + 30 * u * S);
     if (cardDetail) {
+      fillTextFit(ctx, cardTitle ?? "Update", tx + 56 * u * S, cy + 30 * u * S, cw - 180 * u * S, { maxLines: 1, minScale: 0.72 });
       ctx.fillStyle = rgba(palette.text, 0.65);
       ctx.font = subFont(16 * u * S, 500);
-      ctx.fillText(ellipsize(ctx, cardDetail, cw - 60 * u * S), tx + 22 * u * S, cy + 66 * u * S);
+      fillTextFit(ctx, cardDetail, tx + 22 * u * S, cy + 64 * u * S, cw - 60 * u * S, { maxLines: 2, lineHeight: 1.1, minScale: 0.8 });
+    } else {
+      // A title with no detail line gets the card's two lines to itself.
+      ctx.textBaseline = "top";
+      fillTextFit(ctx, cardTitle ?? "Update", tx + 56 * u * S, cy + 20 * u * S, cw - 180 * u * S, { maxLines: 2, lineHeight: 1.15, minScale: 0.8 });
+      ctx.textBaseline = "middle";
     }
     ctx.restore();
     ctx.save();

@@ -18,7 +18,7 @@
 import { exitT } from "../fx";
 import { clamp, ease, lerp, mixHex, range, rgba, TAU } from "../math";
 import { borderBeam, clickRipple, drawCursor, drawIcon, glassCard, iconFor, iconsFor, pill, saasBackground, spring } from "../saasfx";
-import { subFont } from "../text";
+import { fillTextFit, fitTextLines, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { topHeadline } from "./saas";
 import { parseStat } from "./worlds";
@@ -48,6 +48,14 @@ export function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number) 
     } else line = next;
   }
   if (line) out.push(line);
+  return out;
+}
+
+/** wrap() limited to n lines; when words are left over, the last line ends in "…" instead of losing them silently. */
+export function wrapClamp(ctx: CanvasRenderingContext2D, text: string, maxW: number, n: number) {
+  const all = wrap(ctx, text, maxW);
+  const out = all.slice(0, n);
+  if (all.length > n) out[n - 1] = ellipsize(ctx, `${out[n - 1]} ${all.slice(n).join(" ")}`, maxW);
   return out;
 }
 
@@ -323,10 +331,14 @@ function commandK(sc: SkillContext) {
       ctx.textBaseline = "middle";
       ctx.fillStyle = selected ? palette.text : rgba(palette.text, 0.78);
       const lx = px + 82 * u * S;
-      const txt = ellipsize(ctx, label, pw - 230 * u * S);
-      // Matched part of the label highlighted.
-      const li = typed.length >= 2 ? label.toLowerCase().indexOf(typed) : -1;
-      if (li >= 0) {
+      // Long labels shrink to stay on their row instead of running past it.
+      const lfit = fitTextLines(ctx, label, pw - 230 * u * S, { maxLines: 2, minScale: 0.72 });
+      ctx.font = lfit.font;
+      const txt = lfit.lines[0];
+      // Matched part of the label highlighted (a label too long for one line wraps onto two instead).
+      const li = typed.length >= 2 && lfit.lines.length === 1 ? label.toLowerCase().indexOf(typed) : -1;
+      if (lfit.lines.length > 1) lfit.lines.forEach((l, j) => ctx.fillText(l, lx, cy + (j - 0.5) * lfit.size * 1.05));
+      else if (li >= 0) {
         const pre = txt.slice(0, li);
         const mid = txt.slice(li, li + typed.length);
         ctx.fillText(pre, lx, cy);
@@ -359,7 +371,13 @@ function commandK(sc: SkillContext) {
   if (lt > 0) {
     const k = clamp(spring(lt, 11, 7), 0, 1.06);
     const tw = Math.min(pw * 0.86, 900 * u * S);
-    const th = 118 * u * S;
+    // A long command name takes two lines; the card grows to hold them.
+    const ic = 64 * u * S;
+    const titleW = tw - (30 * u * S + ic + 24 * u * S) - 110 * u * S;
+    ctx.font = subFont(32 * u * S, 700);
+    const tfit = fitTextLines(ctx, items[0], titleW, { maxLines: 2, minScale: 0.75 });
+    const extra = (tfit.lines.length - 1) * tfit.size * 0.55;
+    const th = 118 * u * S + extra * 1.6;
     const tx = w / 2 - tw / 2;
     const rowY = py + searchH + 8 * u * S;
     const ty = lerp(rowY, py + ph + 56 * u * S, Math.min(1, k));
@@ -374,17 +392,16 @@ function commandK(sc: SkillContext) {
     glassCard(sc, tx, ty, tw, th, { r: 26 * u * S });
     ctx.restore();
     borderBeam(sc, tx, ty, tw, th, t * 0.5, { r: 26 * u * S, color: palette.accent, alpha: 0.8 });
-    const ic = 64 * u * S;
     iconTile(sc, icons[0], tx + 30 * u * S + ic / 2, ty + th / 2, ic, ease.outCubic(range(lt, 0.1, 0.7)));
     const lx = tx + 30 * u * S + ic + 24 * u * S;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle = palette.text;
     ctx.font = subFont(32 * u * S, 700);
-    ctx.fillText(ellipsize(ctx, items[0], tw - (lx - tx) - 110 * u * S), lx, ty + th / 2 - 16 * u * S);
+    fillTextFit(ctx, items[0], lx, ty + th / 2 - 16 * u * S - extra, titleW, { maxLines: 2, lineHeight: 1.05, minScale: 0.75 });
     ctx.fillStyle = rgba(palette.text, 0.55);
     ctx.font = subFont(20 * u * S, 500);
-    ctx.fillText("Done · just now", lx, ty + th / 2 + 22 * u * S);
+    ctx.fillText("Done · just now", lx, ty + th / 2 + 22 * u * S + extra * 0.6);
     checkBadge(sc, tx + tw - 58 * u * S, ty + th / 2, 26 * u * S, (lt - 0.1) / 0.5);
     ctx.restore();
   }
@@ -503,7 +520,7 @@ function aiPrompt(sc: SkillContext) {
     const k = clamp(spring(t - T.send, 13, 8), 0, 1.05);
     ctx.font = subFont(fs, 500);
     const maxBW = pw * 0.68;
-    const lines = wrap(ctx, prompt, maxBW - 44 * u * S).slice(0, 2);
+    const lines = wrapClamp(ctx, prompt, maxBW - 44 * u * S, 2);
     const bw = Math.min(maxBW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 44 * u * S);
     const bh = lines.length * fs * 1.35 + 30 * u * S;
     const bx = px + pw - pad - bw;
@@ -563,7 +580,7 @@ function aiPrompt(sc: SkillContext) {
         const isBullet = bi > 0;
         const bxOff = isBullet ? 40 * u * S : 0;
         ctx.font = subFont(fs, isBullet || !bullets.length ? 500 : 600);
-        const lines = wrap(ctx, blocks[bi], tw - bxOff).slice(0, bi === 0 ? 3 : 2);
+        const lines = wrapClamp(ctx, blocks[bi], tw - bxOff, bi === 0 ? 3 : 2);
         if (isBullet) {
           const k = clamp(budget / 2);
           checkBadge(sc, tx + 13 * u * S, cy, 12 * u * S, k * 0.6);
@@ -657,7 +674,7 @@ function clickFlow(sc: SkillContext) {
   ctx.textBaseline = "middle";
   const allDone = t > T.done;
   const count = T.rows.filter((r) => t > r).length;
-  ctx.fillText(ellipsize(ctx, brand?.name ?? "Workflow", bx - wx - 200 * u * S), wx + 30 * u * S, top + headH / 2 - 12 * u * S);
+  fillTextFit(ctx, brand?.name ?? "Workflow", wx + 30 * u * S, top + headH / 2 - 12 * u * S, bx - wx - 200 * u * S, { maxLines: 1, minScale: 0.6 });
   ctx.font = subFont(17 * u * S, 500);
   ctx.fillStyle = rgba(palette.text, 0.55);
   ctx.fillText(allDone ? `${n} of ${n} complete` : t > T.start ? `Running… ${count} of ${n}` : `${n} tasks ready`, wx + 30 * u * S, top + headH / 2 + 18 * u * S);
@@ -734,7 +751,7 @@ function clickFlow(sc: SkillContext) {
     ctx.font = subFont(24 * u * S, 500);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(ellipsize(ctx, item, ww - 300 * u * S), wx + 116 * u * S, cy);
+    fillTextFit(ctx, item, wx + 116 * u * S, cy, ww - 300 * u * S, { maxLines: 2, lineHeight: 1.08, minScale: 0.8 });
     pill(sc, doneK > 0 ? "Done" : "Queued", wx + ww - 76 * u * S, cy, {
       size: 15 * u * S,
       fill: doneK > 0 ? rgba(palette.accent, 0.2) : undefined,
@@ -843,11 +860,11 @@ function notifyStack(sc: SkillContext) {
     const desc = descOf(items[i]);
     ctx.fillStyle = palette.text;
     ctx.font = subFont(23 * u * S, 700);
-    ctx.fillText(ellipsize(ctx, title, maxW), tx, y + nh / 2 - (desc ? 15 * u * S : 0));
+    fillTextFit(ctx, title, tx, y + nh / 2 - (desc ? 15 * u * S : 0), maxW, { maxLines: 1, minScale: 0.75 });
     if (desc) {
       ctx.fillStyle = rgba(palette.text, 0.62);
       ctx.font = subFont(19 * u * S, 500);
-      ctx.fillText(ellipsize(ctx, desc, maxW + 60 * u * S), tx, y + nh / 2 + 17 * u * S);
+      fillTextFit(ctx, desc, tx, y + nh / 2 + 17 * u * S, maxW + 60 * u * S, { maxLines: 1, minScale: 0.75 });
     }
     ctx.textAlign = "right";
     ctx.fillStyle = rgba(palette.text, 0.42);
@@ -932,7 +949,7 @@ function chartGrow(sc: SkillContext) {
   ctx.fillStyle = rgba(palette.text, 0.68);
   ctx.font = subFont(28 * u * S, 600);
   const label = stat.label ? stat.label.charAt(0).toUpperCase() + stat.label.slice(1) : "and counting";
-  ctx.fillText(ellipsize(ctx, label, numW), nx, ny + 46 * u * S);
+  fillTextFit(ctx, label, nx, ny + 46 * u * S, numW, { maxLines: 1, minScale: 0.72 });
   // Area chart draws on from the left with a glowing head.
   const gx = portrait ? cx0 + pad : cx0 + cw * 0.42;
   const gy = portrait ? ny + 160 * u * S : cy0 + pad * 1.2;

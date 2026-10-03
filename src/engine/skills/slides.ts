@@ -15,10 +15,10 @@ import { exitT } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
 import { drawIcon, glassCard, iconsFor, pill, saasBackground, spring } from "../saasfx";
-import { subFont } from "../text";
+import { fillTextFit, fitTextLines, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { coverDraw, gallery } from "./gallery";
-import { checkBadge, ellipsize, iconTile, windowChrome, wrap } from "./interactions";
+import { checkBadge, ellipsize, iconTile, windowChrome, wrap, wrapClamp } from "./interactions";
 import { avatar, enter, fitTimes, onLand, PEOPLE } from "./moments";
 import { topHeadline } from "./saas";
 
@@ -49,7 +49,7 @@ function bubble(sc: SkillContext, text: string, x: number, y: number, maxW: numb
   const { ctx, u, palette } = sc;
   ctx.save();
   ctx.font = subFont(17 * u * S, 500);
-  const lines = wrap(ctx, text, maxW - 32 * u * S).slice(0, 3);
+  const lines = wrapClamp(ctx, text, maxW - 32 * u * S, 3);
   const bw = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 32 * u * S);
   const bh = lines.length * 24 * u * S + 22 * u * S;
   const bx = mine ? x - bw : x;
@@ -154,7 +154,7 @@ function support(sc: SkillContext) {
     drawIcon(ctx, "BookOpen", hx + pad + 14 * u * S, y + rowH / 2 - 3 * u, 20 * u * S, i === 0 ? palette.primary : rgba(palette.text, 0.6));
     ctx.fillStyle = palette.text;
     ctx.font = subFont(18 * u * S, 600);
-    ctx.fillText(ellipsize(ctx, a, hw - pad * 2 - 90 * u * S), hx + pad + 42 * u * S, y + rowH / 2 - 3 * u);
+    fillTextFit(ctx, a, hx + pad + 42 * u * S, y + rowH / 2 - 3 * u, hw - pad * 2 - 90 * u * S, { maxLines: 1, minScale: 0.72 });
     drawIcon(ctx, "ChevronRight", hx + hw - pad - 10 * u * S, y + rowH / 2 - 3 * u, 18 * u * S, rgba(palette.text, 0.4));
     ctx.restore();
   });
@@ -225,7 +225,7 @@ function support(sc: SkillContext) {
         ctx.font = subFont(16 * u * S, 600);
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText(ellipsize(ctx, articles[0], maxW - 60 * u * S), 44 * u * S, 23 * u * S);
+        fillTextFit(ctx, articles[0], 44 * u * S, 23 * u * S, maxW - 60 * u * S, { maxLines: 1, minScale: 0.72 });
       }
       ctx.restore();
     }
@@ -405,9 +405,10 @@ function worldMap(sc: SkillContext) {
     const s = clamp(spring(c.k, 13, 7), 0, 1.08);
     ctx.save();
     ctx.font = subFont(19 * u * S, 600);
-    const text = ellipsize(ctx, items[c.i], 320 * u * S);
-    const cw = ctx.measureText(text).width + 78 * u * S;
-    const ch = 50 * u * S;
+    // Long event names wrap onto two lines; the card grows to fit them.
+    const fit = fitTextLines(ctx, items[c.i], 320 * u * S, { maxLines: 2, minScale: 0.85 });
+    const cw = fit.width + 78 * u * S;
+    const ch = Math.max(50 * u * S, fit.lines.length * fit.size * 1.12 + 24 * u * S);
     const safe = tokens(w, h).safe;
     const bx = clamp(c.x - cw / 2, safe.left, safe.right - cw);
     const by = Math.max(my - 20 * u, c.y - ch - 20 * u * S);
@@ -420,7 +421,7 @@ function worldMap(sc: SkillContext) {
     ctx.fillStyle = palette.text;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, bx + 54 * u * S, by + ch / 2 + 1 * u);
+    fillTextFit(ctx, items[c.i], bx + 54 * u * S, by + ch / 2 + 1 * u, fit.width + 2, { maxLines: 2, lineHeight: 1.12, minScale: 0.85 });
     ctx.restore();
   }
   ctx.restore();
@@ -465,7 +466,7 @@ function featureSlides(sc: SkillContext) {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.globalAlpha = (1 - ex) * clamp(t / 0.3);
-  ctx.fillText(ellipsize(ctx, label, bw * 0.7), bx0, by - 18 * u * S);
+  fillTextFit(ctx, label, bx0, by - 18 * u * S, bw * 0.7, { maxLines: 1, minScale: 0.72 });
   const gap = 10 * u;
   const segW = (bw - gap * (n - 1)) / n;
   for (let i = 0; i < n; i++) {
@@ -540,7 +541,7 @@ function featureSlides(sc: SkillContext) {
       ctx.fillStyle = palette.text;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(ellipsize(ctx, title, cwid - 66 * u * S), cxp + 52 * u * S, cyp + 26 * u * S);
+      fillTextFit(ctx, title, cxp + 52 * u * S, cyp + 26 * u * S, cwid - 66 * u * S, { maxLines: 1, minScale: 0.72 });
       ctx.restore();
     }
     ctx.restore();
@@ -551,9 +552,9 @@ function featureSlides(sc: SkillContext) {
     };
     ctx.save();
     ctx.font = subFont(50 * u * S, 800);
-    const tl = wrap(ctx, title, tw).slice(0, 2);
+    const tl = wrapClamp(ctx, title, tw, 2);
     ctx.font = subFont(24 * u * S, 450);
-    const dl = desc ? wrap(ctx, desc, tw).slice(0, 3) : [];
+    const dl = desc ? wrapClamp(ctx, desc, tw, 3) : [];
     const blockH = 64 * u * S + 24 * u * S + tl.length * 58 * u * S + 16 * u * S + dl.length * 34 * u * S;
     let y = portrait ? ty : ty - blockH / 2;
     let p = part(0);
@@ -641,7 +642,7 @@ function problemSolution(sc: SkillContext) {
       drawIcon(ctx, "CircleX", x + 34 * u * S, y + chh / 2, 26 * u * S, rgba(red, 0.9 - 0.4 * strike));
     }
     ctx.font = subFont(21 * u * S, good ? 700 : 500);
-    const lines = wrap(ctx, text, cw - 90 * u * S).slice(0, 2);
+    const lines = wrapClamp(ctx, text, cw - 90 * u * S, 2);
     ctx.fillStyle = good ? palette.text : rgba(palette.text, 0.85 - 0.35 * strike);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";

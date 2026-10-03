@@ -1,4 +1,5 @@
 import { exitT } from "../fx";
+import { fillTextFit } from "../text";
 import { tokens } from "../grid";
 import { clamp, ease, lerp, mixHex, range, rgba, rng } from "../math";
 import { pill, saasBackground, spring } from "../saasfx";
@@ -312,7 +313,7 @@ function photoDrop(sc: SkillContext) {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.globalAlpha *= ease.outCubic(range(lt, 0.15, 0.6));
-      ctx.fillText(items[i], 0, y + border + photo + capH / 2, photo);
+      fillTextFit(ctx, items[i], 0, y + border + photo + capH / 2, photo, { lineHeight: 1.0, minScale: 0.75 });
     }
     ctx.restore();
   }

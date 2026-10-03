@@ -14,7 +14,7 @@ import { tokens } from "../grid";
 import { drawLogo, getImage, getMedia, logoMaxWidth, mediaSize, type Drawable } from "../media";
 import { glassCard, saasBackground, sentence, spring } from "../saasfx";
 import { scratch } from "../scratch";
-import { subFont } from "../text";
+import { fillTextFit, fitTextLines, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { topHeadline } from "./saas";
 
@@ -320,7 +320,10 @@ function nodeGraph(sc: SkillContext) {
     ctx.translate(-(x + nw / 2), -(y + nh / 2));
     glassCard(sc, x, y, nw, nh, { r: 14 * u });
     // Header strip with the node's title.
-    const hh = 46 * u;
+    // Long titles wrap onto a second line and the header strip grows to hold them.
+    ctx.font = subFont(24 * u, 700);
+    const tfit = fitTextLines(ctx, titleOf(item), nw - 30 * u, { maxLines: 2, minScale: 0.75 });
+    const hh = 46 * u + (tfit.lines.length - 1) * tfit.size * 1.08;
     ctx.save();
     ctx.beginPath();
     ctx.roundRect(x, y, nw, hh, [14 * u, 14 * u, 0, 0]);
@@ -331,22 +334,23 @@ function nodeGraph(sc: SkillContext) {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#ffffff";
-    let title = titleOf(item);
-    while (title.length > 3 && ctx.measureText(title).width > nw - 30 * u) title = `${title.slice(0, -2).trimEnd()}…`;
-    ctx.fillText(title, x + 14 * u, y + hh / 2);
+    fillTextFit(ctx, titleOf(item), x + 14 * u, y + hh / 2, nw - 30 * u, { maxLines: 2, lineHeight: 1.08, minScale: 0.75 });
     // Body: the description, or parameter sliders settling into place.
     const desc = descOf(item);
     const bodyY = y + hh + 14 * u;
     ctx.font = subFont(18 * u, 500);
     ctx.fillStyle = mixHex(palette.text, palette.bg1, 0.3);
+    let descH = 0;
     if (desc && !portrait) {
-      let line = desc;
-      while (line.length > 3 && ctx.measureText(line).width > nw - 28 * u) line = `${line.slice(0, -2).trimEnd()}…`;
-      ctx.fillText(line, x + 14 * u, bodyY + 8 * u);
+      // The description wraps onto two lines; the sliders below make room for it.
+      ctx.textBaseline = "top";
+      const n = fillTextFit(ctx, desc, x + 14 * u, bodyY - 2 * u, nw - 28 * u, { maxLines: 2, lineHeight: 1.15, minScale: 0.85 });
+      ctx.textBaseline = "middle";
+      descH = n * 18 * u * 1.15 + 12 * u;
     }
     const rows = portrait ? 2 : desc ? 2 : 3;
     for (let r = 0; r < rows; r++) {
-      const ry = bodyY + (desc && !portrait ? 36 * u : 8 * u) + r * 26 * u;
+      const ry = bodyY + (descH || 8 * u) + r * 26 * u;
       if (ry > y + nh - 12 * u) break;
       const barW = nw - 28 * u;
       ctx.fillStyle = rgba(palette.text, 0.1);

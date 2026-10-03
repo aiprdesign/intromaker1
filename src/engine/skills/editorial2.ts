@@ -3,7 +3,7 @@ import { tokens } from "../grid";
 import { drawLucide } from "../icons";
 import { clamp, ease, lerp, mixHex, range, rgba, rng } from "../math";
 import { iconsFor, imageless, luminance, saasFont, spring } from "../saasfx";
-import { displayFont } from "../text";
+import { displayFont, fillTextFit } from "../text";
 import type { Scene, Skill, SkillContext } from "../types";
 import {
   accentWords,
@@ -367,7 +367,7 @@ function posterSplit(sc: SkillContext) {
     ctx.fillStyle = sys.muted;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(scene.subtext, rx, y + (1 - k) * 10 * u, rw);
+    fillTextFit(ctx, scene.subtext, rx, y + (1 - k) * 10 * u, rw, { lineHeight: 1.25 });
     ctx.restore();
     y += subH;
   }
@@ -508,7 +508,7 @@ function cardStack(sc: SkillContext) {
       ctx.fillStyle = sys.muted;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(desc, w / 2, by + 40 * u, g.safe.width);
+      fillTextFit(ctx, desc, w / 2, by + 40 * u, g.safe.width, { lineHeight: 1.2 });
       ctx.restore();
     }
   }
@@ -601,7 +601,7 @@ function contactSheet(sc: SkillContext) {
     ctx.fillStyle = sys.muted;
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    ctx.fillText(line, gx + gw, cy, gw - 140 * u);
+    fillTextFit(ctx, line, gx + gw, cy, gw - 140 * u, { lineHeight: 1.15 });
     ctx.restore();
   }
 }
@@ -683,13 +683,13 @@ function specSheet(sc: SkillContext) {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     const nameY = portrait && desc ? ry + rowH * 0.36 : ry + rowH / 2;
-    ctx.fillText(title, cName, nameY + (1 - e) * rowH * 0.6, portrait || !details ? cTick - cName - 30 * u : cDesc - cName - 24 * u);
+    fillTextFit(ctx, title, cName, nameY + (1 - e) * rowH * 0.6, portrait || !details ? cTick - cName - 30 * u : cDesc - cName - 24 * u, { lineHeight: 1.05, minScale: 0.75 });
     if (desc) {
       ctx.font = `500 ${Math.round(fs * 0.78)}px Inter, sans-serif`;
       ctx.fillStyle = sys.muted;
       const dy = portrait ? ry + rowH * 0.68 : ry + rowH / 2;
       ctx.globalAlpha = ease.outCubic(range(lt, 0.2, 0.7));
-      ctx.fillText(desc, cDesc, dy + (1 - e) * rowH * 0.6, cTick - cDesc - 40 * u);
+      fillTextFit(ctx, desc, cDesc, dy + (1 - e) * rowH * 0.6, cTick - cDesc - 40 * u, { lineHeight: 1.1, minScale: 0.8 });
     }
     ctx.restore();
     // The tick.
@@ -765,7 +765,7 @@ function widgetSet(sc: SkillContext) {
       ctx.fillStyle = palette.text;
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
-      ctx.fillText(label, x + pad, y + wh - pad, ww - pad * 2);
+      fillTextFit(ctx, label, x + pad, y + wh - pad, ww - pad * 2, { lineHeight: 1.1 });
       ctx.restore();
       // The widget itself, centred in the card's upper area.
       const cx = x + ww / 2;

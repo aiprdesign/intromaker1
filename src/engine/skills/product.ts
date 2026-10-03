@@ -9,7 +9,7 @@ import { clamp, ease, mixHex, range, rgba } from "../math";
 import { getImage } from "../media";
 import { backLight, blurInLayout, drawIcon, glassCard, iconsFor, saasBackground, sentence, spring } from "../saasfx";
 import { scratch } from "../scratch";
-import { subFont } from "../text";
+import { fillTextFit, fitTextLines, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { ctaButton, ctaCursor, ctaTiming, topHeadline } from "./saas";
 
@@ -624,7 +624,9 @@ function callout(sc: SkillContext, text: string, icon: string, cx: number, cy: n
   const fs = (portrait ? 36 : 33) * u;
   ctx.save();
   ctx.font = subFont(fs, 650);
-  const tw = Math.min(ctx.measureText(text).width, w * (portrait ? 0.32 : 0.24));
+  // Long callouts wrap onto two lines inside the chip rather than being squeezed.
+  const fit = fitTextLines(ctx, text, w * (portrait ? 0.32 : 0.24), { maxLines: 2, minScale: 0.75 });
+  const tw = fit.width;
   const ih = fs * 2.1;
   const cw = tw + ih + fs * 1.4;
   const x = align === "left" ? cx - cw : align === "right" ? cx : cx - cw / 2;
@@ -648,7 +650,7 @@ function callout(sc: SkillContext, text: string, icon: string, cx: number, cy: n
   ctx.fillStyle = palette.text;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, x + ih + fs * 0.35, cy + 1, tw);
+  fillTextFit(ctx, text, x + ih + fs * 0.35, cy + 1, tw + 1, { maxLines: 2, lineHeight: 1.08, minScale: 0.75 });
   ctx.restore();
   return { x, y, w: cw, h: ih };
 }
