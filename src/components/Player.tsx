@@ -323,7 +323,7 @@ export default function Player({
           <div className="stage-export">
             <div className="spinner" />
             <div>Rendering {Math.round(exporting * 100)}%</div>
-            <small>Rendering every frame at full quality.</small>
+            <small>Rendering the frames at full quality.</small>
             <button className="btn btn-ghost" onClick={() => abortRef.current?.abort()}>Cancel</button>
           </div>
         )}

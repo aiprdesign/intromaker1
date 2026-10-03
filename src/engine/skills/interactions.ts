@@ -1083,7 +1083,7 @@ export const interactionSkills: Skill[] = [
   {
     id: "click-flow",
     name: "One-Click Flow",
-    tagline: "A cursor glides to the primary button behind a micro-zoom; one click and every task ticks off in a fast cascade.",
+    tagline: "A cursor glides to the primary button behind a micro-zoom; one click and the tasks tick off in a fast cascade.",
     bestFor: "Automation and 'it just works' moments. Headline = the outcome; subtext = the button label ('Run', 'Deploy', 'Approve'); items = 3–5 tasks it completes (real features).",
     sample: { text: "Busywork, *handled*", subtext: "Run", items: ["Match receipts", "Categorise expenses", "Sync to accounting", "Notify finance"] },
     itemsHint: "3–5 tasks it completes",
@@ -1096,8 +1096,8 @@ export const interactionSkills: Skill[] = [
   {
     id: "notify-stack",
     name: "Notification Stack",
-    tagline: "App notifications drop into an iOS-style stack, newest on top, each with an icon, title and detail.",
-    bestFor: "Showing the product alive and working for you (sales, e-commerce, security, messaging). items = 3–5 notifications, each 'Title — detail'.",
+    tagline: "App notifications drop into an iOS-style stack, newest on top, with an icon, title and detail.",
+    bestFor: "Showing the product alive and working for you (sales, e-commerce, security, messaging). items = 3–5 notifications as 'Title — detail'.",
     sample: { text: "Your store, *in real time*", items: ["New order — 2 × Linen shirt, shipped today", "Payment received — Invoice #1042 paid", "Low stock — Reorder drafted", "New review — From a customer"] },
     itemsHint: "3–5 notifications, 'Title — detail'",
     render: notifyStack,

@@ -164,7 +164,7 @@ function page() {
   sec(1200, 1000, "#f4f5fb");
   g.fillStyle = "#14182b";
   g.font = "700 54px sans-serif";
-  g.fillText("Everything you need", 720, 1360);
+  g.fillText("Tools you need", 720, 1360);
   for (let i = 0; i < 3; i++) {
     const x = 160 + i * 400;
     bar(g, x, 1460, 360, 420, "#ffffff", 20);

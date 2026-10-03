@@ -113,9 +113,9 @@ export default function FilmsTab() {
   const removeAll = async () => {
     if (!data) return;
     const ok = await confirm({
-      title: `Delete all ${data.stats.total} logged films?`,
+      title: `Delete the ${data.stats.total} logged films?`,
       body: "The whole film log and its storyboards are removed. Visitors' own films and accounts are not affected. This can't be undone.",
-      confirm: "Delete everything",
+      confirm: "Delete the film log",
       danger: true,
       typed: "DELETE",
     });
@@ -142,7 +142,7 @@ export default function FilmsTab() {
       {s ? (
         <>
           <section className="admin-kpis">
-            <Kpi label="Films" value={s.total} hint="Every film event logged (new, remakes, takes, exports)" />
+            <Kpi label="Films" value={s.total} hint="Film events logged (new, remakes, takes, exports)" />
             <Kpi label="Today" value={s.today} />
             <Kpi label="Last 7 days" value={s.week} />
             <Kpi label="Visitors" value={s.visitors} hint="Different visitors (anonymous)" />
@@ -192,7 +192,7 @@ export default function FilmsTab() {
           )}
         </span>
         <select className="select" value={kind} onChange={(e) => (setKind(e.target.value), setPage(0))} aria-label="Event">
-          <option value="">All events</option>
+          <option value="">Any event</option>
           {Object.entries(KIND_LABEL).map(([k, v]) => (
             <option key={k} value={k}>
               {v}
@@ -200,7 +200,7 @@ export default function FilmsTab() {
           ))}
         </select>
         {visitor && (
-          <button className="chip active" onClick={() => setVisitor("")} title="Show all visitors">
+          <button className="chip active" onClick={() => setVisitor("")} title="Clear the visitor filter">
             Visitor {visitor} ×
           </button>
         )}
@@ -229,7 +229,7 @@ export default function FilmsTab() {
                 Clear filters
               </button>
             ) : (
-              "Every film made in the studio (new films, remakes, alternative takes) and every export shows up here."
+              "Films made in the studio (new films, remakes, alternative takes) and exports show up here."
             )}
           </p>
         </div>
@@ -283,7 +283,7 @@ export default function FilmsTab() {
           <summary>Danger zone</summary>
           <p className="hint">Remove the whole film log. Visitors&apos; accounts and saved intros are not affected.</p>
           <button className="btn btn-danger sm" onClick={removeAll}>
-            Delete all {data.stats.total} films…
+            Delete the {data.stats.total} films…
           </button>
         </details>
       )}

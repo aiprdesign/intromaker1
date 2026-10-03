@@ -64,11 +64,11 @@ export default function VoicePanel({
       </label>
       {!voice.enabled && (
         <div className="voice-intro">
-          <p className="hint">Turn it on and the director writes a narrator line for every slide, sized to fit it, then records it. Word-by-word captions follow the voice, and the music ducks under every line.</p>
+          <p className="hint">Turn it on and the director writes a narrator line per slide, sized to fit it, then records it. Word-by-word captions follow the voice, and the music ducks under the voice.</p>
           <ul className="hint">
             <li>Free voice that runs in your browser (no key), or OpenAI, ElevenLabs, your own voice server or an uploaded recording.</li>
             <li>Edit any line in the slide editor; it re-records automatically.</li>
-            <li>Voice and captions are in every export.</li>
+            <li>Voice and captions are included in exports.</li>
           </ul>
           <button className="btn btn-ghost" onClick={() => set({ enabled: true })}>
             🎙 Add a voice-over

@@ -898,7 +898,7 @@ export const speedSkills: Skill[] = [
   {
     id: "whip-pan",
     name: "Whip Pan",
-    tagline: "Words whip across the frame with a directional smear, each pushing the last out, until the line pans in and holds.",
+    tagline: "Words whip across the frame with a directional smear, one pushing the last out, until the line pans in and holds.",
     bestFor: "Momentum: 3–6 short features (items) whipping past before the headline. Great straight after the reveal.",
     sample: { text: "Move at *full speed*", items: ["Plan", "Build", "Ship", "Grow"] },
     itemsHint: "3–6 short features",
@@ -908,7 +908,7 @@ export const speedSkills: Skill[] = [
   {
     id: "stack-stomp",
     name: "Stack Stomp",
-    tagline: "The line drops in word by word into a tight justified stack, each word squashing on impact and kicking the stack.",
+    tagline: "The line drops in word by word into a tight justified stack, the words squashing on impact and kicking the stack.",
     bestFor: "A punchy line of 3–6 words set as a poster stack ('Built to *ship* faster'). No items needed.",
     sample: { text: "Built to *ship* faster" },
     render: stackStomp,
@@ -927,7 +927,7 @@ export const speedSkills: Skill[] = [
   {
     id: "cube-spin",
     name: "Cube Spin",
-    tagline: "A panel rolls like a cube on every tick, a new feature on each face, until the line arrives on the last face.",
+    tagline: "A panel rolls like a cube on the tick, a new feature on the next face, until the line arrives on the last face.",
     bestFor: "Switching through 3–5 short features (items) before the headline, with a tactile 3D roll.",
     sample: { text: "Ideas *in motion*", items: ["Sketch", "Prototype", "Launch"] },
     itemsHint: "3–5 short features",
@@ -947,7 +947,7 @@ export const speedSkills: Skill[] = [
   {
     id: "bar-wipe",
     name: "Bar Wipe",
-    tagline: "A brand-colour bar sweeps over each word and pulls back on the next, alternating direction, then leaves a rule under the line.",
+    tagline: "A brand-colour bar sweeps over a word and pulls back on the next, alternating direction, then leaves a rule under the line.",
     bestFor: "Clean, fast switching through 3–5 short features (items) before the headline. Editorial and corporate friendly.",
     sample: { text: "Cut to *the point*", items: ["Clear", "Quick", "Focused"] },
     itemsHint: "3–5 short features",
@@ -957,7 +957,7 @@ export const speedSkills: Skill[] = [
   {
     id: "crash-zoom",
     name: "Crash Zoom",
-    tagline: "Each word arrives from the distance, then the camera crashes through a letter's hollow straight into the next word.",
+    tagline: "A word arrives from the distance, then the camera crashes through a letter's hollow straight into the next word.",
     bestFor: "High-energy hooks: 3–5 short features (items) zoomed through before the headline lands.",
     sample: { text: "Zoom *into the work*", items: ["Docs", "Boards", "Goals"] },
     itemsHint: "3–5 short features",

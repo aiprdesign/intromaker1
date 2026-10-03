@@ -44,7 +44,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
     setBusy(true);
     try {
       take(await api<View>("/api/admin/plans", { method: "PUT", body: JSON.stringify(form) }));
-      notify("Plans saved. The pricing page and every account use them now.");
+      notify("Plans saved. The pricing page and accounts use them now.");
     } catch (e) {
       notify((e as Error).message, "error");
     } finally {
@@ -52,7 +52,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
     }
   };
   const resetDefaults = async () => {
-    if (!(await confirm({ title: "Reset the limits to the defaults?", body: "The form goes back to the built-in Free and Pro limits. Nothing changes until you save.", confirm: "Reset form" }))) return;
+    if (!(await confirm({ title: "Reset the limits to the defaults?", body: "The form goes back to the built-in Free and Pro limits. Changes apply when you save.", confirm: "Reset form" }))) return;
     setForm((f) => f && { ...f, plans: defaults });
   };
   const differs = (id: PlanId, key: keyof PlanLimits) => plans[id][key] !== defaults[id][key];

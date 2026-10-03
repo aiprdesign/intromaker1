@@ -2033,8 +2033,8 @@ export const saasSkills: Skill[] = [
   {
     id: "bento",
     name: "Bento Grid",
-    tagline: "Feature cards spring into a bento grid, each with an icon and a live micro-animation.",
-    bestFor: 'Feature overviews. Headline = section title; items = 3–6 features, each "Title" or "Title — one-line description".',
+    tagline: "Feature cards spring into a bento grid with icons and live micro-animations.",
+    bestFor: 'Feature overviews. Headline = section title; items = 3–6 features as "Title" or "Title — one-line description".',
     sample: { text: "Built for *your team*", items: ["Search", "Real-time analytics", "Team spaces", "Access controls", "AI assistant", "Integrations"] },
     itemsHint: "3–6 features, comma separated",
     render: bento,
@@ -2044,7 +2044,7 @@ export const saasSkills: Skill[] = [
     id: "icon-features",
     name: "Feature Icons",
     tagline: "Glowing icon tiles draw themselves on, one per feature, with a title and one-line benefit.",
-    bestFor: 'Key features at a glance. Headline = section title; items = 2–6 features, each "Title" or "Title — one-line benefit". Icons are picked from the wording.',
+    bestFor: 'Key features at a glance. Headline = section title; items = 2–6 features as "Title" or "Title — one-line benefit". Icons are picked from the wording.',
     sample: { text: "Built for *developers*", items: ["Git deploys — Push to ship", "Access controls — SSO and audit logs", "Real-time logs — Watch requests live", "Usage-based — Pay for what you use"] },
     itemsHint: "2–6 features, comma separated",
     render: iconFeatures,
@@ -2103,7 +2103,7 @@ export const saasSkills: Skill[] = [
   {
     id: "site-scroll",
     name: "Website Scroll",
-    tagline: "Your real website opens on its hero, scrolls to each section and lifts that section out of the page.",
+    tagline: "Your real website opens on its hero, scrolls from section to section and lifts them out of the page.",
     bestFor: "Showing the actual site right after the brand reveal. Uses the full-page screenshot from live capture and the page's own sections.",
     sample: { text: "Meet your new *workspace*" },
     render: siteScroll,

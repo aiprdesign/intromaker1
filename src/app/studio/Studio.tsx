@@ -1575,8 +1575,7 @@ export default function Studio() {
               {site.partial && (
                 <p className="hint warn">
                   {site.marketplace ?? "The marketplace"} only let us read part of this listing: the product name from the link and its main photo. Add more
-                  photos above, and type the product&apos;s name and features in the prompt (e.g. &ldquo;Aero Buds: wireless earbuds with noise cancelling, all-day
-                  battery and a pocket case&rdquo;), then Generate.
+                  photos above, and type the product&apos;s name and features in the prompt (e.g. &ldquo;Aero Buds: wireless earbuds with noise cancelling, long battery life and a pocket case&rdquo;), then Generate.
                 </p>
               )}
               {!site.shots?.full && site.kind !== "product" && (
@@ -1690,7 +1689,7 @@ export default function Studio() {
                 className={`chip auto-style ${trailerStyle === "auto" ? "active" : ""}`}
                 aria-pressed={trailerStyle === "auto"}
                 onClick={() => chooseTrailerStyle("auto")}
-                title="Each new trailer takes the style that matches your product"
+                title="New trailers take the style that matches your product"
               >
                 ✦ Auto: matched to your product{trailerStyle === "auto" ? ` (${TRAILER_STYLE_MAP[detectedTrailer()]?.name})` : ""}
               </button>
@@ -1727,7 +1726,7 @@ export default function Studio() {
                   const id = suggestedFor(plan);
                   if (id) chooseTemplate(id, true);
                 }}
-                title="Each new film takes the style suggested for its kind of product. A style you pick applies to this film and its remakes; the next website or prompt gets its own best style."
+                title="New films take the style suggested for their kind of product. A style you pick applies to this film and its remakes; the next website or prompt gets its own best style."
               >
                 ✦ Auto: best style for your product
                 {autoStyle && suggestedFor(plan) ? ` (${TEMPLATE_MAP[suggestedFor(plan)!].name})` : ""}
@@ -1750,7 +1749,7 @@ export default function Studio() {
               <span className="field-label inline">Heading font</span> <span className="tpl-desc">{fontChoice ? FONT_LABELS[fontChoice].name : "Style default"}</span>
             </summary>
             <FontPicker value={fontChoice} onChange={chooseFont} kind={fontKind} current={fontChoice ? (plan.style === "trailer" ? TRAILER_STYLE_MAP[plan.trailerStyle ?? ""]?.mood.font ?? plan.font : TEMPLATE_MAP[plan.template ?? template]?.font ?? plan.font) : plan.font} />
-            <p className="hint">{fontKind === "trailer" ? "Movie-title faces, each paired with its own subtitle face." : "Applies to every headline; subtitles stay in a clean sans."}</p>
+            <p className="hint">{fontKind === "trailer" ? "Movie-title faces, paired with their own subtitle faces." : "Applies to the headlines; subtitles stay in a clean sans."}</p>
           </details>
           <label className="field-label">
             Text glow <span className="tpl-desc">{glow ? "On" : "Off"}</span>
@@ -1795,7 +1794,7 @@ export default function Studio() {
           <p className="hint">
             {scheme === "60-30-10"
               ? "60% background, 30% cards and gradients, 10% accent for highlights."
-              : "Every palette colour at full strength."}
+              : "The palette's colours at full strength."}
           </p>
           <PaletteChooser
             value={colourChoice}
@@ -1838,7 +1837,7 @@ export default function Studio() {
                 <span className="spinner sm" /> Remaking… <span className="stop-label">■ Stop</span>
               </button>
             ) : (
-              <button className="btn btn-ghost btn-lg" onClick={remake} disabled={loading || importing || takesLoading} title="A new version with different slides for each section. Undo or Original brings back earlier versions.">
+              <button className="btn btn-ghost btn-lg" onClick={remake} disabled={loading || importing || takesLoading} title="A new version with different slides for its sections. Undo or Original brings back earlier versions.">
                 Remake ↻
               </button>
             )}
@@ -1976,7 +1975,7 @@ export default function Studio() {
           <div className="takes">
             <div className="takes-head">
               <h2>Versions</h2>
-              <span className="hint">Your original, every remake and alternative cuts. Click one to go back to it.</span>
+              <span className="hint">Your original, remakes and alternative cuts. Click one to go back to it.</span>
             </div>
             <div className="takes-row">
               {takes.map((t, i) => (

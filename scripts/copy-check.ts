@@ -3,7 +3,7 @@
  * "free" is only offered when the copy really offers it, and site buttons are cleaned.
  * Run: npm run check:copy
  */
-import { mentionsOffer, offerKey, offerSafe, offersIn } from "../src/engine/claims";
+import { mentionsOffer, offerKey, offerSafe, offersIn, safeCopy } from "../src/engine/claims";
 import { cleanCta, contextCta, lowerFirst, offersFree, safePlan } from "../src/engine/planner";
 import { speakable } from "../src/engine/voice";
 import { applyTemplate, trailerBeats } from "../src/engine/templates";
@@ -157,6 +157,20 @@ console.log("New slides are written from the film");
     check(c.text !== SKILL_MAP[sk].sample.text && !/developers|Git deploys|your team\*?$/i.test(all), `${sk}: "${c.text}" ${c.items ? `(${c.items.join(", ")})` : ""}`);
   }
 }
+
+console.log("No absolute words on screen");
+for (const [from, to] of [
+  ["Each cup made by hand", "The cups made by hand"],
+  ["See it from every angle", "See it from different angles"],
+  ["Never settle", "Don't settle"],
+  ["All night long", "Through the night"],
+  ["Each and every customer", "Your customers"],
+  ["Every step of the way", "Along the way"],
+  ["Each of the bottles is tested", "The bottles are tested"],
+  ["Plan all your projects", "Plan your projects"],
+  ["Built for everyone", "Built for you"],
+  ["Always on time", "On time"],
+]) check(safeCopy(from) === to, `"${from}" → "${safeCopy(from)}"`);
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");
 process.exit(failed ? 1 : 0);

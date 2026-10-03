@@ -180,28 +180,28 @@ const OUTRO_SUBS = ["Coming soon", "Available now", "Join the movement", "Start 
  * brand "Look closer".)
  */
 const GENRE_LINES: Record<string, { hooks: string[]; beats: string[]; outro: string[] }> = {
-  cyber: { hooks: ["SYSTEM ONLINE", "ACCESS GRANTED", "THE CODE HAS CHANGED"], beats: ["ENTER THE GRID", "NO LIMITS", "UPLOAD COMPLETE", "BREAK THE SYSTEM"], outro: ["Access now", "Coming soon", "Join the network"] },
+  cyber: { hooks: ["SYSTEM ONLINE", "ACCESS GRANTED", "THE CODE HAS CHANGED"], beats: ["ENTER THE GRID", "PUSH FURTHER", "UPLOAD COMPLETE", "BREAK THE SYSTEM"], outro: ["Access now", "Coming soon", "Join the network"] },
   tech: { hooks: ["THE FUTURE IS HERE", "INTRODUCING", "A NEW ERA BEGINS"], beats: ["BUILT FOR WHAT'S NEXT", "THINK BIGGER", "SEE WHAT'S POSSIBLE", "SMARTER BY DESIGN"], outro: ["Coming soon", "Available now", "Start today"] },
-  action: { hooks: ["NO TURNING BACK", "BRACE YOURSELF", "IT BEGINS NOW"], beats: ["NO LIMITS", "NO FEAR", "HOLD ON", "NO HOLDING BACK"], outro: ["Coming soon", "Out now"] },
-  space: { hooks: ["THE JOURNEY BEGINS", "LOOK UP", "BEYOND THE STARS"], beats: ["INTO THE UNKNOWN", "FURTHER THAN EVER", "ONE SMALL STEP", "BEYOND THE EDGE"], outro: ["Coming soon", "Premieres soon"] },
-  luxury: { hooks: ["TIMELESS", "CRAFTED WITH CARE", "BEAUTY IN DETAIL"], beats: ["EVERY DETAIL", "PURE ELEGANCE", "TIME, REFINED", "QUIET CONFIDENCE"], outro: ["Discover the collection", "Available now", "Experience it"] },
+  action: { hooks: ["NO TURNING BACK", "BRACE YOURSELF", "IT BEGINS NOW"], beats: ["PUSH FURTHER", "NO FEAR", "HOLD ON", "NO HOLDING BACK"], outro: ["Coming soon", "Out now"] },
+  space: { hooks: ["THE JOURNEY BEGINS", "LOOK UP", "BEYOND THE STARS"], beats: ["INTO THE UNKNOWN", "FURTHER OUT", "ONE SMALL STEP", "BEYOND THE EDGE"], outro: ["Coming soon", "Premieres soon"] },
+  luxury: { hooks: ["TIMELESS", "CRAFTED WITH CARE", "BEAUTY IN DETAIL"], beats: ["IN THE DETAILS", "PURE ELEGANCE", "TIME, REFINED", "QUIET CONFIDENCE"], outro: ["Discover the collection", "Available now", "Experience it"] },
   retro: { hooks: ["PRESS PLAY", "TONIGHT", "TURN IT UP"], beats: ["UNTIL SUNRISE", "FEEL THE BEAT", "NEON DREAMS", "BACK IN TIME"], outro: ["Get your tickets", "Coming soon", "See you there"] },
   music: { hooks: ["TURN IT UP", "PRESS PLAY", "FEEL IT"], beats: ["LIVE", "LOUDER", "TILL LATE", "ONE MORE SONG"], outro: ["Listen now", "Out now", "Get your tickets"] },
   gaming: { hooks: ["GAME ON", "PRESS START", "LET THE GAMES BEGIN"], beats: ["NO MERCY", "LEVEL UP", "LOCK AND LOAD", "ONE MORE ROUND"], outro: ["Subscribe now", "Play now", "Join the squad"] },
   nature: { hooks: ["LISTEN CLOSELY", "WILD AT HEART", "WHERE IT BEGINS"], beats: ["UNTAMED", "BREATHE IN", "FIND YOUR PATH", "STILL WATERS"], outro: ["Coming soon", "Explore now"] },
   fun: { hooks: ["GUESS WHAT", "HERE WE GO", "GET READY"], beats: ["LET'S GO", "SAY HELLO", "MORE FUN", "JUST FOR YOU"], outro: ["Download now", "Join the fun", "Available now"] },
   editorial: { hooks: ["CHAPTER ONE", "IN FOCUS", "A STORY"], beats: ["LOOK CLOSER", "THE DETAILS", "BEHIND THE SCENES", "IN THEIR WORDS"], outro: ["Coming soon", "Read the story"] },
-  hype: { hooks: ["ARE YOU READY", "IT'S HERE", "THE WAIT IS OVER"], beats: ["NO LIMITS", "LET'S GO", "GAME ON", "TURN IT UP"], outro: ["Out now", "Coming soon", "Join the movement"] },
+  hype: { hooks: ["ARE YOU READY", "IT'S HERE", "THE WAIT IS OVER"], beats: ["PUSH FURTHER", "LET'S GO", "GAME ON", "TURN IT UP"], outro: ["Out now", "Coming soon", "Join the movement"] },
   // Movie trailers: title-card lines in each genre's voice.
-  "film-horror": { hooks: ["SOME DOORS STAY CLOSED", "IT KNOWS YOUR NAME", "DON'T LOOK BACK"], beats: ["NO ONE IS SAFE", "LISTEN", "THE NIGHT IS LONG", "IT'S STILL HERE"], outro: ["Coming soon"] },
-  "film-thriller": { hooks: ["ONE LAST JOB", "TRUST NO ONE", "EVERYONE HAS A SECRET"], beats: ["THE CLOCK IS RUNNING", "NOTHING IS WHAT IT SEEMS", "NO WAY OUT", "ONE CHANCE"], outro: ["Coming soon"] },
+  "film-horror": { hooks: ["SOME DOORS STAY CLOSED", "IT KNOWS YOUR NAME", "DON'T LOOK BACK"], beats: ["STAY CLOSE", "LISTEN", "THE NIGHT IS LONG", "IT'S STILL HERE"], outro: ["Coming soon"] },
+  "film-thriller": { hooks: ["ONE LAST JOB", "WATCH YOUR BACK", "SECRETS RUN DEEP"], beats: ["THE CLOCK IS RUNNING", "LOOK AGAIN", "NO WAY OUT", "ONE CHANCE"], outro: ["Coming soon"] },
   "film-action": { hooks: ["THIS SUMMER", "NO RULES", "ONE MISSION"], beats: ["NO RETREAT", "NO SURRENDER", "HOLD THE LINE", "FULL THROTTLE"], outro: ["Coming soon"] },
-  "film-scifi": { hooks: ["THE STARS ARE CALLING", "BEYOND THE EDGE", "ONE SIGNAL"], beats: ["NO WAY HOME", "THE FUTURE IS WATCHING", "FURTHER THAN EVER", "ONE LAST HOPE"], outro: ["Coming soon"] },
+  "film-scifi": { hooks: ["THE STARS ARE CALLING", "BEYOND THE EDGE", "ONE SIGNAL"], beats: ["NO WAY HOME", "THE FUTURE IS WATCHING", "FURTHER OUT", "ONE LAST HOPE"], outro: ["Coming soon"] },
   "film-fantasy": { hooks: ["AN AGE IS ENDING", "LEGENDS ARE FORGED", "BEYOND THE MOUNTAINS"], beats: ["ONE QUEST", "ONE CHOICE", "THE OLD MAGIC STIRS", "A KINGDOM WAITS"], outro: ["Coming soon"] },
-  "film-drama": { hooks: ["EVERY FAMILY HAS A STORY", "SOME MOMENTS CHANGE EVERYTHING", "THIS WINTER"], beats: ["WHAT WE KEEP", "WHAT WE LOSE", "WHO WE BECOME", "WHAT WE LEAVE BEHIND"], outro: ["Coming soon"] },
-  "film-comedy": { hooks: ["THIS SUMMER", "WHAT COULD GO WRONG?", "BAD IDEA. GREAT TIMING."], beats: ["NOTHING WENT TO PLAN", "EVERYTHING WENT WRONG", "AND THEN IT GOT WORSE", "THEY'RE BACK"], outro: ["Coming soon"] },
-  "film-romance": { hooks: ["SOME LOVE STORIES", "ONE SUMMER", "TWO STRANGERS"], beats: ["ONE CHANCE", "TWO HEARTS", "EVERY MOMENT", "ONE LAST DANCE"], outro: ["Coming soon"] },
-  "film-noir": { hooks: ["THE CITY NEVER SLEEPS", "EVERY CLUE HIDES A SECRET", "ONE NIGHT"], beats: ["SOMEONE IS LYING", "FOLLOW THE TRUTH", "NO ONE IS INNOCENT", "THE RAIN KEEPS FALLING"], outro: ["Coming soon"] },
+  "film-drama": { hooks: ["A FAMILY STORY", "SOME MOMENTS CHANGE YOU", "THIS WINTER"], beats: ["WHAT WE KEEP", "WHAT WE LOSE", "WHO WE BECOME", "WHAT WE LEAVE BEHIND"], outro: ["Coming soon"] },
+  "film-comedy": { hooks: ["THIS SUMMER", "WHAT COULD GO WRONG?", "BAD IDEA. GREAT TIMING."], beats: ["IT DIDN'T GO TO PLAN", "THEN IT WENT WRONG", "AND THEN IT GOT WORSE", "THEY'RE BACK"], outro: ["Coming soon"] },
+  "film-romance": { hooks: ["SOME LOVE STORIES", "ONE SUMMER", "TWO STRANGERS"], beats: ["ONE CHANCE", "TWO HEARTS", "THIS MOMENT", "ONE LAST DANCE"], outro: ["Coming soon"] },
+  "film-noir": { hooks: ["THE CITY IS AWAKE", "THE CLUES HIDE SECRETS", "ONE NIGHT"], beats: ["SOMEONE IS LYING", "FOLLOW THE TRUTH", "SOMEONE KNOWS", "THE RAIN KEEPS FALLING"], outro: ["Coming soon"] },
   "film-doc": { hooks: ["A STORY OF", "SEE IT AS IT IS", "LOOK CLOSER"], beats: ["THE PEOPLE", "THE PLACE", "THE MOMENT", "THE JOURNEY"], outro: ["Coming soon"] },
   "film-family": { hooks: ["THIS HOLIDAY", "GET READY FOR", "THE BIGGEST LITTLE ADVENTURE"], beats: ["NEW FRIENDS", "BIG DREAMS", "ONE WILD RIDE", "HOME IS WHERE"], outro: ["Coming soon"] },
   "film-western": { hooks: ["OUT WEST", "THE LAW ENDS HERE", "ONE TOWN"], beats: ["ONE SHERIFF", "NO MERCY", "A RECKONING", "AT SUNDOWN"], outro: ["Coming soon"] },
@@ -1741,7 +1741,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     add(proofPriority("cards", 7), {
       role: "cards", skill: "ui-cards",
       text: spare ?? `${site.name} *in numbers*`,
-      items: [`${site.name} update: all systems go`, site.stats[0], "This week", "Your team"],
+      items: [`${site.name} update: systems go`, site.stats[0], "This week", "Your team"],
       eyebrow: "Results",
       duration: Math.max(4.2, beats(9)),
       transition: "whip",
@@ -1858,7 +1858,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     const cut = Math.round(total);
     styled.target = cut;
     styled.notes = [
-      `There's enough material for a tight ${cut}s film rather than ${target}s, so nothing is padded or invented. ` +
+      `There's enough material for a tight ${cut}s film rather than ${target}s, with no padding or invented lines. ` +
         (site.url
           ? "Sites with more feature headlines, steps or testimonials make longer films."
           : "List a few features in your prompt (e.g. “with X, Y and Z”) or import the website for the full cut."),
@@ -1989,7 +1989,7 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   const galleryKinds = ["product-spin", "photo-fan", "gallery-flow", "card-spread", "carousel-3d", "photo-drop"] as const;
   const gallery: Scene | null =
     photos >= 2 && target >= 20
-      ? { role: "gallery", skill: galleryKinds[variant % galleryKinds.length], text: "From each *angle*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
+      ? { role: "gallery", skill: galleryKinds[variant % galleryKinds.length], text: "From *different angles*", eyebrow: "Gallery", items: [], duration: beats(12), transition: "dolly", why: `${photos} product photos` }
       : null;
   const closer: Scene | null =
     target >= 30
@@ -2034,7 +2034,7 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   if (!feats.length || photos < 2) {
     const runs = styled.scenes.reduce((a, s) => a + s.duration, 0);
     styled.notes = [
-      `${photos < 2 ? (photos ? "Only one product photo was found" : "No product photos were added") : "The listing has no bullet points"}, so this is a short product film${runs < target * 0.9 ? ` (${Math.round(runs)}s rather than ${target}s, so nothing is padded or shown twice)` : ""}. ${photos < 2 ? "Add more photos" : "Add features in your prompt"} for galleries and feature callouts.`,
+      `${photos < 2 ? (photos ? "Only one product photo was found" : "No product photos were added") : "The listing has no bullet points"}, so this is a short product film${runs < target * 0.9 ? ` (${Math.round(runs)}s rather than ${target}s, with no padding or repeats)` : ""}. ${photos < 2 ? "Add more photos" : "Add features in your prompt"} for galleries and feature callouts.`,
     ];
     // Judged (and fitted later) on the length its material supports.
     if (runs < target * 0.9) styled.target = Math.round(runs);

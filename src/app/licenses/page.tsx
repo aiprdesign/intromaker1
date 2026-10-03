@@ -20,7 +20,7 @@ export default function Licenses() {
       <article className="legal">
         <h1>Open-source licences</h1>
         <p className="lead">
-          IntroMaker is built on open-source software. Every component is open source and its licence allows commercial use. Their notices and licence
+          IntroMaker is built on open-source software. Its components are open source, with licences that allow commercial use. Their notices and licence
           texts are reproduced here, as those licences ask.
         </p>
 

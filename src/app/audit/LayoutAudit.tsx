@@ -144,7 +144,7 @@ export default function LayoutAudit() {
     <article className="legal audit">
       <h1>Layout audit</h1>
       <p className="lead">
-        Every skill in 16:9, 9:16 and 1:1, at three moments, checked against the design system: text inside the title-safe area, nothing clipped by the frame,
+        The skills in 16:9, 9:16 and 1:1, at three moments, checked against the design system: text inside the title-safe area, no text clipped by the frame,
         no text overlapping other text.
       </p>
       {!findings ? (
@@ -152,7 +152,7 @@ export default function LayoutAudit() {
       ) : (
         <>
           <p data-audit-done>
-            {SKILLS.length} skills × 3 formats: <strong>{findings.length === 0 ? "all clear" : `${findings.length} findings in ${bySkill.size} skills`}</strong>
+            {SKILLS.length} skills × 3 formats: <strong>{findings.length === 0 ? "clear" : `${findings.length} findings in ${bySkill.size} skills`}</strong>
           </p>
           {[...bySkill].map(([skill, fs]) => (
             <details key={skill}>

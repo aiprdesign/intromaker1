@@ -834,7 +834,7 @@ export const epicSkills: Skill[] = [
   {
     id: "countdown",
     name: "Countdown",
-    tagline: "3, 2, 1 land heavy on sweeping timer rings, each with a kick, then the title slams in on a ring of light.",
+    tagline: "3, 2, 1 land heavy on sweeping timer rings with a kick apiece, then the title slams in on a ring of light.",
     bestFor: "Launch days, drops, events and premieres. Title of 1–3 words.",
     sample: { text: "LAUNCH DAY", subtext: "Live now" },
     render: countdown,

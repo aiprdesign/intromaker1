@@ -96,7 +96,7 @@ export default function HeroPrompt() {
       </h1>
       <p className="lede">
         {product
-          ? "Paste your Amazon, eBay, Etsy or Shopify listing, or upload product photos. IntroMaker cuts your product out of its photos and directs it in the format that sells: product first, benefits on screen (they read with the sound off), each angle, one clear call to action."
+          ? "Paste your Amazon, eBay, Etsy or Shopify listing, or upload product photos. IntroMaker cuts your product out of its photos and directs it in the format that sells: product first, benefits on screen (they read with the sound off), its angles, one clear call to action."
           : "Enter your website below. IntroMaker reads your logo, brand colours, screenshots, UI and copy, picks the scenes that suit your product, and directs a beat-synced launch film you can edit and export in 1080p."}
       </p>
     <div className="hero-prompt">
@@ -201,7 +201,7 @@ export default function HeroPrompt() {
           <p className={`hero-note${productError ? " error" : ""}`} role={productError ? "alert" : undefined}>
             {productError ?? (
               <>
-                Works with {MARKETS.join(", ")}: we read the title, bullet points and photos (never prices or reviews). Or drop in your own product
+                Works with {MARKETS.join(", ")}: we read the title, bullet points and photos (not prices or reviews). Or drop in your own product
                 photos. Use listings and photos you have the right to use. <Link href="/privacy">What we keep</Link>
               </>
             )}

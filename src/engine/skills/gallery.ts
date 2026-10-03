@@ -595,7 +595,7 @@ export const gallerySkills: Skill[] = [
     id: "carousel-3d",
     name: "3D Carousel",
     tagline: "The images on a curved 3D ring that turns card by card, the front card spotlit with its caption and a floor reflection.",
-    bestFor: "A premium product gallery: 4–6 screenshots, templates or examples. Headline = the range ('Templates for *every team*'); items = captions.",
+    bestFor: "A premium product gallery: 4–6 screenshots, templates or examples. Headline = the range ('Templates for *your team*'); items = captions.",
     sample: { text: "Templates for *your team*", items: ["Roadmap", "Sprint board", "Launch plan", "Weekly report", "OKRs"] },
     itemsHint: "One caption per card",
     render: carousel3D,

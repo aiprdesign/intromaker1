@@ -1284,7 +1284,7 @@ function productEnd(sc: SkillContext) {
   ctaCursor(sc, tx + button.bw * 0.1, by + 4 * u, T);
 }
 
-/* ───────────────────────── Every Angle ───────────────────────── */
+/* ───────────────────────── Angle Tour ────────────────────────── */
 
 /** The product's photos (up to 6), each with its cache key. */
 function productPhotos(sc: SkillContext) {
@@ -1299,7 +1299,7 @@ function spinTiming(d: number, n: number) {
 }
 
 /**
- * Every Angle: the product's photos take turns on the same spot of the stage, each sliding off
+ * Angle Tour: the product's photos take turns on the same spot of the stage, each sliding off
  * level to one side as the next glides in from the other, over one floor shadow, with a row of
  * dots counting the angles. A turntable feel without ever tilting the product.
  */
@@ -1682,7 +1682,7 @@ export const productSkills: Skill[] = [
     bestFor:
       "Physical products (marketplace listings, uploaded product photos). Without items: the product reveal (headline = product name, subtext = a short line). With items: 2-4 short feature callouts around the product (titles of 1-4 words).",
     sample: { text: "Meet *Aero Buds*", items: ["Noise cancelling", "USB-C charging", "Water resistant"] },
-    itemsHint: "Feature callouts around the product (1-4 words each)",
+    itemsHint: "Feature callouts around the product (1-4 words apiece)",
     render: productHero,
     sfx: (scene, beat) => {
       const T = heroTiming(scene, beat);
@@ -1703,10 +1703,10 @@ export const productSkills: Skill[] = [
   },
   {
     id: "product-spin",
-    name: "Every Angle",
-    tagline: "The product's photos take turns on the stage, each sliding off level as the next glides in, with dots counting the angles.",
-    bestFor: "Physical products with 2+ photos from different angles. Headline = a short line ('From each *angle*'); the photos come from the product images.",
-    sample: { text: "From each *angle*" },
+    name: "Angle Tour",
+    tagline: "The product's photos take turns on the stage, one sliding off level as the next glides in, with dots counting the angles.",
+    bestFor: "Physical products with 2+ photos from different angles. Headline = a short line ('From *different angles*'); the photos come from the product images.",
+    sample: { text: "From *different angles*" },
     render: productSpin,
     sfx: (scene) => {
       const n = 4;
@@ -1717,7 +1717,7 @@ export const productSkills: Skill[] = [
   {
     id: "product-zoom",
     name: "Detail Zoom",
-    tagline: "A magnifying lens glides over the product to its most detailed parts, enlarging each, with the feature it shows called out beside it.",
+    tagline: "A magnifying lens glides over the product to its most detailed parts, enlarging them one at a time, with the feature it shows called out beside it.",
     bestFor: "Physical products: the close-up moment. Headline = a short line ('The *details*'); items = up to 3 short feature titles, one per stop (optional).",
     sample: { text: "The *details*", items: ["Soft-touch finish", "Magnetic case", "Charging light"] },
     itemsHint: "One short feature per close-up (optional)",
@@ -1730,7 +1730,7 @@ export const productSkills: Skill[] = [
   {
     id: "product-teaser",
     name: "Trailer Cold Open",
-    tagline: "Hard cuts on the beat between tight close-ups of the product, one big word on each, with flashes and cinema bars, then a white flash into the reveal.",
+    tagline: "Hard cuts on the beat between tight close-ups of the product, one big word per shot, with flashes and cinema bars, then a white flash into the reveal.",
     bestFor:
       "The opening of a product trailer (trailer styles). Items = 2-3 punchy feature words, one per shot ('Noise cancelling', 'USB-C charging'); headline = a fallback line. Put the product reveal right after it.",
     sample: { text: "Introducing", items: ["Noise cancelling", "USB-C charging", "Pocket case"] },

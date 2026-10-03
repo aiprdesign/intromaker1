@@ -52,8 +52,7 @@ export default function AdminApp() {
           <Logo />
           <h1>Admin is off</h1>
           <p className="hint">
-            Set the <code>ADMIN_PASSWORD</code> environment variable on your server (for example in Railway → Variables) and redeploy. Until then nothing is logged
-            and this page stays closed.
+            Set the <code>ADMIN_PASSWORD</code> environment variable on your server (for example in Railway → Variables) and redeploy. Until then no films are logged and this page stays closed.
           </p>
           <a className="link-btn" href="/">
             ← Back to site

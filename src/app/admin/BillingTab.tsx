@@ -108,8 +108,7 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
             <code>{EVENTS.join(", ")}</code>
             <CopyButton text={EVENTS.join("\n")} label="Copy list" />
           </span>
-          Reveal the <strong>Signing secret</strong> (whsec_…) and set it as <code>STRIPE_WEBHOOK_SECRET</code> in Railway → Variables. Railway redeploys by itself. The
-          secret stays in the environment, never on this page.
+          Reveal the <strong>Signing secret</strong> (whsec_…) and set it as <code>STRIPE_WEBHOOK_SECRET</code> in Railway → Variables. Railway redeploys by itself. The secret stays in the environment, not on this page.
         </>
       ),
     },

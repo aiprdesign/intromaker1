@@ -45,8 +45,8 @@ export const MOVIE_STYLES: TrailerStyle[] = [
     mood: { palette: "crimson", font: "serif", bpm: 84, hook: [card], title: ["glitch-reveal", "cinematic-title"], body: [card, "glitch-reveal"], outro: [billing], transitions: ["cut", "glitch", "flash"] },
   },
   {
-    id: "film-thriller", name: "Thriller", movie: true, preview: "TRUST NO ONE",
-    description: "Cold steel blue, thin wide-set type, a slit of light under each card, shutters and cuts on a heartbeat tempo.",
+    id: "film-thriller", name: "Thriller", movie: true, preview: "WATCH YOUR BACK",
+    description: "Cold steel blue, thin wide-set type, a slit of light under the cards, shutters and cuts on a heartbeat tempo.",
     keys: /\b(thriller|heist|spy|espionage|detectives?|conspiracy|hostage|killer|crime|assassins?|fbi|manhunt)\b/,
     mood: { palette: "steel", font: "jost", bpm: 100, hook: [card], title: ["glitch-reveal", "cinematic-title"], body: [card, "split-wipe", "glitch-reveal", "anamorphic-flare"], outro: [billing], transitions: ["cut", "shutter", "flash"] },
   },
@@ -308,7 +308,7 @@ export const TRAILER_STYLES: TrailerStyle[] = [
   {
     id: "hype",
     name: "Hype Trailer",
-    description: "The all-rounder: hyperspace, shockwaves and glass shatter in neon cyan with condensed type, flash and whip cuts.",
+    description: "The versatile one: hyperspace, shockwaves and glass shatter in neon cyan with condensed type, flash and whip cuts.",
     mood: {
       palette: "cyber",
       font: "bebas",

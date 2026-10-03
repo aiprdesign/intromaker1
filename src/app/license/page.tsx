@@ -24,7 +24,7 @@ export default async function License() {
 
         <h2>Free: personal and non-commercial use</h2>
         <p>
-          Make as many videos as you like, with every style, skill and export size, for personal projects, study, hobbies, and charities, schools,
+          Make as many videos as you like, with the styles, skills and export sizes, for personal projects, study, hobbies, and charities, schools,
           research and public bodies. Rate limits that protect the service from abuse still apply.
         </p>
 

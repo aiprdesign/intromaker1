@@ -379,7 +379,7 @@ function Security({ mustChange, onChanged, onSignOutAll }: { mustChange: boolean
     }
   };
   const del = async () => {
-    if (!confirm("Delete your account and every saved intro? This can't be undone.")) return;
+    if (!confirm("Delete your account and your saved intros? This can't be undone.")) return;
     try {
       await api("/api/account", { method: "DELETE", body: JSON.stringify({ password: delPw }) });
       location.href = "/";
@@ -407,14 +407,14 @@ function Security({ mustChange, onChanged, onSignOutAll }: { mustChange: boolean
         {error && <p className="error">{error}</p>}
         <div className="admin-row actions">
           <button type="button" className="btn btn-ghost" onClick={onSignOutAll}>
-            Sign out everywhere
+            Sign out on your devices
           </button>
           <button className="btn btn-primary">Change password</button>
         </div>
       </form>
       <details className="account-card danger-zone">
         <summary>Delete account</summary>
-        <p className="hint">Deletes your account and all saved intros. Enter your password to confirm.</p>
+        <p className="hint">Deletes your account and your saved intros. Enter your password to confirm.</p>
         <input className="input" type="password" autoComplete="current-password" value={delPw} onChange={(e) => setDelPw(e.target.value)} placeholder="Password" />
         <button className="btn btn-ghost danger" onClick={del} disabled={!delPw}>
           Delete my account

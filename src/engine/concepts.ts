@@ -549,7 +549,7 @@ export const DEMOS: Record<string, DemoSpec> = {
   },
   fitness: {
     skill: "click-flow", title: "Your plan, *ready*", eyebrow: "In action", action: "Start workout",
-    items: ["Warm up", "Log each set", "Track your progress", "Keep the streak going"],
+    items: ["Warm up", "Log your sets", "Track your progress", "Keep the streak going"],
   },
   booking: {
     skill: "click-flow", title: "Bookings, *handled*", eyebrow: "In action", action: "Confirm",

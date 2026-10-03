@@ -386,7 +386,7 @@ export const typographySkills: Skill[] = [
     id: "kinetic-slam",
     name: "Kinetic Slam",
     tagline: "Word-by-word impact typography with camera shake and speed lines.",
-    bestFor: "Hype phrases of 2–5 words, trailers, sports, launches. Each word slams in on the beat.",
+    bestFor: "Hype phrases of 2–5 words, trailers, sports, launches. The words slam in on the beat.",
     sample: { text: "BUILT TO WIN", subtext: "Season 2026" },
     render: kineticSlam,
   },
@@ -409,7 +409,7 @@ export const typographySkills: Skill[] = [
   {
     id: "type-cascade",
     name: "Block Cascade",
-    tagline: "Colour blocks wipe through each letter in a rhythmic cascade.",
+    tagline: "Colour blocks wipe through the letters in a rhythmic cascade.",
     bestFor: "Modern brand intros, agencies, playful launches. Any short title.",
     sample: { text: "MAKE IT BOLD", subtext: "Studio reel" },
     render: typeCascade,

@@ -285,7 +285,7 @@ export default function AiSettings({
                 ? inBrowser
                   ? "Runs on your computer: this browser talks to the local model directly (IntroMaker is online)."
                   : "Runs on your computer: the local IntroMaker server calls the model on localhost."
-                : "Runs in the cloud, through the IntroMaker server (your key is never sent anywhere else)."}
+                : "Runs in the cloud, through the IntroMaker server (your key isn't sent to other services)."}
             </p>
             {detected && <p className="hint ok">Recognised a {detected} key.</p>}
             {p.note && <p className="hint">{p.note}</p>}
@@ -372,8 +372,7 @@ export default function AiSettings({
               ))}
             </div>
             <p className="hint">
-              Fast ships the first draft. Balanced fixes drafts that fail the quality checklist. Best always has the AI
-              critique and revise its storyboard (two calls, slower, noticeably better).
+              Fast ships the first draft. Balanced fixes drafts that fail the quality checklist. Best has the AI critique and revise its storyboard (two calls, slower, noticeably better).
             </p>
 
             <label className="check-row">

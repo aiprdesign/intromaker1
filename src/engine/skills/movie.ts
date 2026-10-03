@@ -253,7 +253,7 @@ export const movieSkills: Skill[] = [
     id: "intertitle",
     name: "Title Card",
     tagline: "A line of the story alone in tracked capitals, faded up from black and held over a slow push: the trailer's voice between shots.",
-    bestFor: "Movie trailers: the story beats between shots ('THIS WINTER', 'ONE LAST JOB', 'NOTHING STAYS BURIED'). 2–6 words.",
+    bestFor: "Movie trailers: the story beats between shots ('THIS WINTER', 'ONE LAST JOB', 'SECRETS SURFACE'). 2–6 words.",
     sample: { text: "This winter", subtext: "" },
     render: intertitle,
     sfx: () => [{ t: 0.1, kind: "whoosh" }],

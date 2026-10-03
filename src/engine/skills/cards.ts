@@ -342,7 +342,7 @@ export const cardSkills: Skill[] = [
   {
     id: "card-spread",
     name: "Card Spread",
-    tagline: "A stack of photo cards fans open like a hand of cards, then each card lifts out in turn with its caption.",
+    tagline: "A stack of photo cards fans open like a hand of cards, then the cards lift out in turn with their captions.",
     bestFor: "A collection or range (products, templates, destinations) with 3–6 images. Headline = the range; items = one caption per card.",
     sample: { text: "The *collection*", items: SAMPLE_ITEMS },
     itemsHint: "One caption per card",
@@ -355,7 +355,7 @@ export const cardSkills: Skill[] = [
   {
     id: "photo-drop",
     name: "Photo Drop",
-    tagline: "White-bordered prints drop onto the stage one after another, each at its own angle, captions written on the border.",
+    tagline: "White-bordered prints drop onto the stage one after another at their own angles, captions written on the border.",
     bestFor: "Moments, places or products told as photos (travel, events, food, hospitality, physical products). Items = one handwritten-style caption per print.",
     sample: { text: "Moments worth *keeping*", items: SAMPLE_ITEMS },
     itemsHint: "One caption per print",

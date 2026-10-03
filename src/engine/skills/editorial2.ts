@@ -1049,7 +1049,7 @@ export const editorialMoreSkills: Skill[] = [
   {
     id: "poster-grid",
     name: "Grid Poster",
-    tagline: "A Bauhaus module grid draws on beside the stacked headline; each square fills with a shape on the beat, then the quarter circles turn.",
+    tagline: "A Bauhaus module grid draws on beside the stacked headline; the squares fill with shapes on the beat, then the quarter circles turn.",
     bestFor: "A bold statement as a geometric poster (3–8 words). Items = up to 4 short features listed under it.",
     sample: { text: "Form follows *function*", subtext: "", items: ["Plan", "Build", "Ship"] },
     itemsHint: "Up to 4 short features for the list",
@@ -1091,8 +1091,8 @@ export const editorialMoreSkills: Skill[] = [
   {
     id: "contact-sheet",
     name: "Contact Sheet",
-    tagline: "Every feature as a framed card on one sheet, outlines first; a focus frame then moves card to card on the beat, lifting each in turn.",
-    bestFor: "Showing 3–6 features (or product shots) at once, then each in turn (items as 'Title — one line').",
+    tagline: "The features as framed cards on one sheet, outlines first; a focus frame then moves card to card on the beat, lifting them in turn.",
+    bestFor: "Showing 3–6 features (or product shots) at once, then one at a time (items as 'Title — one line').",
     sample: { text: "The whole *picture*", items: [...REEL_FALLBACK, "Share — One link for your team", "Grow — Built to scale with you"] },
     itemsHint: "Feature title — one line, per card",
     render: contactSheet,
@@ -1104,8 +1104,8 @@ export const editorialMoreSkills: Skill[] = [
   {
     id: "spec-sheet",
     name: "Spec Sheet",
-    tagline: "A ruled spec sheet: the rules draw on, each feature lands on its row with its detail and a tick, and a highlight walks the rows.",
-    bestFor: "Listing 3–5 features with a one-line detail each (items as 'Title — detail'). Calm and precise.",
+    tagline: "A ruled spec sheet: the rules draw on, the features land on their rows with a detail and a tick, and a highlight walks the rows.",
+    bestFor: "Listing 3–5 features with a one-line detail apiece (items as 'Title — detail'). Calm and precise.",
     sample: { text: "What's *included*", items: SPEC_FALLBACK },
     itemsHint: "Feature title — detail, per row",
     render: specSheet,
@@ -1146,7 +1146,7 @@ export const editorialMoreSkills: Skill[] = [
   {
     id: "type-slots",
     name: "Type Slots",
-    tagline: "Each word of the line spins on its own slot reel through the film's other words and locks into place, left to right.",
+    tagline: "The words of the line spin on their own slot reels through the film's other words and lock into place, left to right.",
     bestFor: "A line of 2–6 words with energy; the features (items) are the words the reels spin through.",
     sample: { text: "Plan, build and *ship*", items: ["Design", "Review", "Launch", "Grow"] },
     itemsHint: "Short features the reels spin through",

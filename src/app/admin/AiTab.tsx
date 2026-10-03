@@ -96,7 +96,7 @@ export default function AiTab() {
       </div>
       <p className="hint">
         The AI the server&apos;s director uses when a visitor hasn&apos;t added a key of their own (their own keys stay in their browser). The key is stored on the
-        server&apos;s data volume, readable only by the app, and is never sent back to the browser.
+        server&apos;s data volume, readable only by the app, and isn&apos;t sent back to the browser.
         {s.envKey && " ANTHROPIC_API_KEY is also set in the environment; it's used when no provider is chosen here."}
       </p>
       <label className="fld">
@@ -166,7 +166,7 @@ export default function AiTab() {
               ))}
             </div>
             <span className="hint sm">
-              {form.mode === "fast" ? "One pass, cheapest." : form.mode === "balanced" ? "The director reviews its own draft when it looks weak." : "Always a self-review pass: slower, best films."}
+              {form.mode === "fast" ? "One pass, cheapest." : form.mode === "balanced" ? "The director reviews its own draft when it looks weak." : "Self-review pass on: slower, more polished films."}
             </span>
           </div>
           {preset.vision && (
@@ -179,7 +179,7 @@ export default function AiTab() {
       )}
       <div className="admin-row">
         <label className="fld">
-          <span className="fld-cap">AI films per day (everyone)</span>
+          <span className="fld-cap">AI films per day (site-wide)</span>
           <input className="input" type="number" min={0} value={form.dailyBudget} placeholder={`${s.envBudget} (default)`} onChange={(e) => set({ dailyBudget: e.target.value })} />
         </label>
         <label className="fld">

@@ -3,7 +3,7 @@
  * (the FTC's standard; the FDA's for anything health-related). The words on screen and in the
  * voice-over stay generic and descriptive:
  * - no superlatives ("the best", "#1", "world's fastest"), absolutes or guarantees ("100%",
- *   "guaranteed", "never miss", "forever", "always"), totality words ("all", "every",
+ *   "guaranteed", "never", "forever", "always"), totality words ("all", "each", "every",
  *   "everything", "everyone", "anywhere", "unlimited", "all-in-one"), speed or multiplier claims ("in seconds", "10x faster") and no
  *   social-proof numbers ("trusted by 12,000+ teams");
  * - no efficacy or outcome promises ("stops every threat", "boost your revenue", "clinically
@@ -76,17 +76,37 @@ const RULES: Rule[] = [
   [/\b(?:unlimited|limitless|infinite)\s+/gi, ""],
   [/\bthe\s+only\s+(?=[a-z*])/gi, "a "],
   [/\b(?:total|complete)\s+(?=(?:\*)?(?:control|visibility|security|privacy|peace of mind|solution|platform|toolkit|suite|package)\b)/gi, ""],
-  [/\beach\s+and\s+every\b/gi, "each"],
+  [/\beach\s+and\s+every\b/gi, "every"],
   [/\bfor\s+(\*?)every\s*day\b/gi, "for $1daily use"],
   [/\bevery\s*day\b/gi, "daily"],
   [/\bevery\s+(\*?)detail(s?)\b/gi, "the $1details"],
-  [/\bevery\s+(\*?)(angle|step|shot|scene|time|moment)\b/gi, "each $1$2"],
+  [/\bevery\s+step\s+of\s+the\s+way\b/gi, "along the way"],
+  [/\bevery\s+(\*?)step\b/gi, "$1step by step"],
+  [/\bevery\s+(\*?)time\b/gi, "$1time after time"],
+  [/\bevery\s+(\*?)angle\b/gi, "$1different angles"],
+  [/\bevery\s+(\*?)(shot|scene|moment)\b/gi, (_m, star: string, w: string) => `the ${star}${plural(w)}`],
   [/\bevery\s+(\*?)([a-z]+)\b/gi, (_m, star: string, w: string) => `your ${star}${plural(w)}`],
+  // "Each" reads as a totality too: "Each cup made by hand" → "The cups made by hand".
+  [/\beach\s+other\b/gi, "one another"],
+  [/\beach\s+of\s+((?:\*)?(?:the|your|our|its|their|these|those)\s+\*?[a-z]+\*?)\s+(is|has|was)\b/gi, (_m, what: string, v: string) => `${what} ${{ is: "are", has: "have", was: "were" }[v.toLowerCase()]}`],
+  [/\beach\s+of\s+(?=(?:\*)?(?:the|your|our|its|their|these|those)\b)/gi, ""],
+  [/\beach\s+one\s+/gi, ""],
+  [/\beach\s+(\*?)([a-z]+)\b/gi, (_m, star: string, w: string) => `the ${star}${plural(w)}`],
+  [/\s*\beach\b/gi, ""],
+  // "Never …" as a promise: "Never settle" → "Don't settle".
+  [/\bnever\s+(?=(?:\*)?[a-z])/gi, "don't "],
   [/\bany\s+(\*?)(device|tool|app|platform|browser|screen|stack|workflow|format|channel|language)\b/gi, (_m, star: string, w: string) => `your ${star}${plural(w)}`],
   [/\bof\s+(?:all|any)\s+sizes?\b/gi, "of different sizes"],
   [/\ball\s+of\s+(?=your|the|our|my)\b/gi, ""],
   [/\ball\s+(?=(?:\*)?(?:your|the|our|my|these|those)\b)/gi, ""],
-  [/\ball\s+(?!(?:night|set|good|right|along|around|over|about|but|at once|of a sudden|ears)\b)(?=(?:\*)?[a-z])/gi, ""],
+  [/\ball\s+night(?:\s+long)?\b/gi, "through the night"],
+  [/\ball\s+set\b/gi, "ready"],
+  [/\ball\s+(good|right|along|around|about|at once)\b/gi, "$1"],
+  [/\ball\s+over\b/gi, "across"],
+  [/\ball\s+of\s+a\s+sudden\b/gi, "suddenly"],
+  [/\ball\s+ears\b/gi, "listening"],
+  [/\ball\s+but\b/gi, "nearly"],
+  [/\ball\s+(?=(?:\*)?[a-z])/gi, ""],
   [/\bno more\b/gi, "less time on"],
   [/\s+again\b(?=[.!?]?$)/gi, ""],
   // Efficacy: "Sentinel stops cyber threats" → "Sentinel helps you monitor cyber threats".

@@ -993,7 +993,7 @@ export const fastTypeSkills: Skill[] = [
   {
     id: "rapid-fire",
     name: "Rapid Fire",
-    tagline: "The features flash one per half-beat, each in a new treatment (solid, outline, boxed, italic), then the line punches in.",
+    tagline: "The features flash one per half-beat in changing treatments (solid, outline, boxed, italic), then the line punches in.",
     bestFor: "A high-energy positioning moment: 3–6 one- or two-word features (items) fired off before the headline (2–6 words) lands.",
     sample: { text: "Ship it *faster*", items: ["Plan", "Build", "Test", "Launch"] },
     itemsHint: "3–6 one- or two-word features",
@@ -1023,7 +1023,7 @@ export const fastTypeSkills: Skill[] = [
   {
     id: "slice-switch",
     name: "Slice Switch",
-    tagline: "Each word is cut into strips that shear out sideways as the next word shears in, with a brand-coloured cut along every seam.",
+    tagline: "A word is cut into strips that shear out sideways as the next word shears in, with a brand-coloured cut along the seams.",
     bestFor: "Switching quickly between 3–5 short features (items) before the headline lands. Bold, editorial energy.",
     sample: { text: "Work at *full speed*", items: ["Plan", "Track", "Review", "Ship"] },
     itemsHint: "3–5 short features",
@@ -1033,7 +1033,7 @@ export const fastTypeSkills: Skill[] = [
   {
     id: "style-shuffle",
     name: "Style Shuffle",
-    tagline: "The accent word jumps between typefaces and treatments every half-beat, then locks into the film's own face inside snapping brackets.",
+    tagline: "The accent word jumps between typefaces and treatments on the half-beat, then locks into the film's own face inside snapping brackets.",
     bestFor: "A short line with one key word (*accent*) that deserves a moment: 'Made to *stand out*'. No items needed.",
     sample: { text: "Made to *stand out*" },
     render: styleShuffle,

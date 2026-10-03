@@ -26,14 +26,13 @@ export default function Privacy() {
 
         <h2>Your videos</h2>
         <p>
-          Videos are rendered on your own computer and never uploaded. Your work in progress is saved in your browser so a reload doesn&apos;t lose it. A share
+          Videos are rendered on your own computer and not uploaded. Your work in progress is saved in your browser so a reload doesn&apos;t lose it. A share
           link carries the storyboard after the <code>#</code> in the address, which browsers don&apos;t send to the server.
         </p>
         {logging ? (
           <p>
-            <strong>This site keeps a log of the films made on it</strong>, which its owner can review: the prompt or website address, the storyboard (the
-            text on each slide and the styles used) and when it was made, for each new film, remake and export. You appear in it only as an anonymous code
-            (a salted hash of your address), never by your address itself. The video file is not included. Don&apos;t put anything private in a prompt.
+            <strong>This site keeps a log of the films made on it</strong>, which its owner can review: the prompt or website address, the storyboard (the text on the slides and the styles used) and when it was made, for new films, remakes and exports. You appear in it only as an anonymous code
+            (a salted hash of your address), not by your address itself. The video file is not included. Don&apos;t put anything private in a prompt.
           </p>
         ) : (
           <p>This site doesn&apos;t keep a log of the films made on it: storyboards and edits stay in your browser.</p>
@@ -41,13 +40,12 @@ export default function Privacy() {
 
         <h2>Accounts</h2>
         <p>
-          An account is optional. If you create one, the server keeps your email address, your password as a salted scrypt hash (never the password itself),
+          An account is optional. If you create one, the server keeps your email address, your password as a salted scrypt hash (not the password itself),
           your plan, how many AI films and website imports you&apos;ve used this month and today, and the intros you save (their storyboards and a small
-          thumbnail). Signing in sets one cookie, which keeps you signed in for 30 days; there are no tracking cookies. You can delete your account and every
-          saved intro at any time from your account page.
+          thumbnail). Signing in sets one cookie, which keeps you signed in for 30 days; there are no tracking cookies. You can delete your account and your saved intros at any time from your account page.
         </p>
         <p>
-          If you pay for Pro, payment happens on Stripe&apos;s own pages: your card details go to Stripe, never to this server. Stripe tells the server that you
+          If you pay for Pro, payment happens on Stripe&apos;s own pages: your card details go to Stripe, not to this server. Stripe tells the server that you
           paid, and the server keeps your Stripe customer and subscription ids and the subscription&apos;s status, so your plan follows your subscription.
           Stripe&apos;s own privacy policy covers what it keeps.
         </p>
@@ -56,7 +54,7 @@ export default function Privacy() {
         <p>
           The server opens the public page you enter in a headless browser, reads its text and takes screenshots of it, its UI components and its logo.{" "}
           {CAPTURE_STORAGE === "browser"
-            ? "The screenshots are never written to the server's disk: it holds them in memory only while your film is being made (up to 30 minutes), and your browser keeps its own copy."
+            ? "The screenshots aren't written to the server's disk: it holds them in memory only while your film is being made (up to 30 minutes), and your browser keeps its own copy."
             : "The screenshots are stored on the server so the studio, share links and saved intros can show them, and are deleted automatically after 7 days. Your browser also keeps its own copy."}{" "}
           The site&apos;s own images and videos are passed through to your browser and not stored. Only public addresses can be imported: private and internal
           networks are refused. Please import only sites you have the right to use.
@@ -75,26 +73,25 @@ export default function Privacy() {
 
         <h2>API keys</h2>
         <p>
-          Keys you enter (AI providers, cloud voices) are saved in your browser&apos;s local storage, not on the server. They are sent with each request that
-          needs them, passed straight to that provider, and never stored or written to logs (error messages have keys removed). Use a key with a spending limit,
+          Keys you enter (AI providers, cloud voices) are saved in your browser&apos;s local storage, not on the server. They are sent with the requests that need them, passed straight to that provider, and not stored or written to logs (error messages have keys removed). Use a key with a spending limit,
           and remove it any time from the AI settings. The demo&apos;s own AI key, when one is set, has a daily budget; after it, the built-in director is used.
         </p>
 
         <h2>AI and voice providers</h2>
         <p>
           When you choose an AI director or a cloud voice, your prompt, the imported site&apos;s text and screenshots (for AI) or the narration text (for voice)
-          go to that provider under its own terms. The built-in director and the free on-device voice send nothing anywhere; the voice model is downloaded
+          go to that provider under its own terms. The built-in director and the free on-device voice don&apos;t send your data out; the voice model is downloaded
           once from public CDNs (jsDelivr, Hugging Face).
         </p>
 
         <h2>What the server keeps</h2>
         <ul>
           {CAPTURE_STORAGE === "browser" ? (
-            <li>Screenshots of imported sites, in memory only, for up to 30 minutes; never on disk.</li>
+            <li>Screenshots of imported sites, in memory only, for up to 30 minutes; not on disk.</li>
           ) : (
             <li>Screenshots of imported sites, for 7 days.</li>
           )}
-          <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits. It is never written to disk.</li>
+          <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits. It isn&apos;t written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>
           {logging && <li>The film log described above, up to the most recent few thousand films, until the owner deletes it.</li>}
           <li>If you have an account: your email, password hash, plan, usage counts and saved intros, until you delete the account.</li>
@@ -102,7 +99,7 @@ export default function Privacy() {
 
         <h2>Claims in generated copy</h2>
         <p>
-          By default the copy is screened to stay generic, and health or medical claims are always removed. This is automated screening, not legal advice:
+          By default the copy is screened to stay generic, and health or medical claims are removed. This is automated screening, not legal advice:
           review your video before publishing it.
         </p>
 

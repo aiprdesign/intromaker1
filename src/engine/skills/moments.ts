@@ -1422,8 +1422,8 @@ export const momentSkills: Skill[] = [
   {
     id: "globe",
     name: "Dot Globe",
-    tagline: "A dotted world turns while arcs fly between cities, each landing with a ping and a live event card (Stripe / Vercel style).",
-    bestFor: "Products used across locations: payments, commerce, hosting, messaging, security. Only when the site talks about global / international use. Headline = the site's own words about it, or neutral ('Built for *distributed* teams'; never 'everywhere' or coverage numbers); items = 3–4 generic live events ('Payment received', 'New order').",
+    tagline: "A dotted world turns while arcs fly between cities, landing with a ping and a live event card (Stripe / Vercel style).",
+    bestFor: "Products used across locations: payments, commerce, hosting, messaging, security. Only when the site talks about global / international use. Headline = the site's own words about it, or neutral ('Built for *distributed* teams'; no coverage words or numbers); items = 3–4 generic live events ('Payment received', 'New order').",
     sample: { text: "Your business, *across borders*", items: ["Payment received", "New order", "Invoice paid", "New signup"] },
     itemsHint: "3–4 live events",
     render: globe,

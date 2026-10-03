@@ -457,8 +457,8 @@ export const mediaSkills: Skill[] = [
     id: "screen-wall",
     name: "Screen Wall",
     tagline: "An endless 3D wall of your site's images scrolls behind a bold headline.",
-    bestFor: "Breadth moments: integrations, templates, 'all in one place'. Needs several images.",
-    sample: { text: "ALL IN ONE PLACE", subtext: "See it in action" },
+    bestFor: "Breadth moments: integrations, templates, 'one place for your work'. Needs several images.",
+    sample: { text: "ONE PLACE FOR IT", subtext: "See it in action" },
     render: screenWall,
   },
 ];

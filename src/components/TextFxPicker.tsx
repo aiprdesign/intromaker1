@@ -41,7 +41,7 @@ export default function TextFxPicker({
     <div className="fx-grid" role="listbox" aria-label="Text effect">
       <button role="option" aria-selected={value === null} className={`fx-card default ${value === null ? "active" : ""}`} onClick={() => onChange(null)}>
         <span className="fx-name">Template default</span>
-        <span className="fx-note">Each style&apos;s own effect</span>
+        <span className="fx-note">The style&apos;s own effect</span>
       </button>
       {TEXT_FX_OPTIONS.map((o) => (
         <button key={o.id} role="option" aria-selected={value === o.id} className={`fx-card ${value === o.id ? "active" : ""}`} onClick={() => onChange(o.id)} title={o.note}>

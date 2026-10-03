@@ -118,6 +118,7 @@ OFFERS (required): say "free" (free trial, start free) only when the website its
 /** Added to the system prompt when claim-safe copy is on (the default). */
 const CLAIM_RULES = `CLAIM-SAFE COPY (required — overrides the rules above): every on-screen line and narrator line is generic and descriptive: what the product is and what it does, in plain words.
 - No superlatives or rankings: best, #1, leading, top, world's first, fastest, most powerful, award-winning, ultimate.
+- No absolute or totality words on screen or in the narration: all, each, every, everything, everyone, always, never, forever. Say "your projects", not "all your projects"; "the cups", not "each cup".
 - No absolutes or guarantees: 100%, guaranteed, never, always, everything, zero downtime, risk-free.
 - No speed or multiplier claims: in seconds, in minutes, instantly, 10x faster, 50% more.
 - No comparatives without a comparison: faster, better, smarter, easier.

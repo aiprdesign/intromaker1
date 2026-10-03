@@ -776,7 +776,7 @@ export const slideSkills: Skill[] = [
     id: "feature-slides",
     name: "Feature Slides",
     tagline: "One full slide per feature (number, icon, title, benefit and the product's own UI) with story-style progress bars.",
-    bestFor: "Long films with 2–4 real features that each have a one-line benefit, and product screenshots or captured UI to show. Headline = a short chapter label ('Inside *Orbit*'); items = 'Title — one-line benefit'.",
+    bestFor: "Long films with 2–4 real features that have one-line benefits, and product screenshots or captured UI to show. Headline = a short chapter label ('Inside *Orbit*'); items = 'Title — one-line benefit'.",
     sample: { text: "Inside *the product*", items: ["Real-time dashboards — See signups, events and conversions as they happen", "Automations — Hand off the busywork and keep things moving", "Team spaces — Plan, share and ship together in one place"] },
     itemsHint: "2–4 'Title — benefit'",
     render: featureSlides,
@@ -785,7 +785,7 @@ export const slideSkills: Skill[] = [
   {
     id: "problem-solution",
     name: "Problem → Solution",
-    tagline: "Each problem from the site is struck through, and an arrow draws to the feature that solves it.",
+    tagline: "The site's problems are struck through one by one, and an arrow draws to the feature that answers them.",
     bestFor: "When the site names 2–4 pains and features that answer them. items = 'Problem → Solution' pairs (the site's own pains and feature titles); headline neutral ('From problem to *solution*'; not comparative claims like 'a better way').",
     sample: { text: "From problem to *solution*", items: ["Scattered spreadsheets → One shared workspace", "Endless status meetings → Live progress for your team", "Copy-pasting between tools → Your tools, connected"] },
     itemsHint: "2–4 'Problem → Solution'",

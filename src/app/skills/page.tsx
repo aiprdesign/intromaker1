@@ -11,7 +11,7 @@ export default function SkillsPage() {
         <div className="section-head">
           <span className="eyebrow">Skill showcase</span>
           <h2>Effects and palettes, side by side.</h2>
-          <p>Switch palettes to see each skill re-skin instantly. Pick one to start a project with it.</p>
+          <p>Switch palettes to see the skills re-skin instantly. Pick one to start a project with it.</p>
         </div>
         <SkillGrid pickers />
       </section>

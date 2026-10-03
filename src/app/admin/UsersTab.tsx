@@ -70,13 +70,13 @@ export default function UsersTab({ onCounts }: { onCounts: (requests: number) =>
     void load();
   };
   const reset = async (u: AdminUser) => {
-    if (!(await confirm({ title: `Reset the password of ${u.email}?`, body: "They're signed out everywhere and must choose a new password after signing in with the one-time password.", confirm: "Reset password" }))) return;
+    if (!(await confirm({ title: `Reset the password of ${u.email}?`, body: "They're signed out of their sessions and must choose a new password after signing in with the one-time password.", confirm: "Reset password" }))) return;
     const r = await api<{ tempPassword: string }>(`/api/admin/users/${u.id}`, { method: "POST" });
     setTemp({ email: u.email, pw: r.tempPassword });
     void load();
   };
   const toggle = async (u: AdminUser) => {
-    if (!u.disabled && !(await confirm({ title: `Disable ${u.email}?`, body: "They're signed out and can't sign in until you enable the account again. Nothing is deleted.", confirm: "Disable", danger: true }))) return;
+    if (!u.disabled && !(await confirm({ title: `Disable ${u.email}?`, body: "They're signed out and can't sign in until you enable the account again. Their data is kept.", confirm: "Disable", danger: true }))) return;
     await api(`/api/admin/users/${u.id}`, { method: "PATCH", body: JSON.stringify({ disabled: !u.disabled }) });
     notify(u.disabled ? `${u.email} enabled` : `${u.email} disabled`);
     void load();
@@ -135,7 +135,7 @@ export default function UsersTab({ onCounts }: { onCounts: (requests: number) =>
         <div className="seg-control nowrap" role="radiogroup" aria-label="Show">
           {(
             [
-              ["", `All · ${data.counts.total}`],
+              ["", `Accounts · ${data.counts.total}`],
               ["requests", `Requests · ${data.counts.requests}`],
               ["pro", `Pro · ${data.counts.pro}`],
               ["stripe", "Stripe"],
