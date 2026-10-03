@@ -2232,6 +2232,21 @@ function sanitizeVoice(v: unknown): VideoPlan["voiceover"] {
 }
 
 /** Clamp and repair a plan from any source (AI, URL, user edits). */
+/** Detail Zoom's lens settings, kept to sane ranges (stops on the product, size 0.6–1.6×, zoom 1.5–4.5×). */
+function sanitizeZoom(z: unknown): Scene["zoom"] {
+  if (!z || typeof z !== "object") return undefined;
+  const o = z as Record<string, unknown>;
+  const num = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : undefined);
+  const points = Array.isArray(o.points)
+    ? o.points
+        .filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && p.every((v) => typeof v === "number" && Number.isFinite(v)))
+        .slice(0, 4)
+        .map(([x, y]) => [Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))] as [number, number])
+    : undefined;
+  const out = { points: points?.length ? points : undefined, size: num(o.size, 0.6, 1.6), power: num(o.power, 1.5, 4.5) };
+  return out.points || out.size !== undefined || out.power !== undefined ? out : undefined;
+}
+
 export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>[] }): VideoPlan {
   const scenes: Scene[] = (raw.scenes ?? [])
     .slice(0, 16)
@@ -2251,6 +2266,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
         : undefined,
       vo: typeof s.vo === "string" && s.vo.trim() ? s.vo.trim().slice(0, 240) : undefined,
       why: typeof s.why === "string" && s.why.trim() ? s.why.trim().slice(0, 160) : undefined,
+      zoom: sanitizeZoom(s.zoom),
     }));
   if (!scenes.length) scenes.push({ skill: "particle-assemble", text: "HELLO", duration: 3, transition: "cut" });
   return {

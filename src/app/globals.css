@@ -4095,3 +4095,11 @@ code.secret {
   font-weight: 700;
   color: #ff8a98;
 }
+
+/* Detail Zoom's lens editor */
+.zoom-editor .zoom-canvas { display: block; border-radius: 10px; background: repeating-conic-gradient(rgba(255,255,255,0.06) 0 25%, transparent 0 50%) 0 0 / 16px 16px; cursor: grab; touch-action: none; max-width: 100%; }
+.zoom-editor .zoom-canvas:active { cursor: grabbing; }
+.zoom-editor .zoom-hint { margin: 6px 0 0; font-size: 12px; opacity: 0.7; }
+.zoom-editor .zoom-sliders { display: grid; gap: 6px; margin-top: 8px; }
+.zoom-editor .zoom-sliders label { display: grid; grid-template-columns: 70px 1fr 44px; align-items: center; gap: 8px; font-size: 12px; }
+.zoom-editor .zoom-sliders output { text-align: right; font-variant-numeric: tabular-nums; opacity: 0.8; }

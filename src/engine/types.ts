@@ -278,6 +278,12 @@ export interface Scene {
   vo?: string;
   /** Why the director chose this beat for this product (shown on the story-arc chip). */
   why?: string;
+  /**
+   * Detail Zoom's lens, as set in the studio: where each stop looks (0–1 across the product
+   * cut-out, in visiting order), the lens size (× the default) and the zoom strength (×).
+   * Anything left out stays automatic.
+   */
+  zoom?: { points?: [number, number][]; size?: number; power?: number };
 }
 
 export type VoiceSource = "local" | "openai" | "elevenlabs" | "custom" | "upload";

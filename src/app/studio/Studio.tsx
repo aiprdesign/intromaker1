@@ -36,6 +36,7 @@ import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, safePlan,
 import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import SlideMedia from "@/components/SlideMedia";
+import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
 import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
@@ -1242,6 +1243,7 @@ export default function Studio() {
             waiting={needsPicture(s, plan)}
           />
         )}
+        {s.skill === "product-zoom" && <ZoomLensEditor scene={s} brand={plan.brand} onChange={(z) => updateScene(i, { zoom: z })} />}
         {narrating && (
           <div className="vo-line">
             <label className="fld">

@@ -918,6 +918,31 @@ function detailPoints(src: HTMLCanvasElement, key: string, want = 3): [number, n
   return out;
 }
 
+/**
+ * The lens's stops: the ones set in the studio (in their order), topped up with the automatic
+ * ones (the product's most detailed parts) so there are always three.
+ */
+function lensStops(scene: Scene, src: HTMLCanvasElement, key: string): [number, number][] {
+  const auto = detailPoints(src, key, 3);
+  const own = scene.zoom?.points ?? [];
+  if (!own.length) return auto;
+  const out = own.slice(0, 3).map(([x, y]) => [clamp(x, 0, 1), clamp(y, 0, 1)] as [number, number]);
+  for (const p of auto) if (out.length < 3 && out.every(([x, y]) => Math.hypot(x - p[0], y - p[1]) > 0.15)) out.push(p);
+  return out;
+}
+
+/**
+ * For the studio's lens editor: the product cut-out the lens magnifies and the stops it visits
+ * (null until the photo has loaded).
+ */
+export function zoomLensSource(scene: Scene, brand: SkillContext["brand"]) {
+  const pi = productImage({ scene, brand } as SkillContext);
+  if (!pi) return null;
+  const cut = productCutout(pi.img, pi.key);
+  if (!cut) return null;
+  return { canvas: cut.canvas, auto: detailPoints(cut.canvas, pi.key, 3), stops: lensStops(scene, cut.canvas, pi.key) };
+}
+
 function zoomTiming(d: number, n: number) {
   const first = 0.9;
   const each = (d - first - 0.5) / Math.max(1, n);
@@ -939,7 +964,7 @@ function productZoom(sc: SkillContext) {
   const rect = drawProduct(sc, box.cx, box.cy, box.w, box.h, k, clamp(t / 0.25) * (1 - ex));
   if (!rect) return;
   const pi = productImage(sc);
-  const pts = detailPoints(rect.src, pi?.key ?? "product", 3);
+  const pts = lensStops(scene, rect.src, pi?.key ?? "product");
   const labels = calloutItems(scene);
   const T = zoomTiming(d, pts.length);
   if (t < T.first - T.move) return;
@@ -951,10 +976,13 @@ function productZoom(sc: SkillContext) {
   const to = pts[idx];
   const fx = from[0] + (to[0] - from[0]) * mv;
   const fy = from[1] + (to[1] - from[1]) * mv;
-  const lx = rect.x + fx * rect.w;
-  const ly = rect.y + fy * rect.h;
-  const R = Math.min(w, h) * (portrait ? 0.17 : 0.14);
-  const zoom = 2.7;
+  // Lens size and zoom strength as set in the studio (× the defaults).
+  const R = Math.min(w, h) * (portrait ? 0.17 : 0.14) * clamp(scene.zoom?.size ?? 1, 0.6, 1.6);
+  // The lens sits over the spot it magnifies, kept inside the frame and below the headline (it
+  // still shows exactly that spot, wherever it has to sit).
+  const lx = clamp(rect.x + fx * rect.w, w * 0.05 + R, w * 0.95 - R);
+  const ly = clamp(rect.y + fy * rect.h, h * (portrait ? 0.2 : 0.17) + R, h * 0.93 - R);
+  const zoom = clamp(scene.zoom?.power ?? 2.7, 1.5, 4.5);
   const appear = idx === 0 ? mv : 1;
   ctx.save();
   ctx.globalAlpha = appear * (1 - ex);

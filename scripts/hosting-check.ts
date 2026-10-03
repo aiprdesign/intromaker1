@@ -102,7 +102,7 @@ async function main() {
   check((await filmsRoute.GET(areq("/api/admin/films", { cookie }))).status === 200, "the session opens the admin API");
   check((await filmsRoute.DELETE(areq("/api/admin/films", { method: "DELETE", cookie, origin: "https://evil.example", body: JSON.stringify({ all: true }) }))).status === 403, "a cross-site write with the cookie is refused");
   const token = cookie.split("=")[1];
-  const tampered = token.slice(0, -2) + (token.endsWith("A") ? "B" : "A") + token.slice(-1);
+  const tampered = token.slice(0, -2) + (token.at(-2) === "A" ? "B" : "A") + token.slice(-1);
   check(!admin.validSession(tampered), "a tampered session is rejected");
   check(!admin.validSession(token, Date.now() + 13 * 3_600_000), "sessions expire after 12 hours");
 
@@ -194,7 +194,7 @@ async function main() {
   check((await acc.limitsFor(proUser)).aiPerMonth === 100 && (await acc.spendAi(proUser)) && acc.usageOf((await acc.getUser(anaId))!).ai === 1, "Pro's AI allowance is counted per month");
 
   // Sessions end on a password change, and tampering is rejected.
-  const tamperedU = ucookie.slice(0, -2) + (ucookie.endsWith("A") ? "B" : "A") + ucookie.slice(-1);
+  const tamperedU = ucookie.slice(0, -2) + (ucookie.at(-2) === "A" ? "B" : "A") + ucookie.slice(-1);
   check(!(await acc.currentUser(ureq("/", { cookie: tamperedU }))), "a tampered account session is rejected");
   const changed = await accPassword.POST(ureq("/api/account/password", { method: "POST", cookie: ucookie, body: JSON.stringify({ current: "pass-word-1", next: "new-pass-word" }) }));
   check(changed.status === 200 && !(await acc.currentUser(ureq("/", { cookie: ucookie }))), "changing the password signs out the old sessions");
