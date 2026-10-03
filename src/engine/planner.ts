@@ -1,6 +1,7 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
+import { hasSpecificIcon } from "./icons";
 import { writeVoiceover } from "./script";
 import { isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
@@ -181,16 +182,16 @@ const OUTRO_SUBS = ["Coming soon", "Available now", "Join the movement", "Start 
 const GENRE_LINES: Record<string, { hooks: string[]; beats: string[]; outro: string[] }> = {
   cyber: { hooks: ["SYSTEM ONLINE", "ACCESS GRANTED", "THE CODE HAS CHANGED"], beats: ["ENTER THE GRID", "NO LIMITS", "UPLOAD COMPLETE", "BREAK THE SYSTEM"], outro: ["Access now", "Coming soon", "Join the network"] },
   tech: { hooks: ["THE FUTURE IS HERE", "INTRODUCING", "A NEW ERA BEGINS"], beats: ["BUILT FOR WHAT'S NEXT", "THINK BIGGER", "SEE WHAT'S POSSIBLE", "SMARTER BY DESIGN"], outro: ["Coming soon", "Available now", "Start today"] },
-  action: { hooks: ["NO TURNING BACK", "BRACE YOURSELF", "IT BEGINS NOW"], beats: ["NO LIMITS", "NO FEAR", "HOLD ON", "ALL OR NOTHING"], outro: ["Coming soon", "Out now"] },
+  action: { hooks: ["NO TURNING BACK", "BRACE YOURSELF", "IT BEGINS NOW"], beats: ["NO LIMITS", "NO FEAR", "HOLD ON", "NO HOLDING BACK"], outro: ["Coming soon", "Out now"] },
   space: { hooks: ["THE JOURNEY BEGINS", "LOOK UP", "BEYOND THE STARS"], beats: ["INTO THE UNKNOWN", "FURTHER THAN EVER", "ONE SMALL STEP", "BEYOND THE EDGE"], outro: ["Coming soon", "Premieres soon"] },
   luxury: { hooks: ["TIMELESS", "CRAFTED WITH CARE", "BEAUTY IN DETAIL"], beats: ["EVERY DETAIL", "PURE ELEGANCE", "TIME, REFINED", "QUIET CONFIDENCE"], outro: ["Discover the collection", "Available now", "Experience it"] },
-  retro: { hooks: ["PRESS PLAY", "TONIGHT", "TURN IT UP"], beats: ["ALL NIGHT LONG", "FEEL THE BEAT", "NEON DREAMS", "BACK IN TIME"], outro: ["Get your tickets", "Coming soon", "See you there"] },
-  music: { hooks: ["TURN IT UP", "PRESS PLAY", "FEEL IT"], beats: ["LIVE", "LOUDER", "ALL NIGHT", "ONE MORE SONG"], outro: ["Listen now", "Out now", "Get your tickets"] },
+  retro: { hooks: ["PRESS PLAY", "TONIGHT", "TURN IT UP"], beats: ["UNTIL SUNRISE", "FEEL THE BEAT", "NEON DREAMS", "BACK IN TIME"], outro: ["Get your tickets", "Coming soon", "See you there"] },
+  music: { hooks: ["TURN IT UP", "PRESS PLAY", "FEEL IT"], beats: ["LIVE", "LOUDER", "TILL LATE", "ONE MORE SONG"], outro: ["Listen now", "Out now", "Get your tickets"] },
   gaming: { hooks: ["GAME ON", "PRESS START", "LET THE GAMES BEGIN"], beats: ["NO MERCY", "LEVEL UP", "LOCK AND LOAD", "ONE MORE ROUND"], outro: ["Subscribe now", "Play now", "Join the squad"] },
   nature: { hooks: ["LISTEN CLOSELY", "WILD AT HEART", "WHERE IT BEGINS"], beats: ["UNTAMED", "BREATHE IN", "FIND YOUR PATH", "STILL WATERS"], outro: ["Coming soon", "Explore now"] },
   fun: { hooks: ["GUESS WHAT", "HERE WE GO", "GET READY"], beats: ["LET'S GO", "SAY HELLO", "MORE FUN", "JUST FOR YOU"], outro: ["Download now", "Join the fun", "Available now"] },
   editorial: { hooks: ["CHAPTER ONE", "IN FOCUS", "A STORY"], beats: ["LOOK CLOSER", "THE DETAILS", "BEHIND THE SCENES", "IN THEIR WORDS"], outro: ["Coming soon", "Read the story"] },
-  hype: { hooks: ["ARE YOU READY", "IT'S HERE", "THE WAIT IS OVER"], beats: ["NO LIMITS", "LET'S GO", "ALL IN", "TURN IT UP"], outro: ["Out now", "Coming soon", "Join the movement"] },
+  hype: { hooks: ["ARE YOU READY", "IT'S HERE", "THE WAIT IS OVER"], beats: ["NO LIMITS", "LET'S GO", "GAME ON", "TURN IT UP"], outro: ["Out now", "Coming soon", "Join the movement"] },
   // Movie trailers: title-card lines in each genre's voice.
   "film-horror": { hooks: ["SOME DOORS STAY CLOSED", "IT KNOWS YOUR NAME", "DON'T LOOK BACK"], beats: ["NO ONE IS SAFE", "LISTEN", "THE NIGHT IS LONG", "IT'S STILL HERE"], outro: ["Coming soon"] },
   "film-thriller": { hooks: ["ONE LAST JOB", "TRUST NO ONE", "EVERYONE HAS A SECRET"], beats: ["THE CLOCK IS RUNNING", "NOTHING IS WHAT IT SEEMS", "NO WAY OUT", "ONE CHANCE"], outro: ["Coming soon"] },
@@ -313,6 +314,9 @@ function trailerCall(lower: string, lines: { outro: string[] }, pick: <T>(arr: T
 function extractBrand(prompt: string): string | null {
   const quoted = prompt.match(/["“'‘]([^"”'’]{2,32})["”'’]/);
   if (quoted) return quoted[1].trim();
+  // "Grand opening of Sunny Side Bakery" / "Welcome to Casa Verde": the name after the occasion.
+  const occasion = prompt.match(/\b(?:opening of|launch of|welcome to|reopening of)\s+([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})/i);
+  if (occasion && /^[A-Z]/.test(occasion[1])) return occasion[1].trim();
   const named = prompt.match(/\b(?:called|named|for|brand|channel|company|startup|product)\s+([A-Z][\w.&-]*(?:\s+(?:&\s+)?[A-Z0-9][\w.&-]*){0,2})/);
   if (named) return named[1].trim();
   // "Sentinel stops threats…" / "Shopwave helps brands…": a capitalised name opening a sentence.
@@ -740,6 +744,32 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
     used += BEAT;
   }
 
+  // Words alone shouldn't make an all-type film: a body beat becomes an icon slide (two in longer
+  // films), its icons drawn from the prompt's own short words, else the category's icon family.
+  // (Only wording that names something with an icon of its own, and none of the title's words:
+  // otherwise the slide shows the category's icons without labels.)
+  const titleWords = new Set(title.toLowerCase().split(/\s+/));
+  const iconWords = [...new Set([...content, ...allPhrases].map((p) => p.toLowerCase()))]
+    .filter((p) => p.length <= 18 && p.split(/\s+/).length <= 2 && !/\d/.test(p) && !/\b(of|the|for|and|with|to|in|on|a|an|my|our|your)\b/.test(p) && !p.split(/\s+/).some((x) => titleWords.has(x)) && hasSpecificIcon(p))
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .slice(0, 4);
+  const beatsAt = scenes.map((s, i) => (i >= 2 && s.skill !== "number-ticker" ? i : -1)).filter((i) => i >= 0);
+  const spare = lines.beats.filter((x) => !scenes.some((s) => s.text === x));
+  const iconScene = (skill: SkillId, at: number) => {
+    const s = scenes[at];
+    // A heading worth reading above the icons (a stray fragment like "IN" becomes a trailer line).
+    const weak = s.text.replace(/[^A-Za-z]/g, "").length < 5 || s.text.split(/\s+/).length < 2;
+    const text = weak && spare.length ? spare.splice(Math.floor(r() * spare.length), 1)[0] : s.text;
+    scenes[at] = { ...s, skill, text, items: iconWords.length >= 2 ? iconWords : undefined, duration: Math.max(s.duration, beats(8, 3.2)) };
+  };
+  if (beatsAt.length) iconScene("icon-reveal", beatsAt[0]);
+  else {
+    scenes.push({ skill: "icon-reveal", text: pick(lines.beats), items: iconWords.length >= 2 ? iconWords : undefined, duration: beats(8, 3.2), transition: nextTransition(mood.transitions) });
+    last = "icon-reveal";
+  }
+  if (beatsAt.length >= 4) iconScene("icon-ring", beatsAt[beatsAt.length - 1]);
+  if (scenes[scenes.length - 1].skill === last) last = scenes[scenes.length - 1].skill;
+
   scenes.push({
     skill: pickSkill(mood.outro, last),
     text: title,
@@ -749,6 +779,7 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
   });
 
   const palette = req.palette && req.palette !== "auto" ? req.palette : mood.palette;
+  const concept = detectConcept(prompt).id;
   return beatSync(sanitizePlan({
     title: title,
     palette,
@@ -759,6 +790,8 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
     scenes,
     style: "trailer",
     trailerStyle: look.id,
+    // The category (bakery → food, yoga → fitness) picks the icon slides' icons.
+    ...(concept !== "general" ? { concept } : {}),
   }));
 }
 
@@ -2093,7 +2126,7 @@ function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
   if (wall) {
     scenes.push({
       skill: "screen-wall",
-      text: pick(["ALL IN ONE PLACE", "BUILT FOR TEAMS", "SEE IT IN ACTION"] as const),
+      text: pick(["ONE PLACE FOR IT", "BUILT FOR TEAMS", "SEE IT IN ACTION"] as const),
       subtext: site.domain,
       duration: BEAT,
       transition: tr(["dolly", "whip", "zoom"]),

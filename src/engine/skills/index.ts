@@ -6,6 +6,7 @@ import { editorialSkills } from "./editorial";
 import { editorialMoreSkills } from "./editorial2";
 import { energySkills } from "./energy";
 import { epicSkills } from "./epic";
+import { iconicSkills } from "./iconic";
 import { fastTypeSkills } from "./fastype";
 import { speedSkills } from "./speed";
 import { interactionSkills } from "./interactions";
@@ -56,6 +57,7 @@ export const SKILLS: Skill[] = [
   signatureSkills[2],
   signatureSkills[3],
   ...epicSkills,
+  ...iconicSkills,
   ...mediaSkills,
   ...movieSkills,
 ];
@@ -72,7 +74,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Slides", skills: slideSkills },
   { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
-  { name: "Epic screens", skills: epicSkills },
+  { name: "Epic screens", skills: [...epicSkills, ...iconicSkills] },
   { name: "Movie trailer", skills: movieSkills },
   { name: "Cinematic", skills: [...signatureSkills, ...energySkills, ...worldSkills] },
 ];

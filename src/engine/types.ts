@@ -40,6 +40,8 @@ export const SKILL_IDS = [
   "searchlights",
   "rift-open",
   "blade-slash",
+  "icon-reveal",
+  "icon-ring",
   "studio-ident",
   "intertitle",
   "billing-block",

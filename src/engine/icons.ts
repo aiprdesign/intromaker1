@@ -315,6 +315,11 @@ const ALTERNATIVES: Record<string, string[]> = {
 
 type Match = { icon: string; pos: number; rank: number };
 
+/** Whether wording names something with a specific icon of its own ("bread" → a croissant; not "great"). */
+export function hasSpecificIcon(label: string) {
+  return matchesIn(label.toLowerCase()).some((m) => m.rank < GENERIC_FROM);
+}
+
 /** Every keyword that appears in `text`, with where it appears and how specific it is. */
 function matchesIn(text: string): Match[] {
   const out: Match[] = [];
