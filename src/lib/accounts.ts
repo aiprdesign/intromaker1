@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { VideoPlan } from "@/engine/types";
-import { planLimits } from "./admin";
+import { forgetAccount, planLimits } from "./admin";
 import { cookieOf, isHttps, sameOrigin } from "./http";
 import type { PlanId, PlanLimits } from "./plans";
 
@@ -202,6 +202,7 @@ export async function deleteUser(id: string) {
     await rm(userPath(id), { force: true });
     await rm(join(FILMS, id), { recursive: true, force: true });
   });
+  await forgetAccount(id);
   return true;
 }
 

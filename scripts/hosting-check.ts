@@ -193,6 +193,22 @@ async function main() {
   const proUser = (await acc.getUser(anaId))!;
   check((await acc.limitsFor(proUser)).aiPerMonth === 100 && (await acc.spendAi(proUser)) && acc.usageOf((await acc.getUser(anaId))!).ai === 1, "Pro's AI allowance is counted per month");
 
+  // The film log links a signed-in maker's films to their account, for the owner.
+  const adminCookie = (await login(env.ADMIN_PASSWORD!)).headers.get("set-cookie")!.split(";")[0];
+  const usersList = await import("../src/app/api/admin/users/route");
+  const madeBy = { id: anaId, email: "ana@example.com" };
+  await admin.recordFilm(ureq("/api/generate", { method: "POST" }), { kind: "generated", plan, engine: "builtin", prompt: "Coffee subscription with fresh roasts", account: madeBy });
+  await admin.recordFilm(ureq("/api/generate", { method: "POST" }), { kind: "generated", plan, engine: "builtin", prompt: "Roasts for coffee lovers", account: madeBy });
+  const mine = await (await filmsRoute.GET(areq(`/api/admin/films?account=${anaId}`, { cookie: adminCookie }))).json();
+  check(mine.total === 2 && mine.items.every((e: { account?: { email: string } }) => e.account?.email === "ana@example.com"), "films made while signed in are linked to the account");
+  check(mine.stats.keywords.some(([w, n]: [string, number]) => w === "coffee" && n === 2) && !mine.stats.keywords.some(([w]: [string, number]) => w === "with"), "the log lists the keywords people use");
+  const users = await (await usersList.GET(areq("/api/admin/users", { cookie: adminCookie }))).json();
+  const anaRow = users.users.find((u: { id: string }) => u.id === anaId);
+  check(anaRow?.made.made === 2 && anaRow.made.recent[0] === "Roasts for coffee lovers", "the Users tab shows the intros an account made and its prompts");
+  await admin.forgetAccount(anaId);
+  const forgot = await (await filmsRoute.GET(areq(`/api/admin/films?account=${anaId}`, { cookie: adminCookie }))).json();
+  check(forgot.total === 0 && (await (await filmsRoute.GET(areq("/api/admin/films?q=fresh+roasts", { cookie: adminCookie }))).json()).total === 1, "a deleted account's films stay in the log without its email");
+
   // Sessions end on a password change, and tampering is rejected.
   const tamperedU = ucookie.slice(0, -2) + (ucookie.at(-2) === "A" ? "B" : "A") + ucookie.slice(-1);
   check(!(await acc.currentUser(ureq("/", { cookie: tamperedU }))), "a tampered account session is rejected");

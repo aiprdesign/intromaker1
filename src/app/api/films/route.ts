@@ -1,3 +1,4 @@
+import { currentUser } from "@/lib/accounts";
 import { adminEnabled, recordFilm } from "@/lib/admin";
 import { sanitizePlan } from "@/engine/planner";
 import { rateLimit } from "@/lib/ratelimit";
@@ -22,7 +23,9 @@ export async function POST(req: Request) {
   }
   const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : undefined);
   const url = str(body.url, 300);
+  const who = await currentUser(req).catch(() => null);
   await recordFilm(req, {
+    account: who ? { id: who.id, email: who.email } : null,
     kind: "exported",
     plan,
     engine: "export",

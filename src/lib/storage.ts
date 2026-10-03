@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +13,21 @@ import { join } from "node:path";
  * (Share links that point at an expired capture still play, without that screenshot.)
  */
 export const SHOT_DIR = process.env.INTROMAKER_DATA_DIR ? join(process.env.INTROMAKER_DATA_DIR, "shots") : join(tmpdir(), "intromaker-shots");
+
+/**
+ * Whether the data folder survives a redeploy: INTROMAKER_DATA_DIR is set and is its own mounted
+ * volume (a different device from the container's root). The Docker image always sets /data, so
+ * without a mounted volume it's still a folder inside the container that a redeploy throws away.
+ */
+export function dataIsPersistent() {
+  const dir = process.env.INTROMAKER_DATA_DIR;
+  if (!dir) return false;
+  try {
+    return statSync(dir).dev !== statSync("/").dev;
+  } catch {
+    return false;
+  }
+}
 
 const TTL_MS = Math.max(1, Number(process.env.INTROMAKER_SHOT_TTL_DAYS ?? 7) || 7) * 86_400_000;
 const MAX_BYTES = Math.max(50, Number(process.env.INTROMAKER_SHOT_MAX_MB ?? 1024) || 1024) * 1_048_576;

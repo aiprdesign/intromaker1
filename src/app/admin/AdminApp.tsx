@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Nav";
 import AiTab from "./AiTab";
 import BillingTab from "./BillingTab";
-import FilmsTab from "./FilmsTab";
+import FilmsTab, { type AccountRef } from "./FilmsTab";
 import PlansTab from "./PlansTab";
 import UsersTab from "./UsersTab";
 import { AdminUiProvider, api } from "./ui";
@@ -181,6 +181,15 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
     setTab(TABS[(next + TABS.length) % TABS.length].id, true);
   };
   const onCounts = useCallback((n: number) => setRequests(n), []);
+  // "View films" on an account opens the film log on that account's films.
+  const [filmsFor, setFilmsFor] = useState<AccountRef | null>(null);
+  const showFilms = useCallback(
+    (u: AccountRef) => {
+      setFilmsFor(u);
+      setTab("films");
+    },
+    [setTab],
+  );
 
   return (
     <main className="admin">
@@ -202,7 +211,11 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
               aria-controls="admin-panel"
               tabIndex={tab === t.id ? 0 : -1}
               className={tab === t.id ? "active" : ""}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                // The Films tab itself shows the whole log, not the last account looked at.
+                if (t.id === "films") setFilmsFor(null);
+                setTab(t.id);
+              }}
             >
               {t.label}
               {t.id === "users" && requests > 0 && (
@@ -227,8 +240,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         </div>
       </header>
       <div id="admin-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="admin-panel">
-        {tab === "films" && <FilmsTab />}
-        {tab === "users" && <UsersTab onCounts={onCounts} />}
+        {tab === "films" && <FilmsTab account={filmsFor} />}
+        {tab === "users" && <UsersTab onCounts={onCounts} onShowFilms={showFilms} />}
         {tab === "plans" && <PlansTab billingOn={billingOn} onOpenBilling={() => setTab("billing")} />}
         {tab === "billing" && <BillingTab onChange={setBillingOn} onOpenPlans={() => setTab("plans")} />}
         {tab === "ai" && <AiTab />}

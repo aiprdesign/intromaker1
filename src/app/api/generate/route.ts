@@ -421,7 +421,9 @@ export async function POST(req: Request) {
   const lintCtx = { site: c.site, targetSeconds: LENGTH_SECONDS[c.length], safe: c.safe };
   // Every film made is logged for the owner's admin area (a remake, an alternative take, or new).
   const film = async (out: { plan: VideoPlan; engine: string; engineLabel?: string; note?: string }) => {
+    const who = await currentUser(req).catch(() => null);
     await recordFilm(req, {
+      account: who ? { id: who.id, email: who.email } : null,
       kind: c.variant ? "remake" : c.angle ? "take" : "generated",
       plan: out.plan,
       engine: out.engine === "ai" ? out.engineLabel || "AI" : "builtin",

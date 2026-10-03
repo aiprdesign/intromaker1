@@ -19,18 +19,21 @@ type AdminUser = {
   billingStatus?: "active" | "past_due" | "canceling" | "canceled";
   periodEnd?: number;
   stripeCustomerId?: string;
+  /** Intros made (from the film log): how many, when last, and their latest prompts or sites. */
+  made: { made: number; lastAt: number; recent: string[] };
 };
 type Data = { users: AdminUser[]; counts: { total: number; pro: number; requests: number } };
 
 const SORTS = {
   new: { label: "Newest", fn: (a: AdminUser, b: AdminUser) => b.createdAt - a.createdAt },
   active: { label: "Last active", fn: (a: AdminUser, b: AdminUser) => (b.lastLoginAt ?? 0) - (a.lastLoginAt ?? 0) },
-  films: { label: "Most intros", fn: (a: AdminUser, b: AdminUser) => b.films - a.films },
+  films: { label: "Most saved", fn: (a: AdminUser, b: AdminUser) => b.films - a.films },
+  made: { label: "Most made", fn: (a: AdminUser, b: AdminUser) => (b.made?.made ?? 0) - (a.made?.made ?? 0) },
   email: { label: "Email A–Z", fn: (a: AdminUser, b: AdminUser) => a.email.localeCompare(b.email) },
 };
 const BILLING: Record<string, string> = { active: "Paying", past_due: "Payment failed", canceling: "Cancelling", canceled: "Cancelled" };
 
-export default function UsersTab({ onCounts }: { onCounts: (requests: number) => void }) {
+export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (requests: number) => void; onShowFilms: (u: { id: string; email: string }) => void }) {
   const { notify, confirm } = useAdminUi();
   const [data, setData] = useState<Data | null>(null);
   const [q, setQ] = useState("");
@@ -169,7 +172,7 @@ export default function UsersTab({ onCounts }: { onCounts: (requests: number) =>
             <div className="who">
               <strong title={u.email}>{u.email}</strong>
               <span className="hint">
-                joined <When t={u.createdAt} /> · last in {u.lastLoginAt ? <When t={u.lastLoginAt} /> : "never"} · {u.films} saved
+                joined <When t={u.createdAt} /> · last in {u.lastLoginAt ? <When t={u.lastLoginAt} /> : "not yet"} · {u.made?.made ?? 0} made · {u.films} saved
                 {u.usage?.aiMonth === new Date().toISOString().slice(0, 7) ? ` · ${u.usage.ai ?? 0} AI films this month` : ""}
               </span>
               <span className="film-tags">
@@ -192,6 +195,22 @@ export default function UsersTab({ onCounts }: { onCounts: (requests: number) =>
                 {u.mustChangePassword && <span className="tag">Password reset pending</span>}
                 {u.disabled && <span className="tag warn">Disabled</span>}
               </span>
+              {u.made?.made ? (
+                <div className="user-made">
+                  <ul>
+                    {u.made.recent.map((r) => (
+                      <li key={r} title={r}>
+                        {/^https?:\/\//.test(r) ? r.replace(/^https?:\/\//, "") : `“${r}”`}
+                      </li>
+                    ))}
+                  </ul>
+                  <button className="link-btn" onClick={() => onShowFilms({ id: u.id, email: u.email })}>
+                    View {u.made.made} film{u.made.made === 1 ? "" : "s"} · newest <When t={u.made.lastAt} /> →
+                  </button>
+                </div>
+              ) : (
+                <span className="hint">No intros made while signed in yet.</span>
+              )}
             </div>
             <div className="seg-control plan-switch" role="radiogroup" aria-label={`Plan of ${u.email}`}>
               {(["free", "pro"] as PlanId[]).map((id) => (

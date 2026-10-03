@@ -31,8 +31,10 @@ export default function Privacy() {
         </p>
         {logging ? (
           <p>
-            <strong>This site keeps a log of the films made on it</strong>, which its owner can review: the prompt or website address, the storyboard (the text on the slides and the styles used) and when it was made, for new films, remakes and exports. You appear in it only as an anonymous code
-            (a salted hash of your address), not by your address itself. The video file is not included. Don&apos;t put anything private in a prompt.
+            <strong>This site keeps a log of the films made on it</strong>, which its owner can review: the prompt or website address, the storyboard (the text on the slides and the styles used) and when it was made, for new films, remakes and exports. Without an account you appear in it only as an anonymous code
+            (a salted hash of your address), not by your address itself. If you&apos;re signed in to an account, the entry is also linked to your
+            account&apos;s email, so the owner can see the intros an account made; deleting your account removes that link. The video file is not
+            included. Don&apos;t put anything private in a prompt.
           </p>
         ) : (
           <p>This site doesn&apos;t keep a log of the films made on it: storyboards and edits stay in your browser.</p>

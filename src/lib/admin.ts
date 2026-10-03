@@ -106,6 +106,8 @@ export interface FilmEntry {
   template?: string;
   /** Export preset, for exports. */
   preset?: string;
+  /** The signed-in account that made it (none for visitors without an account). */
+  account?: { id: string; email: string };
 }
 
 async function ensureDir() {
@@ -137,7 +139,10 @@ let writes = 0;
 /**
  * Log one film event. Never throws: a full disk or a read-only volume must not break making films.
  */
-export async function recordFilm(req: Request, e: { kind: FilmKind; plan: VideoPlan; engine: string; prompt?: string; url?: string; preset?: string }) {
+export async function recordFilm(
+  req: Request,
+  e: { kind: FilmKind; plan: VideoPlan; engine: string; prompt?: string; url?: string; preset?: string; account?: { id: string; email: string } | null },
+) {
   // Nothing is kept unless the owner has turned the admin area on.
   if (!adminEnabled()) return;
   try {
@@ -163,6 +168,7 @@ export async function recordFilm(req: Request, e: { kind: FilmKind; plan: VideoP
       skills: [...new Set(e.plan.scenes.map((s) => s.skill))].slice(0, 20),
       template: e.plan.template,
       preset: e.preset?.slice(0, 40),
+      account: e.account ? { id: e.account.id, email: e.account.email } : undefined,
     };
     await writeFile(join(FILMS, `${id}.json`), planJson);
     await appendFile(INDEX, JSON.stringify(entry) + "\n");
@@ -209,6 +215,8 @@ export interface FilmQuery {
   q?: string;
   kind?: string;
   visitor?: string;
+  /** An account id: only that account's films. */
+  account?: string;
   page?: number;
   size?: number;
 }
@@ -220,7 +228,8 @@ export async function listFilms(query: FilmQuery) {
     (e) =>
       (!query.kind || e.kind === query.kind) &&
       (!query.visitor || e.visitor === query.visitor) &&
-      (!q || [e.title, e.prompt, e.url, e.engine, e.template, ...e.skills].some((x) => x?.toLowerCase().includes(q))),
+      (!query.account || e.account?.id === query.account) &&
+      (!q || [e.title, e.prompt, e.url, e.engine, e.template, e.account?.email, ...e.skills].some((x) => x?.toLowerCase().includes(q))),
   );
   const size = Math.min(100, Math.max(1, query.size ?? 30));
   const page = Math.max(0, query.page ?? 0);
@@ -237,6 +246,8 @@ export async function listFilms(query: FilmQuery) {
     today: all.filter((e) => now - e.at < day).length,
     week: all.filter((e) => now - e.at < 7 * day).length,
     visitors: new Set(all.map((e) => e.visitor)).size,
+    accounts: new Set(all.map((e) => e.account?.id).filter(Boolean)).size,
+    keywords: keywordsOf(all).slice(0, 24),
     exported: all.filter((e) => e.kind === "exported").length,
     fromSites: all.filter((e) => e.source === "site").length,
     engines: count((e) => (e.kind === "exported" ? undefined : e.engine.startsWith("builtin") ? "Built-in director" : e.engine.split(" · ")[0])).slice(0, 6),
@@ -262,6 +273,45 @@ export async function getFilm(id: string) {
   } catch {
     return { entry, plan: null };
   }
+}
+
+/** Words people use in their prompts, most used first (a word counts once per film). */
+const STOPWORDS = new Set(
+  ("the and for with from that this your our their its into onto about over under than then them they you are was were has have had " +
+    "will can just very more most some any not but all each every also only like make made makes making create want need please " +
+    "video videos intro intros film films clip one two three new get use using who what when where which how why out off per via " +
+    "a an of to in on at by as is be it or my we us me so do if no up").split(" "),
+);
+function keywordsOf(entries: FilmEntry[]): [string, number][] {
+  const m = new Map<string, number>();
+  for (const e of entries) {
+    if (!e.prompt || e.kind === "exported") continue;
+    const words = new Set((e.prompt.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).map((w) => w.replace(/['’]s$/, "")));
+    for (const w of words) if (w.length >= 3 && !STOPWORDS.has(w) && !/^\d+$/.test(w)) m.set(w, (m.get(w) ?? 0) + 1);
+  }
+  return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+/** Per account: how many films it made, when it last made one, and its latest prompts or sites. */
+export async function filmsByAccount() {
+  const out = new Map<string, { made: number; lastAt: number; recent: string[] }>();
+  for (const e of (await readIndex()).reverse()) {
+    if (!e.account) continue;
+    const a = out.get(e.account.id) ?? { made: 0, lastAt: e.at, recent: [] };
+    a.made++;
+    const said = e.url ?? e.prompt;
+    if (said && a.recent.length < 3 && !a.recent.includes(said)) a.recent.push(said);
+    out.set(e.account.id, a);
+  }
+  return out;
+}
+
+/** A deleted account: its films stay in the log, no longer linked to its email. */
+export async function forgetAccount(id: string) {
+  const all = await readIndex();
+  if (!all.some((e) => e.account?.id === id)) return;
+  await ensureDir();
+  await writeIndex(all.map((e) => (e.account?.id === id ? { ...e, account: undefined } : e)));
 }
 
 export async function deleteFilms(ids: string[] | "all") {

@@ -24,29 +24,37 @@ type Entry = {
   skills: string[];
   template?: string;
   preset?: string;
+  account?: { id: string; email: string };
 };
 type Stats = {
   total: number;
   today: number;
   week: number;
   visitors: number;
+  accounts: number;
+  keywords: [string, number][];
   exported: number;
   fromSites: number;
   engines: [string, number][];
   skills: [string, number][];
   perDay: { day: string; films: number }[];
 };
-type List = { items: Entry[]; total: number; page: number; size: number; stats: Stats; aiToday: number; aiBudget: number };
+type List = { items: Entry[]; total: number; page: number; size: number; stats: Stats; aiToday: number; aiBudget: number; persistent?: boolean };
 
 const KIND_LABEL: Record<Entry["kind"], string> = { generated: "New film", remake: "Remake", take: "Alternative take", exported: "Exported" };
 const engineLabel = (e: Entry) => (e.engine === "builtin" ? "Built-in" : e.engine === "export" ? e.preset || "Export" : "AI");
 
-export default function FilmsTab() {
+export type AccountRef = { id: string; email: string };
+
+/** The film log. `account` opens it on one account's films (from the Users tab). */
+export default function FilmsTab({ account: initialAccount = null }: { account?: AccountRef | null }) {
   const { notify, confirm } = useAdminUi();
   const [data, setData] = useState<List | null>(null);
   const [q, setQ] = useState("");
   const [kind, setKind] = useState("");
   const [visitor, setVisitor] = useState("");
+  const [account, setAccount] = useState<AccountRef | null>(initialAccount);
+  useEffect(() => setAccount(initialAccount), [initialAccount]);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -59,6 +67,7 @@ export default function FilmsTab() {
     if (q.trim()) qs.set("q", q.trim());
     if (kind) qs.set("kind", kind);
     if (visitor) qs.set("visitor", visitor);
+    if (account) qs.set("account", account.id);
     try {
       setData(await api<List>(`/api/admin/films?${qs}`));
       setError(null);
@@ -66,7 +75,7 @@ export default function FilmsTab() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [q, kind, visitor, page]);
+  }, [q, kind, visitor, account, page]);
   useEffect(() => {
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
@@ -124,11 +133,12 @@ export default function FilmsTab() {
     notify(`Deleted ${r.deleted} films`);
     void load();
   };
-  const filtered = !!(q.trim() || kind || visitor);
+  const filtered = !!(q.trim() || kind || visitor || account);
   const clear = () => {
     setQ("");
     setKind("");
     setVisitor("");
+    setAccount(null);
     setPage(0);
   };
 
@@ -139,13 +149,19 @@ export default function FilmsTab() {
   return (
     <>
       {error && <p className="error">{error}</p>}
+      {data && data.persistent === false && (
+        <p className="admin-warn">
+          The film log, accounts and settings are kept in a temporary folder, so a redeploy empties them. Add a volume (Railway → your service → Volumes, mounted
+          at <code>/data</code>) and set <code>INTROMAKER_DATA_DIR=/data</code>.
+        </p>
+      )}
       {s ? (
         <>
           <section className="admin-kpis">
             <Kpi label="Films" value={s.total} hint="Film events logged (new, remakes, takes, exports)" />
             <Kpi label="Today" value={s.today} />
             <Kpi label="Last 7 days" value={s.week} />
-            <Kpi label="Visitors" value={s.visitors} hint="Different visitors (anonymous)" />
+            <Kpi label="Visitors" value={s.visitors} hint={`Different visitors · ${s.accounts} signed in`} />
             <Kpi label="Exports" value={s.exported} />
             <Kpi label="AI films today" value={`${data!.aiToday} / ${data!.aiBudget}`} hint="Paid by the site's AI key, against the daily budget" meter={data!.aiBudget ? data!.aiToday / data!.aiBudget : 0} />
           </section>
@@ -158,6 +174,18 @@ export default function FilmsTab() {
                   s.skills.map(([k, n]) => (
                     <button key={k} className="chip" onClick={() => (setQ(k), setPage(0))} title="Show films with this slide">
                       {SKILL_MAP[k as SkillId]?.name ?? k} · {n}
+                    </button>
+                  ))
+                ) : (
+                  <span className="hint">None yet</span>
+                )}
+              </div>
+              <span className="fld-cap">Top keywords in prompts</span>
+              <div className="chips">
+                {s.keywords?.length ? (
+                  s.keywords.map(([k, n]) => (
+                    <button key={k} className="chip" onClick={() => (setQ(k), setPage(0))} title="Show films whose prompt uses this word">
+                      {k} · {n}
                     </button>
                   ))
                 ) : (
@@ -184,7 +212,7 @@ export default function FilmsTab() {
 
       <section className="admin-filters">
         <span className="search-box">
-          <input className="input" placeholder="Search prompts, websites, titles, slides…" value={q} onChange={(e) => (setQ(e.target.value), setPage(0))} aria-label="Search films" />
+          <input className="input" placeholder="Search prompts, websites, accounts, titles, slides…" value={q} onChange={(e) => (setQ(e.target.value), setPage(0))} aria-label="Search films" />
           {q && (
             <button className="clear" onClick={() => setQ("")} aria-label="Clear search">
               ×
@@ -202,6 +230,11 @@ export default function FilmsTab() {
         {visitor && (
           <button className="chip active" onClick={() => setVisitor("")} title="Clear the visitor filter">
             Visitor {visitor} ×
+          </button>
+        )}
+        {account && (
+          <button className="chip active" onClick={() => (setAccount(null), setPage(0))} title="Clear the account filter">
+            {account.email} ×
           </button>
         )}
         {filtered && (
@@ -229,7 +262,7 @@ export default function FilmsTab() {
                 Clear filters
               </button>
             ) : (
-              "Films made in the studio (new films, remakes, alternative takes) and exports show up here."
+              "Films made in the studio (new films, remakes, alternative takes) and exports show up here from now on. Films made before ADMIN_PASSWORD was set aren't in the log."
             )}
           </p>
         </div>
@@ -245,7 +278,7 @@ export default function FilmsTab() {
                 {e.title}
               </button>
               <span className="film-src" title={e.url ?? e.prompt}>
-                {e.url ? e.url.replace(/^https?:\/\//, "") : e.prompt || "—"}
+                {e.url ? e.url.replace(/^https?:\/\//, "") : e.prompt || (e.kind === "exported" ? "Exported from the studio" : "No prompt (product photos or an example)")}
               </span>
               <span className="film-tags">
                 <span className={`tag ${e.kind}`}>{KIND_LABEL[e.kind]}</span>
@@ -255,10 +288,16 @@ export default function FilmsTab() {
                 </span>
               </span>
               <span className="film-when">
-                <When t={e.at} /> ·{" "}
-                <button className="visitor" onClick={() => (setVisitor(e.visitor), setPage(0))} title="Show this visitor's films">
-                  visitor {e.visitor}
-                </button>
+                <When t={e.at} /> ·
+                {e.account ? (
+                  <button className="visitor account" onClick={() => (setAccount(e.account!), setPage(0))} title="Show this account's films">
+                    {e.account.email}
+                  </button>
+                ) : (
+                  <button className="visitor" onClick={() => (setVisitor(e.visitor), setPage(0))} title="Show this visitor's films">
+                    visitor {e.visitor}
+                  </button>
+                )}
               </span>
             </div>
           </article>
@@ -396,8 +435,8 @@ function FilmDetail({
           <dd>
             {entry.aspect} · {entry.seconds}s · {entry.scenes} slides{entry.template ? ` · style ${entry.template}` : ""}
           </dd>
-          <dt>Visitor</dt>
-          <dd>{entry.visitor} (anonymous)</dd>
+          <dt>Made by</dt>
+          <dd>{entry.account ? `${entry.account.email} (account) · visitor ${entry.visitor}` : `Visitor ${entry.visitor} (anonymous, not signed in)`}</dd>
         </dl>
         {plan && (
           <ol className="admin-scenes">
