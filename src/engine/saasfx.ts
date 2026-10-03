@@ -11,7 +11,7 @@ import { drawLucide, iconFor as lucideFor, iconsFor as lucideIconsFor } from "./
 import { scratch } from "./scratch";
 import { planetStage, plexusStage, rainStage, warpStage, wormholeStage } from "./scifi";
 import { renderShaderBg } from "./shaderbg";
-import { subFont, type HeadlineLayout } from "./text";
+import { fillTextMid, subFont, type HeadlineLayout } from "./text";
 import type { FontId, SkillContext, TextFx } from "./types";
 
 /** Critically-damped-ish spring: fast settle with a gentle overshoot. t in seconds since start. */
@@ -829,7 +829,7 @@ export function pill(
   ctx.fillStyle = opts.color ?? (light ? palette.text : "#fff");
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, cx, cy + size * 0.04);
+  fillTextMid(ctx, text, cx, cy);
   ctx.restore();
   return pw;
 }

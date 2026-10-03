@@ -4,7 +4,7 @@ import { drawLucide } from "../icons";
 import { clamp, ease, lerp, mixHex, range, rgba, rng } from "../math";
 import { getImage, drawLogo, logoMaxWidth } from "../media";
 import { brandGlyph, iconsFor, drawIcon, imageless, luminance, saasFont, spring } from "../saasfx";
-import { autoAccent, displayFont, fillTextFit } from "../text";
+import { autoAccent, displayFont, fillTextFit, fillTextMid } from "../text";
 import type { Scene, Skill, SkillContext } from "../types";
 import { drawCover } from "./media";
 import { topHeadline } from "./saas";
@@ -746,7 +746,7 @@ function cardSystem(sc: SkillContext) {
         ctx.fillStyle = palette.bg0;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText(label, tx + 14 * u, ty + 17 * u);
+        fillTextMid(ctx, label, tx + 14 * u, ty + 17 * u);
       }
       ctx.restore();
     }

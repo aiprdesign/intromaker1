@@ -3,7 +3,7 @@ import { tokens } from "../grid";
 import { drawLucide } from "../icons";
 import { clamp, ease, lerp, mixHex, range, rgba, rng } from "../math";
 import { iconsFor, imageless, luminance, saasFont, spring } from "../saasfx";
-import { displayFont, fillTextFit } from "../text";
+import { displayFont, fillTextFit, fillTextMid } from "../text";
 import type { Scene, Skill, SkillContext } from "../types";
 import {
   accentWords,
@@ -390,7 +390,7 @@ function posterSplit(sc: SkillContext) {
       ctx.fillStyle = palette.text;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(it, cx + tw / 2, cy + (1 - k) * 8 * u);
+      fillTextMid(ctx, it, cx + tw / 2, cy + (1 - k) * 8 * u);
       cx += tw + 12 * u;
     });
     ctx.restore();

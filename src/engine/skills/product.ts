@@ -650,7 +650,7 @@ function callout(sc: SkillContext, text: string, icon: string, cx: number, cy: n
   ctx.fillStyle = palette.text;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  fillTextFit(ctx, text, x + ih + fs * 0.35, cy + 1, tw + 1, { maxLines: 2, lineHeight: 1.08, minScale: 0.75 });
+  fillTextFit(ctx, text, x + ih + fs * 0.35, cy, tw + 1, { maxLines: 2, lineHeight: 1.08, minScale: 0.75 });
   ctx.restore();
   return { x, y, w: cw, h: ih };
 }

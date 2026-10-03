@@ -32,7 +32,7 @@ import {
   spring,
   type IconKind,
 } from "../saasfx";
-import { autoAccent, displayFont, fillTextFit, fitTextLines, subFont } from "../text";
+import { autoAccent, displayFont, fillTextFit, fillTextMid, fitTextLines, subFont } from "../text";
 import { drawLucide } from "../icons";
 import { ctaClickAt } from "../arrange";
 import { CONCEPT_MAP } from "../concepts";
@@ -703,17 +703,19 @@ function bento(sc: SkillContext) {
     const lit = i === active && t > 1.4;
     glassCard(sc, x, y, bw, bh, { r: 20 * u, tint: lit ? palette.bg1 : undefined });
     if (lit) borderBeam(sc, x, y, bw, bh, (t - 1.4) * 0.6, { r: 20 * u });
+    // One inset on the 8pt grid (24px) for the icon tile, the label and the visual.
+    const pad = 24 * u;
     // Icon tile.
     const it = 52 * u;
-    const ig = ctx.createLinearGradient(x + 22 * u, y + 22 * u, x + 22 * u + it, y + 22 * u + it);
+    const ig = ctx.createLinearGradient(x + pad, y + pad, x + pad + it, y + pad + it);
     ig.addColorStop(0, palette.primary);
     ig.addColorStop(1, palette.secondary);
     ctx.fillStyle = ig;
     ctx.beginPath();
-    ctx.roundRect(x + 22 * u, y + 22 * u, it, it, 14 * u);
+    ctx.roundRect(x + pad, y + pad, it, it, 14 * u);
     ctx.fill();
     const [title, desc] = items[i].split(/\s+[—–]\s+/);
-    drawIcon(ctx, icons[i], x + 22 * u + it / 2, y + 22 * u + it / 2, it * 0.56, "#fff", ease.outCubic(range(lt, 0.15, 0.9)));
+    drawIcon(ctx, icons[i], x + pad + it / 2, y + pad + it / 2, it * 0.56, "#fff", ease.outCubic(range(lt, 0.15, 0.9)));
     // Label, with the feature's one-line description under it in roomy cells.
     const fs = portrait ? Math.min(46 * u, bw / 14) : Math.min(30 * u, bw / 11);
     const wrap = (text: string, font: string) => {
@@ -722,7 +724,7 @@ function bento(sc: SkillContext) {
       let line = "";
       for (const wd of text.split(" ")) {
         const next = line ? `${line} ${wd}` : wd;
-        if (ctx.measureText(next).width > bw - 44 * u && line) {
+        if (ctx.measureText(next).width > bw - pad * 2 && line) {
           lines.push(line);
           line = wd;
         } else line = next;
@@ -738,19 +740,19 @@ function bento(sc: SkillContext) {
     const lines = wrap(title, tFont);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    const baseY = y + bh - 24 * u;
+    const baseY = y + bh - pad;
     ctx.font = dFont;
     ctx.fillStyle = rgba(palette.text, 0.62);
-    dLines.forEach((l, li) => ctx.fillText(l, x + 22 * u, baseY - (dLines.length - 1 - li) * ds * 1.3));
+    dLines.forEach((l, li) => ctx.fillText(l, x + pad, baseY - (dLines.length - 1 - li) * ds * 1.3));
     const titleBase = dLines.length ? baseY - dLines.length * ds * 1.3 - fs * 0.25 : baseY;
     ctx.font = tFont;
     ctx.fillStyle = palette.text;
-    lines.forEach((l, li, arr) => ctx.fillText(l, x + 22 * u, titleBase - (arr.length - 1 - li) * fs * 1.2));
+    lines.forEach((l, li, arr) => ctx.fillText(l, x + pad, titleBase - (arr.length - 1 - li) * fs * 1.2));
     // Visual in the upper-right area: a real UI component when we have one, else a micro-animation.
     const mx = x + bw * 0.45;
-    const my = y + 22 * u;
-    const mw = bw * 0.5 - 22 * u;
-    const mh = Math.max(40 * u, bh - 22 * u - (lines.length > 1 ? fs * 2.6 : fs * 1.5) - dLines.length * ds * 1.3 - 40 * u);
+    const my = y + pad;
+    const mw = bw * 0.5 - pad;
+    const mh = Math.max(40 * u, bh - pad - (lines.length > 1 ? fs * 2.6 : fs * 1.5) - dLines.length * ds * 1.3 - 40 * u);
     const part = partFor.get(i);
     const pimg = part ? getImage(part.src) : null;
     const titleTop = titleBase - (lines.length - 1) * fs * 1.2 - fs;
@@ -913,7 +915,7 @@ function iconFeatures(sc: SkillContext) {
     ctx.fillStyle = palette.text;
     ctx.font = `700 ${Math.round(fs)}px Inter, sans-serif`;
     const titleTop = y + ch * 0.64;
-    tl.slice(0, 2).forEach((l, li) => ctx.fillText(l, tx, titleTop + li * fs * 1.15));
+    tl.slice(0, 2).forEach((l, li) => fillTextMid(ctx, l, tx, titleTop + li * fs * 1.15));
     const descTop = titleTop + (Math.min(2, tl.length) - 1) * fs * 1.15;
     if (desc && ch > 150 * u) {
       ctx.font = `500 ${Math.round(fs * 0.66)}px Inter, sans-serif`;
@@ -921,7 +923,7 @@ function iconFeatures(sc: SkillContext) {
       // Two lines; a longer description sets a touch smaller before anything is shortened.
       const dfit = fitTextLines(ctx, desc, cw - 44 * u, { maxLines: 2, minScale: 0.8 });
       ctx.font = dfit.font;
-      dfit.lines.forEach((l, li) => ctx.fillText(l, tx, descTop + fs * 1.1 + li * fs * 0.9));
+      dfit.lines.forEach((l, li) => fillTextMid(ctx, l, tx, descTop + fs * 1.1 + li * fs * 0.9));
     }
     ctx.restore();
   });
@@ -1130,6 +1132,8 @@ function orbit(sc: SkillContext) {
     { r: short * 0.22, n: 6, speed: 0.18 },
     { r: short * 0.37, n: 9, speed: -0.12 },
   ];
+  // Landscape and square tilt the orbit into an ellipse, so the outer tiles clear the headline below.
+  const ey = portrait ? 1 : 0.78;
   // Orbit guides.
   ctx.save();
   ctx.globalAlpha = (1 - ex) * clamp(t / 0.5);
@@ -1137,7 +1141,7 @@ function orbit(sc: SkillContext) {
   ctx.lineWidth = 1.2 * u;
   rings.forEach((rg) => {
     ctx.beginPath();
-    ctx.arc(cx, cy, rg.r, 0, TAU);
+    ctx.ellipse(cx, cy, rg.r, rg.r * ey, 0, 0, TAU);
     ctx.stroke();
   });
   ctx.restore();
@@ -1153,7 +1157,7 @@ function orbit(sc: SkillContext) {
       const a = (i / rg.n) * TAU + t * rg.speed + ri * 0.3;
       const rr = rg.r * Math.min(1, k);
       const x = cx + Math.cos(a) * rr;
-      const y = cy + Math.sin(a) * rr;
+      const y = cy + Math.sin(a) * rr * ey;
       // Connector + data pulse (inner ring only).
       if (ri === 0) {
         ctx.save();
@@ -1204,7 +1208,7 @@ function orbit(sc: SkillContext) {
     ctx.font = `800 ${Math.round(cs)}px Inter, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText((brand?.name ?? scene.text).slice(0, 1).toUpperCase(), cx, cy);
+    fillTextMid(ctx, (brand?.name ?? scene.text).slice(0, 1).toUpperCase(), cx, cy);
   }
   ctx.restore();
   const layout = sentence(sc, { text: accented(scene.text), cy: portrait ? h * 0.8 : h * 0.86, sizeFrac: 0.07, widthFrac: 0.84, maxLines: 2 });
@@ -1229,7 +1233,7 @@ function testimonial(sc: SkillContext) {
   const cx0 = w / 2 - cw / 2;
   const cy0 = qTop - 110 * u;
   const k = clamp(spring(t - 0.1, 10, 7), 0, 1.05);
-  chapter(sc, cy0 - 6 * u);
+  chapter(sc, cy0 - 20 * u);
   // Once it has landed the whole card floats: a slow bob and a slight tilt, as if a pane of glass
   // were turning in the light (quote and author ride with it).
   const T = sc.globalT ?? t;
@@ -1428,7 +1432,7 @@ function marquee(sc: SkillContext) {
             ctx.fillStyle = palette.text;
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
-            ctx.fillText(team, x + chipH + fs * 0.2, cyc + 1);
+            fillTextMid(ctx, team, x + chipH + fs * 0.2, cyc);
             ctx.restore();
             ctx.restore();
           }
@@ -1520,7 +1524,7 @@ function ctaLockup(sc: SkillContext) {
     ctx.fillStyle = palette.text;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(brand.name, mx + size * 1.4, size * 0.04);
+    fillTextMid(ctx, brand.name, mx + size * 1.4, 0);
     ctx.restore();
   }
   const layout = sentence(sc, { text: accented(scene.text), cy: h * (hasLogo ? 0.44 : 0.4), sizeFrac: 0.1, widthFrac: 0.8, maxLines: 2 });
@@ -1577,7 +1581,7 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
   ctx.fillStyle = "#07040f";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(`${label}  →`, 0, 1 * u);
+  fillTextMid(ctx, `${label}  →`, 0, 0);
   ctx.restore();
   borderBeam(sc, cx - bw / 2 - 6 * u, by - bh / 2 - 6 * u, bw + 12 * u, bh + 12 * u, t * 0.6, { r: bh / 2 + 6 * u, alpha: clamp(bk) * (1 - ex) });
   clickRipple(sc, cx + bw * 0.1, by, range(t, T.click, T.click + 0.6), "#ffffff");
@@ -1883,10 +1887,17 @@ function steps(sc: SkillContext) {
   const n = labels.length;
   const ex = ease.inCubic(exitT(sc, 0.4));
   const R = 40 * u * S;
+  // Landscape cards sit centred under their nodes; the outer cards stay inside the title-safe area.
+  const safe = tokens(w, h).safe;
+  const colW = portrait ? w * (h > w ? 0.7 : 0.62) : (w * 0.72) / Math.max(1, n - 1) * 0.9;
+  // Vertical cards run from beside their node to the safe area's right edge.
+  const cw = portrait ? safe.right - (w * (h > w ? 0.15 : 0.2) + R + 24 * u) : Math.min(colW, 380 * u);
+  const x0 = Math.max(w * 0.14, safe.left + cw / 2);
+  const x1 = Math.min(w * 0.86, safe.right - cw / 2);
   const pts = labels.map((_, i) =>
     portrait
       ? { x: w * (h > w ? 0.15 : 0.2), y: h * 0.32 + (i * h * (h > w ? 0.55 : 0.52)) / Math.max(1, n - 1) }
-      : { x: w * 0.14 + (i * w * 0.72) / Math.max(1, n - 1), y: h * 0.47 },
+      : { x: x0 + (i * (x1 - x0)) / Math.max(1, n - 1), y: h * 0.47 },
   );
   const g = ctx.createLinearGradient(pts[0].x, pts[0].y, pts[n - 1].x, pts[n - 1].y);
   g.addColorStop(0, palette.primary);
@@ -1916,11 +1927,9 @@ function steps(sc: SkillContext) {
     const lt = t - times[i];
     const on = clamp(spring(lt, 12, 7), 0, 1.15);
     const p = pts[i];
-    const colW = portrait ? w * (h > w ? 0.7 : 0.62) : (w * 0.72) / Math.max(1, n - 1) * 0.9;
     ctx.save();
     ctx.globalAlpha = (1 - ex) * clamp(0.35 + clamp(lt / 0.3) * 0.65);
     // Card with the step title.
-    const cw = Math.min(colW, (portrait ? 620 : 380) * u);
     const ch = 130 * u * S;
     const cx = portrait ? p.x + R + 24 * u : p.x - cw / 2;
     const cy = portrait ? p.y - ch / 2 : p.y + R + 26 * u;
@@ -1940,7 +1949,7 @@ function steps(sc: SkillContext) {
     let line = "";
     for (const wd of words) {
       const next = line ? `${line} ${wd}` : wd;
-      if (ctx.measureText(next).width > cw - 40 * u - Math.min(ch * 0.42, 40 * u * S) - 14 * u && line) {
+      if (ctx.measureText(next).width > cw - 48 * u - Math.min(ch * 0.42, 40 * u * S) - 14 * u && line) {
         lines.push(line);
         line = wd;
       } else line = next;
@@ -1948,12 +1957,16 @@ function steps(sc: SkillContext) {
     lines.push(line);
     const lh = fsz * 1.25;
     // Step icon at the card's leading edge; text makes room for it.
+    // 24px (3-step) padding; under a centred node the icon + text group centres in the card.
     const is = Math.min(ch * 0.42, 40 * u * S);
-    const ix = cx + 20 * u + is / 2;
+    const pad = 24 * u;
+    const groupW = is + 14 * u + Math.max(...lines.slice(0, 2).map((l) => ctx.measureText(l).width));
+    const gx = portrait ? cx + pad : cx + Math.max(pad, (cw - groupW) / 2);
+    const ix = gx + is / 2;
     drawIcon(ctx, iconsFor(labels, sc)[i], ix, cy + ch / 2, is, palette.primary, lt > 0 ? ease.outCubic(range(lt, 0.05, 0.7)) : 0.35);
-    const tx0 = cx + 20 * u + is + 14 * u;
+    const tx0 = gx + is + 14 * u;
     ctx.textAlign = "left";
-    lines.slice(0, 2).forEach((l, li, arr) => ctx.fillText(l, tx0, cy + ch / 2 + (li - (arr.length - 1) / 2) * lh));
+    lines.slice(0, 2).forEach((l, li, arr) => fillTextMid(ctx, l, tx0, cy + ch / 2 + (li - (arr.length - 1) / 2) * lh));
     ctx.restore();
     // Numbered node.
     ctx.translate(p.x, p.y);
@@ -1975,7 +1988,7 @@ function steps(sc: SkillContext) {
     ctx.font = `800 ${Math.round(R * 0.9)}px Inter, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(i + 1), 0, 2 * u);
+    fillTextMid(ctx, String(i + 1), 0, 0);
     ctx.restore();
   });
 }

@@ -18,7 +18,7 @@
 import { exitT } from "../fx";
 import { clamp, ease, lerp, mixHex, range, rgba, TAU } from "../math";
 import { borderBeam, clickRipple, drawCursor, drawIcon, glassCard, iconFor, iconsFor, pill, saasBackground, spring } from "../saasfx";
-import { fillTextFit, fitTextLines, subFont } from "../text";
+import { fillTextFit, fillTextMid, fitTextLines, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { topHeadline } from "./saas";
 import { parseStat } from "./worlds";
@@ -851,8 +851,10 @@ function notifyStack(sc: SkillContext) {
     ctx.restore();
     if (i === arrived - 1) borderBeam(sc, x, y, nw, nh, t * 0.5, { r: 26 * u * S, alpha: 0.6 });
     const ic = 58 * u * S;
-    iconTile(sc, icons[i], x + 22 * u * S + ic / 2, y + nh / 2, ic, ease.outCubic(range(lt, 0.1, 0.7)));
-    const tx = x + 22 * u * S + ic + 20 * u * S;
+    // The icon sits an equal distance from the card's left, top and bottom edges.
+    const inset = (nh - ic) / 2;
+    iconTile(sc, icons[i], x + inset + ic / 2, y + nh / 2, ic, ease.outCubic(range(lt, 0.1, 0.7)));
+    const tx = x + inset + ic + 20 * u * S;
     const maxW = nw - (tx - x) - 90 * u * S;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
@@ -860,7 +862,11 @@ function notifyStack(sc: SkillContext) {
     const desc = descOf(items[i]);
     ctx.fillStyle = palette.text;
     ctx.font = subFont(23 * u * S, 700);
-    fillTextFit(ctx, title, tx, y + nh / 2 - (desc ? 15 * u * S : 0), maxW, { maxLines: 1, minScale: 0.75 });
+    const titleY = y + nh / 2 - (desc ? 15 * u * S : 0);
+    ctx.textBaseline = "alphabetic";
+    const titleBase = titleY + ctx.measureText("H").actualBoundingBoxAscent / 2;
+    ctx.textBaseline = "middle";
+    fillTextFit(ctx, title, tx, titleY, maxW, { maxLines: 1, minScale: 0.75 });
     if (desc) {
       ctx.fillStyle = rgba(palette.text, 0.62);
       ctx.font = subFont(19 * u * S, 500);
@@ -869,7 +875,9 @@ function notifyStack(sc: SkillContext) {
     ctx.textAlign = "right";
     ctx.fillStyle = rgba(palette.text, 0.42);
     ctx.font = subFont(16 * u * S, 500);
-    ctx.fillText(i === arrived - 1 ? "now" : `${Math.max(1, Math.round((arrived - 1 - i) * 2))}m ago`, x + nw - 24 * u * S, y + 28 * u * S);
+    // The time shares the title's baseline, inset from the right like the icon is from the left.
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(i === arrived - 1 ? "now" : `${Math.max(1, Math.round((arrived - 1 - i) * 2))}m ago`, x + nw - inset, titleBase);
     ctx.restore();
   }
   // App name tag under the stack.
@@ -1022,7 +1030,7 @@ function chartGrow(sc: SkillContext) {
       ctx.fillStyle = palette.light ? "#ffffff" : "#0b0d12";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(finalTxt, -tw / 2 + 20 * u, 1 * u);
+      fillTextMid(ctx, finalTxt, -tw / 2 + 20 * u, 0);
       ctx.restore();
     }
   }

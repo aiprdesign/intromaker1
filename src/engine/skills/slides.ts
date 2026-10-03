@@ -15,7 +15,7 @@ import { exitT } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
 import { drawIcon, glassCard, iconsFor, pill, saasBackground, spring } from "../saasfx";
-import { fillTextFit, fitTextLines, subFont } from "../text";
+import { fillTextFit, fillTextMid, fitTextLines, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { coverDraw, gallery } from "./gallery";
 import { checkBadge, ellipsize, iconTile, windowChrome, wrap, wrapClamp } from "./interactions";
@@ -96,15 +96,18 @@ function support(sc: SkillContext) {
   const articles = supportArticles(scene);
   const query = supportQuery(scene);
   const name = brand?.name;
-  const hx = portrait ? w * 0.05 : w * 0.09;
-  const hw = portrait ? w * 0.9 : w * 0.5;
+  // Vertical: the help window spans the title-safe width, and the chat widget plus its launcher
+  // end at the safe area's bottom edge.
+  const safe = tokens(w, h).safe;
+  const hx = portrait ? safe.left : w * 0.09;
+  const hw = portrait ? safe.width : w * 0.5;
   const hy = portrait ? h * 0.27 : h * 0.28;
   const rowH = 58 * u * S;
   const hh = 46 * u + 176 * u * S + articles.length * rowH + 20 * u * S;
-  const cw = portrait ? w * 0.78 : w * 0.3;
-  const cx = portrait ? w * 0.17 : hx + hw + w * 0.03;
+  const cw = portrait ? safe.width * 0.84 : w * 0.3;
+  const cx = portrait ? safe.right - cw : hx + hw + w * 0.03;
   const cy = portrait ? hy + hh + 24 * u : hy + 30 * u;
-  const chH = portrait ? Math.min(h * 0.94 - cy, 470 * u * S) : Math.min(h * 0.86 - cy, hh);
+  const chH = portrait ? Math.min(safe.top + safe.height - 74 * u * S - cy, 470 * u * S) : Math.min(h * 0.86 - cy, hh);
   topHeadline(sc);
   ctx.save();
   ctx.globalAlpha = (1 - ex) * enter(sc);
@@ -421,7 +424,7 @@ function worldMap(sc: SkillContext) {
     ctx.fillStyle = palette.text;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    fillTextFit(ctx, items[c.i], bx + 54 * u * S, by + ch / 2 + 1 * u, fit.width + 2, { maxLines: 2, lineHeight: 1.12, minScale: 0.85 });
+    fillTextFit(ctx, items[c.i], bx + 54 * u * S, by + ch / 2, fit.width + 2, { maxLines: 2, lineHeight: 1.12, minScale: 0.85 });
     ctx.restore();
   }
   ctx.restore();
@@ -649,7 +652,7 @@ function problemSolution(sc: SkillContext) {
     const lx = x + 64 * u * S;
     lines.forEach((l, j) => {
       const ly = y + chh / 2 + (j - (lines.length - 1) / 2) * 28 * u * S;
-      ctx.fillText(l, lx, ly);
+      fillTextMid(ctx, l, lx, ly);
       if (!good && strike > 0) {
         const lw = ctx.measureText(l).width;
         const sk = clamp(strike * lines.length - j);

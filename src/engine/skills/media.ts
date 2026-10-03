@@ -5,7 +5,7 @@ import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
 import { fitSafeTop, tokens } from "../grid";
 import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, getImage, getMedia, mediaSize, type Drawable } from "../media";
 import { scratch } from "../scratch";
-import { subFont } from "../text";
+import { fillTextMid, subFont } from "../text";
 import type { Skill, SkillContext } from "../types";
 
 /** Draw `d` scaled to cover the box (like CSS object-fit: cover), with zoom and focal pan. */
@@ -275,7 +275,7 @@ function productShowcase(sc: SkillContext) {
   ctx.font = subFont(13 * u, 500);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(brand?.domain ?? "yourbrand.com", 0, y0 + bar / 2);
+  fillTextMid(ctx, brand?.domain ?? "yourbrand.com", 0, y0 + bar / 2);
   const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
   // Slow scroll through tall screenshots.
   if (media) drawCover(ctx, media, x0, y0 + bar, ww, wh - bar, 1.02 + t * 0.01, 0.5, clamp(t / d) * 0.3);

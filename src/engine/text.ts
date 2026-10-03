@@ -376,6 +376,42 @@ export function fitTextLines(
 }
 
 /**
+ * Optical centring. A "middle" baseline centres the font's em box on y, which leaves capitals
+ * sitting a pixel or two high in a chip, button or row and above the icon beside them. This is
+ * how far to move text drawn on a "middle" baseline (in the current font) so the capitals'
+ * centre lands exactly on y.
+ */
+export function capShift(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D): number {
+  const base = ctx.textBaseline;
+  ctx.textBaseline = "middle";
+  const m = ctx.measureText("H");
+  ctx.textBaseline = base;
+  return (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+}
+
+/**
+ * fillText for UI text (chips, buttons, rows) centred optically: on a "middle" baseline its
+ * capitals centre on y (see capShift), and centre-aligned text centres its ink rather than its
+ * advance width, so a short label sits dead centre in its chip.
+ */
+export function fillTextMid(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxW?: number,
+) {
+  const dy = ctx.textBaseline === "middle" ? capShift(ctx) : 0;
+  let dx = 0;
+  if (ctx.textAlign === "center" && maxW === undefined) {
+    const m = ctx.measureText(text.trimEnd());
+    dx = (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2;
+  }
+  if (maxW === undefined) ctx.fillText(text, x + dx, y + dy);
+  else ctx.fillText(text, x, y + dy, maxW);
+}
+
+/**
  * Draw text that has to stay inside its container (a card, a row, a strip), set as fitTextLines
  * lays it out: wrapped onto up to `maxLines` lines rather than squeezed or cut. It follows the
  * context's current font, alignment and baseline like fillText: a "middle" baseline centres the
@@ -396,11 +432,15 @@ export function fillTextFit(
   const n = fit.lines.length;
   const base = ctx.textBaseline;
   ctx.font = fit.font;
+  // A "middle" block is centred on its capitals, so it lines up with icons and sits centred in its row.
+  const oy = base === "middle" ? capShift(ctx) : 0;
   fit.lines.forEach((l, i) => {
-    const ly = base === "middle" ? y + (i - (n - 1) / 2) * step : base === "top" || base === "hanging" ? y + i * step : y - (n - 1 - i) * step;
+    const ly = oy + (base === "middle" ? y + (i - (n - 1) / 2) * step : base === "top" || base === "hanging" ? y + i * step : y - (n - 1 - i) * step);
+    const m = ctx.measureText(l);
     // A single word longer than the box is the one case left: draw it at the box's width.
-    if (ctx.measureText(l).width > maxW) ctx.fillText(l, x, ly, maxW);
-    else ctx.fillText(l, x, ly);
+    if (m.width > maxW) ctx.fillText(l, x, ly, maxW);
+    // Centred lines centre their ink, not their advance width (see fillTextMid).
+    else ctx.fillText(l, ctx.textAlign === "center" ? x + (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2 : x, ly);
   });
   ctx.font = font0;
   return n;

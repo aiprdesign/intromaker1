@@ -527,7 +527,7 @@ function globe(sc: SkillContext) {
     ctx.font = subFont(19 * u * S, 600);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    fillTextFit(ctx, items[l.i], bx + 54 * u * S, by + ch / 2 + 1 * u, fit.width + 2, { maxLines: 2, lineHeight: 1.12, minScale: 0.85 });
+    fillTextFit(ctx, items[l.i], bx + 54 * u * S, by + ch / 2, fit.width + 2, { maxLines: 2, lineHeight: 1.12, minScale: 0.85 });
     ctx.restore();
   }
   ctx.restore();
@@ -944,7 +944,7 @@ function kanban(sc: SkillContext) {
       fillTextFit(ctx, cards[i], x + 26 * u * S, y + cardH / 2, colW - 72 * u * S, { maxLines: 3, lineHeight: 1.18, minScale: 0.8 });
     } else {
       drawIcon(ctx, icons[i], x + 36 * u * S, y + cardH / 2, 22 * u * S, rgba(palette.text, 0.7));
-      fillTextFit(ctx, cards[i], x + 56 * u * S, y + cardH / 2 + 1 * u, colW - 104 * u * S, { maxLines: 2, lineHeight: 1.05, minScale: 0.75 });
+      fillTextFit(ctx, cards[i], x + 56 * u * S, y + cardH / 2, colW - 104 * u * S, { maxLines: 2, lineHeight: 1.05, minScale: 0.75 });
     }
     ctx.restore();
     if (done) checkBadge(sc, x + colW - 24 * u * S, y + cardH / 2, 12 * u * S, 1);
