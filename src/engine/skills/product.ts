@@ -15,13 +15,16 @@ import { ctaButton, ctaCursor, ctaTiming, topHeadline } from "./saas";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 
-type Cut = { canvas: HTMLCanvasElement; cut: boolean };
+/** The cut-out (or the photo as it is), and where its top-left sits in the photo, scaled by `scale`. */
+type Cut = { canvas: HTMLCanvasElement; cut: boolean; x?: number; y?: number; scale?: number; visible?: number };
 const cuts = new Map<string, Cut>();
 
 /**
- * The product without its studio background: when the photo's border is (nearly) all white, the
- * white connected to the edges is keyed out with a soft edge and the result trimmed to the
- * product. Lifestyle photos (no white border) are kept whole and shown as a rounded photo.
+ * The product without its studio background: when the photo's border is a light studio backdrop
+ * (white, a grey sweep or a vignette), the backdrop is keyed out with a soft edge and the result
+ * trimmed to the product. Lifestyle photos are kept whole and shown as a rounded photo, and so is
+ * a white product whose outline mostly can't be seen against white (framed close around it), as
+ * a cut-out guessed there would look torn.
  */
 export function productCutout(img: HTMLImageElement, key: string): Cut | null {
   if (!img.naturalWidth || typeof document === "undefined") return null;
@@ -49,22 +52,33 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
     let whiteBorder = 0;
     for (let x = 0; x < W; x += 2) for (const y of [0, H - 1]) {
       border++;
-      if (white((y * W + x) * 4, 236)) whiteBorder++;
+      if (white((y * W + x) * 4, 200)) whiteBorder++;
     }
     for (let y = 0; y < H; y += 2) for (const x of [0, W - 1]) {
       border++;
-      if (white((y * W + x) * 4, 236)) whiteBorder++;
+      if (white((y * W + x) * 4, 200)) whiteBorder++;
     }
     if (whiteBorder / border >= 0.8) {
       const box = keyStudioBackground(px, W, H);
-      if (box) {
+      if (box && box.visible < 0.8) {
+        // Too much of the outline is white on white with nothing to follow: a guessed cut-out would
+        // look torn, so the photo is shown as it is, framed close around the product.
+        const m = Math.round(Math.max(box.x1 - box.x0, box.y1 - box.y0) * 0.12);
+        const fx0 = Math.max(0, box.x0 - m);
+        const fy0 = Math.max(0, box.y0 - m);
+        const t = document.createElement("canvas");
+        t.width = Math.min(W, box.x1 + m + 1) - fx0;
+        t.height = Math.min(H, box.y1 + m + 1) - fy0;
+        t.getContext("2d")!.drawImage(c, fx0, fy0, t.width, t.height, 0, 0, t.width, t.height);
+        out = { canvas: t, cut: false, x: fx0, y: fy0, scale: k, visible: box.visible };
+      } else if (box) {
         g.putImageData(data, 0, 0);
         const pad = 2;
         const t = document.createElement("canvas");
         t.width = box.x1 - box.x0 + 1 + pad * 2;
         t.height = box.y1 - box.y0 + 1 + pad * 2;
         t.getContext("2d")!.drawImage(c, box.x0 - pad, box.y0 - pad, t.width, t.height, 0, 0, t.width, t.height);
-        out = { canvas: t, cut: true };
+        out = { canvas: t, cut: true, x: box.x0 - pad, y: box.y0 - pad, scale: k, visible: box.visible };
       }
     }
   } catch {
@@ -72,6 +86,136 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
   }
   cuts.set(key, out);
   return out;
+}
+
+/**
+ * A smooth background (a quadratic surface per channel, which follows a vignette or a studio
+ * sweep) fitted to the given pixels, ignoring outliers, and how noisy the background is around it.
+ */
+function fitBackground(px: Uint8ClampedArray, W: number, H: number, pick: number[]) {
+  if (pick.length < 12) return null;
+  const sx = 2 / Math.max(1, W - 1);
+  const sy = 2 / Math.max(1, H - 1);
+  const f = new Float64Array(6);
+  const feat = (p: number) => {
+    const x = (p % W) * sx - 1;
+    const y = Math.floor(p / W) * sy - 1;
+    f[0] = 1;
+    f[1] = x;
+    f[2] = y;
+    f[3] = x * x;
+    f[4] = x * y;
+    f[5] = y * y;
+  };
+  let use = pick.filter((p) => px[p * 4 + 3] >= 200);
+  let coef: number[][] = [];
+  for (let round = 0; round < 3; round++) {
+    if (use.length < 12) return null;
+    const A = Array.from({ length: 6 }, () => new Float64Array(6));
+    const b = [0, 1, 2].map(() => new Float64Array(6));
+    for (const p of use) {
+      feat(p);
+      const i = p * 4;
+      for (let r = 0; r < 6; r++) {
+        const fr = f[r];
+        for (let c = r; c < 6; c++) A[r][c] += fr * f[c];
+        b[0][r] += fr * px[i];
+        b[1][r] += fr * px[i + 1];
+        b[2][r] += fr * px[i + 2];
+      }
+    }
+    for (let r = 0; r < 6; r++) for (let c = 0; c < r; c++) A[r][c] = A[c][r];
+    for (let r = 0; r < 6; r++) A[r][r] += 1e-6 * use.length;
+    coef = b.map((rhs) => solve6(A, rhs));
+    // Drop what's far from the fit (the product touching the border, a cast shadow) and refit.
+    const res = new Float32Array(use.length);
+    for (let k = 0; k < use.length; k++) {
+      const p = use[k];
+      feat(p);
+      let m = 0;
+      for (let ch = 0; ch < 3; ch++) {
+        const c = coef[ch];
+        const v = c[0] + c[1] * f[1] + c[2] * f[2] + c[3] * f[3] + c[4] * f[4] + c[5] * f[5];
+        m = Math.max(m, Math.abs(px[p * 4 + ch] - v));
+      }
+      res[k] = m;
+    }
+    const sorted = Float32Array.from(res).sort();
+    const mad = sorted[sorted.length >> 1];
+    const cut = Math.max(6, mad * 4);
+    const keep = use.filter((_, k) => res[k] <= cut);
+    if (keep.length === use.length || round === 2) {
+      const noise = Math.max(1, mad * 1.25);
+      const bg = [0, 1, 2].map((ch) => {
+        const out = new Float32Array(W * H);
+        const c = coef[ch];
+        for (let y = 0; y < H; y++) {
+          const fy = y * sy - 1;
+          const base = c[0] + c[2] * fy + c[5] * fy * fy;
+          const lin = c[1] + c[4] * fy;
+          for (let x = 0; x < W; x++) {
+            const fx = x * sx - 1;
+            out[y * W + x] = Math.min(255, base + lin * fx + c[3] * fx * fx);
+          }
+        }
+        return out;
+      });
+      return { bg, noise };
+    }
+    use = keep;
+  }
+  return null;
+}
+
+/** A 3×3 mean (edges average what's inside the image), as two 1-D passes. */
+function box3(src: Float32Array, W: number, H: number) {
+  const tmp = new Float32Array(W * H);
+  const out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    for (let x = 0; x < W; x++) {
+      let sum = src[row + x];
+      let n = 1;
+      if (x > 0) (sum += src[row + x - 1]), n++;
+      if (x < W - 1) (sum += src[row + x + 1]), n++;
+      tmp[row + x] = sum / n;
+    }
+  }
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const p = y * W + x;
+      let sum = tmp[p];
+      let n = 1;
+      if (y > 0) (sum += tmp[p - W]), n++;
+      if (y < H - 1) (sum += tmp[p + W]), n++;
+      out[p] = sum / n;
+    }
+  return out;
+}
+
+/** Solves a 6×6 linear system (Gaussian elimination with partial pivoting). */
+function solve6(A0: Float64Array[], b0: Float64Array) {
+  const A = A0.map((r) => Array.from(r));
+  const b = Array.from(b0);
+  for (let c = 0; c < 6; c++) {
+    let piv = c;
+    for (let r = c + 1; r < 6; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+    [A[c], A[piv]] = [A[piv], A[c]];
+    [b[c], b[piv]] = [b[piv], b[c]];
+    const d = A[c][c] || 1e-9;
+    for (let r = c + 1; r < 6; r++) {
+      const f = A[r][c] / d;
+      for (let k = c; k < 6; k++) A[r][k] -= f * A[c][k];
+      b[r] -= f * b[c];
+    }
+  }
+  const x = new Array(6).fill(0);
+  for (let r = 5; r >= 0; r--) {
+    let sum = b[r];
+    for (let k = r + 1; k < 6; k++) sum -= A[r][k] * x[k];
+    x[r] = sum / (A[r][r] || 1e-9);
+  }
+  return x;
 }
 
 /**
@@ -92,37 +236,60 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
  */
 function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
   const N = W * H;
-  // The background colour: the border's median.
-  const samples: number[][] = [];
-  for (let x = 0; x < W; x += 3) for (const y of [0, H - 1]) samples.push([px[(y * W + x) * 4], px[(y * W + x) * 4 + 1], px[(y * W + x) * 4 + 2]]);
-  for (let y = 0; y < H; y += 3) for (const x of [0, W - 1]) samples.push([px[(y * W + x) * 4], px[(y * W + x) * 4 + 1], px[(y * W + x) * 4 + 2]]);
-  const med = [0, 1, 2].map((ch) => samples.map((v) => v[ch]).sort((a, b) => a - b)[samples.length >> 1]);
-  const medL = 0.299 * med[0] + 0.587 * med[1] + 0.114 * med[2];
+  // The k-th 4-neighbour of a pixel (-1 off the image), without allocating in the hot loops.
+  const nb = (p: number, k: number) => (k === 0 ? (p % W > 0 ? p - 1 : -1) : k === 1 ? (p % W < W - 1 ? p + 1 : -1) : k === 2 ? p - W : p + W < N ? p + W : -1);
+  // The background: a smooth surface fitted to the border (a studio sweep or vignette is rarely one
+  // flat white), refitted to all the plain background the first pass finds.
+  const border: number[] = [];
+  const band = Math.max(2, Math.round(Math.min(W, H) * 0.02));
+  for (let y = 0; y < H; y += 2)
+    for (let x = 0; x < W; x += 2) if (x < band || y < band || x >= W - band || y >= H - band) border.push(y * W + x);
+  let model = fitBackground(px, W, H, border);
+  if (!model) return null;
   const dist = new Float32Array(N);
+  const measure = () => {
+    for (let p = 0; p < N; p++) {
+      const i = p * 4;
+      dist[p] = px[i + 3] < 200 ? 0 : Math.max(Math.abs(px[i] - model!.bg[0][p]), Math.abs(px[i + 1] - model!.bg[1][p]), Math.abs(px[i + 2] - model!.bg[2][p]));
+    }
+  };
+  measure();
+  // A studio backdrop: light, neutral and smooth all round the border.
+  let fits = 0;
+  for (const p of border) if (dist[p] <= Math.max(10, model.noise * 3)) fits++;
+  const bgL = 0.299 * model.bg[0][border[0]] + 0.587 * model.bg[1][border[0]] + 0.114 * model.bg[2][border[0]];
+  if (fits / border.length < 0.8 || bgL < 200) return null;
   const chroma = new Float32Array(N);
   const lum = new Float32Array(N);
   for (let p = 0; p < N; p++) {
     const i = p * 4;
-    dist[p] = px[i + 3] < 200 ? 0 : Math.max(Math.abs(px[i] - med[0]), Math.abs(px[i + 1] - med[1]), Math.abs(px[i + 2] - med[2]));
     chroma[p] = Math.max(px[i], px[i + 1], px[i + 2]) - Math.min(px[i], px[i + 1], px[i + 2]);
     lum[p] = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
   }
-  // Brightness smoothed over 3×3 (so sensor and JPEG noise don't stop the flood).
-  const smooth = new Float32Array(N);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      let sum = 0;
-      let n = 0;
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = x + dx;
-          const yy = y + dy;
-          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-          sum += lum[yy * W + xx];
-          n++;
-        }
-      smooth[y * W + x] = sum / n;
+  {
+    // Refit to the plain background connected to the border (sampled), then measure again.
+    const plainT = Math.max(6, model.noise * 2.5);
+    const reach = new Uint8Array(N);
+    const st: number[] = [];
+    for (const p of border) if (dist[p] <= plainT) (reach[p] = 1), st.push(p);
+    while (st.length) {
+      const p = st.pop()!;
+      const x = p % W;
+      for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4))
+        if (q >= 0 && q < N && !reach[q] && dist[q] <= plainT) (reach[q] = 1), st.push(q);
     }
+    const all: number[] = [];
+    for (let y = 1; y < H; y += 4) for (let x = 1; x < W; x += 4) if (reach[y * W + x]) all.push(y * W + x);
+    const refit = all.length > border.length ? fitBackground(px, W, H, all) : null;
+    if (refit) {
+      model = refit;
+      measure();
+    }
+  }
+  const bgc = model.bg;
+  const noise = model.noise;
+  // Brightness smoothed over 3×3 (so sensor and JPEG noise don't stop the flood).
+  const smooth = box3(lum, W, H);
   // Edge strength: Sobel on the smoothed brightness, plus colour changes.
   const grad = new Uint8Array(N);
   for (let y = 1; y < H - 1; y++)
@@ -135,7 +302,7 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
     }
   // Markers. Background: plain background (within a few levels of its colour) connected to the
   // border. Product: what can't be background or a soft shadow: colour, dark tones, strong edges.
-  const PLAIN = 6;
+  const PLAIN = Math.max(6, noise * 2.5);
   const lab = new Uint8Array(N); // 0 unknown, 1 background, 2 product
   const stack: number[] = [];
   for (let p = 0; p < N; p++) {
@@ -208,13 +375,13 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
   for (let p = 0; p < N; p++) {
     if (!lab[p]) continue;
     const x = p % W;
-    for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p - W, p + W]) if (q >= 0 && q < N && !lab[q]) push(q);
+    for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) if (q >= 0 && q < N && !lab[q]) push(q);
   }
   const owner = (q: number) => {
     const x = q % W;
     // The neighbour label that reached it (background wins only where nothing else is next to it).
     let l = 0;
-    for (const r of [x > 0 ? q - 1 : -1, x < W - 1 ? q + 1 : -1, q - W, q + W]) {
+    for (let k4 = 0, r = nb(q, 0); k4 < 4; r = nb(q, ++k4)) {
       if (r < 0 || r >= N || !lab[r]) continue;
       if (lab[r] === 2) return 2;
       l = lab[r];
@@ -230,7 +397,7 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
       if (!l) continue;
       lab[q] = l;
       const x = q % W;
-      for (const r of [x > 0 ? q - 1 : -1, x < W - 1 ? q + 1 : -1, q - W, q + W]) {
+      for (let k4 = 0, r = nb(q, 0); k4 < 4; r = nb(q, ++k4)) {
         if (r < 0 || r >= N || lab[r]) continue;
         // Never step back to a lower level than the one being flooded.
         buckets[Math.max(level, grad[r])].push(r);
@@ -239,51 +406,212 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
   }
   const bg = new Uint8Array(N);
   for (let p = 0; p < N; p++) bg[p] = lab[p] === 1 ? 1 : 0;
-  // Enclosed gaps (a mug's handle): thick blobs of pure background colour inside the product.
-  // Print (a white logo, lettering) is thin and stays.
+  // Distance from the backdrop smoothed over 3×3 (noise averages out, shading doesn't).
+  const shade = box3(dist, W, H);
+  const shadeT = Math.max(3, noise * 1.2);
+  // Background that reached inside the product's outline (product on both sides of it along a row
+  // or a column) through a white face that meets the white backdrop with no outline at all. A real
+  // gap (between a chair's legs, a headphone band and its cups) is lined with crisp edges; a white
+  // face is lined with its own soft shading, so it goes back to the product instead of tearing.
+  {
+    // The outline comes from the product's real pieces, not noise specks in the backdrop.
+    const piece = new Int32Array(N).fill(-1);
+    const pieceSize: number[] = [];
+    for (let s0 = 0; s0 < N; s0++) {
+      if (bg[s0] || piece[s0] >= 0) continue;
+      const id = pieceSize.length;
+      const comp = [s0];
+      piece[s0] = id;
+      for (let k = 0; k < comp.length; k++) {
+        const p = comp[k];
+        const x = p % W;
+        for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4))
+          if (q >= 0 && q < N && !bg[q] && piece[q] < 0) (piece[q] = id), comp.push(q);
+      }
+      pieceSize.push(comp.length);
+    }
+    const realSize = Math.max(40, Math.max(0, ...pieceSize) * 0.01);
+    const real = (p: number) => !bg[p] && pieceSize[piece[p]] >= realSize;
+    const rowMin = new Int32Array(H).fill(W), rowMax = new Int32Array(H).fill(-1);
+    const colMin = new Int32Array(W).fill(H), colMax = new Int32Array(W).fill(-1);
+    for (let p = 0; p < N; p++) {
+      if (!real(p)) continue;
+      const x = p % W;
+      const y = (p - x) / W;
+      if (x < rowMin[y]) rowMin[y] = x;
+      if (x > rowMax[y]) rowMax[y] = x;
+      if (y < colMin[x]) colMin[x] = y;
+      if (y > colMax[x]) colMax[x] = y;
+    }
+    const inside = (p: number) => {
+      const x = p % W;
+      const y = (p - x) / W;
+      return (x > rowMin[y] && x < rowMax[y]) || (y > colMin[x] && y < colMax[x]);
+    };
+    const done = new Uint8Array(N);
+    for (let s0 = 0; s0 < N; s0++) {
+      if (!bg[s0] || done[s0] || !inside(s0)) continue;
+      const comp = [s0];
+      done[s0] = 1;
+      let lined = 0;
+      let crispN = 0;
+      for (let k = 0; k < comp.length; k++) {
+        const p = comp[k];
+        const x = p % W;
+        let edge = false;
+        for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) {
+          if (q < 0 || q >= N) continue;
+          if (real(q)) {
+            edge = true;
+            continue;
+          }
+          if (!bg[q] || done[q] || !inside(q)) continue;
+          done[q] = 1;
+          comp.push(q);
+        }
+        if (edge) {
+          lined++;
+          // A crisp edge at or just past the lining.
+          const y = (p - x) / W;
+          let hit = false;
+          for (let dy = -2; dy <= 2 && !hit; dy++)
+            for (let dx = -2; dx <= 2; dx++) {
+              const xx = x + dx;
+              const yy = y + dy;
+              if (xx >= 0 && yy >= 0 && xx < W && yy < H && grad[yy * W + xx] >= 12) {
+                hit = true;
+                break;
+              }
+            }
+          if (hit) crispN++;
+        }
+      }
+      // Only light, colourless intrusions can be a white face.
+      if (comp.length < 40 || lined < 8 || crispN / lined >= 0.4) continue;
+      let pale = 0;
+      for (const p of comp) if (chroma[p] <= 14 && lum[p] >= 170) pale++;
+      if (pale / comp.length < 0.9) continue;
+      for (const p of comp) bg[p] = 0;
+    }
+  }
+  // A shadow cast beside the product (a drop shadow): a smooth, colourless region darker than the
+  // backdrop that fades into it with no outline, and meets the product at the product's crisp edge.
+  // A grey face of the product meets the backdrop at its own outline, or rounds off into the rest
+  // of the product, so it stays.
+  {
+    const bgL = (p: number) => 0.299 * bgc[0][p] + 0.587 * bgc[1][p] + 0.114 * bgc[2][p];
+    const dim = (p: number) => !bg[p] && chroma[p] <= 12 && grad[p] < 8 && lum[p] < bgL(p) - shadeT && dist[p] <= 95;
+    const seenS = new Uint8Array(N);
+    const near = (p: number, t: number) => {
+      const x = p % W;
+      const y = (p - x) / W;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < W && yy < H && grad[yy * W + xx] >= t) return true;
+        }
+      return false;
+    };
+    for (let s0 = 0; s0 < N; s0++) {
+      if (seenS[s0] || !dim(s0)) continue;
+      const comp = [s0];
+      seenS[s0] = 1;
+      let toBg = 0, softBg = 0, toProd = 0, crispProd = 0, firmProd = 0;
+      for (let k = 0; k < comp.length; k++) {
+        const p = comp[k];
+        const x = p % W;
+        let b = false, o = false;
+        for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) {
+          if (q < 0 || q >= N) continue;
+          if (bg[q]) b = true;
+          else if (!dim(q)) o = true;
+          else if (!seenS[q]) {
+            seenS[q] = 1;
+            comp.push(q);
+          }
+        }
+        if (b) {
+          toBg++;
+          if (!near(p, 7)) softBg++;
+        }
+        if (o) {
+          toProd++;
+          if (near(p, 12)) crispProd++;
+          if (near(p, 8)) firmProd++;
+        }
+      }
+      // A thin glow band along the outline (a few pixels across) may meet a softer product edge.
+      const thin = comp.length / Math.max(1, toBg) <= 8;
+      // It has to meet the product: a region on its own is a part of the product (a white one).
+      const meets = toProd > 0 && (crispProd / toProd >= 0.6 || (thin && firmProd / toProd >= 0.6));
+      if (comp.length < (thin ? 60 : 200) || toBg < 20 || softBg / toBg < 0.85 || !meets || toBg < toProd * 0.5) continue;
+      for (const p of comp) bg[p] = 1;
+    }
+  }
+  // Enclosed gaps (a mug's handle, between a chair's legs): thick blobs of the background's colour
+  // inside the product, outlined by a crisp edge nearly all the way round. A white face or a
+  // highlight on one fades into its shading instead, and print (a white logo, lettering) is thin:
+  // both stay.
+  const sd = shade;
+  const holeT = Math.max(5, noise * 1.6);
   const seen = new Uint8Array(N);
   const gapMark = new Int32Array(N);
   let gapId = 0;
-  const minGap = Math.max(60, N * 0.003);
-  const thick = Math.max(6, Math.round(Math.min(W, H) * 0.025));
+  const minGap = Math.max(60, N * 0.0015);
+  const thick = Math.max(5, Math.round(Math.min(W, H) * 0.018));
+  const crisp = (q: number) => {
+    // A strong edge at or just past this pixel.
+    const x = q % W;
+    const y = (q - x) / W;
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        if (grad[yy * W + xx] >= 12) return true;
+      }
+    return false;
+  };
   for (let s0 = 0; s0 < N; s0++) {
-    if (bg[s0] || seen[s0] || dist[s0] > 4) continue;
+    if (bg[s0] || seen[s0] || sd[s0] > holeT) continue;
     const comp: number[] = [s0];
     seen[s0] = 1;
+    let touches = false;
+    const rim: number[] = [];
     for (let k = 0; k < comp.length; k++) {
       const p = comp[k];
       const x = p % W;
-      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p - W, p + W]) {
-        if (q < 0 || q >= N || seen[q] || bg[q] || dist[q] > 4) continue;
+      for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) {
+        if (q < 0 || q >= N) continue;
+        if (bg[q]) {
+          touches = true;
+          continue;
+        }
+        if (seen[q]) continue;
+        if (sd[q] > holeT) {
+          rim.push(q);
+          continue;
+        }
         seen[q] = 1;
         comp.push(q);
       }
     }
-    if (comp.length < minGap) continue;
+    if (comp.length < minGap || touches) continue;
     // Thick: some pixel has the gap all around it for `thick` pixels.
     const mark = ++gapId;
     for (const p of comp) gapMark[p] = mark;
-    const inGap = { has: (q: number) => gapMark[q] === mark };
+    const inGap = (q: number) => gapMark[q] === mark;
     const deep = comp.some((p) => {
       const x = p % W;
       const y = (p - x) / W;
       if (x < thick || y < thick || x >= W - thick || y >= H - thick) return false;
-      return [p - thick, p + thick, p - thick * W, p + thick * W, p - thick * (W + 1), p + thick * (W + 1), p - thick * (W - 1), p + thick * (W - 1)].every((q) => inGap.has(q));
+      return [p - thick, p + thick, p - thick * W, p + thick * W, p - thick * (W + 1), p + thick * (W + 1), p - thick * (W - 1), p + thick * (W - 1)].every(inGap);
     });
-    if (!deep) continue;
-    // Framed by product material (a contrasting edge), not by the smooth shading of a white face
-    // whose brightest part this is.
-    let ring = 0;
-    let rn = 0;
-    for (const p of comp) {
-      const x = p % W;
-      for (const q of [x > 2 ? p - 3 : -1, x < W - 3 ? p + 3 : -1, p - 3 * W, p + 3 * W]) {
-        if (q < 0 || q >= N || inGap.has(q)) continue;
-        ring += dist[q];
-        rn++;
-      }
-    }
-    if (rn && ring / rn >= 40) for (const p of comp) bg[p] = 1;
+    if (!deep || !rim.length) continue;
+    let sharp = 0;
+    for (const q of rim) if (crisp(q)) sharp++;
+    if (sharp / rim.length >= 0.8) for (const p of comp) bg[p] = 1;
   }
   // Thin, light, colourless skirts left along the outline (the rim of a shadow or reflection):
   // a morphological opening finds what's thinner than a few pixels, and of that only the light
@@ -309,12 +637,38 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
     }
     return out;
   };
+  // Light specks in the backdrop (noise, dust) go before anything is closed up, so they can't
+  // be joined into a patch.
+  {
+    const lbl = new Int32Array(N).fill(-1);
+    const parts: number[][] = [];
+    let big = 0;
+    for (let s0 = 0; s0 < N; s0++) {
+      if (bg[s0] || lbl[s0] >= 0) continue;
+      const comp = [s0];
+      lbl[s0] = parts.length;
+      for (let k = 0; k < comp.length; k++) {
+        const p = comp[k];
+        const x = p % W;
+        for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4))
+          if (q >= 0 && q < N && !bg[q] && lbl[q] < 0) (lbl[q] = parts.length), comp.push(q);
+      }
+      parts.push(comp);
+      big = Math.max(big, comp.length);
+    }
+    const tiny = Math.max(24, big * 0.004);
+    for (const comp of parts) {
+      if (comp.length >= tiny) continue;
+      let light = 0;
+      for (const p of comp) light += dist[p];
+      if (light / comp.length < 45) for (const p of comp) bg[p] = 1;
+    }
+  }
   const solid = new Uint8Array(N);
   for (let p = 0; p < N; p++) solid[p] = bg[p] ? 0 : 1;
   // First a closing: a highlight stripe that runs out to the backdrop (a specular line down a
   // white earbud stem) is a thin white channel, not a gap: give it back to the product.
   // Next to a dark or coloured product, white is always backdrop: only light products get it.
-  const closed = minPass(minPass(minPass(minPass(solid, true, true), false, true), true, false), false, false);
   const lightAround = (p: number) => {
     const x = p % W;
     const y = (p - x) / W;
@@ -329,11 +683,79 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
       }
     return strongest < 80;
   };
+  // Closed across the channel (along rows for an upright stripe, down columns for a lying one),
+  // and kept only where the channel runs long and thin that way, or is a hairline: a highlight down
+  // a stem. A wider gap between two parts (under an earbud's stem, above its case) is backdrop and
+  // stays clear.
   const fill: number[] = [];
-  for (let p = 0; p < N; p++) if (!solid[p] && closed[p] && dist[p] <= 12 && lightAround(p)) fill.push(p);
+  for (const across of [true, false]) {
+    const closed = minPass(minPass(solid, across, true), across, false);
+    const mark = new Uint8Array(N);
+    const cand: number[] = [];
+    for (let p = 0; p < N; p++) if (!solid[p] && closed[p] && dist[p] <= 12 && lightAround(p)) (mark[p] = 1), cand.push(p);
+    for (const s0 of cand) {
+      if (mark[s0] !== 1) continue;
+      const comp = [s0];
+      mark[s0] = 2;
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let k = 0; k < comp.length; k++) {
+        const p = comp[k];
+        const x = p % W;
+        // Its length runs the other way from the closing.
+        const along = across ? (p - x) / W : x;
+        if (along < lo) lo = along;
+        if (along > hi) hi = along;
+        for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) if (q >= 0 && mark[q] === 1) (mark[q] = 2), comp.push(q);
+      }
+      const len = hi - lo + 1;
+      const thickness = comp.length / len;
+      if ((len >= 4 * r && len / thickness >= 6) || (thickness <= Math.max(3, r * 0.6) && len >= thickness * 2)) fill.push(...comp);
+    }
+  }
   for (const p of fill) {
     solid[p] = 1;
     bg[p] = 0;
+  }
+  // Small bites out of the outline (where a highlight or a seam line meets the edge): pale
+  // backdrop pixels hemmed in by the product in at least 6 of 8 directions within a few pixels.
+  {
+    const R = Math.max(6, Math.round(r * 1.5));
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+    for (let pass = 0; pass < 3; pass++) {
+      const bite: number[] = [];
+      for (let p = 0; p < N; p++) {
+        if (!bg[p] || dist[p] > 12 || chroma[p] > 14) continue;
+        let touch = false;
+        for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4))
+          if (q >= 0 && !bg[q]) {
+            touch = true;
+            break;
+          }
+        if (!touch) continue;
+        const x = p % W;
+        const y = (p - x) / W;
+        let hits = 0;
+        for (let d = 0; d < 8 && hits + 8 - d >= 6; d++) {
+          const [dx, dy] = dirs[d];
+          for (let k = 1; k <= R; k++) {
+            const xx = x + dx * k;
+            const yy = y + dy * k;
+            if (xx < 0 || yy < 0 || xx >= W || yy >= H) break;
+            if (!bg[yy * W + xx]) {
+              hits++;
+              break;
+            }
+          }
+        }
+        if (hits >= 6) bite.push(p);
+      }
+      if (!bite.length) break;
+      for (const p of bite) {
+        bg[p] = 0;
+        solid[p] = 1;
+      }
+    }
   }
   const opened = minPass(minPass(minPass(minPass(solid, true, false), false, false), true, true), false, true);
   for (let p = 0; p < N; p++) if (solid[p] && !opened[p] && dist[p] < 45 && chroma[p] <= 12) bg[p] = 1;
@@ -348,7 +770,7 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
     for (let k = 0; k < comp.length; k++) {
       const p = comp[k];
       const x = p % W;
-      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p - W, p + W]) {
+      for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) {
         if (q < 0 || q >= N || bg[q] || label[q] >= 0) continue;
         label[q] = id;
         comp.push(q);
@@ -382,6 +804,61 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
     return h <= Math.max(4, H * 0.035) && w >= h * 4 && light[l] / n < 40;
   });
   for (let p = 0; p < N; p++) if (!bg[p] && drop[label[p]]) bg[p] = 1;
+  // A faint glow or shadow band hugging the outline (a few pixels of light grey between the backdrop
+  // and a soft product edge) is peeled off from the outside in, so it doesn't show as a pale sliver
+  // on a dark stage. Only colourless pixels darker than the backdrop and much fainter than the
+  // product just inside go, never the product itself.
+  {
+    const glowR = Math.max(3, Math.round(Math.min(W, H) * 0.007));
+    const bgLum = (p: number) => 0.299 * bgc[0][p] + 0.587 * bgc[1][p] + 0.114 * bgc[2][p];
+    const faint = (p: number) => {
+      if (chroma[p] > 10 || lum[p] >= bgLum(p) - 1) return false;
+      const x = p % W;
+      const y = (p - x) / W;
+      let ref = 0;
+      for (let dy = -glowR; dy <= glowR; dy++)
+        for (let dx = -glowR; dx <= glowR; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const q = yy * W + xx;
+          if (!bg[q] && dist[q] > ref) ref = dist[q];
+        }
+      return ref >= 12 && dist[p] < ref * 0.35;
+    };
+    let ring: number[] = [];
+    for (let p = 0; p < N; p++) {
+      if (bg[p]) continue;
+      for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4))
+        if (q >= 0 && bg[q]) {
+          ring.push(p);
+          break;
+        }
+    }
+    const peeled = new Uint8Array(N);
+    const first = new Uint8Array(N);
+    for (let layer = 0; layer < glowR * 2 && ring.length; layer++) {
+      const peel = ring.filter(faint);
+      for (const p of peel) (bg[p] = 1), (peeled[p] = 1), (first[p] = layer === 0 ? 1 : 0);
+      const next = new Set<number>();
+      for (const p of peel) for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) if (q >= 0 && !bg[q]) next.add(q);
+      ring = [...next];
+    }
+    // A glow is a band along the outline: shallow for its length. A deep, narrow bite (up a faint
+    // highlight from the tip of a stem) is product and goes back.
+    for (let s0 = 0; s0 < N; s0++) {
+      if (peeled[s0] !== 1) continue;
+      const comp = [s0];
+      peeled[s0] = 2;
+      let contact = 0;
+      for (let k = 0; k < comp.length; k++) {
+        const p = comp[k];
+        if (first[p]) contact++;
+        for (let k4 = 0, q = nb(p, 0); k4 < 4; q = nb(p, ++k4)) if (q >= 0 && peeled[q] === 1) (peeled[q] = 2), comp.push(q);
+      }
+      if (comp.length / Math.max(1, contact) > glowR * 0.75) for (const p of comp) bg[p] = 0;
+    }
+  }
   // Matte the outline and write alpha (on pixels within 2px of the background).
   const nearBg = new Uint8Array(N);
   for (let y = 0; y < H; y++)
@@ -434,10 +911,33 @@ function keyStudioBackground(px: Uint8ClampedArray, W: number, H: number) {
       }
       // Take the background mixed into the edge back out of its colour.
       if (a < 1)
-        for (let ch = 0; ch < 3; ch++) px[i + ch] = clamp(med[ch] + (px[i + ch] - med[ch]) / a, 0, 255);
+        for (let ch = 0; ch < 3; ch++) px[i + ch] = clamp(bgc[ch][p] + (px[i + ch] - bgc[ch][p]) / a, 0, 255);
       px[i + 3] = Math.round(px[i + 3] * a);
     }
-  return x1 > x0 && y1 > y0 ? { x0, y0, x1, y1 } : null;
+  if (x1 <= x0 || y1 <= y0) return null;
+  // How much of the outline is a visible edge (rather than white meeting white with nothing to
+  // follow): a cut-out guessed along an invisible outline looks torn.
+  let rim = 0;
+  let shown = 0;
+  for (let p = 0; p < N; p++) {
+    if (bg[p]) continue;
+    const x = p % W;
+    if (!((x > 0 && bg[p - 1]) || (x < W - 1 && bg[p + 1]) || (p >= W && bg[p - W]) || (p < N - W && bg[p + W]))) continue;
+    rim++;
+    const y = (p - x) / W;
+    let hit = dist[p] >= Math.max(24, noise * 6);
+    for (let dy = -2; dy <= 2 && !hit; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H && grad[yy * W + xx] >= 8) {
+          hit = true;
+          break;
+        }
+      }
+    if (hit) shown++;
+  }
+  return { x0, y0, x1, y1, visible: rim ? shown / rim : 0 };
 }
 
 const cards = new Map<string, HTMLCanvasElement>();
