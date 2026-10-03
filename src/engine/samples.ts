@@ -41,6 +41,21 @@ export const SAAS_SAMPLE: VideoPlan = inTemplate(
   ],
 );
 
+/** A speed promo made only of fast type slides: words switching on the half-beat, cut on the beat. */
+export const SPEED_SAMPLE: VideoPlan = inTemplate(
+  { title: "Lumetrik", aspect: "16:9", seed: 4410, brand: { name: "Lumetrik", domain: "lumetrik.app", images: [], videos: [] }, concept: "analytics" },
+  "pop",
+  [
+    [{ role: "hook", skill: "crash-zoom", text: "Meet *Lumetrik*", items: ["Data", "Charts", "Answers"], subtext: "Analytics for product teams", transition: "cut" }, 9],
+    [{ role: "promise", skill: "rapid-fire", text: "Your metrics, *in motion*", items: ["Track", "Share", "Decide"], transition: "cut" }, 9],
+    [{ role: "promise", skill: "flip-switch", text: "Built for *teams*", items: ["Product", "Growth", "Design"], transition: "whip" }, 9],
+    [{ role: "promise", skill: "speed-ticker", text: "Insights at *full speed*", items: ["Funnels", "Cohorts", "Retention", "Alerts"], transition: "cut" }, 9],
+    [{ role: "promise", skill: "word-grid", text: "Your data, *one place*", items: ["Funnels", "Cohorts", "Alerts", "Reports", "Goals", "Boards"], transition: "cut" }, 10],
+    [{ role: "promise", skill: "stack-stomp", text: "Decide with *clarity*", transition: "whip" }, 9],
+    [{ role: "cta", skill: "cta", text: "Start with *Lumetrik*", subtext: "Get started", transition: "cut" }, 8],
+  ],
+);
+
 const KELVO = ["/samples/kelvo-front.jpg", "/samples/kelvo-angle.jpg", "/samples/kelvo-back.jpg"];
 const photo = (i: number) => ({ src: KELVO[i], kind: "image" as const });
 
@@ -96,6 +111,13 @@ export const SAMPLE_FILMS = [
     plan: PRODUCT_SAMPLE,
     blurb: "Kelvo is an imaginary smart bottle. From three photos the film builds the reveal, feature callouts, each angle, close-ups and an end card.",
     prompt: 'Product video for "Kelvo", a smart water bottle with a temperature display on the cap. Screw-top lid, carry loop, brushed steel cap',
+  },
+  {
+    id: "speed",
+    label: "Speed promo",
+    plan: SPEED_SAMPLE,
+    blurb: "A fast promo for the same imaginary app, made only of fast type slides: a crash zoom, rapid-fire words, a flip, a speed ticker, a word grid and a stomped stack, each switching on the half-beat.",
+    prompt: 'Fast promo for "Lumetrik", an analytics app for product teams. Funnels, cohorts, alerts, shared reports',
   },
   {
     id: "trailer",

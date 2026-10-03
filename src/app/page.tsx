@@ -45,7 +45,7 @@ export default function Home() {
         <div className="section-head">
           <span className="eyebrow">Sample films</span>
           <h2>See what it makes.</h2>
-          <p>A SaaS launch, a product video and a trailer for three imaginary brands, each built from its best slides. They play live in your browser, frame for frame what you export.</p>
+          <p>A SaaS launch, a speed promo, a product video and a trailer for imaginary brands, each built from its best slides. They play live in your browser, frame for frame what you export.</p>
         </div>
         <SampleFilms />
       </section>
@@ -53,13 +53,27 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>88 motion skills, rendered live.</h2>
+          <h2>98 motion skills, rendered live.</h2>
           <p>The cards below are real-time output of the engine: the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See all 88 skills →
+            See all 98 skills →
+          </Link>
+        </div>
+      </section>
+
+      <section className="section" id="fast-type">
+        <div className="section-head">
+          <span className="eyebrow">Fast type</span>
+          <h2>Speed animations, on the beat.</h2>
+          <p>Sixteen kinetic text slides that switch words every half-beat (whips, crash zooms, flips, tickers, stomps) and then land your line. Each card below is playing live.</p>
+        </div>
+        <SkillGrid group="Fast type" ids={["crash-zoom", "rapid-fire", "speed-ticker", "flip-switch", "stack-stomp", "word-grid"]} />
+        <div className="center">
+          <Link href="/skills#fast-type" className="btn btn-ghost btn-lg">
+            See all 16 fast type slides →
           </Link>
         </div>
       </section>

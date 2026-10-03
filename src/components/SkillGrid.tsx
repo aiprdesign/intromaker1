@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { PALETTES } from "@/engine/palettes";
-import { SKILLS } from "@/engine/skills";
+import { SKILL_GROUPS, SKILLS } from "@/engine/skills";
 import { PALETTE_IDS, type PaletteId } from "@/engine/types";
 import LoopCanvas from "./LoopCanvas";
 
@@ -14,9 +14,18 @@ const DEFAULT_PALETTES: PaletteId[] = [
   "cosmos", "aurora", "ice", "synthwave",
 ];
 
-export default function SkillGrid({ limit, pickers = false }: { limit?: number; pickers?: boolean }) {
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+/** The first skill of each picker group carries the group's anchor (/skills#fast-type). */
+const ANCHORS = new Map(SKILL_GROUPS.map((g) => [g.skills[0]?.id, slug(g.name)]));
+
+export default function SkillGrid({ limit, pickers = false, group, ids }: { limit?: number; pickers?: boolean; group?: string; ids?: string[] }) {
   const [palette, setPalette] = useState<PaletteId | "mix">("mix");
-  const skills = limit ? SKILLS.slice(0, limit) : SKILLS;
+  const inGroup = group ? (SKILL_GROUPS.find((g) => g.name === group)?.skills ?? []) : SKILLS;
+  // An explicit pick (in its own order) narrows the group.
+  const pool = ids ? ids.map((id) => inGroup.find((s) => s.id === id)).filter((s) => !!s) : inGroup;
+  const skills = limit ? pool.slice(0, limit) : pool;
+  // A group's own grid (the homepage's fast type row) plays in the SaaS look throughout.
+  const saasAll = !!group;
   return (
     <>
       {pickers && (
@@ -37,9 +46,9 @@ export default function SkillGrid({ limit, pickers = false }: { limit?: number; 
           const pal = palette === "mix" ? DEFAULT_PALETTES[i % DEFAULT_PALETTES.length] : palette;
           const scene = { skill: s.id, text: s.sample.text, subtext: s.sample.subtext, items: s.sample.items, duration: 4.6, transition: "cut" as const };
           return (
-            <article className="skill-card" key={s.id}>
+            <article className="skill-card" key={s.id} id={!group && pickers ? ANCHORS.get(s.id) : undefined}>
               <div className="skill-canvas">
-                <LoopCanvas scene={scene} plan={{ style: i < 10 ? "saas" : "trailer", palette: pal, font: i < 10 ? "inter" : i % 3 === 1 ? "grotesk" : "anton", seed: 77 + i }} long={640} />
+                <LoopCanvas scene={scene} plan={{ style: saasAll || i < 10 ? "saas" : "trailer", palette: pal, font: saasAll || i < 10 ? "inter" : i % 3 === 1 ? "grotesk" : "anton", seed: 77 + i }} long={640} />
               </div>
               <div className="skill-meta">
                 <div className="skill-head">

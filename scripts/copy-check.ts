@@ -151,7 +151,7 @@ console.log("New slides are written from the film");
   const prompt = "Nimbus, a project management app for remote teams with tasks, docs and chat";
   const film = planFromPrompt({ prompt, aspect: "16:9", length: "standard", safe: true });
   const direct = (variant: number) => planFromPrompt({ prompt, aspect: "16:9", length: "standard", safe: true, variant, seed: 1 + variant });
-  for (const sk of ["bento", "icon-features", "word-swap", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "photo-fan", "card-spread", "photo-drop", "cta"] as const) {
+  for (const sk of ["bento", "icon-features", "word-swap", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "photo-fan", "card-spread", "photo-drop", "cta"] as const) {
     const c = slideContent(sk, film, direct);
     const all = [c.text, ...(c.items ?? [])].join(" ");
     check(c.text !== SKILL_MAP[sk].sample.text && !/developers|Git deploys|your team\*?$/i.test(all), `${sk}: "${c.text}" ${c.items ? `(${c.items.join(", ")})` : ""}`);

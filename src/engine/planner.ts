@@ -1643,7 +1643,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // between the reveal and the product that needs no media and makes no claims.
   // Remakes set the same line as an editorial type moment: bands of kinetic type, or a poster.
   // Fast type joins the rotation: words switching on the half-beat before the line lands.
-  const promiseKind = (["word-swap", "type-rows", "type-poster", "type-echo", "poster-split", "type-slots", "poster-grid", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap"] as const)[variant % 13];
+  const promiseKind = (["word-swap", "type-rows", "type-poster", "type-echo", "poster-split", "type-slots", "poster-grid", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush"] as const)[variant % 23];
   const [swapLead, swapWords = ""] = concept.swap.split(/,\s*(?=[^,]*$)/);
   const swapList = swapWords.split("|").filter(Boolean);
   const promiseLine = swapList.length ? `${swapLead}, *${swapList[swapList.length - 1]}*` : concept.swap;
@@ -1662,13 +1662,13 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
         role: "promise", skill: promiseKind,
         text: promiseLine,
         items:
-          promiseKind === "type-echo" || promiseKind === "style-shuffle"
+          promiseKind === "type-echo" || promiseKind === "style-shuffle" || promiseKind === "stack-stomp"
             ? undefined
-            : promiseKind === "flip-switch"
+            : promiseKind === "flip-switch" || promiseKind === "speed-type"
               ? swapList.length >= 3 ? swapList.slice(0, -1).map(cap) : shortFeatures.slice(0, 4)
               : promiseKind === "split-flap"
                 ? snappy.filter((f) => f.length <= 12).slice(0, 2)
-                : promiseKind === "rapid-fire" || promiseKind === "zoom-through" || promiseKind === "slice-switch"
+                : ["rapid-fire", "zoom-through", "slice-switch", "whip-pan", "speed-ticker", "cube-spin", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush"].includes(promiseKind)
                   ? // Fast type switches words every half-beat, so only short ones (else the category's swap words).
                     snappy.length >= 3 ? snappy.slice(0, 5) : swapList.length >= 2 ? swapList.map(cap) : snappy
                   : promiseKind === "type-rows" || promiseKind === "type-slots"

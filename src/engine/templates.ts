@@ -692,7 +692,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.5, card: "frost", text: "blur", grain: 0.6, shader: "warp", shaderStrength: 0.9, depth: 10 },
     transitions: ["dissolve", "dolly", "leak"],
     pace: 1.05,
-    roles: {},
+    roles: { promise: "cube-spin" },
     revealNoLogo: "logo-reveal",
     sample: sample("The future, *in full colour*."),
   },
@@ -710,7 +710,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.2, card: "flat", text: "type", grain: 0.4, vignette: 1, shader: "dither", shaderStrength: 0.8 },
     transitions: ["cut", "glitch", "shutter"],
     pace: 0.95,
-    roles: {},
+    roles: { promise: "speed-type" },
     revealNoLogo: "logo-reveal",
     sample: sample("thinking in *pixels*."),
   },
@@ -891,7 +891,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 1, aurora: 0.4, card: "glass", text: "streak", textScale: 1.12, grain: 0.9, vignette: 1.5, shader: "rays", shaderStrength: 0.85, depth: 6 },
     transitions: ["flash", "zoom", "whip"],
     pace: 0.95,
-    roles: {},
+    roles: { promise: "stack-stomp" },
     revealNoLogo: "logo-reveal",
     sample: sample("Built *different*.", "blur-reveal", { eyebrow: "Coming soon" }),
   },
@@ -948,7 +948,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0.6, aurora: 0.5, card: "glass", text: "streak", textScale: 1.16, grain: 1, vignette: 1.6, shader: "smoke", shaderStrength: 0.7, depth: 6 },
     transitions: ["whip", "flash", "leak", "zoom"],
     pace: 0.9,
-    roles: {},
+    roles: { promise: "crash-zoom" },
     revealNoLogo: "logo-reveal",
     sample: sample("Bring the *heat*.", "blur-reveal", { eyebrow: "This summer" }),
   },
@@ -1002,6 +1002,16 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "slice-switch": "promise",
   "style-shuffle": "promise",
   "split-flap": "promise",
+  "whip-pan": "promise",
+  "stack-stomp": "promise",
+  "speed-ticker": "promise",
+  "cube-spin": "promise",
+  "speed-type": "promise",
+  "bar-wipe": "promise",
+  "crash-zoom": "promise",
+  "word-grid": "promise",
+  "orbit-text": "promise",
+  "tape-rush": "promise",
   "card-stack": "features",
   "contact-sheet": "features",
   "spec-sheet": "bento",
@@ -1117,7 +1127,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

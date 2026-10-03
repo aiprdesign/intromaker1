@@ -11,7 +11,7 @@
  *
  * Photosensitive-safe: nothing flashes the whole frame; colour changes stay word-sized.
  */
-import { exitT, speedLines } from "../fx";
+import { exitT, lightSweep } from "../fx";
 import { tokens } from "../grid";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba } from "../math";
 import { saasBackground, saasFont, spring } from "../saasfx";
@@ -25,7 +25,7 @@ const FALLBACK = ["Plan", "Build", "Ship", "Grow"];
  * Fast skills also take a word-swap line ("Your work, planned|built|shared"): the last
  * alternative becomes the accent word and the others the words it switches through.
  */
-function fastScene(scene: Scene): Scene {
+export function fastScene(scene: Scene): Scene {
   const group = /\S+(?:\|\S+)+/.exec(scene.text ?? "");
   if (!group) return scene;
   const alts = group[0].split("|").map((x) => x.replace(/[*,.!?]/g, "")).filter(Boolean);
@@ -38,10 +38,10 @@ function fastScene(scene: Scene): Scene {
 }
 
 /** How fast words switch: half a beat, kept between ~4 and ~9 frames at 30 fps. */
-const tickOf = (beat: number) => clamp(beat / 2, 0.14, 0.3);
+export const tickOf = (beat: number) => clamp(beat / 2, 0.14, 0.3);
 
 /** The words a fast skill switches through: the items' short titles, else a stock set. */
-function cycleWords(scene: Scene, max = 6) {
+export function cycleWords(scene: Scene, max = 6) {
   const items = (scene.items ?? []).map((x) => titleOf(x).trim()).filter((x) => x && x.length <= 22 && x.split(/\s+/).length <= 3);
   return (items.length >= 2 ? items : FALLBACK).slice(0, max);
 }
@@ -50,7 +50,7 @@ function cycleWords(scene: Scene, max = 6) {
  * When each word lands and when the headline does. At least ~45% of the scene (and 1.2 s) is
  * left for the headline to hold, so short scenes switch through fewer words, never faster ones.
  */
-function switchPlan(scene: Scene, beat: number, opts: { start?: number; per?: number; max?: number; words?: string[] } = {}) {
+export function switchPlan(scene: Scene, beat: number, opts: { start?: number; per?: number; max?: number; words?: string[] } = {}) {
   const tick = (opts.per ?? 1) * tickOf(beat);
   const start = opts.start ?? 0.2;
   const words = opts.words ?? cycleWords(scene, opts.max ?? 6);
@@ -60,7 +60,7 @@ function switchPlan(scene: Scene, beat: number, opts: { start?: number; per?: nu
 }
 
 /** The headline split into the switching word (its *accent*, else its last word) and the rest. */
-function splitTarget(text: string) {
+export function splitTarget(text: string) {
   const words = accentWords(text || "Built for *teams*");
   let hit = words.filter((x) => x.a);
   if (!hit.length) hit = words.slice(-1);
@@ -75,7 +75,7 @@ function splitTarget(text: string) {
 /* ───────────────────────── Shared type layout ───────────────────────── */
 
 type Line = { words: Word[]; w: number };
-type Laid = { lines: Line[]; size: number; lh: number; face: (s: number) => string; track: number };
+export type Laid = { lines: Line[]; size: number; lh: number; face: (s: number) => string; track: number };
 
 /** Set the film's display face (with its tracking) at a size. */
 function useFace(sc: SkillContext, size: number) {
@@ -92,7 +92,7 @@ function measureLine(sc: SkillContext, words: Word[], size: number) {
 }
 
 /** Lay the headline in the film's face: one line if it fits big enough, else balanced lines. */
-function layWords(sc: SkillContext, words: Word[], maxW: number, maxSize: number, maxLines: number): Laid {
+export function layWords(sc: SkillContext, words: Word[], maxW: number, maxSize: number, maxLines: number): Laid {
   const probe = 100;
   let best: { lines: Word[][]; size: number } = { lines: [words], size: 0 };
   for (let n = 1; n <= Math.min(maxLines, words.length); n++) {
@@ -125,7 +125,7 @@ function layWords(sc: SkillContext, words: Word[], maxW: number, maxSize: number
 }
 
 /** Draw a laid headline centred on (cx, cy); the *accent* words carry the brand gradient. */
-function drawLaid(sc: SkillContext, laid: Laid, cx: number, cy: number, opts: { color?: string } = {}) {
+export function drawLaid(sc: SkillContext, laid: Laid, cx: number, cy: number, opts: { color?: string } = {}) {
   const { ctx, palette } = sc;
   const { size, lh } = laid;
   ctx.save();
@@ -156,7 +156,7 @@ function drawLaid(sc: SkillContext, laid: Laid, cx: number, cy: number, opts: { 
 }
 
 /** The supporting line under the headline. */
-function subLine(sc: SkillContext, y: number, k: number) {
+export function subLine(sc: SkillContext, y: number, k: number) {
   const { ctx, w, u, palette, scene } = sc;
   if (!scene.subtext || k <= 0) return;
   ctx.save();
@@ -170,16 +170,28 @@ function subLine(sc: SkillContext, y: number, k: number) {
 }
 
 /** The landed headline: it punches in from a touch larger with a short smear, then holds. */
-function landHeadline(sc: SkillContext, at: number, cy: number) {
+export function landHeadline(
+  sc: SkillContext,
+  at: number,
+  cy: number,
+  opts: { maxW?: number; maxSize?: number; maxLines?: number; from?: number; sub?: boolean } = {},
+) {
   const { ctx, w, h, t, u } = sc;
   const scene = fastScene(sc.scene);
   if (t < at) return null;
   const portrait = h > w;
   const safe = tokens(w, h).safe;
-  const laid = layWords(sc, accentWords(scene.text || "Ship it *faster*"), safe.width * 0.92, Math.min(w, h) * (portrait ? 0.19 : 0.17), portrait ? 3 : 2);
+  const laid = layWords(
+    sc,
+    accentWords(scene.text || "Ship it *faster*"),
+    opts.maxW ?? safe.width * 0.92,
+    opts.maxSize ?? Math.min(w, h) * (portrait ? 0.19 : 0.17),
+    opts.maxLines ?? (portrait ? 3 : 2),
+  );
   const k = ease.outExpo(clamp((t - at) / 0.24));
   const ex = ease.inCubic(exitT(sc, 0.35));
-  const s = lerp(1.28, 1, k) * (1 + 0.1 * ex) * (1 + 0.025 * smoothHold(t - at));
+  // It punches down from a touch larger (or, with `from` < 1, arrives from the distance).
+  const s = lerp(opts.from ?? 1.28, 1, k) * (1 + 0.1 * ex) * (1 + 0.025 * smoothHold(t - at));
   ctx.save();
   ctx.translate(w / 2, cy);
   ctx.scale(s, s);
@@ -199,17 +211,20 @@ function landHeadline(sc: SkillContext, at: number, cy: number) {
     ctx.restore();
   }
   ctx.globalAlpha = clamp(k * 1.8) * (1 - ex);
+  // Leaving, the line rushes forward and out of focus.
+  if (ex > 0.02) ctx.filter = `blur(${(ex * 12 * u).toFixed(1)}px)`;
   const box = drawLaid(sc, laid, w / 2, cy);
+  ctx.filter = "none";
   ctx.restore();
-  subLine(sc, box.bottom + 40 * u, range(t, at + 0.25, at + 0.7) * (1 - ex));
+  if (opts.sub !== false) subLine(sc, box.bottom + 40 * u, range(t, at + 0.25, at + 0.7) * (1 - ex));
   return box;
 }
 
 /** A slow drift after landing (0 → 1 over a few seconds), so the held line keeps living. */
-const smoothHold = (dt: number) => 1 - Math.exp(-Math.max(0, dt) * 0.5);
+export const smoothHold = (dt: number) => 1 - Math.exp(-Math.max(0, dt) * 0.5);
 
 /** Story-style progress dashes at the foot of the frame: one per word, plus the headline. */
-function dashes(sc: SkillContext, n: number, lit: number, alpha: number) {
+export function dashes(sc: SkillContext, n: number, lit: number, alpha: number) {
   const { ctx, w, h, u, palette } = sc;
   if (alpha <= 0) return;
   const safe = tokens(w, h).safe;
@@ -228,14 +243,60 @@ function dashes(sc: SkillContext, n: number, lit: number, alpha: number) {
   ctx.restore();
 }
 
+/**
+ * Speed streaks rushing out from the centre (or sideways, for whips): each streak keeps its own
+ * lane and travels smoothly frame to frame, so the motion reads as speed rather than flicker.
+ */
+export function streaks(sc: SkillContext, intensity: number, color: string, opts: { dir?: "radial" | "left" | "right"; count?: number } = {}) {
+  if (intensity <= 0.01) return;
+  const { ctx, w, h, t, u, seed } = sc;
+  const n = opts.count ?? 56;
+  const R = Math.hypot(w, h) / 2;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineCap = "round";
+  for (let i = 0; i < n; i++) {
+    const hsh = hashString(`${seed}:streak:${i}`);
+    const r1 = (hsh % 997) / 997;
+    const r2 = ((hsh >> 10) % 991) / 991;
+    const speed = 0.9 + r2 * 1.4;
+    const q = (t * speed + r1) % 1;
+    ctx.globalAlpha = intensity * (0.25 + 0.55 * r2) * Math.sin(q * Math.PI);
+    ctx.lineWidth = (1 + r1 * 2.2) * u;
+    ctx.beginPath();
+    if (opts.dir === "left" || opts.dir === "right") {
+      const y = r1 * h;
+      const len = (0.08 + r2 * 0.22) * w;
+      const x = opts.dir === "left" ? w * (1.1 - q * 1.4) : w * (-0.1 + q * 1.4);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (opts.dir === "left" ? len : -len), y);
+    } else {
+      const a = r1 * Math.PI * 2;
+      const r0 = R * (0.18 + q * 0.9);
+      const len = R * (0.04 + q * 0.22);
+      ctx.moveTo(w / 2 + Math.cos(a) * r0, h / 2 + Math.sin(a) * r0);
+      ctx.lineTo(w / 2 + Math.cos(a) * (r0 + len), h / 2 + Math.sin(a) * (r0 + len));
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A small camera kick on each switch, settling within a few frames. */
+export function kick(sc: SkillContext, since: number, amount = 5) {
+  if (since < 0 || since > 0.18) return { x: 0, y: 0 };
+  const k = (1 - since / 0.18) ** 2 * amount * sc.u;
+  return { x: Math.sin(since * 110) * k, y: Math.cos(since * 83) * k };
+}
+
 /** A single word's size: as big as allowed while fitting the width. */
-function fitWord(sc: SkillContext, word: string, face: (s: number) => string, maxW: number, maxSize: number) {
+export function fitWord(sc: SkillContext, word: string, face: (s: number) => string, maxW: number, maxSize: number) {
   sc.ctx.font = face(100);
   sc.ctx.letterSpacing = "0px";
   return Math.min(maxSize, (maxW / Math.max(1, sc.ctx.measureText(word).width)) * 100);
 }
 
-const textOn = (sc: SkillContext) => (sc.palette.light ? "#ffffff" : sc.palette.bg0);
+export const textOn = (sc: SkillContext) => (sc.palette.light ? "#ffffff" : sc.palette.bg0);
 
 /* ───────────────────────── Rapid Fire ───────────────────────── */
 
@@ -260,7 +321,8 @@ function rapidFire(sc: SkillContext) {
     const pk = ease.outExpo(clamp(local / (P.tick * 0.55)));
     const dir = i % 2 ? 1 : -1;
     ctx.save();
-    ctx.translate(w / 2, cy);
+    const kk = kick(sc, local);
+    ctx.translate(w / 2 + kk.x, cy + kk.y);
     ctx.scale(lerp(1.22, 1, pk), lerp(1.22, 1, pk));
     ctx.rotate(dir * 0.025 * (1 - pk));
     ctx.font = face(size);
@@ -416,6 +478,15 @@ function flipSwitch(sc: SkillContext) {
   ctx.strokeStyle = lit > 0 ? rgba(palette.primary, 0.4 + 0.5 * lit) : rgba(palette.text, 0.16);
   ctx.lineWidth = Math.max(1, (1.5 + 1.5 * lit) * u);
   ctx.stroke();
+  // Landing: one glint crosses the box.
+  if (landed) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bwNow, boxH, size * 0.2);
+    ctx.clip();
+    lightSweep(ctx, bx, by, bwNow, boxH, range(t, F.land + 0.05, F.land + 0.65), { alpha: palette.light ? 0.35 : 0.22, width: 0.35 });
+    ctx.restore();
+  }
   // Hinge line across the middle, like a flap card.
   ctx.fillStyle = rgba(palette.bg0, 0.35);
   ctx.fillRect(bx + 2 * u, cy - Math.max(1, u) / 2, bwNow - 4 * u, Math.max(1, u));
@@ -463,7 +534,7 @@ function zoomThrough(sc: SkillContext) {
   const cy = h * 0.47;
   const ex = ease.inCubic(exitT(sc, 0.35));
   // Streaks rush outward while the words fly, and calm once the line lands.
-  speedLines(sc, 0.3 * clamp(t / 0.3) * (1 - clamp((t - P.land) / 0.5)) * (1 - ex), rgba(palette.primary, 0.7));
+  streaks(sc, 0.55 * clamp(t / 0.3) * (1 - clamp((t - P.land) / 0.5)) * (1 - ex), rgba(palette.primary, 0.8));
   const face = (s: number) => displayFont(saasFont(sc), s);
   // Each word arrives out of the distance over one tick, holds the focus, then passes the camera.
   const drawn: { s: number; a: number; blur: number; word: string }[] = [];
@@ -578,6 +649,14 @@ function sliceSwitch(sc: SkillContext) {
       ctx.beginPath();
       ctx.rect(0, sy - 0.5, w, sh + 1);
       ctx.clip();
+      // A faint trail behind each moving strip reads as motion blur.
+      if (Math.abs(dx) > 4 * u) {
+        ctx.save();
+        ctx.globalAlpha *= 0.22;
+        ctx.translate(dx * 0.8, 0);
+        drawFrame(fi);
+        ctx.restore();
+      }
       ctx.translate(dx, 0);
       drawFrame(fi);
       ctx.restore();
@@ -657,7 +736,8 @@ function styleShuffle(sc: SkillContext) {
   const look = landed ? -1 : i % 5;
   ctx.save();
   ctx.globalAlpha = clamp((t - S.start + 0.05) / 0.1) * (1 - ex);
-  ctx.translate(w / 2, cy);
+  const kk = landed ? { x: 0, y: 0 } : kick(sc, local, 4);
+  ctx.translate(w / 2 + kk.x, cy + kk.y);
   const s = lerp(landed ? 1.2 : 1.08, 1, pk) * (1 + 0.03 * smoothHold(t - S.land) * (landed ? 1 : 0));
   ctx.scale(s, s);
   if (!landed) ctx.rotate((i % 2 ? 1 : -1) * 0.03 * (1 - pk));
@@ -857,17 +937,25 @@ function splitFlap(sc: SkillContext) {
       ctx.roundRect(x, y + th / 2, tw, th / 2, [0, 0, tw * 0.1, tw * 0.1]);
       ctx.fill();
       const color = !flips && p === pages.length - 1 && accentCell(r, c) ? palette.primary : ink;
-      const half = (ch: string, top: boolean, scaleY = 1, alpha = 1) => {
-        if (ch === " ") return;
+      const half = (ch: string, top: boolean, scaleY = 1, flap = false) => {
+        if (ch === " " && !flap) return;
         ctx.save();
         ctx.beginPath();
         ctx.rect(x, top ? y : y + th / 2, tw, th / 2);
         ctx.clip();
         ctx.translate(x + tw / 2, y + th / 2);
         ctx.scale(1, scaleY);
-        ctx.globalAlpha *= alpha;
+        if (flap) {
+          // The flap is a card of its own: its face, then shade as it turns away from the light.
+          ctx.fillStyle = top ? tileTop : tileBot;
+          ctx.fillRect(-tw / 2, top ? -th / 2 : 0, tw, th / 2);
+        }
         ctx.fillStyle = color;
-        ctx.fillText(ch, 0, dy);
+        if (ch !== " ") ctx.fillText(ch, 0, dy);
+        if (flap) {
+          ctx.fillStyle = rgba("#000000", 0.55 * (1 - Math.abs(scaleY)));
+          ctx.fillRect(-tw / 2, top ? -th / 2 : 0, tw, th / 2);
+        }
         ctx.restore();
       };
       if (flips) {
@@ -875,8 +963,8 @@ function splitFlap(sc: SkillContext) {
         half(shown, true);
         half(prevC, false);
         // The flap: the old top half folding down, then the new bottom half landing.
-        if (f < 0.5) half(prevC, true, Math.cos(f * Math.PI), 0.9);
-        else half(shown, false, -Math.cos(f * Math.PI), 0.9);
+        if (f < 0.5) half(prevC, true, Math.cos(f * Math.PI), true);
+        else half(shown, false, -Math.cos(f * Math.PI), true);
       } else {
         half(shown, true);
         half(shown, false);
