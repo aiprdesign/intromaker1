@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { onMediaReady } from "@/engine/media";
 import type { SkillId, VideoPlan } from "@/engine/types";
-import { sceneThumb, thumbsReady } from "@/lib/thumbs";
+import { later, sceneThumb, thumbsReady } from "@/lib/thumbs";
 import { beatOf } from "./ArcStrip";
 import Icon from "./Icon";
 import SkillPicker from "./SkillPicker";
@@ -44,7 +44,17 @@ export default function SlideTimeline({
     const timer = window.setTimeout(
       () =>
         thumbsReady().then(() => {
-          if (alive) setThumbs(plan.scenes.map((s) => sceneThumb(s, plan)));
+          // One at a time, so a long storyboard never blocks the page.
+          plan.scenes.forEach((s, i) =>
+            later(() => sceneThumb(s, plan), () => alive).then((src) => {
+              if (src && alive)
+                setThumbs((cur) => {
+                  const next = cur.slice(0, plan.scenes.length);
+                  next[i] = src;
+                  return next;
+                });
+            }),
+          );
         }),
       thumbs.length ? 250 : 0,
     );

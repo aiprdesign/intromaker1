@@ -37,7 +37,8 @@ function paint(scene: Scene, plan: VideoPlan): string {
   canvas ??= document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
+  // A CPU canvas: reading a GPU canvas back (toDataURL) can stall the page for seconds.
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
   // Settled content: late enough for staggered reveals, before the exit.
   const t = Math.max(0.6, Math.min(scene.duration - 0.5, scene.duration * 0.62));
   try {
@@ -71,6 +72,48 @@ export function skillThumb(skill: SkillId, plan: VideoPlan): string {
   // A style that shows your media previews with stand-in pictures when the film has none.
   const preview = withPlaceholders(scene, plan);
   return remember(key, paint(preview.scene, preview.plan));
+}
+
+/**
+ * Paints thumbnails a few at a time (about 12 ms per turn), so a storyboard of slides never
+ * freezes the page: the import progress keeps animating and its response is handled promptly.
+ * `alive()` false drops a queued thumbnail that is no longer wanted.
+ */
+const queue: { run: () => void; alive: () => boolean }[] = [];
+let pumping = false;
+let paused = false;
+/**
+ * While a video is being built its slides are about to change: thumbnails wait, so the page
+ * stays free for the progress and the import's response.
+ */
+export function pauseThumbs(on: boolean) {
+  paused = on;
+  if (!on && queue.length && !pumping) {
+    pumping = true;
+    window.setTimeout(pump, 0);
+  }
+}
+function pump() {
+  if (paused) {
+    pumping = false;
+    return;
+  }
+  const until = performance.now() + 12;
+  while (queue.length && performance.now() < until) {
+    const job = queue.shift()!;
+    if (job.alive()) job.run();
+  }
+  if (queue.length) window.setTimeout(pump, 0);
+  else pumping = false;
+}
+export function later(paintOne: () => string, alive: () => boolean = () => true): Promise<string | null> {
+  return new Promise((resolve) => {
+    queue.push({ run: () => resolve(paintOne()), alive: () => alive() || (resolve(null), false) });
+    if (!pumping) {
+      pumping = true;
+      window.setTimeout(pump, 0);
+    }
+  });
 }
 
 /**

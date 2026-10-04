@@ -36,6 +36,8 @@ export const ENV_VARS: EnvVar[] = [
   { name: "AMAZON_PAAPI_PARTNER_TAG", group: "Product listings", purpose: "Your Amazon Associates partner tag.", example: "yourstore-20", secret: false },
   { name: "EBAY_CLIENT_ID", group: "Product listings", purpose: "eBay developer app client id (reads eBay listings through the Browse API).", example: "YourApp-…-PRD-…", secret: true },
   { name: "EBAY_CLIENT_SECRET", group: "Product listings", purpose: "eBay developer app client secret.", example: "PRD-…", secret: true },
+  { name: "INTROMAKER_MAX_CAPTURES", group: "Limits", purpose: "Website imports captured in a headless browser at once, about 300 MB of memory each (default 2; 1 on small servers).", example: "1", secret: false },
+  { name: "INTROMAKER_CAPTURE_TIMEOUT_S", group: "Limits", purpose: "Seconds one website capture may take before the import reads the page's HTML instead (default 60, 15 to 120).", example: "60", secret: false },
   { name: "INTROMAKER_PROXY_HOPS", group: "Limits", purpose: "Trusted proxies in front of the server, for reading visitors' addresses (default 1; 0 when it faces the internet directly).", example: "1", secret: false },
   { name: "INTROMAKER_LOGIN_TRIES", group: "Limits", purpose: "Wrong passwords allowed before an address is blocked from signing in (default 3).", example: "3", secret: false },
   { name: "INTROMAKER_LOGIN_BLOCK_MIN", group: "Limits", purpose: "How long that block lasts, in minutes (default 60, at most 1440).", example: "60", secret: false },

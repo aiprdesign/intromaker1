@@ -404,6 +404,17 @@ async function main() {
     "unknown domains, refused connections, bad certificates and timeouts each get their own message",
   );
 
+  // The website health check shown next to a failed import.
+  const siteCheckRoute = await import("../src/app/api/scrape/check/route");
+  const creq = (url: unknown, ip = "198.51.100.88") =>
+    new Request("https://demo.example/api/scrape/check", { method: "POST", headers: { "x-forwarded-for": ip, "content-type": "application/json" }, body: JSON.stringify({ url }) });
+  check((await siteCheckRoute.POST(creq(""))).status === 400, "the website check asks for an address");
+  const priv = (await (await siteCheckRoute.POST(creq("http://127.0.0.1/"))).json()) as { check?: { online: boolean; problem?: { code: string } } };
+  check(priv.check?.online === false && !!priv.check.problem, "the website check refuses private addresses without fetching them");
+  const checkCodes: number[] = [];
+  for (let i = 0; i <= rl.RULES.siteCheck.limit; i++) checkCodes.push((await siteCheckRoute.POST(creq("http://127.0.0.1/", "198.51.100.89"))).status);
+  check(checkCodes.at(-1) === 429 && checkCodes.slice(0, -1).every((c) => c === 200), `the website check is rate-limited (${rl.RULES.siteCheck.limit} per window)`);
+
   console.log("Product listings and photos");
   const listing = await import("../src/lib/listing");
   check(

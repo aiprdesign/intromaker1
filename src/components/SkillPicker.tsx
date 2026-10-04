@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SKILL_GROUPS, SKILL_MAP } from "@/engine/skills";
 import type { SkillId, VideoPlan } from "@/engine/types";
-import { skillThumb, thumbsReady } from "@/lib/thumbs";
+import { later, skillThumb, thumbsReady } from "@/lib/thumbs";
 
 /**
  * Slide-style picker: a searchable menu where every style shows a live thumbnail (rendered in the
@@ -46,7 +46,9 @@ export default function SkillPicker({
   useEffect(() => {
     if (!value || variant !== "field") return;
     let alive = true;
-    thumbsReady().then(() => alive && setFieldThumb(skillThumb(value, plan)));
+    thumbsReady()
+      .then(() => later(() => skillThumb(value, plan), () => alive))
+      .then((src) => src && alive && setFieldThumb(src));
     return () => {
       alive = false;
     };

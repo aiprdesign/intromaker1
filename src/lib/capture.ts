@@ -38,7 +38,9 @@ async function launch(): Promise<Browser | null> {
   attempts.push({ channel: "chrome" }, { channel: "msedge" }, { channel: "chromium" }, {});
   for (const opts of attempts) {
     try {
-      return await chromium.launch({ ...opts, headless: true, timeout: 15_000 });
+      // Container-safe: Docker's small /dev/shm crashes Chromium's renderer, and one renderer
+      // process at a time keeps a capture within a small instance's memory.
+      return await chromium.launch({ ...opts, headless: true, timeout: 15_000, args: ["--disable-dev-shm-usage", "--disable-gpu", "--renderer-process-limit=1", "--no-first-run"] });
     } catch {
       /* try the next browser */
     }
@@ -387,7 +389,9 @@ async function captureLogo(page: Page, key: string): Promise<string | null> {
 const MAX_ACTIVE = Math.max(1, Number(process.env.INTROMAKER_MAX_CAPTURES ?? 2) || 2);
 const MAX_WAITING = 6;
 const WAIT_MS = 45_000;
-const HARD_TIMEOUT_MS = 90_000;
+// Past this the import reads the HTML instead, so the request always answers before a hosting
+// gateway gives up on it (INTROMAKER_CAPTURE_TIMEOUT_S, default 60).
+const HARD_TIMEOUT_MS = Math.min(120, Math.max(15, Number(process.env.INTROMAKER_CAPTURE_TIMEOUT_S ?? 60) || 60)) * 1000;
 let active = 0;
 const waiting: (() => void)[] = [];
 

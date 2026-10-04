@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Icon from "./Icon";
 import { EXAMPLE_PROMPTS } from "@/engine/demos";
 import { MAX_PHOTOS, uploadPhotos } from "@/lib/photos";
@@ -31,6 +31,19 @@ export default function HeroPrompt() {
   const [busy, setBusy] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  // The studio takes a moment to open: the button says so straight away.
+  const [opening, startOpening] = useTransition();
+  const [openingFor, setOpeningFor] = useState<"url" | "prompt" | "product" | null>(null);
+  const go = (href: string, from: "url" | "prompt" | "product") => {
+    setOpeningFor(from);
+    startOpening(() => router.push(href));
+  };
+  const pending = (from: "url" | "prompt" | "product") => opening && openingFor === from;
+  const busyLabel = (label: string) => (
+    <>
+      <span className="spinner sm" aria-hidden /> {label}
+    </>
+  );
 
   // /#product (the nav's Product videos link) opens this tab.
   useEffect(() => {
@@ -50,7 +63,7 @@ export default function HeroPrompt() {
       return;
     }
     // The format (9:16, 16:9, 1:1) and the look are chosen in the studio.
-    router.push(`/studio?url=${encodeURIComponent(/^[A-Z0-9]{10}$/i.test(u) ? `amazon.com/dp/${u.toUpperCase()}` : u)}`);
+    go(`/studio?url=${encodeURIComponent(/^[A-Z0-9]{10}$/i.test(u) ? `amazon.com/dp/${u.toUpperCase()}` : u)}`, "product");
   };
   const addPhotos = async (files: FileList | File[] | null) => {
     if (!Array.from(files ?? []).some((f) => f.type.startsWith("image/"))) return;
@@ -68,7 +81,7 @@ export default function HeroPrompt() {
   const fromPhotos = () => {
     const ids = photos.map((p) => p.split("id=")[1]).filter(Boolean);
     const text = about.trim();
-    router.push(`/studio?photos=${ids.join(",")}${text ? `&prompt=${encodeURIComponent(text)}` : ""}`);
+    go(`/studio?photos=${ids.join(",")}${text ? `&prompt=${encodeURIComponent(text)}` : ""}`, "product");
   };
 
   const fromUrl = (raw: string) => {
@@ -77,12 +90,12 @@ export default function HeroPrompt() {
       setError("Enter your website's address, like yourproduct.com");
       return;
     }
-    router.push(`/studio?url=${encodeURIComponent(u)}`);
+    go(`/studio?url=${encodeURIComponent(u)}`, "url");
   };
   const fromPrompt = (p: string) => {
     // A URL typed into the prompt box still imports the site.
     const text = p.trim() || EXAMPLE_PROMPTS[0];
-    router.push(isUrl(text) ? `/studio?url=${encodeURIComponent(text)}` : `/studio?prompt=${encodeURIComponent(text)}`);
+    go(isUrl(text) ? `/studio?url=${encodeURIComponent(text)}` : `/studio?prompt=${encodeURIComponent(text)}`, "prompt");
   };
 
   const product = mode === "product";
@@ -145,8 +158,8 @@ export default function HeroPrompt() {
               placeholder="Paste a product listing link"
               aria-label="Product listing link"
             />
-            <button className="btn btn-primary btn-lg" type="submit">
-              Make product video ✦
+            <button className="btn btn-primary btn-lg" type="submit" disabled={pending("product")} aria-busy={pending("product")}>
+              {pending("product") ? busyLabel("Opening the studio…") : "Make product video ✦"}
             </button>
           </form>
           <div className="product-or">
@@ -192,8 +205,8 @@ export default function HeroPrompt() {
                   placeholder="Name and a few features, e.g. Aero Buds: wireless earbuds with noise cancelling"
                   aria-label="Product name and features"
                 />
-                <button className="btn btn-primary btn-lg" type="submit">
-                  Make product video ✦
+                <button className="btn btn-primary btn-lg" type="submit" disabled={pending("product")} aria-busy={pending("product")}>
+                  {pending("product") ? busyLabel("Opening the studio…") : "Make product video ✦"}
                 </button>
               </div>
             </form>
@@ -236,17 +249,19 @@ export default function HeroPrompt() {
               aria-invalid={!!error}
               aria-describedby="url-help"
             />
-            <button className="btn btn-primary btn-lg" type="submit">
-              Make my video ✦
+            <button className="btn btn-primary btn-lg" type="submit" disabled={pending("url")} aria-busy={pending("url")}>
+              {pending("url") ? busyLabel("Starting your import…") : "Make my video ✦"}
             </button>
           </form>
-          <p id="url-help" className={`hero-note${error ? " error" : ""}`} role={error ? "alert" : undefined}>
-            {error ?? (
+          <p id="url-help" className={`hero-note${error ? " error" : ""}`} role={error ? "alert" : "status"}>
+            {error ?? (pending("url") ? (
+              <>Opening the studio: your import starts there, with progress on the preview. It usually takes 15–60 seconds.</>
+            ) : (
               <>
                 We read your public homepage (logo, brand colours, screenshots, UI and copy) and direct a launch video from it.{" "}
                 <Link href="/privacy">What we keep</Link>
               </>
-            )}
+            ))}
           </p>
         </>
       ) : (
@@ -259,8 +274,8 @@ export default function HeroPrompt() {
             }}
           >
             <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe your product and the video you want" aria-label="Video prompt" autoFocus />
-            <button className="btn btn-primary btn-lg" type="submit">
-              Generate ✦
+            <button className="btn btn-primary btn-lg" type="submit" disabled={pending("prompt")} aria-busy={pending("prompt")}>
+              {pending("prompt") ? busyLabel("Opening the studio…") : "Generate ✦"}
             </button>
           </form>
           <div className="examples">

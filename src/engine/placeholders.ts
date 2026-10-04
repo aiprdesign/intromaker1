@@ -16,7 +16,7 @@ function canvas(w: number, h: number) {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  return [c, c.getContext("2d")!] as const;
+  return [c, c.getContext("2d", { willReadFrequently: true })!] as const;
 }
 
 const bar = (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c: string, r = h / 2) => {

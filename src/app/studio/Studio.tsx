@@ -6,7 +6,7 @@ import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiS
 import { Logo } from "@/components/Nav";
 import SkillPicker from "@/components/SkillPicker";
 import type { PlanLimits } from "@/lib/plans";
-import { sceneThumb, thumbsReady } from "@/lib/thumbs";
+import { pauseThumbs, sceneThumb, thumbsReady } from "@/lib/thumbs";
 import SlideTimeline from "@/components/SlideTimeline";
 import Icon from "@/components/Icon";
 import { useReorder } from "@/components/useReorder";
@@ -25,6 +25,7 @@ import { applyTrailerStyle, detectTrailerStyle, TRAILER_STYLE_MAP } from "@/engi
 import TrailerStylePicker from "@/components/TrailerStylePicker";
 import { CONCEPT_MAP } from "@/engine/concepts";
 import Player from "@/components/Player";
+import { BuildProgress, ImportFailure, type SiteCheck } from "@/components/BuildOverlay";
 import VoicePanel, { loadVoiceSettings } from "@/components/VoicePanel";
 import { useNarration } from "@/components/useNarration";
 import { writeVoiceover } from "@/engine/script";
@@ -442,7 +443,7 @@ export default function Studio() {
     setVoice(v);
     // Runs per film shown (and once the voice settings and server keys are known), not per edit.
   }, [version, voiceLoaded, !!plan.product, narration.server.openai, narration.server.elevenlabs]);
-  const [siteUrl, setSiteUrl] = useState("");
+  const [siteUrl, setSiteUrl] = useState(() => (params.get("film") ? "" : (params.get("url") ?? "")));
   const [site, setSite] = useState<SiteData | null>(null);
   // Uploaded product photos (/api/shot URLs): with them, Generate makes a product video.
   const [photos, setPhotos] = useState<string[]>([]);
@@ -486,10 +487,26 @@ export default function Studio() {
       return { ...p, palette: pal, brand: p.brand ? { ...p.brand, colors: colors } : p.brand };
     });
   };
-  const [importing, setImporting] = useState(false);
-  const [importStage, setImportStage] = useState<string | null>(null);
-  const [importError, setImportError] = useState<{ message: string; code?: string; suggestion?: string; url: string } | null>(null);
+  // Opened with ?url=…: the build progress shows from the first paint, not after the studio loads.
+  const [importing, setImporting] = useState(() => !!params.get("url") && !params.get("film"));
+  const [importStage, setImportStage] = useState<string | null>(() => (params.get("url") && !params.get("film") ? "Opening the site in a real browser…" : null));
+  const [importError, setImportError] = useState<{ message: string; code?: string; suggestion?: string; url: string; side?: "site" | "ours" | "limit" | "network" } | null>(null);
+  // A quick health check of the site after a failed import (online? blocks bots? readable?).
+  const [siteCheck, setSiteCheck] = useState<SiteCheck | "loading" | "failed" | null>(null);
+  const runSiteCheck = (url: string) => {
+    setSiteCheck("loading");
+    fetch("/api/scrape/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((d: { check: SiteCheck }) => setSiteCheck(d.check))
+      .catch(() => setSiteCheck("failed"));
+  };
   const booted = useRef(false);
+  // Slide thumbnails wait while the preview is covered (building, or the import's failure card).
+  const covered = importing || (loading && !takesLoading) || (!!importError && !loading);
+  useEffect(() => {
+    pauseThumbs(covered);
+    return () => pauseThumbs(false);
+  }, [covered]);
 
   useEffect(() => {
     fetch("/api/generate")
@@ -715,6 +732,7 @@ export default function Studio() {
     setImportStage(stages[0]);
     const timer = setInterval(() => setImportStage(stages[Math.min(++si, stages.length - 1)]), 2500);
     setImportError(null);
+    setSiteCheck(null);
     try {
       const res = await fetch("/api/scrape", {
         method: "POST",
@@ -723,7 +741,19 @@ export default function Studio() {
         signal,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw Object.assign(new Error(data.error ?? `The import failed (${res.status}). Try again.`), { code: data.code, suggestion: data.suggestion });
+      if (!res.ok) {
+        // No message from IntroMaker itself: the hosting gateway answered (the server crashed,
+        // restarted or ran out of time), which is on our side, not the website's.
+        const ours = !data.error && res.status >= 500;
+        throw Object.assign(
+          new Error(
+            ours
+              ? `IntroMaker's server didn't finish reading the site (error ${res.status} from the hosting service). It may be restarting or short of memory while capturing the page.`
+              : (data.error ?? `The import failed (${res.status}).`),
+          ),
+          { code: ours ? "server" : data.code, suggestion: data.suggestion, side: ours ? "ours" : res.status === 429 ? "limit" : data.code === "failed" ? "ours" : "site" },
+        );
+      }
       if (!stillRunning(run)) return;
       const s: SiteData = data.site;
       setSite(s);
@@ -747,8 +777,18 @@ export default function Studio() {
     } catch (e) {
       clearInterval(timer);
       if (stopped(e) || !stillRunning(run)) return;
-      const err = e as Error & { code?: string; suggestion?: string };
-      setImportError({ message: err.name === "TypeError" ? "Couldn't reach IntroMaker's server. Check your connection and try again." : err.message, code: err.code, suggestion: err.suggestion, url });
+      const err = e as Error & { code?: string; suggestion?: string; side?: "site" | "ours" | "limit" | "network" };
+      const network = err.name === "TypeError";
+      setImportError({
+        message: network ? "Couldn't reach IntroMaker's server. Check your internet connection and try again." : err.message,
+        code: network ? "failed" : err.code,
+        suggestion: err.suggestion,
+        url,
+        side: network ? "network" : (err.side ?? "site"),
+      });
+      // Find out whether the website itself is fine (unless it's a limit or a typo).
+      if (!network && err.side !== "limit" && err.code !== "invalid") runSiteCheck(url);
+      else setSiteCheck(null);
     } finally {
       clearInterval(timer);
       if (stillRunning(run)) {
@@ -769,6 +809,18 @@ export default function Studio() {
     setImporting(false);
     setImportStage(null);
     setToast({ text: "Stopped. The video on screen is unchanged.", key: Date.now() });
+  };
+
+  /** After a failed import: start a prompt about the site instead. */
+  const describeInstead = (url: string) => {
+    const name = url.replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];
+    setImportError(null);
+    if (!prompt.trim()) setPrompt(`An intro for ${name}: `);
+    requestAnimationFrame(() => {
+      const el = document.getElementById("studio-prompt") as HTMLTextAreaElement | null;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+    });
   };
 
   const clearSite = () => {
@@ -861,6 +913,11 @@ export default function Studio() {
     if (!params.get("skill")) saving.current = true;
     cleanUrl();
     const shared = hash.startsWith("#plan=") ? decodePlan(hash.slice(6)) : null;
+    // A shared plan or a slide preview wins over ?url=: no import after all.
+    if (shared || params.get("skill")) {
+      setImporting(false);
+      setImportStage(null);
+    }
     if (shared) {
       bootingRef.current = false;
       setPlan(shared);
@@ -1434,46 +1491,8 @@ export default function Studio() {
             </p>
           )}
           {importError && (
-            <div className="import-error" role="alert">
-              <p>{importError.message}</p>
-              <div className="import-error-actions">
-                {importError.suggestion && (
-                  <button
-                    className="btn btn-ghost sm"
-                    onClick={() => {
-                      setSiteUrl(importError.suggestion!);
-                      void importSite(importError.suggestion);
-                    }}
-                  >
-                    Import {importError.suggestion.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                  </button>
-                )}
-                {importError.code === "listing" && (
-                  <button className="btn btn-primary sm" onClick={() => photoInput.current?.click()}>
-                    Add product photos
-                  </button>
-                )}
-                {["timeout", "refused", "server", "busy", "failed", undefined].includes(importError.code) && (
-                  <button className="btn btn-ghost sm" onClick={() => void importSite(importError.url)}>
-                    Try again
-                  </button>
-                )}
-                <button
-                  className="btn btn-ghost sm"
-                  onClick={() => {
-                    const name = importError.url.replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];
-                    setImportError(null);
-                    if (!prompt.trim()) setPrompt(`An intro for ${name}: `);
-                    requestAnimationFrame(() => {
-                      const el = document.getElementById("studio-prompt") as HTMLTextAreaElement | null;
-                      el?.focus();
-                      el?.setSelectionRange(el.value.length, el.value.length);
-                    });
-                  }}
-                >
-                  Describe it instead
-                </button>
-              </div>
+            <div className="import-error">
+              <p>Import didn&apos;t work: the details and next steps are on the preview.</p>
             </div>
           )}
           <div
@@ -1881,7 +1900,22 @@ export default function Studio() {
         </aside>
 
         <section className="main">
-          <div className={loading ? "dim" : ""}>
+          <div className={`stage-wrap${loading || importing ? " building" : ""}`}>
+            {(importing || (loading && !takesLoading)) && <BuildProgress importing={importing} stage={importStage} site={importing ? siteUrl : undefined} onStop={stopDirecting} />}
+            {!importing && !loading && importError && (
+              <ImportFailure
+                failure={importError}
+                check={siteCheck}
+                onRetry={() => void importSite(importError.url)}
+                onSuggestion={() => {
+                  setSiteUrl(importError.suggestion!);
+                  void importSite(importError.suggestion);
+                }}
+                onPhotos={() => photoInput.current?.click()}
+                onDescribe={() => describeInstead(importError.url)}
+                onClose={() => setImportError(null)}
+              />
+            )}
             <Player
               plan={playPlan}
               resetKey={version}

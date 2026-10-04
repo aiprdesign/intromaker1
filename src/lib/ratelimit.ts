@@ -35,6 +35,8 @@ export const RULES = {
   serverAi: { limit: 12, windowMs: 24 * 60 * MIN },
   /** Voice-over lines through a cloud voice. */
   tts: { limit: 80, windowMs: 10 * MIN },
+  /** Website health checks after a failed import (one plain request each). */
+  siteCheck: { limit: 20, windowMs: 10 * MIN },
   /** Checking an AI key / listing models. */
   aiCheck: { limit: 20, windowMs: 10 * MIN },
   /** Admin sign-in attempts: slows password guessing to a crawl. */

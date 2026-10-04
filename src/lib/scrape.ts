@@ -289,6 +289,53 @@ async function fetchPage(raw: string): Promise<{ html: string; finalUrl: string 
   throw problem ?? new UrlError("Couldn't open that website.", "refused");
 }
 
+/** A quick health check of a website, without a browser: for explaining why an import failed. */
+export interface SiteCheck {
+  host: string;
+  /** The site answered (whatever it said). */
+  online: boolean;
+  /** How long the page took, in ms. */
+  ms?: number;
+  https?: boolean;
+  title?: string;
+  /** Readable text on the page (not just a script shell). */
+  hasText?: boolean;
+  /** A logo or icon declared in the page. */
+  hasLogo?: boolean;
+  /** What's wrong, in the visitor's words, and its kind (dns, refused, tls, timeout, blocked, busy, server, notfound, parked, empty, notpage, invalid). */
+  problem?: { code: string; message: string };
+}
+
+export async function checkSite(raw: string): Promise<SiteCheck> {
+  const typed = raw.trim();
+  let host = typed.replace(/^https?:\/\//i, "").split(/[/?#]/)[0];
+  const t0 = Date.now();
+  try {
+    const { html, finalUrl } = await fetchPage(typed);
+    const ms = Date.now() - t0;
+    const url = new URL(finalUrl);
+    host = url.hostname;
+    const root = parse(html.slice(0, MAX_HTML), { comment: false });
+    const title = clean(root.querySelector("title")?.text ?? "") || undefined;
+    const bodyText = clean((root.querySelector("body") ?? root).structuredText).slice(0, 20_000);
+    const hasLogo = !!root.querySelector('link[rel~="icon"], link[rel="apple-touch-icon"], meta[property="og:image"], img[alt*="logo" i], img[src*="logo" i], img[class*="logo" i], svg[class*="logo" i]');
+    let problem: SiteCheck["problem"];
+    try {
+      checkContent(root, bodyText, url);
+    } catch (e) {
+      if (e instanceof UrlError) problem = { code: e.code, message: e.message };
+    }
+    if (!problem && bodyText.length < 200)
+      problem = { code: "thin", message: `${host} sends almost no text without running its scripts, so the importer needs its browser to read it.` };
+    return { host, online: true, ms, https: url.protocol === "https:", title, hasText: bodyText.length >= 200, hasLogo, problem };
+  } catch (e) {
+    const p = e instanceof UrlError ? e : new UrlError(`Couldn't open ${host}.`, "refused");
+    // An answer from the site (blocked, not found, server error…) means it's online.
+    const online = !["dns", "refused", "tls", "timeout", "invalid"].includes(p.code);
+    return { host, online, ms: Date.now() - t0, problem: { code: p.code, message: p.message } };
+  }
+}
+
 export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}): Promise<SiteData> {
   // Marketplace listings (Amazon, eBay, Etsy, Shopify stores…) become product videos.
   const market = marketOf(canonicalListing(rawUrl));
