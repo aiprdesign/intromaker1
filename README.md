@@ -253,6 +253,8 @@ docker run -p 3000:3000 -v intromaker-data:/data intromaker     # http://localho
 
 Fly.io or any VPS run the same image; mount a volume at `/data`. Give the instance at least 1 GB of memory for comfortable live capture (each headless browser session uses about 300 MB); 512 MB works with one capture at a time.
 
+Set these as environment variables on your host (Railway: the service → **Variables** → **New Variable** → Deploy; Render: **Environment**; Fly.io: `fly secrets set`; Docker: `--env-file`; locally: `.env.local`). **Admin → Setup → Environment variables** has the same steps for each host and shows which ones are set on the running server (never their values); the *Admin is off* page explains how to add `ADMIN_PASSWORD`.
+
 | Setting | Default | What it does |
 |---|---|---|
 | `INTROMAKER_DATA_DIR` | `/data` in the image | Where captured screenshots are stored; mount a persistent volume here |

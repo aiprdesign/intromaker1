@@ -128,6 +128,11 @@ async function main() {
   await setupRoute.PUT(areq("/api/admin/setup", { method: "PUT", cookie, body: JSON.stringify({ clear: ["openaiVoice"] }) }));
   check(!(await admin.serviceKey("openaiVoice")) && (await admin.serviceKey("amazonTag")) === "mystore-20", "a key can be removed from Admin");
   check((await setupRoute.GET(areq("/api/admin/setup"))).status === 401, "the setup page needs the admin session");
+  env.STRIPE_WEBHOOK_SECRET = "whsec_never_shown_123456";
+  const envView = await (await setupRoute.GET(areq("/api/admin/setup", { cookie }))).json();
+  const hookVar = envView.env.find((e: { name: string }) => e.name === "STRIPE_WEBHOOK_SECRET");
+  check(hookVar?.set === true && !JSON.stringify(envView).includes("whsec_never_shown") && !JSON.stringify(envView).includes(env.ADMIN_PASSWORD!), "the environment guide says which variables are set, never their secret values");
+  delete env.STRIPE_WEBHOOK_SECRET;
   delete env.ELEVENLABS_API_KEY;
   const active = await admin.serverAi();
   check(active?.source === "admin" && active.ai.apiKey === "sk-test-1234567890abcdef" && (await admin.readSettings()).dailyBudget === 7, "the server director uses the admin's AI and budget");

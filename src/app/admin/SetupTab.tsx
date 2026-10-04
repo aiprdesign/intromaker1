@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, Skeleton, useAdminUi } from "./ui";
+import { api, CopyButton, Skeleton, useAdminUi } from "./ui";
 
 type KeyName = "openaiVoice" | "elevenlabs" | "amazonAccess" | "amazonSecret" | "amazonTag" | "ebayId" | "ebaySecret";
 type KeyView = { label: string; env: string; source: "admin" | "env" | null; hint: string };
+type EnvRow = { name: string; group: string; purpose: string; example: string; secret: boolean; needed?: boolean; set: boolean; value?: string };
 export type SetupView = {
   keys: Record<KeyName, KeyView>;
+  env: EnvRow[];
   status: {
     persistent: boolean;
     ai: string | null;
@@ -81,6 +83,133 @@ export function KeysCard({ title, intro, names, view, onSaved }: { title: string
           {busy ? "Saving…" : dirty ? "Save keys" : "Saved"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Where to add an environment variable, per host. */
+const HOSTS: { id: string; name: string; steps: React.ReactNode[] }[] = [
+  {
+    id: "railway",
+    name: "Railway",
+    steps: [
+      <>Open your project on railway.com and click the IntroMaker service.</>,
+      <>
+        Go to the <strong>Variables</strong> tab and press <strong>New Variable</strong>.
+      </>,
+      <>
+        Type the name exactly as shown below (for example <code>STRIPE_WEBHOOK_SECRET</code>), paste the value, and press <strong>Add</strong>.
+      </>,
+      <>
+        Press <strong>Deploy</strong> (or <strong>Apply changes</strong>). Railway redeploys the service with the new variable in about a minute.
+      </>,
+      <>Come back to this page and refresh: the variable shows as set.</>,
+    ],
+  },
+  {
+    id: "render",
+    name: "Render",
+    steps: [
+      <>Open the IntroMaker web service on dashboard.render.com.</>,
+      <>
+        Go to <strong>Environment</strong> and press <strong>Add Environment Variable</strong>.
+      </>,
+      <>Enter the name and the value.</>,
+      <>
+        Press <strong>Save, rebuild, and deploy</strong> (or <strong>Save and deploy</strong>).
+      </>,
+      <>Refresh this page once the deploy is live.</>,
+    ],
+  },
+  {
+    id: "fly",
+    name: "Fly.io",
+    steps: [
+      <>In a terminal, in the app&apos;s folder (with the fly CLI signed in):</>,
+      <>
+        Secrets: <code>fly secrets set STRIPE_WEBHOOK_SECRET=whsec_…</code>. Fly restarts the app with it.
+      </>,
+      <>
+        Plain settings can also go in <code>fly.toml</code> under <code>[env]</code>, then <code>fly deploy</code>.
+      </>,
+    ],
+  },
+  {
+    id: "docker",
+    name: "Docker / a server",
+    steps: [
+      <>
+        Put the variables in a file next to the app, one per line, e.g. <code>intromaker.env</code>: <code>STRIPE_WEBHOOK_SECRET=whsec_…</code>
+      </>,
+      <>Keep the file private (it holds secrets) and out of git.</>,
+      <>
+        Start the container with it: <code>docker run --env-file intromaker.env -p 3000:3000 -v intromaker-data:/data intromaker</code>
+      </>,
+      <>After changing the file, restart the container.</>,
+    ],
+  },
+  {
+    id: "local",
+    name: "On your computer",
+    steps: [
+      <>
+        Copy <code>.env.example</code> to <code>.env.local</code> in the project folder.
+      </>,
+      <>
+        Fill in the values (<code>NAME=value</code>, one per line). <code>.env.local</code> is never committed.
+      </>,
+      <>
+        Restart <code>npm run dev</code> (or <code>npm start</code>) so it reads them.
+      </>,
+    ],
+  },
+];
+
+/** How to add environment variables on the server, and which ones are set here. */
+function EnvGuide({ env }: { env: EnvRow[] }) {
+  const [host, setHost] = useState("railway");
+  const groups = [...new Set(env.map((e) => e.group))];
+  const h = HOSTS.find((x) => x.id === host)!;
+  return (
+    <div className="admin-card env-guide" id="env-vars">
+      <h2>Environment variables</h2>
+      <p className="hint">
+        Secrets such as the Stripe webhook secret and the admin password live in the server&apos;s environment variables: set on your host, never typed into a page,
+        never shown here (this page only says whether each one is set). After adding or changing one, the server restarts with it.
+      </p>
+      <div className="seg-control env-hosts" role="tablist" aria-label="Where the site runs">
+        {HOSTS.map((x) => (
+          <button key={x.id} role="tab" aria-selected={host === x.id} className={host === x.id ? "active" : ""} onClick={() => setHost(x.id)}>
+            {x.name}
+          </button>
+        ))}
+      </div>
+      <ol className="env-steps">
+        {h.steps.map((st, i) => (
+          <li key={i}>{st}</li>
+        ))}
+      </ol>
+      {groups.map((g) => (
+        <div key={g} className="env-group">
+          <span className="fld-cap">{g}</span>
+          <ul className="env-list">
+            {env
+              .filter((e) => e.group === g)
+              .map((e) => (
+                <li key={e.name}>
+                  <span className="env-name">
+                    <code>{e.name}</code>
+                    <CopyButton text={e.name} />
+                  </span>
+                  <span className="env-purpose">
+                    {e.purpose} <span className="hint">e.g. {e.example}</span>
+                  </span>
+                  <span className={`tag ${e.set ? "exported" : e.needed ? "warn" : ""}`}>{e.set ? (e.value ? `Set: ${e.value}` : "Set ✓") : e.needed ? "Not set (needed)" : "Not set"}</span>
+                </li>
+              ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
@@ -187,6 +316,7 @@ export default function SetupTab({ go }: { go: Go }) {
           ))}
         </ol>
       </div>
+      <EnvGuide env={view.env} />
       <KeysCard
         title="Marketplace APIs"
         intro={

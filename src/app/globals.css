@@ -2983,7 +2983,63 @@ button.brand-colors.on {
   color: var(--muted);
 }
 .admin-ai,
-.admin-ai + .keys-card {
+.admin-ai + .env-guide {
+  display: grid;
+  gap: 12px;
+}
+.env-guide p {
+  margin: 0;
+}
+.env-hosts {
+  justify-self: start;
+  flex-wrap: wrap;
+}
+.env-steps {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.env-steps code,
+.env-list code {
+  overflow-wrap: anywhere;
+}
+.env-group {
+  display: grid;
+  gap: 6px;
+}
+.env-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.env-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.env-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .env-list li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+.keys-card {
   max-width: 720px;
 }
 .admin-ai p {

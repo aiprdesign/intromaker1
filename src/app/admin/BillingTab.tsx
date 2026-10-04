@@ -31,7 +31,7 @@ const payOk = (v: string) => !v.trim() || /^https:\/\/(buy|checkout)\.stripe\.co
 const portalOk = (v: string) => !v.trim() || /^https:\/\/billing\.stripe\.com\//.test(v.trim());
 
 /** Stripe, plug and play: paste Payment Links, add one webhook, set one environment variable. */
-export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: boolean) => void; onOpenPlans: () => void }) {
+export default function BillingTab({ onChange, onOpenPlans, onOpenEnvGuide }: { onChange: (on: boolean) => void; onOpenPlans: () => void; onOpenEnvGuide: () => void }) {
   const { notify } = useAdminUi();
   const [view, setView] = useState<View | null>(null);
   const [saved, setSaved] = useState<Form | null>(null);
@@ -151,7 +151,11 @@ export default function BillingTab({ onChange, onOpenPlans }: { onChange: (on: b
             <code>{EVENTS.join(", ")}</code>
             <CopyButton text={EVENTS.join("\n")} label="Copy list" />
           </span>
-          Reveal the <strong>Signing secret</strong> (whsec_…) and set it as <code>STRIPE_WEBHOOK_SECRET</code> in Railway → Variables. Railway redeploys by itself. The secret stays in the environment, not on this page.
+          Reveal the <strong>Signing secret</strong> (whsec_…) and add it to your server as the environment variable <code>STRIPE_WEBHOOK_SECRET</code> (Railway: the
+          service → <strong>Variables</strong> → <strong>New Variable</strong> → Deploy). The secret stays in the environment, not on this page.{" "}
+          <button className="link-btn" onClick={onOpenEnvGuide}>
+            How to add an environment variable on your host →
+          </button>
         </>
       ),
     },

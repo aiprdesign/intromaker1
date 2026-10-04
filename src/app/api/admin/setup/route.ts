@@ -1,6 +1,7 @@
 import { describe } from "@/lib/ai";
 import { maskKey, noStore, planLimits, readSettings, requireAdmin, SERVICE_KEYS, writeSettings, type ServiceKeyName, type ServiceKeys } from "@/lib/admin";
 import { webhookConfigured } from "@/lib/billing";
+import { envStatus } from "@/lib/envvars";
 import { dataIsPersistent } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -25,6 +26,7 @@ async function view() {
   const b = s.billing ?? {};
   return {
     keys,
+    env: envStatus(),
     status: {
       persistent: dataIsPersistent(),
       ai: s.ai && s.ai.provider !== "builtin" ? describe(s.ai) : envAi ? "Anthropic Claude (ANTHROPIC_API_KEY)" : null,

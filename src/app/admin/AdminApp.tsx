@@ -54,8 +54,27 @@ export default function AdminApp() {
           <Logo />
           <h1>Admin is off</h1>
           <p className="hint">
-            Set the <code>ADMIN_PASSWORD</code> environment variable on your server (for example in Railway → Variables) and redeploy. Until then no videos are logged and this page stays closed.
+            Set the <code>ADMIN_PASSWORD</code> environment variable on your server. Until then no videos are logged and this page stays closed.
           </p>
+          <ol className="env-steps">
+            <li>
+              <strong>Railway</strong>: your project → the IntroMaker service → <strong>Variables</strong> → <strong>New Variable</strong>. Name{" "}
+              <code>ADMIN_PASSWORD</code>, value: a long, unique password. Press <strong>Deploy</strong>.
+            </li>
+            <li>
+              <strong>Render</strong>: the web service → <strong>Environment</strong> → <strong>Add Environment Variable</strong> → <strong>Save and deploy</strong>.
+            </li>
+            <li>
+              <strong>Fly.io</strong>: <code>fly secrets set ADMIN_PASSWORD=…</code>
+            </li>
+            <li>
+              <strong>Docker</strong>: add <code>ADMIN_PASSWORD=…</code> to your env file and restart with <code>--env-file</code>.
+            </li>
+            <li>
+              <strong>Your computer</strong>: add it to <code>.env.local</code> and restart the server.
+            </li>
+          </ol>
+          <p className="hint">Once the server has restarted, reload this page and sign in. The Setup tab then lists the other variables (Stripe, AI and voice keys) and how to add them.</p>
           <a className="link-btn" href="/">
             ← Back to site
           </a>
@@ -246,7 +265,16 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         {tab === "films" && <FilmsTab account={filmsFor} />}
         {tab === "users" && <UsersTab onCounts={onCounts} onShowFilms={showFilms} />}
         {tab === "plans" && <PlansTab billingOn={billingOn} onOpenBilling={() => setTab("billing")} />}
-        {tab === "billing" && <BillingTab onChange={setBillingOn} onOpenPlans={() => setTab("plans")} />}
+        {tab === "billing" && (
+          <BillingTab
+            onChange={setBillingOn}
+            onOpenPlans={() => setTab("plans")}
+            onOpenEnvGuide={() => {
+              setTab("setup");
+              setTimeout(() => document.getElementById("env-vars")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+            }}
+          />
+        )}
         {tab === "ai" && <AiTab />}
       </div>
     </main>
