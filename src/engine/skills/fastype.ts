@@ -1033,7 +1033,7 @@ export const fastTypeSkills: Skill[] = [
   {
     id: "style-shuffle",
     name: "Style Shuffle",
-    tagline: "The accent word jumps between typefaces and treatments on the half-beat, then locks into the film's own face inside snapping brackets.",
+    tagline: "The accent word jumps between typefaces and treatments on the half-beat, then locks into the video's own face inside snapping brackets.",
     bestFor: "A short line with one key word (*accent*) that deserves a moment: 'Made to *stand out*'. No items needed.",
     sample: { text: "Made to *stand out*" },
     render: styleShuffle,

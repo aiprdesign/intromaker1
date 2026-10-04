@@ -9,8 +9,8 @@ export const HERO_PLAN: VideoPlan = {
   seed: 4242,
   style: "saas",
   scenes: [
-    { skill: "blur-reveal", text: "Turn a prompt into a *launch film*", items: ["Introducing IntroMaker"], duration: 3.5, transition: "cut" },
-    { skill: "word-swap", text: "Make intros|trailers|launch films|promos", subtext: "Or paste your website URL", duration: 4, transition: "dolly" },
+    { skill: "blur-reveal", text: "Turn a prompt into a *launch video*", items: ["Introducing IntroMaker"], duration: 3.5, transition: "cut" },
+    { skill: "word-swap", text: "Make intros|trailers|launch videos|promos", subtext: "Or paste your website URL", duration: 4, transition: "dolly" },
     {
       skill: "bento",
       text: "Made in *one studio*",

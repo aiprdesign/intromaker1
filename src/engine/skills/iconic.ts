@@ -209,7 +209,7 @@ export const iconicSkills: Skill[] = [
     id: "icon-reveal",
     name: "Icon Reveal",
     tagline: "Big line icons draw on one per beat inside rim-lit plates with their labels, under a heading in the title face.",
-    bestFor: "Trailer and intro films made from words alone: 2–4 things the brand is about (items), shown as icons. Heading of 1–4 words.",
+    bestFor: "Trailer and intro videos made from words alone: 2–4 things the brand is about (items), shown as icons. Heading of 1–4 words.",
     sample: { text: "WHAT WE DO", items: ["Fresh bread", "Coffee", "Cakes"] },
     itemsHint: "2–4 short things it's about; they become icons",
     render: iconReveal,

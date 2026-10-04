@@ -92,7 +92,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
           <div key={id} className="admin-card">
             <h2>{PLAN_NAMES[id]}</h2>
             {num(id, "savedFilms", "Saved intros")}
-            {num(id, "aiPerMonth", "AI films a month", "0 = built-in director only")}
+            {num(id, "aiPerMonth", "AI videos a month", "0 = built-in director only")}
             {num(id, "importsPerDay", "Website imports a day")}
             <label className="fld">
               <span className="fld-cap">Largest export</span>

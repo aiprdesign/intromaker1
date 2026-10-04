@@ -62,9 +62,9 @@ export function lintStoryboard(draft: Draft, ctx: LintContext): string[] {
   if (saas) {
     if (!HOOKS.has(scenes[0].skill)) issues.push(`Open with a hook (blur-reveal with the promise, or pain-strike with real pains), not ${scenes[0].skill}.`);
     if (scenes[scenes.length - 1].skill !== "cta") issues.push("End on a cta scene whose subtext is the button label.");
-    if (scenes.filter((s) => DEMO_SKILLS.has(s.skill)).length > 1) issues.push("Use at most one interaction moment (command-k, ai-prompt, click-flow or notify-stack) per film.");
+    if (scenes.filter((s) => DEMO_SKILLS.has(s.skill)).length > 1) issues.push("Use at most one interaction moment (command-k, ai-prompt, click-flow or notify-stack) per video.");
     const withEyebrow = scenes.filter((s) => s.eyebrow?.trim()).length;
-    if (scenes.length >= 4 && withEyebrow < scenes.length / 2) issues.push("Give most scenes an eyebrow chapter label so the film reads as one story.");
+    if (scenes.length >= 4 && withEyebrow < scenes.length / 2) issues.push("Give most scenes an eyebrow chapter label so the video reads as one story.");
   }
   const numbers = ctx.site ? siteNumbers(ctx.site) : null;
   scenes.forEach((s, i) => {
@@ -83,7 +83,7 @@ export function lintStoryboard(draft: Draft, ctx: LintContext): string[] {
     if (ctx.safe) {
       const claims = [s.text, s.subtext, s.eyebrow, ...(s.items ?? []), (s as { vo?: string }).vo].filter((x): x is string => !!x && hasClaim(x));
       if (claims.length) issues.push(`${n} makes a claim ("${claims[0].replace(/\*/g, "")}"); use generic, descriptive wording: no superlatives, guarantees, speed claims or numbers.`);
-      if (["testimonial", "logo-marquee", "chart-grow", "number-ticker"].includes(s.skill)) issues.push(`${n}: claim-safe films don't use ${s.skill}; drop the scene.`);
+      if (["testimonial", "logo-marquee", "chart-grow", "number-ticker"].includes(s.skill)) issues.push(`${n}: claim-safe videos don't use ${s.skill}; drop the scene.`);
     }
     if (!ctx.site) return;
     if (s.skill === "testimonial" && !ctx.site.testimonials.some((q) => norm(s.text).includes(norm(q.quote).slice(0, 40)))) {

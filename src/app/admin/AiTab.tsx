@@ -63,7 +63,7 @@ export default function AiTab() {
     setBusy("save");
     try {
       fill(await api<Settings>("/api/admin/settings", { method: "PUT", body: JSON.stringify(payload()) }));
-      notify("AI settings saved. New films use them right away.");
+      notify("AI settings saved. New videos use them right away.");
     } catch (e) {
       notify((e as Error).message, "error");
     } finally {
@@ -166,7 +166,7 @@ export default function AiTab() {
               ))}
             </div>
             <span className="hint sm">
-              {form.mode === "fast" ? "One pass, cheapest." : form.mode === "balanced" ? "The director reviews its own draft when it looks weak." : "Self-review pass on: slower, more polished films."}
+              {form.mode === "fast" ? "One pass, cheapest." : form.mode === "balanced" ? "The director reviews its own draft when it looks weak." : "Self-review pass on: slower, more polished videos."}
             </span>
           </div>
           {preset.vision && (
@@ -179,15 +179,15 @@ export default function AiTab() {
       )}
       <div className="admin-row">
         <label className="fld">
-          <span className="fld-cap">AI films per day (site-wide)</span>
+          <span className="fld-cap">AI videos per day (site-wide)</span>
           <input className="input" type="number" min={0} value={form.dailyBudget} placeholder={`${s.envBudget} (default)`} onChange={(e) => set({ dailyBudget: e.target.value })} />
         </label>
         <label className="fld">
-          <span className="fld-cap">AI films per visitor per day</span>
+          <span className="fld-cap">AI videos per visitor per day</span>
           <input className="input" type="number" min={0} value={form.perVisitor} placeholder="12 (default)" onChange={(e) => set({ perVisitor: e.target.value })} />
         </label>
       </div>
-      <p className="hint">Past these limits visitors still get films, made by the built-in director. Accounts also have monthly allowances, set in Plans.</p>
+      <p className="hint">Past these limits visitors still get videos, made by the built-in director. Accounts also have monthly allowances, set in Plans.</p>
       {test && (
         <p className={test.ok ? "ok-msg" : "error"} role="status">
           {test.text}

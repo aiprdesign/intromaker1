@@ -1547,7 +1547,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Offset from the feature-layout rotation, so consecutive remakes never repeat the original's pair.
   const fit = fitting[(variant + Math.floor(variant / 2)) % fitting.length];
   const demo = fit.spec;
-  const demoWhy = fit.because.length ? `Best fit: the site talks about ${fit.because.slice(0, 3).join(", ")}` : `Typical of ${concept.name.toLowerCase()} launch films`;
+  const demoWhy = fit.because.length ? `Best fit: the site talks about ${fit.because.slice(0, 3).join(", ")}` : `Typical of ${concept.name.toLowerCase()} launch videos`;
   let demoScene: Scene | null = null;
   if (demo.skill === "command-k") {
     // The command that runs is a real feature; the rest are the palette's everyday commands.
@@ -1858,9 +1858,9 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     const cut = Math.round(total);
     styled.target = cut;
     styled.notes = [
-      `There's enough material for a tight ${cut}s film rather than ${target}s, with no padding or invented lines. ` +
+      `There's enough material for a tight ${cut}s video rather than ${target}s, with no padding or invented lines. ` +
         (site.url
-          ? "Sites with more feature headlines, steps or testimonials make longer films."
+          ? "Sites with more feature headlines, steps or testimonials make longer videos."
           : "List a few features in your prompt (e.g. “with X, Y and Z”) or import the website for the full cut."),
     ];
   }
@@ -2034,7 +2034,7 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   if (!feats.length || photos < 2) {
     const runs = styled.scenes.reduce((a, s) => a + s.duration, 0);
     styled.notes = [
-      `${photos < 2 ? (photos ? "Only one product photo was found" : "No product photos were added") : "The listing has no bullet points"}, so this is a short product film${runs < target * 0.9 ? ` (${Math.round(runs)}s rather than ${target}s, with no padding or repeats)` : ""}. ${photos < 2 ? "Add more photos" : "Add features in your prompt"} for galleries and feature callouts.`,
+      `${photos < 2 ? (photos ? "Only one product photo was found" : "No product photos were added") : "The listing has no bullet points"}, so this is a short product video${runs < target * 0.9 ? ` (${Math.round(runs)}s rather than ${target}s, with no padding or repeats)` : ""}. ${photos < 2 ? "Add more photos" : "Add features in your prompt"} for galleries and feature callouts.`,
     ];
     // Judged (and fitted later) on the length its material supports.
     if (runs < target * 0.9) styled.target = Math.round(runs);

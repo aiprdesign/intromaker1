@@ -102,14 +102,14 @@ export const SAMPLE_FILMS = [
     id: "saas",
     label: "SaaS launch",
     plan: SAAS_SAMPLE,
-    blurb: "Lumetrik is an imaginary analytics app. Its launch film covers a hook, the problem, a product tour, an AI answer, live charts, teamwork, integrations and a call to action.",
+    blurb: "Lumetrik is an imaginary analytics app. Its launch video covers a hook, the problem, a product tour, an AI answer, live charts, teamwork, integrations and a call to action.",
     prompt: 'Launch video for "Lumetrik", an analytics app for product teams. Dashboards, AI insights, team sharing',
   },
   {
     id: "product",
     label: "Product video",
     plan: PRODUCT_SAMPLE,
-    blurb: "Kelvo is an imaginary smart bottle. From three photos the film builds the reveal, feature callouts, its angles, close-ups and an end card.",
+    blurb: "Kelvo is an imaginary smart bottle. From three photos the video builds the reveal, feature callouts, its angles, close-ups and an end card.",
     prompt: 'Product video for "Kelvo", a smart water bottle with a temperature display on the cap. Screw-top lid, carry loop, brushed steel cap',
   },
   {

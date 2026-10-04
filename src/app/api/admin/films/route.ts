@@ -38,6 +38,6 @@ export async function DELETE(req: Request) {
   const body = (await req.json().catch(() => null)) as { ids?: unknown; all?: unknown } | null;
   if (body?.all === true) return Response.json({ deleted: await deleteFilms("all") }, { headers: noStore });
   const ids = Array.isArray(body?.ids) ? body.ids.filter((x): x is string => typeof x === "string").slice(0, 500) : [];
-  if (!ids.length) return Response.json({ error: "No films given" }, { status: 400 });
+  if (!ids.length) return Response.json({ error: "No videos given" }, { status: 400 });
   return Response.json({ deleted: await deleteFilms(ids) }, { headers: noStore });
 }

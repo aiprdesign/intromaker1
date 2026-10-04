@@ -776,7 +776,7 @@ export const slideSkills: Skill[] = [
     id: "feature-slides",
     name: "Feature Slides",
     tagline: "One full slide per feature (number, icon, title, benefit and the product's own UI) with story-style progress bars.",
-    bestFor: "Long films with 2–4 real features that have one-line benefits, and product screenshots or captured UI to show. Headline = a short chapter label ('Inside *Orbit*'); items = 'Title — one-line benefit'.",
+    bestFor: "Long videos with 2–4 real features that have one-line benefits, and product screenshots or captured UI to show. Headline = a short chapter label ('Inside *Orbit*'); items = 'Title — one-line benefit'.",
     sample: { text: "Inside *the product*", items: ["Real-time dashboards — See signups, events and conversions as they happen", "Automations — Hand off the busywork and keep things moving", "Team spaces — Plan, share and ship together in one place"] },
     itemsHint: "2–4 'Title — benefit'",
     render: featureSlides,

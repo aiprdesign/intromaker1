@@ -20,12 +20,12 @@ export async function POST(req: Request) {
   const u = await requireUser(req);
   if (u instanceof Response) return u;
   const body = (await req.json().catch(() => null)) as { id?: unknown; title?: unknown; plan?: unknown; thumb?: unknown } | null;
-  if (!body?.plan || typeof body.plan !== "object") return Response.json({ error: "Missing film" }, { status: 400 });
+  if (!body?.plan || typeof body.plan !== "object") return Response.json({ error: "Missing video" }, { status: 400 });
   let plan;
   try {
     plan = sanitizePlan(body.plan as never);
   } catch {
-    return Response.json({ error: "That isn't a valid film." }, { status: 400 });
+    return Response.json({ error: "That isn't a valid video." }, { status: 400 });
   }
   try {
     const film = await saveFilm(u, {

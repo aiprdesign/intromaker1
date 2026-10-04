@@ -1146,7 +1146,7 @@ export const editorialMoreSkills: Skill[] = [
   {
     id: "type-slots",
     name: "Type Slots",
-    tagline: "The words of the line spin on their own slot reels through the film's other words and lock into place, left to right.",
+    tagline: "The words of the line spin on their own slot reels through the video's other words and lock into place, left to right.",
     bestFor: "A line of 2–6 words with energy; the features (items) are the words the reels spin through.",
     sample: { text: "Plan, build and *ship*", items: ["Design", "Review", "Launch", "Grow"] },
     itemsHint: "Short features the reels spin through",

@@ -41,7 +41,7 @@ type Stats = {
 };
 type List = { items: Entry[]; total: number; page: number; size: number; stats: Stats; aiToday: number; aiBudget: number; persistent?: boolean };
 
-const KIND_LABEL: Record<Entry["kind"], string> = { generated: "New film", remake: "Remake", take: "Alternative take", exported: "Exported" };
+const KIND_LABEL: Record<Entry["kind"], string> = { generated: "New video", remake: "Remake", take: "Alternative take", exported: "Exported" };
 const engineLabel = (e: Entry) => (e.engine === "builtin" ? "Built-in" : e.engine === "export" ? e.preset || "Export" : "AI");
 
 export type AccountRef = { id: string; email: string };
@@ -113,24 +113,24 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
   }, [data]);
 
   const removeOne = async (e: Entry) => {
-    if (!(await confirm({ title: "Delete this film from the log?", body: `“${e.title}”, ${new Date(e.at).toLocaleString()}. The visitor keeps their own copy.`, confirm: "Delete", danger: true }))) return;
+    if (!(await confirm({ title: "Delete this video from the log?", body: `“${e.title}”, ${new Date(e.at).toLocaleString()}. The visitor keeps their own copy.`, confirm: "Delete", danger: true }))) return;
     await api("/api/admin/films", { method: "DELETE", body: JSON.stringify({ ids: [e.id] }) });
     setOpen(null);
-    notify("Film deleted");
+    notify("Video deleted");
     void load();
   };
   const removeAll = async () => {
     if (!data) return;
     const ok = await confirm({
-      title: `Delete the ${data.stats.total} logged films?`,
-      body: "The whole film log and its storyboards are removed. Visitors' own films and accounts are not affected. This can't be undone.",
-      confirm: "Delete the film log",
+      title: `Delete the ${data.stats.total} logged videos?`,
+      body: "The whole video log and its storyboards are removed. Visitors' own videos and accounts are not affected. This can't be undone.",
+      confirm: "Delete the video log",
       danger: true,
       typed: "DELETE",
     });
     if (!ok) return;
     const r = await api<{ deleted: number }>("/api/admin/films", { method: "DELETE", body: JSON.stringify({ all: true }) });
-    notify(`Deleted ${r.deleted} films`);
+    notify(`Deleted ${r.deleted} videos`);
     void load();
   };
   const filtered = !!(q.trim() || kind || visitor || account);
@@ -151,19 +151,19 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
       {error && <p className="error">{error}</p>}
       {data && data.persistent === false && (
         <p className="admin-warn">
-          The film log, accounts and settings are kept in a temporary folder, so a redeploy empties them. Add a volume (Railway → your service → Volumes, mounted
+          The video log, accounts and settings are kept in a temporary folder, so a redeploy empties them. Add a volume (Railway → your service → Volumes, mounted
           at <code>/data</code>) and set <code>INTROMAKER_DATA_DIR=/data</code>.
         </p>
       )}
       {s ? (
         <>
           <section className="admin-kpis">
-            <Kpi label="Films" value={s.total} hint="Film events logged (new, remakes, takes, exports)" />
+            <Kpi label="Videos" value={s.total} hint="Video events logged (new, remakes, takes, exports)" />
             <Kpi label="Today" value={s.today} />
             <Kpi label="Last 7 days" value={s.week} />
             <Kpi label="Visitors" value={s.visitors} hint={`Different visitors · ${s.accounts} signed in`} />
             <Kpi label="Exports" value={s.exported} />
-            <Kpi label="AI films today" value={`${data!.aiToday} / ${data!.aiBudget}`} hint="Paid by the site's AI key, against the daily budget" meter={data!.aiBudget ? data!.aiToday / data!.aiBudget : 0} />
+            <Kpi label="AI videos today" value={`${data!.aiToday} / ${data!.aiBudget}`} hint="Paid by the site's AI key, against the daily budget" meter={data!.aiBudget ? data!.aiToday / data!.aiBudget : 0} />
           </section>
           <section className="admin-insights">
             <Chart days={s.perDay} />
@@ -172,7 +172,7 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
               <div className="chips">
                 {s.skills.length ? (
                   s.skills.map(([k, n]) => (
-                    <button key={k} className="chip" onClick={() => (setQ(k), setPage(0))} title="Show films with this slide">
+                    <button key={k} className="chip" onClick={() => (setQ(k), setPage(0))} title="Show videos with this slide">
                       {SKILL_MAP[k as SkillId]?.name ?? k} · {n}
                     </button>
                   ))
@@ -184,7 +184,7 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
               <div className="chips">
                 {s.keywords?.length ? (
                   s.keywords.map(([k, n]) => (
-                    <button key={k} className="chip" onClick={() => (setQ(k), setPage(0))} title="Show films whose prompt uses this word">
+                    <button key={k} className="chip" onClick={() => (setQ(k), setPage(0))} title="Show videos whose prompt uses this word">
                       {k} · {n}
                     </button>
                   ))
@@ -212,7 +212,7 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
 
       <section className="admin-filters">
         <span className="search-box">
-          <input className="input" placeholder="Search prompts, websites, accounts, titles, slides…" value={q} onChange={(e) => (setQ(e.target.value), setPage(0))} aria-label="Search films" />
+          <input className="input" placeholder="Search prompts, websites, accounts, titles, slides…" value={q} onChange={(e) => (setQ(e.target.value), setPage(0))} aria-label="Search videos" />
           {q && (
             <button className="clear" onClick={() => setQ("")} aria-label="Clear search">
               ×
@@ -244,7 +244,7 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
         )}
         <span className="spacer" />
         <span className="hint">
-          {data ? `${data.total} film${data.total === 1 ? "" : "s"}` : ""}
+          {data ? `${data.total} video${data.total === 1 ? "" : "s"}` : ""}
           {refreshed ? ` · updated ${new Date(refreshed).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
         </span>
         <button className="btn btn-ghost sm" onClick={() => void load()} title="Refresh">
@@ -255,14 +255,14 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
       {!data && !error && <Skeleton rows={6} kind="card" />}
       {data && !items.length && (
         <div className="admin-card empty">
-          <p>{filtered ? "No films match these filters." : "No films yet."}</p>
+          <p>{filtered ? "No videos match these filters." : "No videos yet."}</p>
           <p className="hint">
             {filtered ? (
               <button className="link-btn" onClick={clear}>
                 Clear filters
               </button>
             ) : (
-              "Films made in the studio (new films, remakes, alternative takes) and exports show up here from now on. Films made before ADMIN_PASSWORD was set aren't in the log."
+              "Videos made in the studio (new videos, remakes, alternative takes) and exports show up here from now on. Videos made before ADMIN_PASSWORD was set aren't in the log."
             )}
           </p>
         </div>
@@ -290,11 +290,11 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
               <span className="film-when">
                 <When t={e.at} /> ·
                 {e.account ? (
-                  <button className="visitor account" onClick={() => (setAccount(e.account!), setPage(0))} title="Show this account's films">
+                  <button className="visitor account" onClick={() => (setAccount(e.account!), setPage(0))} title="Show this account's videos">
                     {e.account.email}
                   </button>
                 ) : (
-                  <button className="visitor" onClick={() => (setVisitor(e.visitor), setPage(0))} title="Show this visitor's films">
+                  <button className="visitor" onClick={() => (setVisitor(e.visitor), setPage(0))} title="Show this visitor's videos">
                     visitor {e.visitor}
                   </button>
                 )}
@@ -320,9 +320,9 @@ export default function FilmsTab({ account: initialAccount = null }: { account?:
       {!!data?.stats.total && (
         <details className="admin-danger">
           <summary>Danger zone</summary>
-          <p className="hint">Remove the whole film log. Visitors&apos; accounts and saved intros are not affected.</p>
+          <p className="hint">Remove the whole video log. Visitors&apos; accounts and saved intros are not affected.</p>
           <button className="btn btn-danger sm" onClick={removeAll}>
-            Delete the {data.stats.total} films…
+            Delete the {data.stats.total} videos…
           </button>
         </details>
       )}
@@ -348,11 +348,11 @@ function Chart({ days }: { days: { day: string; films: number }[] }) {
   return (
     <div className="admin-card chart">
       <span className="fld-cap">
-        Films per day <em>last 14 days · peak {max}</em>
+        Videos per day <em>last 14 days · peak {max}</em>
       </span>
       <div className="bars" role="img" aria-label={days.map((d) => `${fmt(d.day)}: ${d.films}`).join(", ")}>
         {days.map((d) => (
-          <div key={d.day} className={`bar${d.films ? "" : " zero"}`} title={`${fmt(d.day)}: ${d.films} film${d.films === 1 ? "" : "s"}`}>
+          <div key={d.day} className={`bar${d.films ? "" : " zero"}`} title={`${fmt(d.day)}: ${d.films} video${d.films === 1 ? "" : "s"}`}>
             {d.films > 0 && <em>{d.films}</em>}
             <span style={{ height: d.films ? `${Math.max(6, (d.films / max) * 100)}%` : undefined }} />
           </div>
@@ -399,10 +399,10 @@ function FilmDetail({
         <header>
           <h2>{entry.title}</h2>
           <div className="admin-detail-nav">
-            <button className="icon-btn" onClick={onPrev} disabled={!onPrev} aria-label="Newer film" title="Newer (←)">
+            <button className="icon-btn" onClick={onPrev} disabled={!onPrev} aria-label="Newer video" title="Newer (←)">
               ←
             </button>
-            <button className="icon-btn" onClick={onNext} disabled={!onNext} aria-label="Older film" title="Older (→)">
+            <button className="icon-btn" onClick={onNext} disabled={!onNext} aria-label="Older video" title="Older (→)">
               →
             </button>
             <button className="icon-btn" onClick={onClose} aria-label="Close" title="Close (Esc)">
@@ -431,7 +431,7 @@ function FilmDetail({
           </dd>
           <dt>Director</dt>
           <dd>{entry.engine === "builtin" ? "Built-in director" : entry.engine}</dd>
-          <dt>Film</dt>
+          <dt>Video</dt>
           <dd>
             {entry.aspect} · {entry.seconds}s · {entry.scenes} slides{entry.template ? ` · style ${entry.template}` : ""}
           </dd>

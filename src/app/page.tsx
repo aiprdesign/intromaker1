@@ -43,7 +43,7 @@ export default function Home() {
 
       <section className="section" id="samples">
         <div className="section-head">
-          <span className="eyebrow">Sample films</span>
+          <span className="eyebrow">Sample videos</span>
           <h2>See what it makes.</h2>
           <p>A SaaS launch, a speed promo, a product video and a trailer for imaginary brands, built from the slides that suit them. They play live in your browser, frame for frame what you export.</p>
         </div>

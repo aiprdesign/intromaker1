@@ -23,7 +23,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "IntroMaker — Prompt to epic motion graphics",
   description:
-    "Type a prompt, get a cinematic motion-graphics video. 40 pro animation skills, SaaS launch films, website import, AI director, produced soundtrack, voice-over and one-click export.",
+    "Type a prompt, get a cinematic motion-graphics video. 40 pro animation skills, SaaS launch videos, website import, AI director, produced soundtrack, voice-over and one-click export.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

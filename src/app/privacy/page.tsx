@@ -31,19 +31,19 @@ export default function Privacy() {
         </p>
         {logging ? (
           <p>
-            <strong>This site keeps a log of the films made on it</strong>, which its owner can review: the prompt or website address, the storyboard (the text on the slides and the styles used) and when it was made, for new films, remakes and exports. Without an account you appear in it only as an anonymous code
+            <strong>This site keeps a log of the videos made on it</strong>, which its owner can review: the prompt or website address, the storyboard (the text on the slides and the styles used) and when it was made, for new videos, remakes and exports. Without an account you appear in it only as an anonymous code
             (a salted hash of your address), not by your address itself. If you&apos;re signed in to an account, the entry is also linked to your
             account&apos;s email, so the owner can see the intros an account made; deleting your account removes that link. The video file is not
             included. Don&apos;t put anything private in a prompt.
           </p>
         ) : (
-          <p>This site doesn&apos;t keep a log of the films made on it: storyboards and edits stay in your browser.</p>
+          <p>This site doesn&apos;t keep a log of the videos made on it: storyboards and edits stay in your browser.</p>
         )}
 
         <h2>Accounts</h2>
         <p>
           An account is optional. If you create one, the server keeps your email address, your password as a salted scrypt hash (not the password itself),
-          your plan, how many AI films and website imports you&apos;ve used this month and today, and the intros you save (their storyboards and a small
+          your plan, how many AI videos and website imports you&apos;ve used this month and today, and the intros you save (their storyboards and a small
           thumbnail). Signing in sets one cookie, which keeps you signed in for 30 days; there are no tracking cookies. You can delete your account and your saved intros at any time from your account page.
         </p>
         <p>
@@ -56,7 +56,7 @@ export default function Privacy() {
         <p>
           The server opens the public page you enter in a headless browser, reads its text and takes screenshots of it, its UI components and its logo.{" "}
           {CAPTURE_STORAGE === "browser"
-            ? "The screenshots aren't written to the server's disk: it holds them in memory only while your film is being made (up to 30 minutes), and your browser keeps its own copy."
+            ? "The screenshots aren't written to the server's disk: it holds them in memory only while your video is being made (up to 30 minutes), and your browser keeps its own copy."
             : "The screenshots are stored on the server so the studio, share links and saved intros can show them, and are deleted automatically after 7 days. Your browser also keeps its own copy."}{" "}
           The site&apos;s own images and videos are passed through to your browser and not stored. Only public addresses can be imported: private and internal
           networks are refused. Please import only sites you have the right to use.
@@ -68,7 +68,7 @@ export default function Privacy() {
           passed through to your browser and not stored; prices, ratings and reviews are not used. Product photos you add are resized and re-saved as plain
           JPEGs in your browser first (so camera details such as location are dropped), then{" "}
           {CAPTURE_STORAGE === "browser"
-            ? "held in the server's memory only while your film is being made (up to 30 minutes)."
+            ? "held in the server's memory only while your video is being made (up to 30 minutes)."
             : "stored on the server like website screenshots and deleted automatically after 7 days."}{" "}
           Please use only listings and photos you have the right to use, such as your own.
         </p>
@@ -95,7 +95,7 @@ export default function Privacy() {
           )}
           <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits. It isn&apos;t written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>
-          {logging && <li>The film log described above, up to the most recent few thousand films, until the owner deletes it.</li>}
+          {logging && <li>The video log described above, up to the most recent few thousand videos, until the owner deletes it.</li>}
           <li>If you have an account: your email, password hash, plan, usage counts and saved intros, until you delete the account.</li>
         </ul>
 

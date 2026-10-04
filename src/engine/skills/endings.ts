@@ -424,7 +424,7 @@ export const endingSkills: Skill[] = [
     id: "liquid-logo",
     name: "Liquid Logo",
     tagline: "Droplets fall and your logo pours in as glossy liquid, ripples out, then catches a sheen.",
-    bestFor: "The brand reveal in fluid, playful-premium films (the Liquid Motion style uses it). Headline = brand name; subtext = a short tagline.",
+    bestFor: "The brand reveal in fluid, playful-premium videos (the Liquid Motion style uses it). Headline = brand name; subtext = a short tagline.",
     sample: { text: "Acme", subtext: "Ideas that flow" },
     render: liquidLogo,
     sfx: (scene, beat) => {
@@ -437,7 +437,7 @@ export const endingSkills: Skill[] = [
     name: "QR End Card",
     tagline: "The closing line next to a scannable QR code for your site, with a scan beam on the final beat.",
     bestFor:
-      "The final scene when the film plays on a big screen, at an event, in a talk or a store: viewers scan to visit. Headline = closing line; subtext = the call to scan ('Scan to try it free'); items = [link] only if it differs from the website.",
+      "The final scene when the video plays on a big screen, at an event, in a talk or a store: viewers scan to visit. Headline = closing line; subtext = the call to scan ('Scan to try it free'); items = [link] only if it differs from the website.",
     sample: { text: "See it *live*", subtext: "Scan to try it", items: ["example.com"] },
     itemsHint: "Link for the code (leave empty to use your website)",
     render: qrEnd,

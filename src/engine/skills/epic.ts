@@ -807,7 +807,7 @@ export const epicSkills: Skill[] = [
   {
     id: "ember-title",
     name: "Ember Title",
-    tagline: "Embers rise through the heat while the title, forged white-hot, cools into the film's metal.",
+    tagline: "Embers rise through the heat while the title, forged white-hot, cools into the video's metal.",
     bestFor: "Fantasy, war, games and anything forged or fiery. 1–3 words.",
     sample: { text: "FORGED", subtext: "In fire" },
     render: emberTitle,

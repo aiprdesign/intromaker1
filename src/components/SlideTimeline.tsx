@@ -59,7 +59,7 @@ export default function SlideTimeline({
   const tall = plan.aspect === "9:16";
   return (
     <div className="slide-timeline" aria-label="Slides">
-      <div className={`slide-track${reorder.dragging ? " reordering" : ""}`} role="listbox" aria-label="Slides in the film">
+      <div className={`slide-track${reorder.dragging ? " reordering" : ""}`} role="listbox" aria-label="Slides in the video">
         {plan.scenes.map((s, i) => {
           const { name, icon } = beatOf(s);
           return (
@@ -115,7 +115,7 @@ export default function SlideTimeline({
                   }}
                   disabled={one}
                   aria-label={`Remove slide ${i + 1}`}
-                  title={one ? "A film needs at least one slide" : "Remove from the film"}
+                  title={one ? "A video needs at least one slide" : "Remove from the video"}
                 >
                   <Icon name="X" size={12} />
                 </button>

@@ -28,7 +28,7 @@ const ALL_SOURCES: { id: VoiceSource; name: string; note: string }[] = [
   { id: "openai", name: "OpenAI voices", note: "Natural, expressive voices (gpt-4o-mini-tts). Uses your OpenAI key." },
   { id: "elevenlabs", name: "ElevenLabs voices", note: "Studio-quality voices, or any voice ID from your ElevenLabs library." },
   { id: "custom", name: "Any OpenAI-compatible voice server", note: "E.g. Kokoro-FastAPI or openedai-speech on your own machine (…/v1/audio/speech)." },
-  { id: "upload", name: "Upload my own recording", note: "Your narration (MP3/WAV/M4A) laid over the film." },
+  { id: "upload", name: "Upload my own recording", note: "Your narration (MP3/WAV/M4A) laid over the video." },
 ];
 export const VOICE_SOURCES = ALL_SOURCES.filter((s) => LOCAL_VOICE || s.id !== "local");
 

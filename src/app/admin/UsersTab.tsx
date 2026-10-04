@@ -198,7 +198,7 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
               <strong title={u.email}>{u.email}</strong>
               <span className="hint">
                 joined <When t={u.createdAt} /> · last in {u.lastLoginAt ? <When t={u.lastLoginAt} /> : "not yet"} · {u.made?.made ?? 0} made · {u.films} saved
-                {u.usage?.aiMonth === new Date().toISOString().slice(0, 7) ? ` · ${u.usage.ai ?? 0} AI films this month` : ""}
+                {u.usage?.aiMonth === new Date().toISOString().slice(0, 7) ? ` · ${u.usage.ai ?? 0} AI videos this month` : ""}
               </span>
               <span className="film-tags">
                 {u.planSource === "stripe" && u.billingStatus && (
@@ -235,7 +235,7 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
                     ))}
                   </ul>
                   <button className="link-btn" onClick={() => onShowFilms({ id: u.id, email: u.email })}>
-                    View {u.made.made} film{u.made.made === 1 ? "" : "s"} · newest <When t={u.made.lastAt} /> →
+                    View {u.made.made} video{u.made.made === 1 ? "" : "s"} · newest <When t={u.made.lastAt} /> →
                   </button>
                 </div>
               ) : (

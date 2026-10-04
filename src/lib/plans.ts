@@ -72,7 +72,7 @@ export function describeLimits(l: PlanLimits): string[] {
   const res = l.maxLong >= 3840 ? "4K" : l.maxLong >= 2560 ? "1440p" : l.maxLong >= 1920 ? "1080p" : "720p";
   return [
     l.savedFilms >= 100_000 ? "Unlimited saved intros" : `${l.savedFilms} saved intro${l.savedFilms === 1 ? "" : "s"}`,
-    l.aiPerMonth >= 1_000_000 ? "Unlimited AI-directed films" : l.aiPerMonth > 0 ? `AI director: ${l.aiPerMonth} films a month` : "Built-in director (or your own AI key)",
+    l.aiPerMonth >= 1_000_000 ? "Unlimited AI-directed videos" : l.aiPerMonth > 0 ? `AI director: ${l.aiPerMonth} videos a month` : "Built-in director (or your own AI key)",
     l.importsPerDay >= 100_000 ? "Unlimited website and listing imports" : `${l.importsPerDay} website import${l.importsPerDay === 1 ? "" : "s"} a day`,
     `Export up to ${res} at ${l.maxFps} fps`,
     l.watermark ? "Small IntroMaker watermark" : "No watermark",

@@ -350,7 +350,7 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
         <h2>Plan</h2>
         <div className="account-card usage">
           <span>
-            AI films this month: <strong>{me.usage.ai}</strong> / {amount(me.limits.aiPerMonth)}
+            AI videos this month: <strong>{me.usage.ai}</strong> / {amount(me.limits.aiPerMonth)}
           </span>
           <span>
             Website imports today: <strong>{me.usage.imports}</strong> / {amount(me.limits.importsPerDay)}

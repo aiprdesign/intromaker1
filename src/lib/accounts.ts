@@ -417,7 +417,7 @@ export async function getSavedFilm(uid: string, id: string) {
 /** Save a film: a new one (within the plan's limit), or an update of one the account owns. */
 export async function saveFilm(u: User, input: { id?: string; title?: string; plan: VideoPlan; thumb?: string }) {
   const planJson = JSON.stringify(input.plan);
-  if (planJson.length > MAX_FILM_BYTES) throw new AccountError("This film is too large to save (it holds very large images).", 413);
+  if (planJson.length > MAX_FILM_BYTES) throw new AccountError("This video is too large to save (it holds very large images).", 413);
   const thumb = typeof input.thumb === "string" && input.thumb.startsWith("data:image/") && input.thumb.length <= MAX_THUMB ? input.thumb : undefined;
   const title = (input.title || input.plan.title || "Untitled").trim().slice(0, 120);
   return serial(async () => {

@@ -631,7 +631,7 @@ export default function Studio() {
       setTakes([{ ...take, label: "Original" }]);
       if (before.plan !== HERO_PLAN && booted.current && !bootingRef.current)
         setToast({
-          text: "Made a new film",
+          text: "Made a new video",
           key: Date.now(),
           undo: () => {
             setPlan(before.plan);
@@ -740,7 +740,7 @@ export default function Studio() {
       // length chosen for where they'll run (short-form social works best at 15–30s).
       const len = fmt.length ?? (s.kind === "product" ? length : length === "standard" ? "long" : length);
       setLength(len);
-      setImportStage(`Directing your ${s.name} film…`);
+      setImportStage(`Directing your ${s.name} video…`);
       const chosen = brandMode === "logo" ? fromLogo ?? colors : brandMode === "site" ? colors : undefined;
       if (brandMode === "logo" && !fromLogo) setBrandMode("site");
       await generate({ site: s, colors: chosen, length: len, aspect: fmt.aspect, signal });
@@ -768,7 +768,7 @@ export default function Studio() {
     setTakesLoading(false);
     setImporting(false);
     setImportStage(null);
-    setToast({ text: "Stopped. The film on screen is unchanged.", key: Date.now() });
+    setToast({ text: "Stopped. The video on screen is unchanged.", key: Date.now() });
   };
 
   const clearSite = () => {
@@ -851,7 +851,7 @@ export default function Studio() {
           setTakes(savedTakes);
           setCurrent(Math.min(Math.max(0, saved.current ?? 0), Math.max(0, savedTakes.length - 1)));
           setEngine("manual");
-          setNote("Restored your last film from this browser. Generate or Import starts a new one.");
+          setNote("Restored your last video from this browser. Generate or Import starts a new one.");
         }
       } catch {
         /* nothing saved, or unreadable */
@@ -1272,7 +1272,7 @@ export default function Studio() {
             <button className="icon-btn sm" onClick={() => moveScene(i, i - 1)} disabled={i === 0} aria-label="Move earlier" title="Move earlier">←</button>
             <button className="icon-btn sm" onClick={() => moveScene(i, i + 1)} disabled={i === plan.scenes.length - 1} aria-label="Move later" title="Move later">→</button>
             <button className="icon-btn sm" onClick={() => duplicateScene(i)} aria-label="Duplicate slide" title="Duplicate (D)">⧉</button>
-            <button className="icon-btn sm" onClick={() => removeScene(i)} disabled={plan.scenes.length <= 1} aria-label="Remove slide" title="Remove from the film (Delete)">✕</button>
+            <button className="icon-btn sm" onClick={() => removeScene(i)} disabled={plan.scenes.length <= 1} aria-label="Remove slide" title="Remove from the video (Delete)">✕</button>
           </div>
         </div>
       </div>
@@ -1419,7 +1419,7 @@ export default function Studio() {
               inputMode="url"
             />
             {importing ? (
-              <button className="btn stop-btn" type="button" onClick={stopDirecting} title="Stop the import. The film on screen stays as it is.">
+              <button className="btn stop-btn" type="button" onClick={stopDirecting} title="Stop the import. The video on screen stays as it is.">
                 ■ Stop
               </button>
             ) : (
@@ -1726,7 +1726,7 @@ export default function Studio() {
                   const id = suggestedFor(plan);
                   if (id) chooseTemplate(id, true);
                 }}
-                title="New films take the style suggested for their kind of product. A style you pick applies to this film and its remakes; the next website or prompt gets its own best style."
+                title="New videos take the style suggested for their kind of product. A style you pick applies to this video and its remakes; the next website or prompt gets its own best style."
               >
                 ✦ Auto: best style for your product
                 {autoStyle && suggestedFor(plan) ? ` (${TEMPLATE_MAP[suggestedFor(plan)!].name})` : ""}
@@ -1824,7 +1824,7 @@ export default function Studio() {
           <div className="panel-foot">
           <div className="gen-row">
             {loading || importing ? (
-              <button className="btn btn-lg grow stop-btn" onClick={stopDirecting} title="Stop the director. The film on screen stays as it is.">
+              <button className="btn btn-lg grow stop-btn" onClick={stopDirecting} title="Stop the director. The video on screen stays as it is.">
                 <span className="spinner sm" /> {importing && !loading ? "Importing…" : "Directing…"} <span className="stop-label">■ Stop</span>
               </button>
             ) : (
@@ -1833,7 +1833,7 @@ export default function Studio() {
               </button>
             )}
             {remaking ? (
-              <button className="btn btn-lg stop-btn" onClick={stopDirecting} title="Stop the remake. The film on screen stays as it is.">
+              <button className="btn btn-lg stop-btn" onClick={stopDirecting} title="Stop the remake. The video on screen stays as it is.">
                 <span className="spinner sm" /> Remaking… <span className="stop-label">■ Stop</span>
               </button>
             ) : (

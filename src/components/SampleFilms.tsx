@@ -142,7 +142,7 @@ export default function SampleFilms() {
 
   return (
     <div className="samples">
-      <div className="samples-tabs" role="tablist" aria-label="Sample films">
+      <div className="samples-tabs" role="tablist" aria-label="Sample videos">
         {SAMPLE_FILMS.map((f, i) => (
           <button key={f.id} role="tab" aria-selected={i === tab} className={`samples-tab${i === tab ? " on" : ""}`} onClick={() => pick(i)}>
             {f.label}
@@ -152,7 +152,7 @@ export default function SampleFilms() {
       </div>
 
       <div className="samples-stage">
-        <canvas ref={canvasRef} width={1280} height={720} className="samples-canvas" aria-label={`${film.label} sample film`} onClick={() => setPlaying((p) => !p)} />
+        <canvas ref={canvasRef} width={1280} height={720} className="samples-canvas" aria-label={`${film.label} sample video`} onClick={() => setPlaying((p) => !p)} />
         <div className="samples-controls">
           <button className="samples-btn" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"}>
             {playing ? (

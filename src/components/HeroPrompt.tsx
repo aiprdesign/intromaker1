@@ -97,7 +97,7 @@ export default function HeroPrompt() {
       <p className="lede">
         {product
           ? "Paste your Amazon, eBay, Etsy or Shopify listing, or upload product photos. IntroMaker cuts your product out of its photos and directs it in the format that sells: product first, benefits on screen (they read with the sound off), its angles, one clear call to action."
-          : "Enter your website below. IntroMaker reads your logo, brand colours, screenshots, UI and copy, picks the scenes that suit your product, and directs a beat-synced launch film you can edit and export in 1080p."}
+          : "Enter your website below. IntroMaker reads your logo, brand colours, screenshots, UI and copy, picks the scenes that suit your product, and directs a beat-synced launch video you can edit and export in 1080p."}
       </p>
     <div className="hero-prompt">
       <div className="mode-tabs" role="tablist" aria-label="Start from">
@@ -243,7 +243,7 @@ export default function HeroPrompt() {
           <p id="url-help" className={`hero-note${error ? " error" : ""}`} role={error ? "alert" : undefined}>
             {error ?? (
               <>
-                We read your public homepage (logo, brand colours, screenshots, UI and copy) and direct a launch film from it.{" "}
+                We read your public homepage (logo, brand colours, screenshots, UI and copy) and direct a launch video from it.{" "}
                 <Link href="/privacy">What we keep</Link>
               </>
             )}

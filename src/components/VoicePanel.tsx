@@ -154,7 +154,7 @@ export default function VoicePanel({
                     const secs = await loadRecording(f);
                     setBusy(null);
                     onPlan({ ...plan });
-                    setError(secs > plan.scenes.reduce((a, s) => a + s.duration, 0) + 1 ? "The recording is longer than the film; lengthen scenes or trim it." : null);
+                    setError(secs > plan.scenes.reduce((a, s) => a + s.duration, 0) + 1 ? "The recording is longer than the video; lengthen scenes or trim it." : null);
                   } catch (err) {
                     setBusy(null);
                     setError(err instanceof Error ? err.message : "Couldn't read that audio file.");
