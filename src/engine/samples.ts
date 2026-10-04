@@ -48,8 +48,8 @@ export const SPEED_SAMPLE: VideoPlan = inTemplate(
   [
     [{ role: "hook", skill: "crash-zoom", text: "Meet *Lumetrik*", items: ["Data", "Charts", "Answers"], subtext: "Analytics for product teams", transition: "cut" }, 9],
     [{ role: "promise", skill: "rapid-fire", text: "Your metrics, *in motion*", items: ["Track", "Share", "Decide"], transition: "cut" }, 9],
-    [{ role: "promise", skill: "flip-switch", text: "Built for *teams*", items: ["Product", "Growth", "Design"], transition: "whip" }, 9],
-    [{ role: "promise", skill: "speed-ticker", text: "Insights at *full speed*", items: ["Funnels", "Cohorts", "Retention", "Alerts"], transition: "cut" }, 9],
+    [{ role: "promise", skill: "jump-cut", text: "Built for *teams*", items: ["Product", "Growth", "Design"], transition: "whip" }, 9],
+    [{ role: "promise", skill: "speed-gauge", text: "Insights at *full speed*", items: ["Funnels", "Cohorts", "Retention", "Alerts"], transition: "cut" }, 9],
     [{ role: "promise", skill: "word-grid", text: "Your data, *one place*", items: ["Funnels", "Cohorts", "Alerts", "Reports", "Goals", "Boards"], transition: "cut" }, 10],
     [{ role: "promise", skill: "stack-stomp", text: "Decide with *clarity*", transition: "whip" }, 9],
     [{ role: "cta", skill: "cta", text: "Start with *Lumetrik*", subtext: "Get started", transition: "cut" }, 8],
@@ -116,7 +116,7 @@ export const SAMPLE_FILMS = [
     id: "speed",
     label: "Speed promo",
     plan: SPEED_SAMPLE,
-    blurb: "A fast promo for the same imaginary app, made only of fast type slides: a crash zoom, rapid-fire words, a flip, a speed ticker, a word grid and a stomped stack, switching on the half-beat.",
+    blurb: "A fast promo for the same imaginary app, made only of fast type slides: a crash zoom, rapid-fire words, jump cuts, a speed gauge, a word grid and a stomped stack, switching on the half-beat.",
     prompt: 'Fast promo for "Lumetrik", an analytics app for product teams. Funnels, cohorts, alerts, shared reports',
   },
   {

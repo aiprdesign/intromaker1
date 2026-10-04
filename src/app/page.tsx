@@ -54,13 +54,13 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>110 motion skills, rendered live.</h2>
+          <h2>120 motion skills, rendered live.</h2>
           <p>The cards below are real-time output of the engine: the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See the 110 skills →
+            See the 120 skills →
           </Link>
         </div>
       </section>
@@ -69,12 +69,12 @@ export default function Home() {
         <div className="section-head">
           <span className="eyebrow">Fast type</span>
           <h2>Speed animations, on the beat.</h2>
-          <p>Sixteen kinetic text slides that switch words on the half-beat (whips, crash zooms, flips, tickers, stomps) and then land your line. The cards below play live.</p>
+          <p>Twenty-six kinetic text slides that switch words on the half-beat (whips, crash zooms, jump cuts, stamps, gauges, dominoes, rallies, stomps) and then land your line. The cards below play live.</p>
         </div>
-        <SkillGrid group="Fast type" ids={["crash-zoom", "rapid-fire", "speed-ticker", "flip-switch", "stack-stomp", "word-grid"]} />
+        <SkillGrid group="Fast type" ids={["crash-zoom", "jump-cut", "speed-gauge", "rapid-fire", "letter-rush", "stack-stomp"]} />
         <div className="center">
           <Link href="/skills#fast-type" className="btn btn-ghost btn-lg">
-            See the 16 fast type slides →
+            See the 26 fast type slides →
           </Link>
         </div>
       </section>

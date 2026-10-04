@@ -278,7 +278,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: true, beams: 2.5, aurora: 1.2, text: "blur", grain: 1, shader: "neuro", shaderStrength: 0.85 },
     transitions: ["glitch", "whip", "dolly"],
     pace: 0.95,
-    roles: {},
+    roles: { promise: "jump-cut" },
     revealNoLogo: "logo-reveal",
     sample: sample("Security that thinks *ahead*."),
   },
@@ -494,7 +494,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.3, card: "flat", text: "type", grain: 1, vignette: 1.4, shader: "voronoi", shaderStrength: 0.55, overlay: "hud" },
     transitions: ["glitch", "shutter", "cut"],
     pace: 0.95,
-    roles: {},
+    roles: { promise: "speed-gauge" },
     revealNoLogo: "logo-reveal",
     sample: sample("Threat detected. *Neutralised.*"),
   },
@@ -638,7 +638,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.5, card: "clay", text: "pop", grain: 0.2, vignette: 0.3, shader: "metaballs", shaderStrength: 0.9, depth: 7 },
     transitions: ["push", "zoom", "dissolve"],
     pace: 0.95,
-    roles: {},
+    roles: { promise: "stretch-snap" },
     revealNoLogo: "logo-reveal",
     sample: sample("Software that feels *squishy*."),
   },
@@ -818,7 +818,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0, backdrop: "ribbon", card: "flat", text: "shine", textScale: 1.08, bokeh: false, grain: 0.2, vignette: 0.3, depth: 6 },
     transitions: ["push", "whip", "dolly"],
     pace: 0.95,
-    roles: {},
+    roles: { promise: "slipstream" },
     revealNoLogo: "logo-reveal",
     sample: sample("Payments, *beautifully* simple."),
   },
@@ -910,7 +910,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0, backdrop: "beam", card: "flat", text: "focus", textScale: 1.14, grain: 1, vignette: 1.5, depth: 8 },
     transitions: ["cut", "zoom", "dissolve"],
     pace: 1.05,
-    roles: {},
+    roles: { promise: "rack-focus" },
     revealNoLogo: "logo-reveal",
     sample: sample("Step into the *light*.", "blur-reveal", { eyebrow: "In the spotlight" }),
   },
@@ -1012,6 +1012,16 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "word-grid": "promise",
   "orbit-text": "promise",
   "tape-rush": "promise",
+  "jump-cut": "promise",
+  "letter-rush": "promise",
+  "stamp-rush": "promise",
+  "rally": "promise",
+  "spiral-in": "promise",
+  "speed-gauge": "promise",
+  "domino": "promise",
+  "slipstream": "promise",
+  "stretch-snap": "promise",
+  "rack-focus": "promise",
   "card-stack": "features",
   "contact-sheet": "features",
   "spec-sheet": "bento",
@@ -1127,7 +1137,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
