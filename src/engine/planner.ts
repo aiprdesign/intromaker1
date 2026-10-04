@@ -1432,10 +1432,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // the tour becomes the website itself, split into its real sections, visited one by one.
   const sectionTour = !video && !images[0] && !!brand.page && brand.page.bands.length >= 3 && !!shots.full && tourMedia?.src !== shots.full;
   if (tourMedia) {
+    // Remakes stage the product's screen in other launch-film ways: a spotlight on its parts, the
+    // product across devices, or its layers pulled apart.
+    // (Labels are the tour's own callouts, else the next features; too few and the tour stays a tour.)
+    const pointed = (tourCallouts.length >= 2 ? tourCallouts : otherTitles).filter((f) => f && f.split(/\s+/).length <= 5).slice(0, 3);
+    const pick = (["ui-tour", "spotlight", "device-trio", "exploded-ui"] as const)[variant % 4];
+    const tourKind = sectionTour ? "site-scroll" : (pick === "spotlight" || pick === "exploded-ui") && pointed.length < 2 ? "ui-tour" : pick;
     add(angle === "product" ? 1 : target >= 20 ? 2 : 4, {
-      role: "tour", skill: sectionTour ? "site-scroll" : "ui-tour",
+      role: "tour", skill: tourKind,
       text: tourHead,
-      items: sectionTour ? undefined : tourCallouts,
+      items: tourKind === "ui-tour" ? tourCallouts : tourKind === "spotlight" || tourKind === "exploded-ui" ? (pointed.length >= 2 ? pointed : undefined) : undefined,
       eyebrow: "Features",
       duration: Math.max(5.6, beats(12)),
       transition: "whip",
@@ -1581,6 +1587,15 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     demoScene = { role: "demo", skill: "chat-thread", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else if (demo.skill === "click-flow") {
     demoScene = { role: "demo", skill: "click-flow", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
+  } else if (demo.skill === "toggle-list" || demo.skill === "changelog") {
+    // Settings and "what's new" read best as the product's own features, when the film has spare ones.
+    const own = spareFeatures.filter((f) => f.split(/\s+/).length <= 5);
+    demoScene = { role: "demo", skill: demo.skill, text: demo.title, items: own.length >= 3 ? own.slice(0, demo.skill === "changelog" ? 5 : 4) : demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
+  } else if (demo.skill === "comment-pins") {
+    // Comments land on the product's own screen.
+    demoScene = { role: "demo", skill: "comment-pins", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip", media: tourMedia ?? undefined };
+  } else if (demo.skill === "keycaps" || demo.skill === "calendar-drop" || demo.skill === "inbox-sweep" || demo.skill === "table-fill") {
+    demoScene = { role: "demo", skill: demo.skill, text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else {
     demoScene = { role: "demo", skill: "notify-stack", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(demo.items.length * 1.2 + 5), transition: "whip" };
   }

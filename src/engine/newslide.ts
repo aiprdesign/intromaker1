@@ -1,3 +1,4 @@
+import { momentCopy } from "./concepts";
 import { SKILL_MAP } from "./skills";
 import { roleOf } from "./templates";
 import type { Scene, SkillId, VideoPlan } from "./types";
@@ -82,6 +83,18 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
     return { text, subtext, items, eyebrow, media, vo, role: r, duration };
   }
   const features = filmFeatures(plan);
+  // A product moment of another kind (a board, a chat, an inbox…) has its own words: they aren't
+  // borrowed from the film's other moment. Lists of features take the film's own.
+  const moment = role === "demo" ? momentCopy(skill) : undefined;
+  if (moment)
+    return {
+      // ("Nimbus: your week, *planned*")
+      text: name ? `${name}: ${moment.title.charAt(0).toLowerCase()}${moment.title.slice(1)}` : moment.title,
+      eyebrow: moment.eyebrow,
+      subtext: k.sample.subtext !== undefined ? moment.action : undefined,
+      items: itemsLike(skill, features) ?? moment.items,
+      role,
+    };
   const kin = role ? scenes.filter((s, i, all) => roleOf(s, i, all.length) === role) : [];
   const lend = kin.find(fresh) ?? kin[0];
   if (lend) {

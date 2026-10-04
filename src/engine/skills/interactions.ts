@@ -73,7 +73,7 @@ export function focus(sc: SkillContext, cx: number, cy: number, r: number, k: nu
 }
 
 /** A physical keycap that presses down (press 0..1). */
-function keycap(sc: SkillContext, label: string, cx: number, cy: number, size: number, press: number, wide = 1) {
+export function keycap(sc: SkillContext, label: string, cx: number, cy: number, size: number, press: number, wide = 1) {
   const { ctx, u, palette } = sc;
   const kw = size * wide;
   const depth = 7 * u * (size / (96 * u));

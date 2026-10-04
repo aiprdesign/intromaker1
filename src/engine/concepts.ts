@@ -477,7 +477,7 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
  * is filled from the product's real features by the director.
  */
 export interface DemoSpec {
-  skill: "command-k" | "ai-prompt" | "click-flow" | "notify-stack" | "code-deploy" | "kanban" | "live-cursors" | "chat-thread";
+  skill: "command-k" | "ai-prompt" | "click-flow" | "notify-stack" | "code-deploy" | "kanban" | "live-cursors" | "chat-thread" | "keycaps" | "toggle-list" | "changelog" | "calendar-drop" | "inbox-sweep" | "comment-pins" | "table-fill";
   title: string;
   eyebrow: string;
   /** click-flow: the button label; kanban: its columns ("A / B / C"); live-cursors: the comment; chat-thread: the product's card ("Title — detail"). */
@@ -634,6 +634,14 @@ const MOMENT_SIGNALS: Record<MomentSkill, RegExp> = {
   kanban: /\b(kanban|boards?|tasks?|to-?dos?|projects?|sprints?|roadmaps?|backlogs?|issues?|tickets?|pipelines?|deal (flow|stages?)|candidates?|applicants?|hiring|recruit\w*)\b/gi,
   "live-cursors": /\b(collaborat\w*|multiplayer|whiteboards?|canvas(es)?|co-?edit\w*|brainstorm\w*|together|design (files?|tools?|teams?)|mood ?boards?|prototyp\w*|comment(s|ing)?|feedback|hand ?off|figma|wireframes?)\b/gi,
   "chat-thread": /\b(chat|messag\w*|channels?|conversations?|threads?|dms?|inbox(es)?|help ?desk|live chat|team communication|support tickets?)\b/gi,
+  // Launch-film moments (see skills/launch.ts).
+  keycaps: /\b(keyboard[- ]first|keyboard shortcuts?|shortcuts?|hotkeys?|keystrokes?|keybindings?|power users?)\b/gi,
+  "toggle-list": /\b(settings?|preferences?|permissions?|customi[sz]\w*|configur\w*|toggles?|controls?|privacy controls?|admin controls?)\b/gi,
+  changelog: /\b(changelog|release notes?|what'?s new|new releases?|product updates?|version history|roadmaps?|ship(s|ping)? (weekly|often|every week))\b/gi,
+  "calendar-drop": /\b(calendars?|schedul\w*|meetings?|bookings?|book (a|your)|appointments?|availability|time[- ]?blocking|agendas?|week view)\b/gi,
+  "inbox-sweep": /\b(e-?mails?|inbox(es)?|newsletters?|triage|mail ?box|follow[- ]ups?|unread)\b/gi,
+  "comment-pins": /\b(comments?|annotat\w*|feedback|proofing|markups?|mentions?|review (cycles?|rounds?)|design reviews?|approve designs?)\b/gi,
+  "table-fill": /\b(spreadsheets?|tables?|databases?|records?|rows?|columns?|csv|data(sets?| entry| grid)|crm|trackers?|inventory|catalogs?)\b/gi,
 };
 
 /** The copy each moment falls back on when the product's own category has none for it. */
@@ -651,8 +659,19 @@ const GENERIC_MOMENT: Record<MomentSkill, DemoSpec> = {
   "chat-thread": {
     skill: "chat-thread", title: "Your conversations, *one place*", eyebrow: "In action", action: "Update — Tasks complete",
     items: ["Is the launch page ready to go?", "Final copy is in, checking the visuals now", "Looks great, let's ship it"],
-  },
+  },  keycaps: { skill: "keycaps", title: "Do it from the *keyboard*", eyebrow: "Keyboard-first", items: ["⌘ K — Open the command menu", "C — Create a task", "⌘ ↵ — Send it"] },
+  "toggle-list": { skill: "toggle-list", title: "Make it *yours*", eyebrow: "Settings", items: ["Smart reminders", "Shared workspaces", "Weekly summaries", "Dark mode"] },
+  changelog: { skill: "changelog", title: "What's *new*", eyebrow: "Changelog", items: ["Shared views", "Calendar sync", "A new search", "Dark mode"] },
+  "calendar-drop": { skill: "calendar-drop", title: "Your week, *planned*", eyebrow: "In action", items: ["Team standup", "Design review", "Launch planning", "Customer call", "Focus time"] },
+  "inbox-sweep": { skill: "inbox-sweep", title: "Clear your *inbox*", eyebrow: "In action", items: ["Weekly summary is ready", "Notes from the design review", "Your invite to the launch", "Feedback on the new homepage"] },
+  "comment-pins": { skill: "comment-pins", title: "Feedback, *in context*", eyebrow: "Collaboration", items: ["Love this direction", "@Leo can we try a lighter header?", "The new copy reads well"] },
+  "table-fill": { skill: "table-fill", title: "Your data, *organised*", eyebrow: "In action", items: ["Launch plan", "Homepage refresh", "Customer research", "Release notes", "Onboarding emails"] },
 };
+
+/** A moment's own stock copy (title, eyebrow, items), for a moment slide added to a film by hand. */
+export function momentCopy(skill: string): DemoSpec | undefined {
+  return (GENERIC_MOMENT as Record<string, DemoSpec>)[skill];
+}
 
 const CHAT_SUPPORT: DemoSpec = {
   skill: "chat-thread", title: "Questions in, *answers out*", eyebrow: "In action", action: "Conversation resolved — Marked done",
