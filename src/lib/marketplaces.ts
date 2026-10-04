@@ -1,4 +1,5 @@
 import { createHash, createHmac } from "node:crypto";
+import { serviceKey } from "./admin";
 import { safeFetch } from "./netguard";
 
 /**
@@ -6,7 +7,8 @@ import { safeFetch } from "./netguard";
  *
  * 1. The marketplaces' own product APIs, when the owner adds keys (the reliable, sanctioned way):
  *    Amazon's Product Advertising API 5 (AMAZON_PAAPI_ACCESS_KEY, AMAZON_PAAPI_SECRET_KEY,
- *    AMAZON_PAAPI_PARTNER_TAG) and eBay's Browse API (EBAY_CLIENT_ID, EBAY_CLIENT_SECRET).
+ *    AMAZON_PAAPI_PARTNER_TAG) and eBay's Browse API (EBAY_CLIENT_ID, EBAY_CLIENT_SECRET), pasted in
+ *    Admin → Setup or set as environment variables.
  * 2. What the link itself carries: the product name in its path ("/Aero-Buds-Wireless-Earbuds/dp/…")
  *    and, for Amazon, the product's main photo from Amazon's public image server by its code.
  *
@@ -57,13 +59,14 @@ export function sigV4Key(secret: string, date: string, region: string, service: 
   return hmac(hmac(hmac(hmac(`AWS4${secret}`, date), region), service), "aws4_request");
 }
 
-export const amazonApiConfigured = () => !!(process.env.AMAZON_PAAPI_ACCESS_KEY && process.env.AMAZON_PAAPI_SECRET_KEY && process.env.AMAZON_PAAPI_PARTNER_TAG);
+export const amazonApiConfigured = async () => !!((await serviceKey("amazonAccess")) && (await serviceKey("amazonSecret")) && (await serviceKey("amazonTag")));
 
 /** The product from Amazon's Product Advertising API (null when not configured or not found). */
 export async function amazonApi(asin: string, tld: string): Promise<ApiProduct | null> {
-  const access = process.env.AMAZON_PAAPI_ACCESS_KEY;
-  const secret = process.env.AMAZON_PAAPI_SECRET_KEY;
-  const tag = process.env.AMAZON_PAAPI_PARTNER_TAG;
+  // Saved in Admin → Setup, else the environment.
+  const access = await serviceKey("amazonAccess");
+  const secret = await serviceKey("amazonSecret");
+  const tag = await serviceKey("amazonTag");
   const target = PAAPI[tld];
   if (!access || !secret || !tag || !target) return null;
   const [host, region] = target;
@@ -130,13 +133,13 @@ export async function amazonApi(asin: string, tld: string): Promise<ApiProduct |
 
 const EBAY_MARKETS: Record<string, string> = { com: "EBAY_US", "co.uk": "EBAY_GB", de: "EBAY_DE", "com.au": "EBAY_AU", ca: "EBAY_CA", fr: "EBAY_FR", it: "EBAY_IT", es: "EBAY_ES", nl: "EBAY_NL", at: "EBAY_AT", ch: "EBAY_CH", ie: "EBAY_IE", pl: "EBAY_PL", be: "EBAY_BE" };
 
-export const ebayApiConfigured = () => !!(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
+export const ebayApiConfigured = async () => !!((await serviceKey("ebayId")) && (await serviceKey("ebaySecret")));
 
 let ebayToken: { value: string; until: number } | null = null;
 async function ebayAccessToken(): Promise<string | null> {
   if (ebayToken && Date.now() < ebayToken.until) return ebayToken.value;
-  const id = process.env.EBAY_CLIENT_ID;
-  const secret = process.env.EBAY_CLIENT_SECRET;
+  const id = await serviceKey("ebayId");
+  const secret = await serviceKey("ebaySecret");
   if (!id || !secret) return null;
   const res = await safeFetch("https://api.ebay.com/identity/v1/oauth2/token", {
     method: "POST",
@@ -152,7 +155,7 @@ async function ebayAccessToken(): Promise<string | null> {
 
 /** The item from eBay's Browse API (null when not configured or not found). */
 export async function ebayApi(itemId: string, tld: string): Promise<ApiProduct | null> {
-  if (!ebayApiConfigured()) return null;
+  if (!(await ebayApiConfigured())) return null;
   try {
     const token = await ebayAccessToken();
     if (!token) return null;

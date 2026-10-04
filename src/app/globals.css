@@ -2982,7 +2982,8 @@ button.brand-colors.on {
 .admin-scenes small {
   color: var(--muted);
 }
-.admin-ai {
+.admin-ai,
+.admin-ai + .keys-card {
   max-width: 720px;
 }
 .admin-ai p {
@@ -3903,6 +3904,46 @@ code.secret {
   border-color: transparent;
   background: #22c55e;
   color: #05030d;
+}
+.admin-setup {
+  display: grid;
+  gap: 16px;
+}
+.admin-setup .setup-steps li {
+  align-items: center;
+}
+.admin-setup .setup-steps li > div {
+  flex: 1;
+}
+.admin-setup .setup-steps li > .btn {
+  flex: none;
+}
+.keys-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.admin-setup .keys-card {
+  margin-top: 0;
+}
+.keys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px 16px;
+}
+.key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.key-row .input {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .admin-setup .setup-steps li {
+    flex-wrap: wrap;
+  }
 }
 .copy-line {
   display: flex;

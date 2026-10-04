@@ -6,10 +6,12 @@ import AiTab from "./AiTab";
 import BillingTab from "./BillingTab";
 import FilmsTab, { type AccountRef } from "./FilmsTab";
 import PlansTab from "./PlansTab";
+import SetupTab from "./SetupTab";
 import UsersTab from "./UsersTab";
 import { AdminUiProvider, api } from "./ui";
 
 const TABS = [
+  { id: "setup", label: "Setup" },
   { id: "films", label: "Videos" },
   { id: "users", label: "Users" },
   { id: "plans", label: "Plans" },
@@ -169,8 +171,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
     api<{ counts: { requests: number } }>("/api/admin/users")
       .then((d) => setRequests(d.counts.requests))
       .catch(() => {});
-    api<{ monthlyLink: string }>("/api/admin/billing")
-      .then((b) => setBillingOn(!!b.monthlyLink))
+    api<{ monthlyLink: string; yearlyLink: string }>("/api/admin/billing")
+      .then((b) => setBillingOn(!!(b.monthlyLink || b.yearlyLink)))
       .catch(() => {});
   }, []);
   const onKey = (e: React.KeyboardEvent) => {
@@ -240,6 +242,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         </div>
       </header>
       <div id="admin-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="admin-panel">
+        {tab === "setup" && <SetupTab go={(t) => setTab(t)} />}
         {tab === "films" && <FilmsTab account={filmsFor} />}
         {tab === "users" && <UsersTab onCounts={onCounts} onShowFilms={showFilms} />}
         {tab === "plans" && <PlansTab billingOn={billingOn} onOpenBilling={() => setTab("billing")} />}

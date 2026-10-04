@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PROVIDER_GROUPS, PROVIDER_PRESETS, PRESET_MAP } from "@/lib/providers";
+import { KeysCard, type SetupView } from "./SetupTab";
 import { api, SaveBar, Skeleton, useAdminUi, useDirty, When } from "./ui";
 
 type Settings = {
@@ -34,7 +35,7 @@ const toForm = (v: Settings): Form => ({
 });
 
 /** The AI the server's director uses. Keys are write-only: the browser only ever sees a masked hint. */
-export default function AiTab() {
+function DirectorAi() {
   const { notify } = useAdminUi();
   const [s, setS] = useState<Settings | null>(null);
   const [form, setForm] = useState<Form | null>(null);
@@ -203,5 +204,34 @@ export default function AiTab() {
       </div>
       <SaveBar dirty={dirty} busy={busy === "save"} onSave={save} onDiscard={() => fill(s)} label="Save settings" />
     </section>
+  );
+}
+
+/** The director's AI, then the voice-over AI, on one tab. */
+export default function AiTab() {
+  const [keys, setKeys] = useState<SetupView | null>(null);
+  useEffect(() => {
+    api<SetupView>("/api/admin/setup")
+      .then(setKeys)
+      .catch(() => {});
+  }, []);
+  return (
+    <>
+      <DirectorAi />
+      {keys && (
+        <KeysCard
+          title="Voice-over AI"
+          intro={
+            <>
+              Server keys for narration. Visitors who pick OpenAI or ElevenLabs voices in the studio use these when they haven&apos;t added their own key (voice requests are
+              rate-limited per visitor). The free on-device voice needs no key.
+            </>
+          }
+          names={["openaiVoice", "elevenlabs"]}
+          view={keys}
+          onSaved={setKeys}
+        />
+      )}
+    </>
   );
 }

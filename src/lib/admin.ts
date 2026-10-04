@@ -343,6 +343,8 @@ export interface AdminSettings {
   contactEmail?: string;
   /** Stripe Payment Links and customer portal (see billing.ts). */
   billing?: BillingLinks;
+  /** Server keys for voice-over and marketplace imports, set in Admin (write-only, never sent back). */
+  keys?: ServiceKeys;
   updatedAt?: number;
 }
 
@@ -369,6 +371,7 @@ export async function readSettings(): Promise<AdminSettings> {
             yearlyPrice: typeof raw.billing.yearlyPrice === "string" ? raw.billing.yearlyPrice.slice(0, 40) : undefined,
           }
         : undefined,
+      keys: raw.keys && typeof raw.keys === "object" ? readKeys(raw.keys) : undefined,
       updatedAt: raw.updatedAt,
     };
   } catch {
@@ -407,4 +410,34 @@ export async function planLimits(): Promise<Record<PlanId, PlanLimits>> {
 }
 
 /** A key shown back to the admin: enough to recognise it, never the whole thing. */
+/**
+ * Keys the owner can paste in Admin instead of setting environment variables (plug and play). A
+ * key saved in Admin wins; the environment variable is the fallback.
+ */
+export const SERVICE_KEYS = {
+  openaiVoice: { env: "OPENAI_API_KEY", label: "OpenAI API key (voice-over)" },
+  elevenlabs: { env: "ELEVENLABS_API_KEY", label: "ElevenLabs API key" },
+  amazonAccess: { env: "AMAZON_PAAPI_ACCESS_KEY", label: "Amazon PA-API access key" },
+  amazonSecret: { env: "AMAZON_PAAPI_SECRET_KEY", label: "Amazon PA-API secret key" },
+  amazonTag: { env: "AMAZON_PAAPI_PARTNER_TAG", label: "Amazon partner tag" },
+  ebayId: { env: "EBAY_CLIENT_ID", label: "eBay client id" },
+  ebaySecret: { env: "EBAY_CLIENT_SECRET", label: "eBay client secret" },
+} as const;
+export type ServiceKeyName = keyof typeof SERVICE_KEYS;
+export type ServiceKeys = Partial<Record<ServiceKeyName, string>>;
+
+function readKeys(raw: Record<string, unknown>): ServiceKeys {
+  const out: ServiceKeys = {};
+  for (const k of Object.keys(SERVICE_KEYS) as ServiceKeyName[]) {
+    const v = raw[k];
+    if (typeof v === "string" && v.trim()) out[k] = v.trim().slice(0, 400);
+  }
+  return out;
+}
+
+/** A service key: the one saved in Admin, else its environment variable. */
+export async function serviceKey(name: ServiceKeyName): Promise<string | undefined> {
+  return (await readSettings()).keys?.[name] || process.env[SERVICE_KEYS[name].env] || undefined;
+}
+
 export const maskKey = (key?: string) => (key ? (key.length > 10 ? `${key.slice(0, 4)}…${key.slice(-4)}` : "••••") : "");

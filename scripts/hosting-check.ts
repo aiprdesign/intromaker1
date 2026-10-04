@@ -116,6 +116,19 @@ async function main() {
   check(put.status === 200 && view.keySet && !JSON.stringify(view).includes("1234567890abcdef"), "a saved key is never sent back (masked)");
   const mode = (await stat(join(dataDir, "admin", "settings.json"))).mode & 0o777;
   check(mode === 0o600, `settings file is private to the app (${mode.toString(8)})`);
+  // Plug and play: voice and marketplace keys pasted in Admin → Setup / AI, env variables as fallback.
+  const setupRoute = await import("../src/app/api/admin/setup/route");
+  env.ELEVENLABS_API_KEY = "el-env-key-000000000000";
+  const keysPut = await setupRoute.PUT(areq("/api/admin/setup", { method: "PUT", cookie, body: JSON.stringify({ keys: { openaiVoice: "sk-voice-1234567890abcdef", amazonTag: "mystore-20" } }) }));
+  const keysView = await keysPut.json();
+  check(keysPut.status === 200 && keysView.keys.openaiVoice.source === "admin" && !JSON.stringify(keysView).includes("1234567890abcdef") && keysView.keys.elevenlabs.source === "env", "service keys saved in Admin are never sent back (masked); env keys show as env");
+  check((await admin.serviceKey("openaiVoice")) === "sk-voice-1234567890abcdef" && (await admin.serviceKey("elevenlabs")) === "el-env-key-000000000000", "a key saved in Admin is used, the environment is the fallback");
+  const ttsRoute = await import("../src/app/api/tts/route");
+  check((await (await ttsRoute.GET()).json()).openai === true, "the studio sees the server's voice key from Admin");
+  await setupRoute.PUT(areq("/api/admin/setup", { method: "PUT", cookie, body: JSON.stringify({ clear: ["openaiVoice"] }) }));
+  check(!(await admin.serviceKey("openaiVoice")) && (await admin.serviceKey("amazonTag")) === "mystore-20", "a key can be removed from Admin");
+  check((await setupRoute.GET(areq("/api/admin/setup"))).status === 401, "the setup page needs the admin session");
+  delete env.ELEVENLABS_API_KEY;
   const active = await admin.serverAi();
   check(active?.source === "admin" && active.ai.apiKey === "sk-test-1234567890abcdef" && (await admin.readSettings()).dailyBudget === 7, "the server director uses the admin's AI and budget");
   await settingsRoute.PUT(areq("/api/admin/settings", { method: "PUT", cookie, body: JSON.stringify({ provider: "openai", apiKey: "", model: "gpt-5" }) }));
