@@ -250,7 +250,7 @@ function letterRush(sc: SkillContext) {
     ctx.restore();
   }
   // The line: its letters rush in to the exact places the held headline uses.
-  const laid = laidLine(sc, "Built for *speed*");
+  const laid = laidLine(sc, "Made to *move*");
   const glyphs = glyphsOf(sc, laid, w / 2, cy);
   const settle = P.land + fly + glyphs.length * stagger * 0.6;
   if (t >= P.land && t < settle) {
@@ -968,7 +968,7 @@ export const speedMoreSkills: Skill[] = [
     name: "Jump Cut",
     tagline: "Each feature in three hard camera jumps, wide, medium and a close-up in outline, inside snapping viewfinder corners, then the line punches in.",
     bestFor: "Punchy hooks: 2–4 one-word features (items) hit in jump cuts before the headline. Loud launches and promos.",
-    sample: { text: "The *details* count", items: ["Fast", "Sharp", "Simple"] },
+    sample: { text: "The *details* count", items: ["Plan", "Draft", "Launch"] },
     itemsHint: "2–4 one-word features",
     render: jumpCut,
     sfx: jumpSfx,
@@ -978,7 +978,7 @@ export const speedMoreSkills: Skill[] = [
     name: "Letter Rush",
     tagline: "Letters fly in from the edges of the frame and snap into each feature, burst past the camera on the next, and the line's letters rush into place.",
     bestFor: "Energy with craft: 3–5 short features (items) assembled letter by letter before the headline.",
-    sample: { text: "Built for *speed*", items: ["Plan", "Build", "Ship"] },
+    sample: { text: "Made to *move*", items: ["Plan", "Build", "Ship"] },
     itemsHint: "3–5 short features",
     render: letterRush,
     sfx: rushSfx,
@@ -987,8 +987,8 @@ export const speedMoreSkills: Skill[] = [
     id: "stamp-rush",
     name: "Stamp Rush",
     tagline: "The features are stamped round the frame one per tick, each with a kick, then the line stamps down in the middle.",
-    bestFor: "Approvals, checklists and 'done' moments: 3–6 short features (items) stamped before the headline.",
-    sample: { text: "Signed, sealed, *shipped*", items: ["Approved", "Tested", "Secure", "Ready"] },
+    bestFor: "Workflows and checklists: 3–6 short steps or features (items) stamped before the headline.",
+    sample: { text: "Signed, sealed, *shipped*", items: ["Draft", "Review", "Share", "Done"] },
     itemsHint: "3–6 short features",
     render: stampRush,
     sfx: stampSfx,
@@ -998,7 +998,7 @@ export const speedMoreSkills: Skill[] = [
     name: "Rally",
     tagline: "The features ping-pong between two brand-colour paddles, squashing on each hit, until the line is served into the middle.",
     bestFor: "Back-and-forth stories (teams, chat, review, handoff): 3–6 short features (items) rallied before the headline.",
-    sample: { text: "Back and forth, *faster*", items: ["Ask", "Answer", "Review", "Approve"] },
+    sample: { text: "Back and forth, *together*", items: ["Ask", "Answer", "Review", "Merge"] },
     itemsHint: "3–6 short features",
     render: rally,
     sfx: rallySfx,
@@ -1017,8 +1017,8 @@ export const speedMoreSkills: Skill[] = [
     id: "speed-gauge",
     name: "Speed Gauge",
     tagline: "A needle whips round a dial step by step, a feature in the readout at each step, hits the redline, and the line lands below.",
-    bestFor: "Speed and performance stories: 3–6 short features (items) on the readout. The dial has no numbers, so it makes no claims.",
-    sample: { text: "Built for *full speed*", items: ["Load", "Sync", "Search", "Deploy"] },
+    bestFor: "Momentum and progress stories: 3–6 short features or steps (items) on the readout. The dial has no numbers, so it makes no claims.",
+    sample: { text: "Shift *up a gear*", items: ["Load", "Sync", "Search", "Deploy"] },
     itemsHint: "3–6 short features",
     render: speedGauge,
     sfx: gaugeSfx,

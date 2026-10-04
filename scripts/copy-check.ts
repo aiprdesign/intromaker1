@@ -3,12 +3,12 @@
  * "free" is only offered when the copy really offers it, and site buttons are cleaned.
  * Run: npm run check:copy
  */
-import { mentionsOffer, offerKey, offerSafe, offersIn, safeCopy } from "../src/engine/claims";
+import { isClaimWord, mentionsOffer, offerKey, offerSafe, offersIn, safeCopy } from "../src/engine/claims";
 import { cleanCta, contextCta, lowerFirst, offersFree, safePlan } from "../src/engine/planner";
 import { speakable } from "../src/engine/voice";
 import { applyTemplate, trailerBeats } from "../src/engine/templates";
 import { slideContent } from "../src/engine/newslide";
-import { SKILL_MAP } from "../src/engine/skills";
+import { SKILL_MAP, SKILLS } from "../src/engine/skills";
 import type { VideoPlan } from "../src/engine/types";
 import { applyTrailerStyle, detectTrailerStyle, TRAILER_STYLES } from "../src/engine/trailers";
 import { planFromPrompt } from "../src/engine/planner";
@@ -171,6 +171,27 @@ for (const [from, to] of [
   ["Built for everyone", "Built for you"],
   ["Always on time", "On time"],
 ]) check(safeCopy(from) === to, `"${from}" → "${safeCopy(from)}"`);
+
+console.log("No bare claim words on slides");
+{
+  const claims = ["Secure", "Tested", "Approved", "Fast", "Fully encrypted", "Bank-grade", "Certified", "*Proven*"];
+  const plain = ["Security", "Reviews", "Approvals", "Encryption", "Tests", "Draft", "Ship", "Share"];
+  check(claims.every(isClaimWord) && !plain.some(isClaimWord), `claim words (${claims.join(", ")}) are caught, feature names (${plain.join(", ")}) aren't`);
+  const plan: VideoPlan = {
+    title: "Acme", palette: "cosmos", font: "inter", aspect: "16:9", bpm: 120, seed: 1, brand: { name: "Acme", images: [], videos: [] },
+    scenes: [
+      { skill: "logo-reveal", text: "Acme", duration: 3, transition: "cut", role: "reveal" },
+      { skill: "stamp-rush", text: "Signed, sealed, *shipped*", items: ["Approved", "Tested", "Secure", "Draft", "Share"], duration: 4, transition: "cut", role: "promise" },
+      { skill: "word-swap", text: "Your code, built|tested|shipped", duration: 4, transition: "cut", role: "promise" },
+    ],
+  };
+  const out = safePlan(plan, { keepScenes: true });
+  check(out.scenes[1].items?.join() === "Draft,Share", `claim words leave the slide's items: ${out.scenes[1].items?.join(", ")}`);
+  check(out.scenes[2].text === "Your code, built|shipped", `and a word-swap line: "${out.scenes[2].text}"`);
+  const loud = /\b(?:faster|full speed|secure|tested|approved|certified|fast|safe|reliable|proven)\b/i;
+  const bad = SKILLS.filter((k) => loud.test(k.sample.text) || (k.sample.items ?? []).some((x) => isClaimWord(x) || loud.test(x))).map((k) => k.id);
+  check(!bad.length, `slide samples make no claims${bad.length ? ` (${bad.join(", ")})` : ""}`);
+}
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");
 process.exit(failed ? 1 : 0);

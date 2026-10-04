@@ -3,7 +3,7 @@ import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { hasSpecificIcon } from "./icons";
 import { writeVoiceover } from "./script";
-import { isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
+import { isClaimWord, isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
 import { DEFAULT_TRAILER_STYLE, detectTrailerStyle, FILM_CUE, TRAILER_STYLE_MAP, type TrailerStyle } from "./trailers";
 import {
@@ -1175,13 +1175,13 @@ export function safePlan(plan: VideoPlan, opts: { keepScenes?: boolean } = {}): 
     const text = sc.text.includes("|")
       ? sc.text
           .split("|")
-          .map((part, k) => (k === 0 ? clean(part) : isNumericClaim(part) || isUnsafe(part) ? "" : clean(part)))
+          .map((part, k) => (k === 0 ? clean(part) : isNumericClaim(part) || isUnsafe(part) || isClaimWord(part) ? "" : clean(part)))
           .filter(Boolean)
           .join("|")
       : (isNumericClaim(sc.text) || isUnsafe(sc.text)) && sc.role !== "reveal"
         ? neutral(sc.role)
         : clean(sc.text) || neutral(sc.role);
-    const items = sc.items?.filter((it) => !isNumericClaim(it) && !isUnsafe(it)).map((it) => clean(it)).filter(Boolean);
+    const items = sc.items?.filter((it) => !isNumericClaim(it) && !isUnsafe(it) && !isClaimWord(it.split(/\s+[—–-]\s+/)[0])).map((it) => clean(it)).filter(Boolean);
     // The end card's button keeps a label: a plain call to action when its offer goes.
     const isEnd = sc.role === "cta" || i === kept.length - 1;
     const sub = sc.subtext && (isNumericClaim(sc.subtext) || isUnsafe(sc.subtext)) && sc.role !== "cta" ? undefined : fix(sc.subtext);

@@ -183,7 +183,7 @@ export function landHeadline(
   const safe = tokens(w, h).safe;
   const laid = layWords(
     sc,
-    accentWords(scene.text || "Ship it *faster*"),
+    accentWords(scene.text || "Ship it *together*"),
     opts.maxW ?? safe.width * 0.92,
     opts.maxSize ?? Math.min(w, h) * (portrait ? 0.19 : 0.17),
     opts.maxLines ?? (portrait ? 3 : 2),
@@ -609,7 +609,7 @@ function sliceSwitch(sc: SkillContext) {
   const cy = h * 0.47;
   const ex = ease.inCubic(exitT(sc, 0.35));
   const face = (s: number) => displayFont(saasFont(sc), s);
-  const laid = layWords(sc, accentWords(scene.text || "Work at *full speed*"), safe.width * 0.92, short * (portrait ? 0.19 : 0.17), portrait ? 3 : 2);
+  const laid = layWords(sc, accentWords(scene.text || "Work in *one flow*"), safe.width * 0.92, short * (portrait ? 0.19 : 0.17), portrait ? 3 : 2);
   const finalH = laid.lines.length * laid.lh;
   // Frame i shows word i (the last frame is the headline); frames switch at these times.
   const n = P.words.length + 1;
@@ -995,7 +995,7 @@ export const fastTypeSkills: Skill[] = [
     name: "Rapid Fire",
     tagline: "The features flash one per half-beat in changing treatments (solid, outline, boxed, italic), then the line punches in.",
     bestFor: "A high-energy positioning moment: 3–6 one- or two-word features (items) fired off before the headline (2–6 words) lands.",
-    sample: { text: "Ship it *faster*", items: ["Plan", "Build", "Test", "Launch"] },
+    sample: { text: "Ship it *together*", items: ["Plan", "Build", "Test", "Launch"] },
     itemsHint: "3–6 one- or two-word features",
     render: rapidFire,
     sfx: rapidSfx,
@@ -1025,7 +1025,7 @@ export const fastTypeSkills: Skill[] = [
     name: "Slice Switch",
     tagline: "A word is cut into strips that shear out sideways as the next word shears in, with a brand-coloured cut along the seams.",
     bestFor: "Switching quickly between 3–5 short features (items) before the headline lands. Bold, editorial energy.",
-    sample: { text: "Work at *full speed*", items: ["Plan", "Track", "Review", "Ship"] },
+    sample: { text: "Work in *one flow*", items: ["Plan", "Track", "Review", "Ship"] },
     itemsHint: "3–5 short features",
     render: sliceSwitch,
     sfx: sliceSfx,

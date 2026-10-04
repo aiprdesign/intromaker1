@@ -49,7 +49,7 @@ export const SPEED_SAMPLE: VideoPlan = inTemplate(
     [{ role: "hook", skill: "crash-zoom", text: "Meet *Lumetrik*", items: ["Data", "Charts", "Answers"], subtext: "Analytics for product teams", transition: "cut" }, 9],
     [{ role: "promise", skill: "rapid-fire", text: "Your metrics, *in motion*", items: ["Track", "Share", "Decide"], transition: "cut" }, 9],
     [{ role: "promise", skill: "jump-cut", text: "Built for *teams*", items: ["Product", "Growth", "Design"], transition: "whip" }, 9],
-    [{ role: "promise", skill: "speed-gauge", text: "Insights at *full speed*", items: ["Funnels", "Cohorts", "Retention", "Alerts"], transition: "cut" }, 9],
+    [{ role: "promise", skill: "speed-gauge", text: "Insights, *up a gear*", items: ["Funnels", "Cohorts", "Retention", "Alerts"], transition: "cut" }, 9],
     [{ role: "promise", skill: "word-grid", text: "Your data, *one place*", items: ["Funnels", "Cohorts", "Alerts", "Reports", "Goals", "Boards"], transition: "cut" }, 10],
     [{ role: "promise", skill: "stack-stomp", text: "Decide with *clarity*", transition: "whip" }, 9],
     [{ role: "cta", skill: "cta", text: "Start with *Lumetrik*", subtext: "Get started", transition: "cut" }, 8],

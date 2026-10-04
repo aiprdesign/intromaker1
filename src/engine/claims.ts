@@ -199,6 +199,15 @@ export function isUnsafe(text: string) {
 }
 
 /** Does this line still make a claim? (Used by the self-review.) */
+/**
+ * A bare quality or safety word standing in for a feature ("Secure", "Tested", "Fast", "Fully
+ * encrypted"): on a fast type tick or a card it reads as a promise with nothing behind it, so
+ * claim-safe copy leaves it out. Feature names ("Security", "Encryption", "Reviews") stay.
+ */
+const CLAIM_WORD =
+  /^(?:(?:super|ultra|fully|very|truly|rock|lightning|blazing(?:ly)?|bank|military|enterprise)[- ]?)?(?:secure|safe|safer|fast|faster|speedy|quick|quicker|instant|reliable|trusted|tested|proven|approved|certified|verified|validated|compliant|encrypted|protected|private|accurate|powerful|seamless|effortless|flawless|perfect|best|guaranteed|bulletproof|unbreakable|solid|grade)$/i;
+export const isClaimWord = (text: string) => CLAIM_WORD.test(text.replace(/[*_.!,]/g, "").trim());
+
 export function hasClaim(text: string | undefined) {
   if (!text) return false;
   return safeCopy(text) !== tidy(text) || isNumericClaim(text) || isUnsafe(text);

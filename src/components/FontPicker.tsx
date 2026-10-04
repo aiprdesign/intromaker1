@@ -24,7 +24,7 @@ export default function FontPicker({
   current: FontId;
 }) {
   const fonts = kind === "trailer" ? TRAILER_FONTS : SAAS_FONTS;
-  const sample = kind === "trailer" ? "LEGACY" : "Ship faster";
+  const sample = kind === "trailer" ? "LEGACY" : "Ship it together";
   return (
     <div className="font-picker" role="radiogroup" aria-label="Heading font">
       <button type="button" role="radio" aria-checked={value === null} className={`font-opt${value === null ? " active" : ""}`} onClick={() => onChange(null)}>

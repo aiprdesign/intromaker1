@@ -90,7 +90,7 @@ function whipPan(sc: SkillContext) {
       ctx.save();
       ctx.translate(x, 0);
       ctx.globalAlpha = clamp(enter * 3) * (1 - ex);
-      const laid = layWords(sc, accentWords(scene.text || "Move at *full speed*"), safe.width * 0.92, short * (h > w ? 0.19 : 0.17), h > w ? 3 : 2);
+      const laid = layWords(sc, accentWords(scene.text || "Keep work *moving*"), safe.width * 0.92, short * (h > w ? 0.19 : 0.17), h > w ? 3 : 2);
       drawLaid(sc, laid, w / 2, cy);
       ctx.restore();
       continue;
@@ -130,7 +130,7 @@ const whipSfx = (raw: Scene, beat: number): SfxCue[] => {
 
 /** The line's words as stack lines: short words ride with the next one ("to *ship*"). */
 function stackLines(text: string) {
-  const words = accentWords(text || "Built to *ship* faster");
+  const words = accentWords(text || "Built to *ship* together");
   const lines: Word[][] = [];
   let carry: Word[] = [];
   for (const wd of words) {
@@ -246,7 +246,7 @@ function speedTicker(sc: SkillContext) {
   const bandH = (h * (portrait ? 0.6 : 0.74)) / (rows * rowGap + 0.6);
   const top = h * 0.47 - (bandH * (rows * rowGap + 0.6)) / 2;
   // The centre row: the line, braking to a stop dead centre at `land`.
-  const laid = layWords(sc, accentWords(scene.text || "Built for *speed*"), safe.width * 0.84, bandH * 1.25, 1);
+  const laid = layWords(sc, accentWords(scene.text || "Keep work *in motion*"), safe.width * 0.84, bandH * 1.25, 1);
   const lw = laid.lines[0].w;
   const v0 = w * 3.2;
   const stopAt = braked(land, v0, 0, 0.15, land);
@@ -403,7 +403,7 @@ const cubeSfx = (raw: Scene, beat: number): SfxCue[] => {
 
 /** The typing script: each word typed, held, selected, then typed over; the last one stays. */
 function typePlan(scene: Scene, beat: number) {
-  const { target } = splitTarget(scene.text || "Built for *speed*");
+  const { target } = splitTarget(scene.text || "Built for *makers*");
   const pool = cycleWords(scene, 4).filter((x) => x.toLowerCase() !== target.toLowerCase());
   const tick = tickOf(beat);
   const cps = 0.032;
@@ -429,7 +429,7 @@ function speedType(sc: SkillContext) {
   const portrait = h > w;
   const safe = tokens(w, h).safe;
   const short = Math.min(w, h);
-  const { prefix, suffix } = splitTarget(scene.text || "Built for *speed*");
+  const { prefix, suffix } = splitTarget(scene.text || "Built for *makers*");
   const T = typePlan(scene, sc.beat);
   const ex = exitOf(sc);
   const face = faceOf(sc);
@@ -900,7 +900,7 @@ export const speedSkills: Skill[] = [
     name: "Whip Pan",
     tagline: "Words whip across the frame with a directional smear, one pushing the last out, until the line pans in and holds.",
     bestFor: "Momentum: 3–6 short features (items) whipping past before the headline. Great straight after the reveal.",
-    sample: { text: "Move at *full speed*", items: ["Plan", "Build", "Ship", "Grow"] },
+    sample: { text: "Keep work *moving*", items: ["Plan", "Build", "Ship", "Grow"] },
     itemsHint: "3–6 short features",
     render: whipPan,
     sfx: whipSfx,
@@ -909,8 +909,8 @@ export const speedSkills: Skill[] = [
     id: "stack-stomp",
     name: "Stack Stomp",
     tagline: "The line drops in word by word into a tight justified stack, the words squashing on impact and kicking the stack.",
-    bestFor: "A punchy line of 3–6 words set as a poster stack ('Built to *ship* faster'). No items needed.",
-    sample: { text: "Built to *ship* faster" },
+    bestFor: "A punchy line of 3–6 words set as a poster stack ('Built to *ship* together'). No items needed.",
+    sample: { text: "Built to *ship* together" },
     render: stackStomp,
     sfx: stompSfx,
   },
@@ -919,7 +919,7 @@ export const speedSkills: Skill[] = [
     name: "Speed Ticker",
     tagline: "Rows of type race past in opposite directions and brake together; the centre row stops dead on the line.",
     bestFor: "Range and speed: 3–6 short features (items) on the racing rows, the headline in the middle. Bold opener.",
-    sample: { text: "Built for *speed*", items: ["Plan", "Build", "Test", "Ship"] },
+    sample: { text: "Keep work *in motion*", items: ["Plan", "Build", "Review", "Ship"] },
     itemsHint: "3–6 short features",
     render: speedTicker,
     sfx: tickerSfx,
@@ -938,8 +938,8 @@ export const speedSkills: Skill[] = [
     id: "speed-type",
     name: "Speed Type",
     tagline: "The last word of the line is typed at speed, selected and typed over, until it is the right word and the caret rests.",
-    bestFor: "Lines that complete with one word: 'Built for *speed*' with items as the words it types first (features or audiences).",
-    sample: { text: "Built for *speed*", items: ["Teams", "Startups", "Agencies"] },
+    bestFor: "Lines that complete with one word: 'Built for *makers*' with items as the words it types first (features or audiences).",
+    sample: { text: "Built for *makers*", items: ["Teams", "Startups", "Agencies"] },
     itemsHint: "2–4 short features or audiences it types first",
     render: speedType,
     sfx: typeSfx,
@@ -949,7 +949,7 @@ export const speedSkills: Skill[] = [
     name: "Bar Wipe",
     tagline: "A brand-colour bar sweeps over a word and pulls back on the next, alternating direction, then leaves a rule under the line.",
     bestFor: "Clean, fast switching through 3–5 short features (items) before the headline. Editorial and corporate friendly.",
-    sample: { text: "Cut to *the point*", items: ["Clear", "Quick", "Focused"] },
+    sample: { text: "Cut to *the point*", items: ["Clear", "Calm", "Focused"] },
     itemsHint: "3–5 short features",
     render: barWipe,
     sfx: barSfx,

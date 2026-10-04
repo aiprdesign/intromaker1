@@ -72,7 +72,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Built for how you *ship*",
     cta: ["Start *building*", "Try *{name}*", "Ship with *{name}*"],
     template: "ink",
-    swap: "Your code, built|tested|shipped",
+    swap: "Your code, built|reviewed|shipped",
     starter: ["Deploy from Git", "Preview links", "Logs and monitoring", "Team workspaces"],
   },
   {
@@ -100,7 +100,7 @@ export const CONCEPTS: Concept[] = [
     featuresTitle: "Finance, *organised*",
     cta: ["Open an *account*", "Get started *free*", "Take control with *{name}*"],
     template: "flow",
-    swap: "Your spend, tracked|approved|reported",
+    swap: "Your spend, tracked|sorted|reported",
     starter: ["Cards and payments", "Invoices", "Expense tracking", "Finance reports"],
   },
   {
@@ -213,7 +213,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Book a *demo*", "Get *started*", "Care with *{name}*"],
     template: "paper",
     swap: "Your care, scheduled|recorded|followed up",
-    starter: ["Online booking", "Appointment reminders", "Secure messaging", "Patient records"],
+    starter: ["Online booking", "Appointment reminders", "Patient messaging", "Patient records"],
   },
   {
     id: "education",
@@ -367,7 +367,7 @@ export const CONCEPTS: Concept[] = [
     cta: ["Book a *demo*", "Get *started*", "Work with *{name}*"],
     template: "swiss",
     swap: "Your contracts, drafted|reviewed|signed",
-    starter: ["Contract templates", "E-signatures", "Case tracking", "Secure documents"],
+    starter: ["Contract templates", "E-signatures", "Case tracking", "Shared documents"],
   },
   {
     id: "logistics",

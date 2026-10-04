@@ -1065,7 +1065,7 @@ export const editorialMoreSkills: Skill[] = [
     name: "Split Poster",
     tagline: "An accent panel wipes up with the brand's monogram rising huge inside; beside it the headline stacks over feature chips and a running ruler.",
     bestFor: "A brand statement with a line under it (subtext) and up to 4 feature chips (items). Strong after the reveal.",
-    sample: { text: "Built with *intent*", subtext: "Details, considered.", items: ["Fast", "Private", "Simple"] },
+    sample: { text: "Built with *intent*", subtext: "Details, considered.", items: ["Plan", "Share", "Review"] },
     itemsHint: "Up to 4 short features as chips",
     render: posterSplit,
     sfx: () => [

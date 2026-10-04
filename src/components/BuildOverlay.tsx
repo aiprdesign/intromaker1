@@ -122,7 +122,7 @@ export function ImportFailure({
         ...(c.online
           ? [
               { ok: c.problem?.code !== "blocked" && c.problem?.code !== "busy", text: c.problem?.code === "blocked" ? "It blocks automated visitors (so it can't be imported)" : c.problem?.code === "busy" ? "It's limiting visits right now" : "It lets IntroMaker read it" },
-              { ok: c.https ?? null, text: c.https ? "Secure (https)" : "Not on https" },
+              { ok: c.https ?? null, text: c.https ? "Uses https" : "Not on https" },
               { ok: !!c.title, text: c.title ? `Has a page title: “${c.title.length > 60 ? `${c.title.slice(0, 57).trimEnd()}…` : c.title}”` : "Has no page title" },
               { ok: !!c.hasText, text: c.hasText ? "Has readable text" : "Shows almost no text without running its scripts" },
               { ok: !!c.hasLogo, text: c.hasLogo ? "Has a logo or icon" : "No logo or icon found in the page" },

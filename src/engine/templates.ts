@@ -334,7 +334,7 @@ export const TEMPLATES: Template[] = [
     pace: 0.95,
     roles: { promise: "split-flap" },
     revealNoLogo: "logo-reveal",
-    sample: sample("npm install *speed*"),
+    sample: sample("npm run *launch*"),
   },
   {
     id: "kinetic",
