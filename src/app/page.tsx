@@ -4,6 +4,7 @@ import LoopCanvas from "@/components/LoopCanvas";
 import PricingCards from "@/components/PricingCards";
 import SampleFilms from "@/components/SampleFilms";
 import Nav, { Logo } from "@/components/Nav";
+import TermsLink from "@/components/TermsLink";
 import SkillGrid from "@/components/SkillGrid";
 import { HOME_BACKDROP } from "@/engine/demos";
 
@@ -108,7 +109,8 @@ export default function Home() {
       <footer className="footer">
         <Logo />
         <span>
-          © {new Date().getFullYear()} IntroMaker. Rendered in your browser. · <Link href="/privacy">Privacy</Link> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
+          © {new Date().getFullYear()} IntroMaker. Rendered in your browser. · <Link href="/privacy">Privacy</Link>
+          <TermsLink /> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
         </span>
       </footer>
     </main>

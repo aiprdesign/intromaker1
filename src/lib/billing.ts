@@ -229,8 +229,24 @@ async function applyEvent(ev: StripeEvent): Promise<string> {
   } else if (ev.type === "charge.refunded" || ev.type === "charge.dispute.created") {
     const u = await userFor(obj);
     const what = ev.type === "charge.refunded" ? "refunded" : "disputed";
-    if (u) await updateUser(u.id, (x) => void (x.billingFlag = what));
-    result = `${u?.email ?? emailOf(obj) ?? "unknown customer"}: payment ${what}. Check the plan in Users`;
+    // A full refund (the 30-day refund promise on the Terms page) ends Pro; a partial one is the owner's call.
+    const full = ev.type === "charge.refunded" && (obj.refunded === true || (Number(obj.amount) > 0 && Number(obj.amount_refunded) >= Number(obj.amount)));
+    let downgraded = false;
+    if (u)
+      await updateUser(u.id, (x) => {
+        x.billingFlag = what;
+        if (full && x.planSource === "stripe" && x.plan !== "free") {
+          x.plan = "free";
+          x.billingStatus = "canceled";
+          downgraded = true;
+        }
+      });
+    const who = u?.email ?? emailOf(obj) ?? "unknown customer";
+    result = downgraded
+      ? `${who}: payment refunded in full → Free. Cancel the subscription in Stripe if it's still active, so it isn't charged again`
+      : full
+        ? `${who}: payment refunded in full. Check the plan in Users`
+        : `${who}: payment ${what}${ev.type === "charge.refunded" ? " in part" : ""}. Check the plan in Users`;
     attention = true;
   }
 

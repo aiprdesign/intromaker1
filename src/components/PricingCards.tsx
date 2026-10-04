@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { REFUND_DAYS } from "@/lib/stripe-links";
 import { useEffect, useState } from "react";
 import { DEFAULT_LIMITS, describeLimits, type PlanId, type PlanLimits } from "@/lib/plans";
 
@@ -64,14 +65,16 @@ export default function PricingCards() {
             <h3>Pro</h3>
             <div className="price">{proPrice}</div>
             <ul>
-              {["Everything in Free", ...describeLimits(plans.pro).filter((l) => !describeLimits(plans.free).includes(l))].map((f) => (
+              {["The Free features, plus:", ...describeLimits(plans.pro).filter((l) => !describeLimits(plans.free).includes(l))].map((f) => (
                 <li key={f}>{f}</li>
               ))}
             </ul>
             <Link href="/account?plan=pro" className="btn btn-primary">
               Get Pro
             </Link>
-            <span className="hint">Secure checkout by Stripe. Cancel from your account.</span>
+            <span className="hint">
+              Secure checkout by Stripe. Cancel from your account. <Link href="/terms#refunds">{REFUND_DAYS}-day refunds</Link>
+            </span>
           </div>
         )}
         <div className={`price-card${sellsPro ? "" : " featured"}`}>

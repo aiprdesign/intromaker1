@@ -2,6 +2,7 @@ import { describe } from "@/lib/ai";
 import { maskKey, noStore, planLimits, readSettings, requireAdmin, SERVICE_KEYS, writeSettings, type ServiceKeyName, type ServiceKeys } from "@/lib/admin";
 import { webhookConfigured } from "@/lib/billing";
 import { envStatus } from "@/lib/envvars";
+import { effectiveBilling } from "@/lib/stripe-links";
 import { dataIsPersistent } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -23,7 +24,7 @@ async function view() {
   ) as Record<ServiceKeyName, { label: string; env: string; source: "admin" | "env" | null; hint: string }>;
   const plans = await planLimits();
   const envAi = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-  const b = s.billing ?? {};
+  const b = effectiveBilling(s.billing);
   return {
     keys,
     env: envStatus(),

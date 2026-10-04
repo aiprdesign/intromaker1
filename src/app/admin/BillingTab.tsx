@@ -6,6 +6,8 @@ import { api, CopyButton, SaveBar, Skeleton, useAdminUi, useDirty, When } from "
 
 type Form = { monthlyLink: string; yearlyLink: string; portalLink: string; yearlyPrice: string };
 type View = Form & {
+  /** Fields set by the server's environment variables (they win over these fields). */
+  fromEnv: Partial<Record<keyof Form, string>>;
   proPrice: string;
   webhookUrl: string;
   successUrl: string;
@@ -67,6 +69,12 @@ export default function BillingTab({ onChange, onOpenPlans, onOpenEnvGuide }: { 
       setBusy(false);
     }
   };
+  const envNote = (key: keyof Form) =>
+    view.fromEnv?.[key] ? (
+      <span className="hint sm">
+        Set on the server by <code>{view.fromEnv[key]}</code>. Change it in your host&apos;s environment variables.
+      </span>
+    ) : null;
   const field = (key: keyof Form, label: string, placeholder: string, ok: boolean, hint?: React.ReactNode) => (
     <label className="fld">
       <span className="fld-cap">{label}</span>
@@ -76,9 +84,10 @@ export default function BillingTab({ onChange, onOpenPlans, onOpenEnvGuide }: { 
         placeholder={placeholder}
         spellCheck={false}
         aria-invalid={!ok}
+        readOnly={!!view.fromEnv?.[key]}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
       />
-      {!ok ? <span className="error sm">{key === "portalLink" ? "Use the https://billing.stripe.com/p/login/… link." : "Use a https://buy.stripe.com/… Payment Link."}</span> : hint}
+      {!ok ? <span className="error sm">{key === "portalLink" ? "Use the https://billing.stripe.com/p/login/… link." : "Use a https://buy.stripe.com/… Payment Link."}</span> : (envNote(key) ?? hint)}
     </label>
   );
   // Either link turns the Upgrade buttons on.
@@ -272,7 +281,8 @@ export default function BillingTab({ onChange, onOpenPlans, onOpenEnvGuide }: { 
         <div className="admin-row">
           <label className="fld">
             <span className="fld-cap">Yearly price label</span>
-            <input className="input" value={form.yearlyPrice} maxLength={40} placeholder="e.g. $90 / year" onChange={(e) => setForm({ ...form, yearlyPrice: e.target.value })} />
+            <input className="input" value={form.yearlyPrice} maxLength={40} placeholder="e.g. $90 / year" readOnly={!!view.fromEnv?.yearlyPrice} onChange={(e) => setForm({ ...form, yearlyPrice: e.target.value })} />
+            {envNote("yearlyPrice")}
           </label>
           {field("portalLink", "Customer portal login link", "https://billing.stripe.com/p/login/…", portalOk(form.portalLink))}
         </div>
@@ -282,6 +292,20 @@ export default function BillingTab({ onChange, onOpenPlans, onOpenEnvGuide }: { 
             Plans
           </button>
           , with the limits Pro unlocks. Only Stripe-hosted links are accepted. Clear both payment links to switch payments off.
+        </p>
+        <p className="hint">
+          Prefer the server&apos;s environment? Set <code>STRIPE_MONTHLY_LINK</code>, <code>STRIPE_YEARLY_LINK</code>, <code>STRIPE_PORTAL_LINK</code> and <code>STRIPE_YEARLY_PRICE</code>{" "}
+          instead: they win over these fields. The webhook&apos;s signing secret is only read from <code>STRIPE_WEBHOOK_SECRET</code>, not saved here.{" "}
+          <button className="link-btn" onClick={onOpenEnvGuide}>
+            How to add environment variables
+          </button>
+        </p>
+        <p className="hint">
+          Refunds: once a Payment Link is set, a <a href="/terms#refunds">Terms and refunds</a> page goes live (linked in the footer, pricing and account
+          pages), promising a full refund within 30 days of a payment. Until then it isn&apos;t shown. In Stripe, refund the payment
+          and cancel the subscription; a full refund moves the account to Free by itself. Add{" "}
+          <code>{view.webhookUrl.replace(/\/api\/stripe\/webhook$/, "/terms")}</code> <CopyButton text={view.webhookUrl.replace(/\/api\/stripe\/webhook$/, "/terms")} /> as the terms
+          link in your Payment Links&apos; settings so buyers see it at checkout.
         </p>
         <div className="admin-row actions">
           <button className="btn btn-primary" onClick={save} disabled={!dirty || busy || invalid}>

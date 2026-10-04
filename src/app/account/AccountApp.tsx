@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { REFUND_DAYS } from "@/lib/stripe-links";
 import { describeLimits, PLAN_NAMES, type PlanId, type PlanLimits } from "@/lib/plans";
 
 type User = {
@@ -166,7 +168,9 @@ function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: Pl
                   Yearly{me.billing.yearlyPrice ? ` · ${me.billing.yearlyPrice}` : ""}
                 </a>
               )}
-              <span className="hint">Secure checkout by Stripe. Cancel from Manage billing.</span>
+              <span className="hint">
+                Secure checkout by Stripe. Cancel from Manage billing. <Link href="/terms#refunds">{REFUND_DAYS}-day refunds</Link>
+              </span>
             </div>
           )}
           {id === "pro" && current === "free" && proWorth && !me.billing.monthly && !me.billing.yearly && onRequest && (

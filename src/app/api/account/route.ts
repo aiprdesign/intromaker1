@@ -1,7 +1,7 @@
 import { AccountError, createUser, currentUser, deleteUser, limitsFor, login, publicUser, requireUser, sessionFor, subscribed, usageOf, userCookie } from "@/lib/accounts";
 import { planLimits, readSettings } from "@/lib/admin";
 import { noStore, sameOrigin } from "@/lib/http";
-import { checkoutUrl, portalUrl, type BillingLinks } from "@/lib/stripe-links";
+import { checkoutUrl, effectiveBilling, portalUrl, type BillingLinks } from "@/lib/stripe-links";
 import { lockedOut, wrongPassword } from "@/lib/lockout";
 import { rateLimit } from "@/lib/ratelimit";
 
@@ -36,7 +36,7 @@ export async function GET(req: Request) {
       plans: await planLimits(),
       proPrice: settings.proPrice ?? null,
       contactEmail: settings.contactEmail ?? null,
-      billing: billingFor(u, settings.billing),
+      billing: billingFor(u, effectiveBilling(settings.billing)),
     },
     { headers: noStore },
   );

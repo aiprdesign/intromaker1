@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Nav, { Logo } from "@/components/Nav";
+import TermsLink from "@/components/TermsLink";
 import { readSettings } from "@/lib/admin";
 
 // The contact address is the site owner's setting, read at request time.
@@ -54,7 +55,8 @@ export default async function License() {
       <footer className="footer">
         <Logo />
         <span>
-          © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
+          © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link>
+          <TermsLink /> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
         </span>
       </footer>
     </main>

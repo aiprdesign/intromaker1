@@ -311,6 +311,21 @@ async function main() {
   await hook({ id: "evt_cy_fail", type: "invoice.payment_failed", created: 1500, data: { object: { customer: "cus_cy" } } });
   await hook({ id: "evt_cy_inv", type: "invoice.paid", created: 1600, data: { object: { customer: "cus_cy", amount_paid: 900 } } });
   check((await acc.getUser(cyId))!.billingStatus === "active", "a paid invoice clears a failed payment");
+  // 30-day refunds: a full refund ends Pro by itself; a partial one is flagged for the owner.
+  const deeId = (await acc.createUser("dee@example.com", "dee-password-1")).id;
+  await hook({ id: "evt_dee_paid", type: "checkout.session.completed", data: { object: { client_reference_id: deeId, customer: "cus_dee", subscription: "sub_dee", payment_status: "paid" } } });
+  await hook({ id: "evt_dee_part", type: "charge.refunded", data: { object: { customer: "cus_dee", amount: 900, amount_refunded: 300, refunded: false } } });
+  check((await acc.getUser(deeId))!.plan === "pro" && (await acc.getUser(deeId))!.billingFlag === "refunded", "a partial refund keeps Pro and flags the account for the owner");
+  await hook({ id: "evt_dee_full", type: "charge.refunded", data: { object: { customer: "cus_dee", amount: 900, amount_refunded: 900, refunded: true } } });
+  const dee = (await acc.getUser(deeId))!;
+  const deeLog = (await billing.billingStatus()).recent[0];
+  check(dee.plan === "free" && dee.billingStatus === "canceled" && deeLog.attention === true && /Cancel the subscription in Stripe/.test(deeLog.result), "a full refund moves the account to Free and reminds the owner to cancel the subscription");
+  await acc.updateUser(anaId, (x) => void ((x.plan = "pro"), (x.planSource = "admin")));
+  await hook({ id: "evt_ana_refund", type: "charge.refunded", data: { object: { customer: "cus_ana", amount: 900, amount_refunded: 900, refunded: true } } });
+  check((await acc.getUser(anaId))!.plan === "pro", "a refund doesn't take back a plan the owner set by hand");
+  const { effectiveBilling } = await import("../src/lib/stripe-links");
+  const eb = effectiveBilling({ monthlyLink: "https://buy.stripe.com/saved", portalLink: "https://billing.stripe.com/p/login/saved" }, { STRIPE_MONTHLY_LINK: "https://buy.stripe.com/env", STRIPE_PORTAL_LINK: "https://evil.example/login" });
+  check(eb.monthlyLink === "https://buy.stripe.com/env" && eb.portalLink === "https://billing.stripe.com/p/login/saved" && eb.fromEnv.join() === "monthlyLink", "Stripe links from environment variables win over Admin, and only Stripe-hosted ones are used");
   // Money that reaches no account is flagged for the owner, who links it.
   await hook({ id: "evt_orphan", type: "checkout.session.completed", data: { object: { customer: "cus_orphan", customer_details: { email: "nobody@example.com" }, payment_status: "paid" } } });
   const st = await billing.billingStatus();

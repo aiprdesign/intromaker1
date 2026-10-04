@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Nav, { Logo } from "@/components/Nav";
+import TermsLink from "@/components/TermsLink";
 import { adminEnabled } from "@/lib/admin";
 import { CAPTURE_STORAGE } from "@/lib/storage";
 
@@ -114,7 +115,8 @@ export default function Privacy() {
       <footer className="footer">
         <Logo />
         <span>
-          © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
+          © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link>
+          <TermsLink /> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
         </span>
       </footer>
     </main>

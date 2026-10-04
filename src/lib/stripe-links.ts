@@ -1,5 +1,8 @@
 /** Stripe Payment Link and customer-portal URL helpers (no imports, so any module can use them). */
 
+/** The refund window for Pro payments, in days (the Terms page, pricing and account pages say so). */
+export const REFUND_DAYS = 30;
+
 export interface BillingLinks {
   monthlyLink?: string;
   yearlyLink?: string;
@@ -20,6 +23,29 @@ export function stripeLink(v: unknown, kind: "pay" | "portal"): string | undefin
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The Stripe links can also come from the server's environment, which wins over Admin → Billing
+ * (the webhook's signing secret is environment-only: STRIPE_WEBHOOK_SECRET).
+ */
+export const BILLING_ENV = {
+  monthlyLink: "STRIPE_MONTHLY_LINK",
+  yearlyLink: "STRIPE_YEARLY_LINK",
+  portalLink: "STRIPE_PORTAL_LINK",
+  yearlyPrice: "STRIPE_YEARLY_PRICE",
+} as const satisfies Record<keyof BillingLinks, string>;
+
+/** The links in effect: environment first, then what was saved in Admin; and which came from the environment. */
+export function effectiveBilling(saved: BillingLinks | undefined, env: Record<string, string | undefined> = process.env): BillingLinks & { fromEnv: (keyof BillingLinks)[] } {
+  const fromEnv: (keyof BillingLinks)[] = [];
+  const pick = (key: keyof BillingLinks) => {
+    const raw = env[BILLING_ENV[key]]?.trim();
+    const v = !raw ? undefined : key === "yearlyPrice" ? raw.slice(0, 40) : stripeLink(raw, key === "portalLink" ? "portal" : "pay");
+    if (v) fromEnv.push(key);
+    return v ?? saved?.[key];
+  };
+  return { monthlyLink: pick("monthlyLink"), yearlyLink: pick("yearlyLink"), portalLink: pick("portalLink"), yearlyPrice: pick("yearlyPrice"), fromEnv };
 }
 
 /** The webhook events IntroMaker handles: select these on the Stripe endpoint. */

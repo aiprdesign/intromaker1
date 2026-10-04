@@ -156,7 +156,7 @@ const HOSTS: { id: string; name: string; steps: React.ReactNode[] }[] = [
         Copy <code>.env.example</code> to <code>.env.local</code> in the project folder.
       </>,
       <>
-        Fill in the values (<code>NAME=value</code>, one per line). <code>.env.local</code> is never committed.
+        Fill in the values (<code>NAME=value</code>, one per line). <code>.env.local</code> isn&apos;t committed.
       </>,
       <>
         Restart <code>npm run dev</code> (or <code>npm start</code>) so it reads them.
@@ -174,8 +174,8 @@ function EnvGuide({ env }: { env: EnvRow[] }) {
     <div className="admin-card env-guide" id="env-vars">
       <h2>Environment variables</h2>
       <p className="hint">
-        Secrets such as the Stripe webhook secret and the admin password live in the server&apos;s environment variables: set on your host, never typed into a page,
-        never shown here (this page only says whether each one is set). After adding or changing one, the server restarts with it.
+        Secrets such as the Stripe webhook secret and the admin password live in the server&apos;s environment variables: set on your host, not typed into a page,
+        and not shown here (this page only says whether each one is set). After adding or changing one, the server restarts with it.
       </p>
       <div className="seg-control env-hosts" role="tablist" aria-label="Where the site runs">
         {HOSTS.map((x) => (
@@ -284,7 +284,7 @@ export default function SetupTab({ go }: { go: Go }) {
     s.stripeLinks && !s.proUnlocksMore && "set what Pro unlocks over Free",
   ].filter((x): x is string => !!x);
   const rows: { done: boolean; optional?: boolean; title: string; body: React.ReactNode; action?: React.ReactNode }[] = [
-    { done: true, title: "Admin area", body: "On: ADMIN_PASSWORD is set in the environment (it stays there, never on a page)." },
+    { done: true, title: "Admin area", body: "On: ADMIN_PASSWORD is set in the environment (it stays there, not on a page)." },
     {
       done: s.persistent,
       title: "Data volume",
@@ -350,7 +350,7 @@ export default function SetupTab({ go }: { go: Go }) {
     <section className="admin-setup">
       <div className="admin-card">
         <h2>Setup</h2>
-        <p className="hint">Everything the site needs, set from here. Keys pasted on this page are stored on the server, readable only by the app, and never shown again.</p>
+        <p className="hint">What the site needs, set from here. Keys pasted on this page are stored on the server, readable only by the app, and not shown again.</p>
         <ol className="setup-steps">
           {rows.map((r, i) => (
             <li key={r.title} className={r.done ? "done" : ""}>

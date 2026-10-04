@@ -1,13 +1,14 @@
 import { noStore, planLimits, readSettings, requireAdmin, writeSettings } from "@/lib/admin";
 import { dataIsPersistent } from "@/lib/storage";
 import { billingStatus, isTestLink, stripeLink, webhookConfigured } from "@/lib/billing";
+import { BILLING_ENV, effectiveBilling } from "@/lib/stripe-links";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function view(req: Request) {
   const s = await readSettings();
-  const b = s.billing ?? {};
+  const b = effectiveBilling(s.billing);
   const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? new URL(req.url).host;
   const links = [b.monthlyLink, b.yearlyLink].filter(Boolean) as string[];
@@ -18,6 +19,8 @@ async function view(req: Request) {
     yearlyLink: b.yearlyLink ?? "",
     portalLink: b.portalLink ?? "",
     yearlyPrice: b.yearlyPrice ?? "",
+    // Set on the server (STRIPE_MONTHLY_LINK…): shown read-only here, and they win over saved ones.
+    fromEnv: Object.fromEntries(b.fromEnv.map((k) => [k, BILLING_ENV[k]])),
     proPrice: s.proPrice ?? "",
     webhookUrl: `${proto}://${host}/api/stripe/webhook`,
     successUrl: `${proto}://${host}/account?upgraded=1`,
@@ -67,6 +70,9 @@ export async function PUT(req: Request) {
     yearlyPrice: typeof body.yearlyPrice === "string" ? body.yearlyPrice.trim().slice(0, 40) || undefined : undefined,
   };
   if (errors.length) return Response.json({ error: errors.join(" ") }, { status: 400 });
+  // Fields set in the environment aren't edited here: keep what was saved under them.
+  const saved = (await readSettings()).billing ?? {};
+  for (const k of effectiveBilling(saved).fromEnv) billing[k] = saved[k];
   await writeSettings({ billing });
   return Response.json(await view(req), { headers: noStore });
 }
