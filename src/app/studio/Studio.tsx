@@ -58,6 +58,12 @@ const TRANSITION_NAMES: Record<string, string> = {
   dissolve: "Dissolve",
   liquid: "Liquid",
   cube: "3D cube",
+  morph: "Morph",
+  portal: "Portal",
+  iris: "Iris",
+  spin: "Spin",
+  split: "Split",
+  swipe: "Card swipe",
 };
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
 

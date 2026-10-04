@@ -179,7 +179,7 @@ export const PALETTE_IDS = [
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
 
-export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid", "cube"] as const;
+export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid", "cube", "morph", "portal", "iris", "spin", "split", "swipe"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
 export const FONTS = ["anton", "grotesk", "inter", "serif", "mono", "cinzel", "bebas", "playfair", "manrope", "jost"] as const;

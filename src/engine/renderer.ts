@@ -1,5 +1,5 @@
 import { arrange, energyAt, sinceDrop, sinceKick, type Arrangement } from "./arrange";
-import { clamp, ease, mixHex, noise1, range, rgba, rng } from "./math";
+import { clamp, ease, lerp, mixHex, noise1, range, rgba, rng } from "./math";
 import { tokens } from "./grid";
 import { styleOf } from "./music";
 import { captionAt } from "./voice";
@@ -19,7 +19,7 @@ import type { Aspect, MusicPulse, Palette, Scene, SkillContext, Transition, Vide
 export const TRANSITION_LEN = 0.45;
 
 /** Transitions where outgoing and incoming shots overlap on screen. */
-export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak", "liquid", "cube"]);
+export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak", "liquid", "cube", "morph", "portal", "iris", "spin", "split", "swipe"]);
 /** How long past its end an overlapped scene keeps rendering (exit suppressed). */
 const OVERLAP_EXTEND = TRANSITION_LEN + 0.25;
 
@@ -1012,6 +1012,8 @@ function compositeOverlap(sc: SkillContext, a: HTMLCanvasElement, b: HTMLCanvasE
       ctx.globalAlpha = (1 - e) * (i === 0 ? 1 : 0.2);
       ctx.drawImage(a, (w - w * z) / 2, (h - h * z) / 2, w * z, h * z);
     }
+  } else if (kind === "morph" || kind === "portal" || kind === "iris" || kind === "spin" || kind === "split" || kind === "swipe") {
+    continuity(sc, kind, k, a, b);
   } else {
     // Cross-dissolve: outgoing blurs away as the incoming sharpens in.
     const e = ease.inOutCubic(k);
@@ -1024,6 +1026,148 @@ function compositeOverlap(sc: SkillContext, a: HTMLCanvasElement, b: HTMLCanvasE
     ctx.filter = "none";
   }
   ctx.globalAlpha = 1;
+}
+
+/** Draw a shot scaled (and turned) about the frame's centre. */
+function drawAbout(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement, w: number, h: number, scale: number, angle = 0, dx = 0, dy = 0) {
+  ctx.save();
+  ctx.translate(w / 2 + dx, h / 2 + dy);
+  if (angle) ctx.rotate(angle);
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+/**
+ * Continuity transitions: the outgoing shot turns into the incoming one, so the film reads as one
+ * continuous move rather than a series of cuts. No full-frame colour is flashed: what changes on
+ * screen is always one shot or the other, so brightness moves only as fast as the shots differ.
+ *
+ * - morph:  a match cut: the outgoing shot pushes in and softens as the incoming one settles out of
+ *           a slight zoom and sharpens, both centred, so centred headlines flow into each other.
+ * - portal: the next shot opens in a window in the middle of this one; the camera flies into it.
+ * - iris:   the next shot opens in a growing circle, edged with a thin brand-colour ring.
+ * - spin:   both shots turn about the centre with motion blur, the next one landing upright.
+ * - split:  the shot parts along its middle, the halves sliding off, the next one behind it.
+ * - swipe:  the shot shrinks into a card and is swiped up and away, like an app switcher.
+ */
+function continuity(sc: SkillContext, kind: Transition, k: number, a: HTMLCanvasElement, b: HTMLCanvasElement) {
+  const { ctx, w, h, u, palette, seed } = sc;
+  const e = ease.inOutCubic(k);
+  const blur = (px: number) => (px > 0.5 ? `blur(${px.toFixed(1)}px)` : "none");
+  if (kind === "morph") {
+    ctx.filter = blur(e * 10 * u);
+    drawAbout(ctx, a, w, h, 1 + 0.16 * e);
+    ctx.filter = blur((1 - e) * 10 * u);
+    ctx.globalAlpha = e;
+    drawAbout(ctx, b, w, h, 1.12 - 0.12 * e);
+    ctx.filter = "none";
+  } else if (kind === "portal") {
+    // The camera flies at the window as it opens.
+    ctx.filter = blur(e * 6 * u);
+    drawAbout(ctx, a, w, h, 1 + 0.9 * ease.inCubic(k));
+    ctx.filter = "none";
+    const o = ease.inOutCubic(range(k, 0.05, 1));
+    const pw = lerp(w * 0.34, w, o);
+    const ph = lerp(h * 0.34, h, o);
+    const r = lerp(Math.min(w, h) * 0.05, 0, o);
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect((w - pw) / 2, (h - ph) / 2, pw, ph, r);
+    ctx.clip();
+    drawAbout(ctx, b, w, h, lerp(0.7, 1, o));
+    ctx.restore();
+    if (o < 1) {
+      ctx.strokeStyle = palette.primary;
+      ctx.globalAlpha = 1 - o;
+      ctx.lineWidth = 3 * u;
+      ctx.beginPath();
+      ctx.roundRect((w - pw) / 2, (h - ph) / 2, pw, ph, r);
+      ctx.stroke();
+    }
+  } else if (kind === "iris") {
+    drawAbout(ctx, a, w, h, 1 + 0.06 * e);
+    // The circle's area (not its radius) grows evenly, so the picture changes at a steady rate.
+    const R = (Math.hypot(w, h) / 2) * Math.sqrt(0.6 * k + 0.4 * e);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, Math.max(0.1, R), 0, Math.PI * 2);
+    ctx.clip();
+    drawAbout(ctx, b, w, h, 1.08 - 0.08 * e);
+    ctx.restore();
+    if (e > 0.001 && e < 1) {
+      ctx.strokeStyle = palette.primary;
+      ctx.globalAlpha = Math.sin(Math.PI * e);
+      ctx.lineWidth = 4 * u;
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, Math.max(0.1, R), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (kind === "spin") {
+    // A quarter-ish turn shared by the two shots, with a few motion-blurred copies at speed.
+    const dir = seed % 2 ? 1 : -1;
+    const turn = 0.55 * dir;
+    const speed = Math.sin(Math.PI * k);
+    const shots: [HTMLCanvasElement, number, number, number][] = [
+      // (Long, even cross-fades: the shots trade places gradually, never in a frame or two.)
+      [a, e * turn, 1 - 0.18 * Math.sin(Math.PI * Math.min(1, e * 1.4)), 1 - range(k, 0.15, 0.85)],
+      [b, (e - 1) * turn, 1 - 0.18 * Math.sin(Math.PI * e), range(k, 0.15, 0.85)],
+    ];
+    // Behind the turning shots, the next one (soft) fills the corners they uncover.
+    ctx.filter = blur(14 * u);
+    drawAbout(ctx, b, w, h, 1.15);
+    ctx.filter = "none";
+    for (const [img, angle, scale, alpha] of shots) {
+      if (alpha <= 0) continue;
+      for (let i = 3; i >= 0; i--) {
+        if (i && speed < 0.15) continue;
+        ctx.globalAlpha = alpha * (i ? 0.16 * speed : 1);
+        drawAbout(ctx, img, w, h, scale * 1.08, angle - i * 0.05 * dir * speed);
+      }
+    }
+  } else if (kind === "split") {
+    // The next shot waits behind, easing out of a slight zoom as the halves part.
+    drawAbout(ctx, b, w, h, 1.1 - 0.1 * e);
+    const off = ease.inOutCubic(k) * h * 0.55;
+    for (const top of [true, false]) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, top ? -off : h / 2 + off, w, h / 2);
+      ctx.clip();
+      ctx.drawImage(a, 0, top ? -off : off, w, h);
+      ctx.restore();
+    }
+    if (k > 0 && k < 1) {
+      ctx.fillStyle = palette.primary;
+      ctx.globalAlpha = Math.sin(Math.PI * k);
+      ctx.fillRect(0, h / 2 - off - 2 * u, w, 3 * u);
+      ctx.fillRect(0, h / 2 + off - u, w, 3 * u);
+    }
+  } else {
+    // swipe: shrink into a card, then swipe up and away; the next shot settles behind.
+    drawAbout(ctx, b, w, h, 0.92 + 0.08 * ease.outCubic(range(k, 0.25, 1)));
+    const shrink = ease.outCubic(range(k, 0, 0.4));
+    const fly = ease.inCubic(range(k, 0.3, 1));
+    const s = 1 - 0.14 * shrink;
+    const r = 34 * u * shrink;
+    ctx.save();
+    ctx.translate(w / 2, h / 2 - fly * h * 1.05);
+    ctx.rotate(fly * 0.05);
+    ctx.scale(s, s);
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 40 * u * shrink;
+    ctx.shadowOffsetY = 18 * u * shrink;
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -h / 2, w, h, r);
+    ctx.fillStyle = palette.bg0;
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.clip();
+    ctx.drawImage(a, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  ctx.filter = "none";
 }
 
 /** Transform applied before the skill draws (zoom-in punch). */

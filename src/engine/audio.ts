@@ -1109,7 +1109,7 @@ export class Soundtrack {
     let start = 0;
     for (const sc of plan.scenes) {
       if (sc.transition !== "cut" && start > 0 && start >= from) {
-        const kind: SfxKind = sc.transition === "whip" || sc.transition === "wipe" ? "whoosh" : "swoosh";
+        const kind: SfxKind = sc.transition === "whip" || sc.transition === "wipe" || sc.transition === "spin" || sc.transition === "split" || sc.transition === "swipe" ? "whoosh" : "swoosh";
         this.sfx(at(Math.max(from, start - 0.12)), kind);
       }
       const cues = SKILL_MAP[sc.skill]?.sfx?.(sc, beat, plan.brand) ?? [];
