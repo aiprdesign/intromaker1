@@ -300,13 +300,14 @@ export default function BillingTab({ onChange, onOpenPlans, onOpenEnvGuide }: { 
             How to add environment variables
           </button>
         </p>
-        <p className="hint">
-          Refunds: once a Payment Link is set, a <a href="/terms#refunds">Terms and refunds</a> page goes live (linked in the footer, pricing and account
-          pages), promising a full refund within 30 days of a payment. Until then it isn&apos;t shown. In Stripe, refund the payment
-          and cancel the subscription; a full refund moves the account to Free by itself. Add{" "}
-          <code>{view.webhookUrl.replace(/\/api\/stripe\/webhook$/, "/terms")}</code> <CopyButton text={view.webhookUrl.replace(/\/api\/stripe\/webhook$/, "/terms")} /> as the terms
-          link in your Payment Links&apos; settings so buyers see it at checkout.
-        </p>
+        {linksOn && (
+          <p className="hint">
+            Refunds: with payments on, the <a href="/terms#refunds">Terms and refunds</a> page is live (linked in the footer, pricing and account pages),
+            promising a full refund within 30 days of a payment. Without a Payment Link it isn&apos;t shown. In Stripe, refund the payment and cancel the
+            subscription; a full refund moves the account to Free by itself. Add <code>{view.webhookUrl.replace(/\/api\/stripe\/webhook$/, "/terms")}</code> <CopyButton text={view.webhookUrl.replace(/\/api\/stripe\/webhook$/, "/terms")} /> as the terms link in your Payment
+            Links&apos; settings so buyers see it at checkout.
+          </p>
+        )}
         <div className="admin-row actions">
           <button className="btn btn-primary" onClick={save} disabled={!dirty || busy || invalid}>
             {busy ? "Saving…" : dirty ? "Save billing" : "Saved"}

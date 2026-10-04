@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Nav, { Logo } from "@/components/Nav";
 import TermsLink from "@/components/TermsLink";
-import { adminEnabled } from "@/lib/admin";
+import { adminEnabled, readSettings } from "@/lib/admin";
+import { effectiveBilling } from "@/lib/stripe-links";
 import { CAPTURE_STORAGE } from "@/lib/storage";
 
-// Whether this server keeps a log of films depends on its settings, read at request time.
+// Whether this server keeps a log of videos, and whether it takes payments, are read at request time.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -14,8 +15,11 @@ export const metadata: Metadata = {
 };
 
 /** Plain-language privacy note for the hosted demo. Kept in step with what the code does. */
-export default function Privacy() {
+export default async function Privacy() {
   const logging = adminEnabled();
+  // Stripe is mentioned only once payments are set up (a Payment Link, from Admin or the environment).
+  const links = effectiveBilling((await readSettings()).billing);
+  const payments = !!(links.monthlyLink || links.yearlyLink);
   return (
     <main>
       <Nav />
@@ -47,11 +51,13 @@ export default function Privacy() {
           your plan, how many AI videos and website imports you&apos;ve used this month and today, and the intros you save (their storyboards and a small
           thumbnail). Signing in sets one cookie, which keeps you signed in for 30 days; there are no tracking cookies. You can delete your account and your saved intros at any time from your account page.
         </p>
-        <p>
-          If you pay for Pro, payment happens on Stripe&apos;s own pages: your card details go to Stripe, not to this server. Stripe tells the server that you
-          paid, and the server keeps your Stripe customer and subscription ids and the subscription&apos;s status, so your plan follows your subscription.
-          Stripe&apos;s own privacy policy covers what it keeps.
-        </p>
+        {payments && (
+          <p>
+            If you pay for Pro, payment happens on Stripe&apos;s own pages: your card details go to Stripe, not to this server. Stripe tells the server that you
+            paid, and the server keeps your Stripe customer and subscription ids and the subscription&apos;s status, so your plan follows your subscription.
+            Stripe&apos;s own privacy policy covers what it keeps.
+          </p>
+        )}
 
         <h2>Websites you import</h2>
         <p>
