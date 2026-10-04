@@ -1,4 +1,5 @@
 import { adminEnabled, checkPassword, COOKIE, newSession, noStore, sameOrigin, sessionCookie, validSession } from "@/lib/admin";
+import { lockedOut, signedIn, wrongPassword } from "@/lib/lockout";
 import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -19,14 +20,19 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   if (!adminEnabled()) return Response.json({ error: "Not found" }, { status: 404 });
   if (!sameOrigin(req)) return Response.json({ error: "Cross-origin request refused" }, { status: 403 });
+  // Three wrong passwords block the address from signing in (lib/lockout.ts).
+  const locked = lockedOut(req);
+  if (locked) return locked;
   const limited = rateLimit(req, "adminLogin");
   if (limited) return limited;
   const body = (await req.json().catch(() => null)) as { password?: unknown } | null;
   if (!checkPassword(body?.password)) {
-    // A small fixed delay on top of the rate limit makes guessing slower still.
+    // A small fixed delay on top of the lockout makes guessing slower still.
     await new Promise((r) => setTimeout(r, 400));
-    return Response.json({ error: "Wrong password" }, { status: 401, headers: noStore });
+    const w = wrongPassword(req, "admin", "Wrong password.");
+    return Response.json({ error: w.message, blocked: w.blocked }, { status: w.blocked ? 429 : 401, headers: noStore });
   }
+  signedIn(req);
   const { token, maxAge } = newSession();
   return Response.json({ ok: true }, { headers: { ...noStore, "Set-Cookie": sessionCookie(req, token, maxAge) } });
 }

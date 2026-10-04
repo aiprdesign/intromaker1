@@ -93,7 +93,7 @@ export default function Privacy() {
           ) : (
             <li>Screenshots of imported sites, for 7 days.</li>
           )}
-          <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits. It isn&apos;t written to disk.</li>
+          <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits and to block signing in from an address after 3 wrong passwords (for an hour). It isn&apos;t written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>
           {logging && <li>The video log described above, up to the most recent few thousand videos, until the owner deletes it.</li>}
           <li>If you have an account: your email, password hash, plan, usage counts and saved intros, until you delete the account.</li>

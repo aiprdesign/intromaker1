@@ -2983,7 +2983,17 @@ button.brand-colors.on {
   color: var(--muted);
 }
 .admin-ai,
-.admin-ai + .env-guide {
+.admin-ai + .blocks-card {
+  display: grid;
+  gap: 10px;
+}
+.blocks-card p {
+  margin: 0;
+}
+.blocks-card .event-list li {
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+}
+.env-guide {
   display: grid;
   gap: 12px;
 }

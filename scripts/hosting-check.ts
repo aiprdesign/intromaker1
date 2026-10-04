@@ -30,12 +30,14 @@ async function main() {
   const dataDir = await mkdtemp(join(tmpdir(), "intromaker-check-"));
   env.INTROMAKER_DATA_DIR = dataDir;
   const rl = await import("../src/lib/ratelimit");
+  const lock = await import("../src/lib/lockout");
   const storage = await import("../src/lib/storage");
   const { assertPublicUrl } = await import("../src/lib/netguard");
   const { serverReachesLocal } = await import("../src/lib/ai");
 
   console.log("Rate limits");
   rl.resetLimits();
+  lock.resetLockout();
   const limit = rl.RULES.scrape.limit;
   const codes: number[] = [];
   for (let i = 0; i <= limit; i++) codes.push(rl.rateLimit(req("203.0.113.7"), "scrape")?.status ?? 200);
@@ -46,11 +48,13 @@ async function main() {
   check(rl.rateLimit(req("1.2.3.4, 203.0.113.7"), "scrape")?.status === 429, "a spoofed X-Forwarded-For entry doesn't reset the limit");
   const t0 = Date.now();
   rl.resetLimits();
+  lock.resetLockout();
   for (let i = 0; i < limit; i++) rl.take("scrape", "k", t0);
   check(!rl.take("scrape", "k", t0).ok && rl.take("scrape", "k", t0 + rl.RULES.scrape.windowMs + 1).ok, "the window resets after its time");
 
   console.log("Server AI budget");
   rl.resetLimits();
+  lock.resetLockout();
   const spend = [1, 2, 3, 4].map((i) => rl.spendServerAi(req(`192.0.2.${i}`)).ok);
   check(spend.join() === "true,true,true,false", "daily budget (3) shared across visitors, then built-in director");
 
@@ -91,6 +95,7 @@ async function main() {
 
   env.ADMIN_PASSWORD = "correct horse battery staple";
   rl.resetLimits();
+  lock.resetLockout();
   const login = (pw: string, origin?: string | null) => sessionRoute.POST(areq("/api/admin/session", { method: "POST", body: JSON.stringify({ password: pw }), origin }));
   check((await login("wrong")).status === 401, "a wrong password is refused");
   check((await login(env.ADMIN_PASSWORD, "https://evil.example")).status === 403, "sign-in from another site is refused");
@@ -142,14 +147,29 @@ async function main() {
   check(!JSON.parse(await read(join(dataDir, "admin", "settings.json"), "utf8")).ai?.apiKey, "the key can be removed");
 
   rl.resetLimits();
+  lock.resetLockout();
   const tries: number[] = [];
-  for (let i = 0; i < rl.RULES.adminLogin.limit + 1; i++) tries.push((await login("guess" + i)).status);
-  check(tries.slice(0, -1).every((c) => c === 401) && tries.at(-1) === 429, `password guessing is limited (${rl.RULES.adminLogin.limit} tries, then 429)`);
+  for (let i = 0; i < 3; i++) tries.push((await login("guess" + i)).status);
+  const third = await (await login("guess-again")).json();
+  check(tries.join() === "401,401,429" && /blocked/.test(third.error), "3 wrong admin passwords block the address from signing in");
+  check((await login(env.ADMIN_PASSWORD!)).status === 429, "a blocked address can't sign in even with the right password");
+  const blocksRoute = await import("../src/app/api/admin/blocks/route");
+  const listed2 = await (await blocksRoute.GET(areq("/api/admin/blocks", { cookie }))).json();
+  check(listed2.blocks.length === 1 && listed2.blocks[0].address === "203.0.113.x" && !JSON.stringify(listed2).includes("203.0.113.50"), "the owner sees blocked addresses, masked");
+  await blocksRoute.DELETE(areq("/api/admin/blocks", { method: "DELETE", cookie, body: JSON.stringify({ id: listed2.blocks[0].id }) }));
+  check((await login(env.ADMIN_PASSWORD!)).status === 200, "the owner can lift a block");
+  rl.resetLimits();
+  lock.resetLockout();
+  await login("one-wrong");
+  await login("two-wrong");
+  await login(env.ADMIN_PASSWORD!);
+  check((await login("after-success")).status === 401, "a correct password resets the count");
   env.ADMIN_PASSWORD = "a new password";
   check(!admin.validSession(token), "changing ADMIN_PASSWORD signs everyone out");
 
   console.log("Accounts and plans");
   rl.resetLimits();
+  lock.resetLockout();
   const acc = await import("../src/lib/accounts");
   const accountRoute = await import("../src/app/api/account/route");
   const accSession = await import("../src/app/api/account/session/route");
@@ -236,9 +256,14 @@ async function main() {
   const temp = await acc.resetPassword(anaId);
   check(!!temp && (await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: temp }) }))).status === 200 && (await acc.getUser(anaId))!.mustChangePassword === true, "an owner reset gives a one-time password that must be changed");
   rl.resetLimits();
+  lock.resetLockout();
   const guesses: number[] = [];
-  for (let i = 0; i < rl.RULES.accountLogin.limit + 1; i++) guesses.push((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "guess" + i }) }))).status);
-  check(guesses.at(-1) === 429, `account password guessing is limited (${rl.RULES.accountLogin.limit} tries, then 429)`);
+  for (let i = 0; i < 3; i++) guesses.push((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "guess" + i }) }))).status);
+  check(guesses.join() === "401,401,429", "3 wrong account passwords block the address from signing in");
+  check((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: temp }) }))).status === 429, "a blocked address can't sign in to an account either");
+  check((await accSession.POST(ureq("/api/account/session", { method: "POST", ip: "198.51.100.200", body: JSON.stringify({ email: "ana@example.com", password: temp }) }))).status === 200, "other addresses aren't affected by the block");
+  rl.resetLimits();
+  lock.resetLockout();
 
   console.log("Stripe");
   const billing = await import("../src/lib/billing");

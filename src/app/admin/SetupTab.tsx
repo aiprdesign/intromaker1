@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, CopyButton, Skeleton, useAdminUi } from "./ui";
+import { api, CopyButton, Skeleton, useAdminUi, When } from "./ui";
 
 type KeyName = "openaiVoice" | "elevenlabs" | "amazonAccess" | "amazonSecret" | "amazonTag" | "ebayId" | "ebaySecret";
 type KeyView = { label: string; env: string; source: "admin" | "env" | null; hint: string };
@@ -214,6 +214,59 @@ function EnvGuide({ env }: { env: EnvRow[] }) {
   );
 }
 
+type BlockRow = { id: string; address: string; where: "admin" | "account"; at: number; until: number; fails: number };
+
+/** Addresses blocked from signing in after too many wrong passwords, with a way to lift a block. */
+function Blocks() {
+  const { notify } = useAdminUi();
+  const [data, setData] = useState<{ blocks: BlockRow[]; tries: number; blockMinutes: number } | null>(null);
+  const load = () =>
+    api<{ blocks: BlockRow[]; tries: number; blockMinutes: number }>("/api/admin/blocks")
+      .then(setData)
+      .catch(() => {});
+  useEffect(() => {
+    void load();
+  }, []);
+  if (!data) return null;
+  const lift = async (b: BlockRow) => {
+    try {
+      await api("/api/admin/blocks", { method: "DELETE", body: JSON.stringify({ id: b.id }) });
+      notify(`${b.address} can sign in again`);
+    } catch (e) {
+      notify((e as Error).message, "error");
+    }
+    void load();
+  };
+  return (
+    <div className="admin-card blocks-card">
+      <h2>Sign-in protection</h2>
+      <p className="hint">
+        After {data.tries} wrong passwords (admin or account sign-in), the address is blocked from signing in for {data.blockMinutes} minutes. A correct password resets the
+        count. Blocks are kept in memory only.
+      </p>
+      {data.blocks.length ? (
+        <ul className="event-list">
+          {data.blocks.map((b) => (
+            <li key={b.id} className="attention">
+              <span className="hint">
+                <When t={b.at} />
+              </span>
+              <span>
+                <code>{b.address}</code> · {b.fails} wrong {b.where === "admin" ? "admin" : "account"} passwords · blocked until {new Date(b.until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+              <button className="btn btn-ghost sm" onClick={() => lift(b)}>
+                Unblock
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="hint">No address is blocked right now.</p>
+      )}
+    </div>
+  );
+}
+
 /** Plug and play: what the site needs, what's set up, and where to set the rest, all from here. */
 export default function SetupTab({ go }: { go: Go }) {
   const [view, setView] = useState<SetupView | null>(null);
@@ -316,6 +369,7 @@ export default function SetupTab({ go }: { go: Go }) {
           ))}
         </ol>
       </div>
+      <Blocks />
       <EnvGuide env={view.env} />
       <KeysCard
         title="Marketplace APIs"
