@@ -3,7 +3,8 @@ import HeroPrompt from "@/components/HeroPrompt";
 import LoopCanvas from "@/components/LoopCanvas";
 import PricingCards from "@/components/PricingCards";
 import SampleFilms from "@/components/SampleFilms";
-import Nav, { Logo } from "@/components/Nav";
+import Nav from "@/components/Nav";
+import SiteFooter from "@/components/SiteFooter";
 import TermsLink from "@/components/TermsLink";
 import SkillGrid from "@/components/SkillGrid";
 import { HOME_BACKDROP } from "@/engine/demos";
@@ -54,13 +55,13 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>130 motion skills, rendered live.</h2>
+          <h2>138 motion skills, rendered live.</h2>
           <p>The cards below are real-time output of the engine: the same frames you export.</p>
         </div>
         <SkillGrid limit={9} />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See the 130 skills →
+            See the 138 skills →
           </Link>
         </div>
       </section>
@@ -106,13 +107,7 @@ export default function Home() {
         </Link>
       </section>
 
-      <footer className="footer">
-        <Logo />
-        <span>
-          © {new Date().getFullYear()} IntroMaker. Rendered in your browser. · <Link href="/privacy">Privacy</Link>
-          <TermsLink /> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
-        </span>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

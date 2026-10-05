@@ -19,11 +19,16 @@ import "@fontsource/jost/500.css";
 import "@fontsource/jost/600.css";
 import "@fontsource/jost/700.css";
 import "./globals.css";
+import { SITE_URL_ENV } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "IntroMaker — Prompt to epic motion graphics",
+  // Absolute links (canonical, Open Graph) need the public address: INTROMAKER_SITE_URL.
+  ...(SITE_URL_ENV ? { metadataBase: new URL(SITE_URL_ENV) } : {}),
+  title: "IntroMaker — SaaS intro videos, product videos and trailers from a URL or a prompt",
   description:
-    "Type a prompt, get a cinematic motion-graphics video. 40 pro animation skills, SaaS launch videos, website import, AI director, produced soundtrack, voice-over and one-click export.",
+    "Paste your website URL or type a prompt and get a SaaS intro video: an AI director, 138 motion skills, 3D logo intros, a produced soundtrack, voice-over and 1080p export for your landing page, Reels, TikTok and Shorts.",
+  keywords: ["SaaS video maker", "SaaS intro video", "product intro video", "URL to video", "website to video", "product demo video", "launch video", "3D logo intro", "motion graphics", "AI video generator"],
+  openGraph: { siteName: "IntroMaker", type: "website" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

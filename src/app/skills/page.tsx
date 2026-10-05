@@ -1,4 +1,5 @@
 import Nav from "@/components/Nav";
+import SiteFooter from "@/components/SiteFooter";
 import SkillGrid from "@/components/SkillGrid";
 
 export const metadata = { title: "Motion skills — IntroMaker" };
@@ -15,6 +16,7 @@ export default function SkillsPage() {
         </div>
         <SkillGrid pickers />
       </section>
+      <SiteFooter />
     </main>
   );
 }

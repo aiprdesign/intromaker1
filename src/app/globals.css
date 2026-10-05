@@ -837,6 +837,129 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* The site footer: SaaS video topics, tools and the legal links. */
+.site-footer {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 28px;
+  padding-top: 40px;
+}
+.footer-cols {
+  display: grid;
+  grid-template-columns: 1.2fr 2fr 1fr;
+  gap: 32px;
+}
+.footer-brand p {
+  margin-top: 12px;
+  max-width: 300px;
+  line-height: 1.55;
+}
+.footer-col h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.footer-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.footer-col ul.footer-keywords {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+}
+.footer-col a,
+.footer-legal a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.footer-col a:hover,
+.footer-legal a:hover {
+  color: var(--text);
+}
+.footer-legal {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  font-size: 13px;
+}
+@media (max-width: 760px) {
+  .footer-cols {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* Group anchors on the skills page land below the fixed nav. */
+.skill-card[id] {
+  scroll-margin-top: 84px;
+}
+
+/* The SaaS videos guide. */
+.seo-page {
+  max-width: 800px;
+}
+.seo-page h1 {
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.1;
+  margin-top: 10px;
+}
+.seo-page section {
+  scroll-margin-top: 90px;
+}
+.seo-page h2 {
+  font-size: 22px;
+  margin-top: 40px;
+}
+.seo-page ol {
+  padding-left: 20px;
+  color: var(--muted);
+}
+.seo-page ol li {
+  margin-bottom: 8px;
+}
+.seo-page ol strong {
+  color: var(--text);
+}
+.seo-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0 8px;
+}
+.seo-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 28px 0 8px;
+}
+.seo-toc a {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+.seo-toc a:hover {
+  color: var(--text);
+  border-color: var(--line-2);
+}
+.seo-faq {
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+.seo-faq summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+.seo-faq p {
+  margin-top: 8px;
+}
+
 /* ───────── Studio ───────── */
 
 .studio {

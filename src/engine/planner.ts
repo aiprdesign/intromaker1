@@ -25,6 +25,9 @@ import {
   type VideoPlan,
 } from "./types";
 
+/** The 3D logo intros, in the order remakes try them. */
+const LOGO_3D = ["logo-extrude", "logo-stage", "logo-spin", "logo-shatter", "logo-orbit", "logo-layers", "logo-tunnel", "logo-flip"] as const;
+
 export type Length = "short" | "standard" | "long";
 export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20, long: 34 };
 
@@ -1382,7 +1385,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   add(1, revealMedia && site.name.length <= 14
     ? { role: "reveal", skill: "type-mask", text: site.name, subtext: taglineFree ? tagline : undefined, duration: beats(9), transition: "dolly", media: revealMedia }
     : {
-        role: "reveal", skill: brand.logo ? "logo-reveal" : "particle-assemble",
+        // Remakes cycle through the 3D logo intros; the first take keeps the style's own reveal.
+        role: "reveal", skill: brand.logo ? (variant ? LOGO_3D[(variant - 1) % LOGO_3D.length] : "logo-reveal") : "particle-assemble",
         text: site.name,
         subtext: taglineFree ? tagline : site.domain,
         duration: beats(6),
@@ -2086,7 +2090,7 @@ function planFromSiteTrailer(site: SiteData, req: SiteRequest): VideoPlan {
 
   scenes.push({ skill: pick(["warp-tunnel", "hyperspace", "god-rays"] as const), text: "INTRODUCING", duration: beats(6, 2.6), transition: "cut" });
   scenes.push({
-    skill: brand.logo ? "logo-reveal" : pick(["particle-assemble", "god-rays"] as const),
+    skill: brand.logo ? pick(["logo-reveal", "logo-stage", "logo-extrude", "logo-shatter", "logo-spin"] as const) : pick(["particle-assemble", "god-rays", "logo-stage"] as const),
     text: name,
     subtext: tagline || undefined,
     duration: beats(8, 3.6),

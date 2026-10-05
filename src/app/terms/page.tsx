@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Nav, { Logo } from "@/components/Nav";
+import Nav from "@/components/Nav";
+import SiteFooter from "@/components/SiteFooter";
 import { readSettings } from "@/lib/admin";
 import { effectiveBilling, REFUND_DAYS } from "@/lib/stripe-links";
 
@@ -83,13 +84,7 @@ export default async function Terms() {
           </Link>
         </p>
       </article>
-      <footer className="footer">
-        <Logo />
-        <span>
-          © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms and refunds</Link> · <Link href="/license">Licence</Link> ·{" "}
-          <Link href="/licenses">Open-source licences</Link>
-        </span>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

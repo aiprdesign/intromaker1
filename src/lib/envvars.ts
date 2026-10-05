@@ -30,6 +30,7 @@ export const ENV_VARS: EnvVar[] = [
   { name: "STRIPE_YEARLY_LINK", group: "Admin and payments", purpose: "The yearly Stripe Payment Link (optional).", example: "https://buy.stripe.com/…", secret: false },
   { name: "STRIPE_PORTAL_LINK", group: "Admin and payments", purpose: "The Stripe customer portal login link, for Manage billing.", example: "https://billing.stripe.com/p/login/…", secret: false },
   { name: "STRIPE_YEARLY_PRICE", group: "Admin and payments", purpose: "How the yearly price reads on the account page.", example: "$90 / year", secret: false },
+  { name: "INTROMAKER_SITE_URL", group: "Storage", purpose: "The site's public address, for the sitemap, robots.txt and canonical links (search engines). Without it, the address of each request is used.", example: "https://intromaker.example", secret: false },
   { name: "INTROMAKER_DATA_DIR", group: "Storage", purpose: "Where accounts, saved intros, settings and captures are kept. Point it at a mounted volume.", example: "/data", secret: false, needed: true },
   { name: "ANTHROPIC_API_KEY", group: "AI", purpose: "A Claude key for the AI director (or choose any provider and key in the AI tab).", example: "sk-ant-…", secret: true },
   { name: "INTROMAKER_AI_DAILY_BUDGET", group: "AI", purpose: "AI videos per day on the server's key, all visitors combined (default 200).", example: "200", secret: false },

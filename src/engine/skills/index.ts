@@ -11,6 +11,7 @@ import { fastTypeSkills } from "./fastype";
 import { speedSkills } from "./speed";
 import { speedMoreSkills } from "./speed2";
 import { launchSkills } from "./launch";
+import { logo3dSkills } from "./logo3d";
 import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
 import { gallerySkills } from "./gallery";
@@ -28,6 +29,7 @@ export const SKILLS: Skill[] = [
   // Ordered for the showcase: SaaS launch toolkit first.
   ...saasSkills,
   ...endingSkills,
+  ...logo3dSkills,
   ...editorialSkills,
   ...editorialMoreSkills,
   ...fastTypeSkills,
@@ -72,6 +74,7 @@ export const SKILL_MAP = Object.fromEntries(SKILLS.map((s) => [s.id, s])) as Rec
 export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "SaaS essentials", skills: saasSkills },
   { name: "Openers & end cards", skills: endingSkills },
+  { name: "3D logo", skills: logo3dSkills },
   { name: "Editorial system", skills: [...editorialSkills, ...editorialMoreSkills] },
   { name: "Fast type", skills: [...fastTypeSkills, ...speedSkills, ...speedMoreSkills] },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills, ...launchSkills] },

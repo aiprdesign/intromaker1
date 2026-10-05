@@ -36,6 +36,7 @@ import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media"
 import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, safePlan, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
+import { LOGO_3D_IDS } from "@/engine/skills/logo3d";
 import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
@@ -1152,7 +1153,7 @@ export default function Studio() {
     const k = SKILL_MAP[skill];
     const at = selected !== null ? selected + 1 : plan.scenes.length;
     // Brand slides start from the film's own brand; the QR code uses the website unless a link is added.
-    const brandName = (skill === "liquid-logo" || skill === "logo-reveal") && plan.brand?.name;
+    const brandName = (skill === "liquid-logo" || skill === "logo-reveal" || LOGO_3D_IDS.has(skill)) && plan.brand?.name;
     // Everything else is written from the film's own material, not the slide's sample: the
     // built-in director's version of this slide for the same website, listing or prompt.
     const source = promptRef.current.trim() || prompt.trim();
