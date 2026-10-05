@@ -6,12 +6,13 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Icon from "./Icon";
 import { EXAMPLE_PROMPTS } from "@/engine/demos";
 import { MAX_PHOTOS, uploadPhotos } from "@/lib/photos";
+import { marketOf } from "@/lib/markets";
 
 /** A bare domain or a full http(s) address. */
 const isUrl = (s: string) => /^https?:\/\/\S+\.\S+$/i.test(s.trim()) || /^([\w-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(s.trim());
 
-/** Marketplaces whose listing links import as a product (see src/lib/listing.ts). */
-const MARKETS = ["Amazon", "eBay", "Etsy", "Walmart", "AliExpress", "Shopify stores"];
+/** Marketplaces whose listing links import as a product (see src/lib/markets.ts). */
+const MARKETS = ["Amazon", "eBay", "AliExpress", "Etsy", "Walmart", "Temu", "Shopify stores"];
 
 /**
  * The homepage hero: a SaaS launch video from the product's website (the default), from a
@@ -84,6 +85,8 @@ export default function HeroPrompt() {
     go(`/studio?photos=${ids.join(",")}${text ? `&prompt=${encodeURIComponent(text)}` : ""}`, "product");
   };
 
+  // A pasted marketplace or shop product link is recognised as you type (it imports as a product).
+  const pastedListing = mode === "url" && isUrl(url) ? marketOf(url) : null;
   const fromUrl = (raw: string) => {
     const u = raw.trim();
     if (!isUrl(u)) {
@@ -109,7 +112,7 @@ export default function HeroPrompt() {
       </h1>
       <p className="lede">
         {product
-          ? "Paste your Amazon, eBay, Etsy or Shopify listing, or upload product photos. Prodintro.com cuts your product out of its photos and directs it in the format that sells: product first, benefits on screen (they read with the sound off), its angles, one clear call to action."
+          ? "Paste your Amazon, eBay, AliExpress, Etsy or Shopify listing (or any shop's product page), or upload product photos. Prodintro.com cuts your product out of its photos and directs it in the format that sells: product first, benefits on screen (they read with the sound off), its angles, one clear call to action."
           : "Enter your website below. Prodintro.com reads your logo, brand colours, screenshots, UI and copy, picks the scenes that suit your product, and directs a beat-synced launch video you can edit and export in 1080p."}
       </p>
     <div className="hero-prompt">
@@ -250,11 +253,15 @@ export default function HeroPrompt() {
               aria-describedby="url-help"
             />
             <button className="btn btn-primary btn-lg" type="submit" disabled={pending("url")} aria-busy={pending("url")}>
-              {pending("url") ? busyLabel("Starting your import…") : "Make my video ✦"}
+              {pending("url") ? busyLabel("Starting your import…") : pastedListing ? "Make product video ✦" : "Make my video ✦"}
             </button>
           </form>
           <p id="url-help" className={`hero-note${error ? " error" : ""}`} role={error ? "alert" : "status"}>
-            {error ?? (pending("url") ? (
+            {error ?? (pastedListing && !pending("url") ? (
+              <>
+                <Icon name="ShoppingBag" size={14} /> {pastedListing.id === "shop" ? "A shop's product page" : `${pastedListing.name} listing`}: this becomes a <strong>product video</strong>, made from the product&apos;s own title, bullet points and photos.
+              </>
+            ) : pending("url") ? (
               <>Opening the studio: your import starts there, with progress on the preview. It usually takes 15–60 seconds.</>
             ) : (
               <>

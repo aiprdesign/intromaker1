@@ -12,66 +12,8 @@ import { assertPublicUrl, safeFetch, UrlError } from "./netguard";
  * they're claims), and so is everything of the marketplace's own (its logo, colours, page).
  */
 
-export interface Market {
-  id: string;
-  name: string;
-}
-
-const MARKETS: { id: string; name: string; host: RegExp; path?: RegExp }[] = [
-  { id: "amazon", name: "Amazon", host: /(^|\.)amazon\.[a-z.]{2,6}$/i, path: /\/(dp|gp\/product|gp\/aw\/d|d)\/[A-Z0-9]{10}/i },
-  { id: "amazon", name: "Amazon", host: /^(amzn\.(to|eu|asia)|a\.co)$/i },
-  { id: "ebay", name: "eBay", host: /(^|\.)ebay\.[a-z.]{2,6}$/i, path: /\/itm\//i },
-  { id: "etsy", name: "Etsy", host: /(^|\.)etsy\.com$/i, path: /\/listing\/\d+/i },
-  { id: "walmart", name: "Walmart", host: /(^|\.)walmart\.(com|ca)$/i, path: /\/ip\//i },
-  { id: "aliexpress", name: "AliExpress", host: /(^|\.)aliexpress\.[a-z.]{2,6}$/i, path: /\/item\//i },
-  { id: "target", name: "Target", host: /(^|\.)target\.com$/i, path: /\/p\//i },
-  { id: "bestbuy", name: "Best Buy", host: /(^|\.)bestbuy\.(com|ca)$/i, path: /\/site\/|\/product\//i },
-];
-
-/**
- * A listing link in its plain canonical form: everything after the product's code is dropped
- * (the product-name slug, ref= paths, tracking and session parameters). Amazon links become
- * https://www.amazon.<tld>/dp/<ASIN> (the 10-character product code), eBay /itm/<id>, Etsy
- * /listing/<id>; other stores keep their path without the query. A bare ASIN ("B0C1234XYZ") is
- * read as an amazon.com link.
- */
-export function canonicalListing(raw: string): string {
-  const typed = raw.trim();
-  if (/^[A-Z0-9]{10}$/.test(typed) && /\d/.test(typed)) return `https://www.amazon.com/dp/${typed}`;
-  let u: URL;
-  try {
-    u = new URL(/^https?:\/\//i.test(typed) ? typed : `https://${typed}`);
-  } catch {
-    return typed;
-  }
-  const host = u.hostname.toLowerCase();
-  const amazon = host.match(/(?:^|\.)amazon\.([a-z.]{2,6})$/);
-  if (amazon) {
-    const asin = u.pathname.match(/\/(?:dp|gp\/product|gp\/aw\/d|d|o\/ASIN|exec\/obidos\/ASIN|exec\/obidos\/tg\/detail\/-)\/([A-Z0-9]{10})(?=[/?#]|$)/i)?.[1] ?? u.searchParams.get("asin");
-    if (asin && /^[A-Z0-9]{10}$/i.test(asin)) return `https://www.amazon.${amazon[1]}/dp/${asin.toUpperCase()}`;
-  }
-  const ebay = host.match(/(?:^|\.)ebay\.([a-z.]{2,6})$/);
-  const ebayItem = u.pathname.match(/\/itm\/(?:[^/]+\/)?(\d{6,})/)?.[1];
-  if (ebay && ebayItem) return `https://www.ebay.${ebay[1]}/itm/${ebayItem}`;
-  const etsy = /(?:^|\.)etsy\.com$/.test(host) ? u.pathname.match(/\/listing\/(\d+)/)?.[1] : null;
-  if (etsy) return `https://www.etsy.com/listing/${etsy}`;
-  // Other stores: the product page itself, without tracking parameters.
-  return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, "") || "/"}`;
-}
-
-/** Which marketplace a listing URL is on (null for other sites). */
-export function marketOf(raw: string): Market | null {
-  let u: URL;
-  try {
-    u = new URL(/^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`);
-  } catch {
-    return null;
-  }
-  for (const m of MARKETS) if (m.host.test(u.hostname) && (!m.path || m.path.test(u.pathname))) return { id: m.id, name: m.name };
-  // Shopify-style stores: /products/<handle>.
-  if (/^\/(?:collections\/[^/]+\/)?products\/[^/]+\/?$/i.test(u.pathname)) return { id: "shop", name: u.hostname.replace(/^www\./, "") };
-  return null;
-}
+export { canonicalListing, marketOf, type Market } from "./markets";
+import { canonicalListing, marketOf, type Market } from "./markets";
 
 const BLOCKED = /captcha|robot check|automated access|enter the characters you see|pardon our interruption|access denied|are you a human|unusual traffic|verify you are human|px-captcha|security check/i;
 
@@ -88,14 +30,19 @@ export function fullSize(url: string): string {
 
 type Product = { title: string; brand: string; description: string; bullets: string[]; images: string[] };
 
-/** schema.org Product data from the page's JSON-LD (most marketplaces and stores publish it). */
-function jsonLdProduct(root: HTMLElement): Partial<Product> | null {
+/**
+ * schema.org Product data from the page's JSON-LD (most marketplaces and stores publish it): the
+ * page's own product. Products inside lists (related items, "customers also bought", a category
+ * grid) are someone else's; with several left, the one named like the page's title wins.
+ */
+function jsonLdProduct(root: HTMLElement, title = ""): Partial<Product> | null {
   const found: Record<string, unknown>[] = [];
   const walk = (v: unknown) => {
     if (!v || typeof v !== "object") return;
     if (Array.isArray(v)) return v.forEach(walk);
     const o = v as Record<string, unknown>;
     const type = o["@type"];
+    if (type === "ItemList" || type === "OfferCatalog" || type === "CollectionPage") return;
     if (type === "Product" || (Array.isArray(type) && type.includes("Product")) || type === "ProductGroup") found.push(o);
     if (o["@graph"]) walk(o["@graph"]);
   };
@@ -106,7 +53,10 @@ function jsonLdProduct(root: HTMLElement): Partial<Product> | null {
       /* malformed block */
     }
   }
-  const p = found[0];
+  const words = (x: unknown) => new Set(String(x ?? "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
+  const want = words(title);
+  const overlap = (o: Record<string, unknown>) => [...words(o.name)].filter((w) => want.has(w)).length;
+  const p = want.size ? [...found].sort((a, b) => overlap(b) - overlap(a))[0] : found[0];
   if (!p) return null;
   const img = (v: unknown): string[] =>
     typeof v === "string" ? [v] : Array.isArray(v) ? v.flatMap(img) : v && typeof v === "object" ? img((v as Record<string, unknown>).url ?? (v as Record<string, unknown>).contentUrl) : [];
@@ -144,10 +94,14 @@ function readAmazon(root: HTMLElement, html: string): Partial<Product> {
     .map((el) => clean(el.text))
     .filter((t) => t.length > 8 && !/make sure this fits|see more product details|›\s*see more/i.test(t));
   const images: string[] = [];
-  for (const re of [/"hiRes":"(https:[^"]+)"/g, /"large":"(https:[^"]+)"/g, /"mainUrl":"(https:[^"]+)"/g]) {
-    for (const m of html.matchAll(re)) images.push(m[1]);
-    if (images.length) break;
-  }
+  // The product's own photos live in its image block ('colorImages'); other widgets on the page
+  // (sponsored and "also bought" carousels) carry image data too, so the block is read first.
+  const block = html.match(/['"]colorImages['"]\s*:\s*\{\s*['"]initial['"]\s*:\s*(\[[\s\S]*?\])\s*\}/)?.[1] ?? "";
+  for (const src of [block, html])
+    for (const re of [/"hiRes":"(https:[^"]+)"/g, /"large":"(https:[^"]+)"/g, /"mainUrl":"(https:[^"]+)"/g]) {
+      if (images.length) break;
+      for (const m of src.matchAll(re)) images.push(m[1]);
+    }
   const dyn = root.querySelector("#landingImage, #imgBlkFront, #main-image")?.getAttribute("data-a-dynamic-image");
   if (!images.length && dyn) {
     try {
@@ -175,7 +129,10 @@ function readAmazon(root: HTMLElement, html: string): Partial<Product> {
 function readEbay(root: HTMLElement, html: string): Partial<Product> {
   const images: string[] = [];
   const seen = new Set<string>();
-  for (const m of html.matchAll(/https:\/\/i\.ebayimg\.com\/images\/g\/([A-Za-z0-9~_-]+)\/s-l\d+\.(?:jpe?g|png|webp)/g)) {
+  // The item's own picture panel (similar and sponsored items elsewhere on the page use the same
+  // image host); the whole page only when the panel isn't there.
+  const panel = root.querySelector('[data-testid="ux-image-carousel"], .ux-image-carousel-container, .ux-image-carousel, #PicturePanel, .picture-panel')?.toString() ?? "";
+  for (const m of (panel || html).matchAll(/https:\/\/i\.ebayimg\.com\/images\/g\/([A-Za-z0-9~_-]+)\/s-l\d+\.(?:jpe?g|png|webp)/g)) {
     if (seen.has(m[1])) continue;
     seen.add(m[1]);
     images.push(m[0]);
@@ -227,6 +184,50 @@ async function readShopify(url: URL): Promise<Partial<Product> | null> {
   }
 }
 
+/** Store and marketplace chrome, never product copy: buying, delivery, account, reviews, prices. */
+const STORE_CHROME =
+  /cookie|sign in|log ?in|account|wish ?list|(add to|view) (cart|bag|basket)|buy (it )?now|checkout|in stock|out of stock|ships? (from|in|to|within)|sold by|seller|free (shipping|delivery|returns)|shipping|delivery|returns?\b|refund|warranty|guarantee|price|\$|€|£|¥|₹|\breviews?\b|ratings?\b|stars?\b|questions?|answers?|size guide|klarna|afterpay|affirm|pay in \d|financing|coupon|promo code|\bdeal|\bsale\b|subscribe|newsletter|privacy|terms|customer service|help center|track (your )?order|gift card|share|compare|sponsored|similar|related|also (bought|viewed|like)|recently viewed/i;
+
+/** Parts of a page that aren't the product: menus, footers, related and sponsored products, reviews, Q&A. */
+const NOISE_WORDS = new Set([
+  "related", "similar", "sponsored", "sponsor", "recommendations", "recommended", "recommend", "recs", "upsell", "crosssell", "alsobought",
+  "footer", "nav", "navbar", "navigation", "breadcrumb", "breadcrumbs", "menu", "megamenu", "sidebar", "newsletter", "cookie", "cookies",
+  "reviews", "review", "ratings", "questions", "faq", "qna", "recently", "viewed", "compare", "comparison", "advert", "ads", "promo",
+]);
+const NOISE_HEADING = /customers (who|also)|frequently bought|related|similar|sponsored|you (may|might) (also )?like|compare with|more (items|products|from)|recently viewed|reviews|questions|best ?sellers|trending|shop (the|by)|explore more|inspired by/i;
+
+/**
+ * The product's own part of the page: menus, footers, related and sponsored products, reviews and
+ * Q&A taken out, then the block around the product's title (its schema.org Product element, else
+ * the closest container with the title in it that has the product's copy). The page's main area
+ * when there's no title to anchor on.
+ */
+function productScope(root: HTMLElement, title: string): HTMLElement {
+  const doc = parse(root.toString(), { comment: false, blockTextElements: { script: false, style: false, noscript: false } });
+  for (const el of doc.querySelectorAll("header, footer, nav, aside, form, iframe, dialog, [role=navigation], [role=banner], [role=contentinfo], [role=complementary], [aria-hidden=true]")) el.remove();
+  const h1 = doc.querySelector("h1");
+  for (const el of doc.querySelectorAll("section, div, ul, ol")) {
+    if (!el.parentNode) continue;
+    if (h1 && el.querySelector("h1")) continue;
+    const tag = `${el.getAttribute("id") ?? ""} ${el.getAttribute("class") ?? ""} ${el.getAttribute("data-testid") ?? ""} ${el.getAttribute("aria-label") ?? ""}`.toLowerCase();
+    const words = tag.split(/[^a-z]+/).filter(Boolean);
+    const head = el.querySelector("h2, h3, h4");
+    const firstHeading = head && el.text.trim().startsWith(head.text.trim().slice(0, 20)) ? head.text : "";
+    if (words.some((w) => NOISE_WORDS.has(w)) || /also[-_ ]?bought|you[-_ ]?may|recently[-_ ]?viewed/.test(tag) || (firstHeading && NOISE_HEADING.test(firstHeading))) el.remove();
+  }
+  const product = doc.querySelector('[itemtype*="schema.org/Product"]');
+  if (product) return product;
+  if (h1 && title) {
+    // Up from the title to the block that holds the product's copy too (its bullets or description).
+    let el: HTMLElement | null = h1.parentNode as HTMLElement | null;
+    while (el && el.parentNode) {
+      if (el.querySelectorAll("li").length >= 2 || el.querySelector('[class*="description"], [itemprop="description"]')) return el;
+      el = el.parentNode as HTMLElement | null;
+    }
+  }
+  return doc.querySelector("main, [role=main], #main, article") ?? doc;
+}
+
 /** "BRAND X Wireless Earbuds, 40H Playtime, IPX7 …" → "Wireless Earbuds" sized for a title. */
 export function shortTitle(title: string, _brand = ""): string {
   // The brand stays: it's usually part of the product's name ("Aero Buds Pro").
@@ -269,17 +270,20 @@ export function splitBullet(b: string): [string, string] {
 /** Read a listing page into a product profile (null when it isn't one). */
 export function readListing(html: string, base: URL, market: Market, extra?: Partial<Product> | null): SiteData | null {
   const root = parse(html, { comment: false, blockTextElements: { script: true, style: false, noscript: false } });
-  const ld = jsonLdProduct(root) ?? {};
+  const pageTitle = clean(root.querySelector("h1")?.text ?? "") || meta(root, "og:title", "twitter:title");
+  const ld = jsonLdProduct(root, pageTitle) ?? {};
   const own = market.id === "amazon" ? readAmazon(root, html) : market.id === "ebay" ? readEbay(root, html) : market.id === "aliexpress" ? readAliExpress(html) : {};
   const pick = (k: "title" | "brand" | "description") => extra?.[k] || own[k] || ld[k] || "";
   const title = pick("title") || meta(root, "og:title", "twitter:title").replace(/\s*[|:–-]\s*(Amazon|eBay|Etsy|Walmart|AliExpress|Target|Best Buy).*$/i, "");
   if (!title) return null;
   const brand = pick("brand");
-  // A store's own bullet list (inside the product's description or feature block).
-  const pageBullets = root
-    .querySelectorAll('[class*="feature"] li, [class*="bullet"] li, [class*="highlight"] li, [class*="description"] li, [itemprop="description"] li, main ul li')
+  // A store's own bullet list, from the product's own block (never related products, reviews,
+  // the store's menus or footer).
+  const scope = productScope(root, title);
+  const pageBullets = scope
+    .querySelectorAll('[class*="feature"] li, [class*="bullet"] li, [class*="highlight"] li, [class*="description"] li, [itemprop="description"] li, ul li')
     .map((el) => clean(el.text))
-    .filter((t) => t.split(/\s+/).length >= 2 && t.split(/\s+/).length <= 30 && !/cookie|sign in|log in|cart|checkout|shipping|returns|privacy/i.test(t));
+    .filter((t) => t.split(/\s+/).length >= 2 && t.split(/\s+/).length <= 30 && !STORE_CHROME.test(t));
   const bullets = (extra?.bullets?.length ? extra.bullets : own.bullets?.length ? own.bullets : pageBullets.length >= 2 ? [...new Set(pageBullets)] : []).slice(0, 8);
   const description = pick("description") || meta(root, "og:description", "description");
   const imgs = [...(extra?.images ?? []), ...(own.images ?? []), ...(ld.images ?? []), meta(root, "og:image")]

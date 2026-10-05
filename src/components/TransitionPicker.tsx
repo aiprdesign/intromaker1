@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { schedulePreview } from "./previewScheduler";
+import { useVisible } from "./useVisible";
 import { ensureFonts } from "@/engine/fonts";
 import { mediaState } from "@/engine/media";
 import { renderFrame } from "@/engine/renderer";
@@ -155,30 +157,36 @@ export function TransitionPreview({ plan, lookKey, tr, play, w, h }: { plan: Vid
   const mini = useMemo(() => previewPlan(plan, tr), [plan, tr]);
   const [sprite, setSprite] = useState<HTMLCanvasElement | null>(null);
   const still = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  // A first frame right away (the outgoing slide), then the strip once it's rendered.
+  // Nothing is drawn or built until the tile is on screen (a closed fold or a long list costs nothing).
+  const visible = useVisible(ref, "200px");
+  // A first frame (the outgoing slide) through the shared preview loop, then the strip once it's rendered.
   useEffect(() => {
+    if (!visible) return;
     let alive = true;
+    let stop = () => {};
     setSprite(null);
     void ensureFonts().then(() => {
-      const c = ref.current;
-      if (alive && c) renderFrame(c.getContext("2d")!, mini, still ? A_LEN + 0.6 : WIN_START, c.width, c.height, { grain: false });
+      if (!alive) return;
+      stop = schedulePreview(() => {
+        const c = ref.current;
+        if (alive && c) renderFrame(c.getContext("2d")!, mini, still ? A_LEN + 0.6 : WIN_START, c.width, c.height, { grain: false });
+      }, { once: true });
     });
     if (!still) void stripFor(lookKey, mini, tr).then((s) => alive && setSprite(s));
     return () => {
       alive = false;
+      stop();
     };
-  }, [lookKey, mini, tr, still]);
+  }, [lookKey, mini, tr, still, visible]);
   // The strip on its loop.
   useEffect(() => {
     const c = ref.current;
-    if (!c || !sprite || play || still) return;
+    if (!c || !sprite || play || still || !visible) return;
     const ctx = c.getContext("2d")!;
     ctx.imageSmoothingQuality = "high";
-    let raf = 0;
     let shown = "";
     const t0 = performance.now();
     const tick = (now: number) => {
-      raf = requestAnimationFrame(tick);
       const { t, back } = phase((now - t0) / 1000);
       const i = Math.min(FRAMES - 1, Math.round((t - WIN_START) * FPS));
       const key = `${i}|${back.toFixed(2)}`;
@@ -192,9 +200,8 @@ export function TransitionPreview({ plan, lookKey, tr, play, w, h }: { plan: Vid
         ctx.globalAlpha = 1;
       }
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [sprite, play, still]);
+    return schedulePreview(tick, { interval: 1000 / FPS });
+  }, [sprite, play, still, visible]);
   // Live, at full size: the same loop, rendered as it plays.
   useEffect(() => {
     if (!play || still) return;

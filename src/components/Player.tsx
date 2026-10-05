@@ -8,6 +8,7 @@ import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
 import { aspectSize, renderFrameBlurred, totalDuration } from "@/engine/renderer";
+import { previewsQuiet } from "./previewScheduler";
 import { SKILL_MAP } from "@/engine/skills";
 import type { Aspect, VideoPlan } from "@/engine/types";
 import { WATERMARK, type PlanLimits } from "@/lib/plans";
@@ -118,13 +119,23 @@ export default function Player({
   // fast machine plays with the export's blur and a slow one plays sharp. A paused frame always
   // shows the full blur.
   const sampleMs = useRef(8);
-  const draw = useCallback(
+  const refine = useRef(0);
+  const pending = useRef<{ raf: number; t: number }>({ raf: 0, t: 0 });
+  const paint = useCallback(
     (t: number) => {
       const c = canvasRef.current;
       if (!c) return;
       const ctx = c.getContext("2d")!;
       const still = !playingRef.current;
-      const samples = grid ? 1 : still ? 5 : sampleMs.current < 3.5 ? 3 : sampleMs.current < 6 ? 2 : 1;
+      // A paused frame shows at once, sharp; its motion blur follows a moment later if it's still
+      // the frame on screen (so scrubbing and loading never wait on it).
+      window.clearTimeout(refine.current);
+      if (still && !grid && plan.motionBlur !== false)
+        refine.current = window.setTimeout(() => {
+          const c2 = canvasRef.current;
+          if (c2 && !playingRef.current && timeRef.current === t) renderFrameBlurred(c2.getContext("2d")!, plan, t, c2.width, c2.height, {}, { samples: 5, fps: 30 });
+        }, 300);
+      const samples = grid || still ? 1 : sampleMs.current < 3.5 ? 3 : sampleMs.current < 6 ? 2 : 1;
       const t0 = performance.now();
       // Grid view shows the layout itself: the lens (push-in, drift, beat punches) holds still.
       renderFrameBlurred(ctx, plan, t, c.width, c.height, grid ? { camera: false } : {}, { samples, fps: 30 });
@@ -132,6 +143,23 @@ export default function Player({
       if (grid) drawGridOverlay(ctx, c.width, c.height);
     },
     [plan, grid],
+  );
+  // While paused, redraw requests (fonts loaded, a photo arrived, a seek) are merged into one
+  // paint per display frame; playing frames paint directly.
+  const draw = useCallback(
+    (t: number) => {
+      if (playingRef.current) {
+        paint(t);
+        return;
+      }
+      pending.current.t = t;
+      if (!pending.current.raf)
+        pending.current.raf = requestAnimationFrame(() => {
+          pending.current.raf = 0;
+          paint(pending.current.t);
+        });
+    },
+    [paint],
   );
 
   // Jump to a slide picked in the studio, paused on it.
@@ -192,8 +220,20 @@ export default function Player({
         soundRef.current.setMuted(muted);
         soundRef.current.play(plan, startAt);
       }
+      // Frames at 30 fps (the export's rate), the scrubber's React state at 15 Hz, and a clear path
+      // for clicks and key presses (see previewScheduler): playing never makes the studio sluggish.
+      // On a slow machine a frame can cost more than a frame's time: then the player draws less
+      // often (never more than about half the main thread), so the studio stays responsive.
+      let lastDraw = 0;
+      let lastState = 0;
+      let cost = 0;
       const tick = (now: number) => {
         let t = startAt + (now - t0) / 1000;
+        if (t < duration && (now - lastDraw < Math.max(1000 / 30 - 2, cost * 2) || previewsQuiet())) {
+          raf = requestAnimationFrame(tick);
+          return;
+        }
+        lastDraw = now;
         if (t >= duration) {
           t = duration;
           timeRef.current = t;
@@ -203,8 +243,13 @@ export default function Player({
           return;
         }
         timeRef.current = t;
+        const d0 = performance.now();
         draw(t);
-        setTime(t);
+        cost = cost ? cost * 0.8 + (performance.now() - d0) * 0.2 : performance.now() - d0;
+        if (now - lastState > 66) {
+          lastState = now;
+          setTime(t);
+        }
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);

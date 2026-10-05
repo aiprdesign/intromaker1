@@ -8,6 +8,7 @@ import { mediaState, onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { renderFrame, totalDuration } from "@/engine/renderer";
 import { SAMPLE_FILMS } from "@/engine/samples";
 import { SKILL_MAP } from "@/engine/skills";
+import { previewsQuiet } from "./previewScheduler";
 import { useVisible } from "./useVisible";
 
 /** Where each slide starts in a film. */
@@ -91,10 +92,15 @@ export default function SampleFilms() {
         s.play(plan, startAt);
       };
       startSound();
+      let last = 0;
+      let cost = 0;
       const tick = (now: number) => {
         raf = requestAnimationFrame(tick);
-        // Pause while a video exports elsewhere in the app, so the export gets the machine.
-        if (mediaState.exporting) return;
+        // Pause while a video exports elsewhere in the app, so the export gets the machine; draw at
+        // 30 fps (the films' own rate) or less on a slow machine (never more than about half the
+        // main thread), and give way to clicks and key presses (see previewScheduler).
+        if (mediaState.exporting || now - last < Math.max(1000 / 30 - 2, cost * 2) || previewsQuiet()) return;
+        last = now;
         let t = startAt + (now - t0) / 1000;
         if (t >= duration) {
           // Loop: back to the first slide (the score restarts with it).
@@ -105,7 +111,9 @@ export default function SampleFilms() {
           startSound();
         }
         timeRef.current = t;
+        const d0 = performance.now();
         draw(t);
+        cost = cost ? cost * 0.8 + (performance.now() - d0) * 0.2 : performance.now() - d0;
         setTime(t);
       };
       raf = requestAnimationFrame(tick);

@@ -336,6 +336,19 @@ export async function checkSite(raw: string): Promise<SiteCheck> {
   }
 }
 
+/** A shop's product page: schema.org Product with an offer, og:type product, or product price tags (not the home page). */
+export function isProductPage(html: string, url: URL): boolean {
+  // (A SaaS site's pricing or plans page can publish Product data too: that's not a shop.)
+  if (url.pathname === "/" || url.pathname === "" || /\/(pricing|plans?|subscribe|features|docs|blog|about|enterprise)(\/|$)/i.test(url.pathname)) return false;
+  const ldProduct = /"@type"\s*:\s*\[?\s*"Product(Group)?"/.test(html) && /"offers"\s*:/.test(html);
+  const ogProduct = /<meta[^>]+property=["']og:type["'][^>]+content=["'](og:)?product(\.item)?["']/i.test(html) || /<meta[^>]+content=["'](og:)?product(\.item)?["'][^>]+property=["']og:type["']/i.test(html);
+  const priceTags = /<meta[^>]+property=["'](product|og):price:amount["']/i.test(html);
+  const microdata = /itemtype=["']https?:\/\/schema\.org\/Product["']/i.test(html) && /itemprop=["']price["']/i.test(html);
+  // A category page lists many products: more than a handful of offers isn't one product's page.
+  const offers = (html.match(/"@type"\s*:\s*"Offer"/g) ?? []).length;
+  return (ldProduct || ogProduct || priceTags || microdata) && offers <= 6;
+}
+
 export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}): Promise<SiteData> {
   // Marketplace listings (Amazon, eBay, Etsy, Shopify stores…) become product videos.
   const market = marketOf(canonicalListing(rawUrl));
@@ -366,8 +379,10 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
     ({ html, finalUrl } = await fetchPage(rawUrl));
   }
   const base = new URL(finalUrl);
-  // A store's own product page (schema.org Product with photos) is a product too.
-  if (/\/(products?|item|p|dp|shop)\/[^/]+/i.test(base.pathname) && /"@type"\s*:\s*"Product"/.test(html)) {
+  // Any shop's product page is a product too, recognised from its own product data (a product
+  // with a price, or the page declaring itself a product) wherever its address points; a shop's
+  // home page or a category isn't.
+  if (isProductPage(html, base)) {
     const product = readListing(html, base, { id: "store", name: base.hostname.replace(/^www\./, "") });
     if (product && product.images.length) return product;
   }

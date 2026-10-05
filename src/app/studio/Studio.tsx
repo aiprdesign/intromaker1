@@ -41,6 +41,7 @@ import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import { LOGO_3D_IDS } from "@/engine/skills/logo3d";
 import { LOGO_CLEAN_IDS } from "@/engine/skills/logoclean";
+import { marketOf } from "@/lib/markets";
 import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
@@ -1549,7 +1550,7 @@ export default function Studio() {
               className="input"
               value={siteUrl}
               onChange={(e) => setSiteUrl(e.target.value)}
-              placeholder="yourproduct.com or an Amazon / eBay listing"
+              placeholder="yourproduct.com, or an Amazon / eBay / AliExpress listing"
               aria-label="Website or listing URL"
               inputMode="url"
             />
@@ -1563,6 +1564,10 @@ export default function Studio() {
               </button>
             )}
           </form>
+          {(() => {
+            const m = siteUrl.trim().includes(".") ? marketOf(siteUrl) : null;
+            return m && !importing ? <p className="hint">{m.id === "shop" ? "A shop's product page" : `${m.name} listing`}: imports as a product video, from the product&apos;s own title, bullet points and photos.</p> : null;
+          })()}
           {importStage && (
             <p className="hint import-stage">
               <span className="spinner sm" /> {importStage}
