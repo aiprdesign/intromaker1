@@ -2508,6 +2508,12 @@ button.brand-colors.on {
   display: block;
   background: #000;
 }
+.watermark-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
 .fx-card.default {
   justify-content: center;
   padding: 8px;

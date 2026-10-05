@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import SkillPicker from "@/components/SkillPicker";
+import ShapesPicker from "@/components/ShapesPicker";
+import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
 import type { PlanLimits } from "@/lib/plans";
 import { pauseThumbs, sceneThumb, thumbsReady } from "@/lib/thumbs";
@@ -42,7 +44,7 @@ import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
-import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { PALETTE_IDS, SHAPE_SETS, TEXT_FX, TRANSITIONS, type ShapeSet, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 const FILM_KEY = "intromaker.film";
@@ -242,26 +244,43 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.glow === true) !== glow) setPlan((p) => ({ ...p, glow: glow ? true : undefined }));
   }, [plan, glow]);
-  // Animated geometric shapes behind SaaS slides. On by default.
-  const [shapes, setShapes] = useState(true);
+  // What floats behind SaaS slides: a set of animated shapes (geometric by default), watermark
+  // text, or nothing. Remembered, and saved with the video.
+  const [shapes, setShapes] = useState<ShapeSet | "off">("geometric");
+  const [watermark, setWatermark] = useState("");
   useEffect(() => {
     try {
-      if (localStorage.getItem("intromaker.shapes") === "off") setShapes(false);
+      const v = localStorage.getItem("intromaker.shapes");
+      if (v === "off" || (SHAPE_SETS as readonly string[]).includes(v ?? "")) setShapes(v as ShapeSet | "off");
+      setWatermark(localStorage.getItem("intromaker.watermark") ?? "");
     } catch {
       /* ignore */
     }
   }, []);
-  const chooseShapes = (on: boolean) => {
-    setShapes(on);
+  const chooseShapes = (v: ShapeSet | "off") => {
+    setShapes(v);
     try {
-      localStorage.setItem("intromaker.shapes", on ? "on" : "off");
+      localStorage.setItem("intromaker.shapes", v);
+    } catch {
+      /* ignore */
+    }
+  };
+  const chooseWatermark = (text: string) => {
+    setWatermark(text);
+    try {
+      localStorage.setItem("intromaker.watermark", text);
     } catch {
       /* ignore */
     }
   };
   useEffect(() => {
-    if ((plan.shapes !== false) !== shapes) setPlan((p) => ({ ...p, shapes: shapes ? undefined : false }));
-  }, [plan, shapes]);
+    const want = {
+      shapes: shapes === "off" ? false : undefined,
+      shapeSet: shapes === "off" || shapes === "geometric" ? undefined : shapes,
+      watermark: shapes === "text" && watermark.trim() ? watermark.trim().slice(0, 40) : undefined,
+    };
+    if (plan.shapes !== want.shapes || plan.shapeSet !== want.shapeSet || plan.watermark !== want.watermark) setPlan((p) => ({ ...p, ...want }));
+  }, [plan, shapes, watermark]);
   const [bg, setBg] = useState<BgChoice>("template");
   const bgRef = useRef(bg);
   bgRef.current = bg;
@@ -1829,18 +1848,13 @@ export default function Studio() {
           <p className="hint">{glow ? "Soft halo around text and highlights." : "Sharp text, no halo or bloom."}</p>
           {(style !== "trailer" || plan.product) && (
             <>
-              <label className="field-label">
-                Background shapes <span className="tpl-desc">{shapes ? "On" : "Off"}</span>
-              </label>
-              <div className="seg-control">
-                <button className={shapes ? "active" : ""} onClick={() => chooseShapes(true)} aria-pressed={shapes}>
-                  Shapes
-                </button>
-                <button className={!shapes ? "active" : ""} onClick={() => chooseShapes(false)} aria-pressed={!shapes}>
-                  Off
-                </button>
-              </div>
-              <p className="hint">{shapes ? "Rings, triangles, hexagons and dot grids drift around the edges and pulse with the beat." : "A clean stage with no floating shapes."}</p>
+              <details className="fold">
+                <summary>
+                  <span className="field-label inline">Background shapes</span> <span className="tpl-desc">{shapes === "off" ? "Off" : SHAPE_SET_INFO[shapes].name}</span>
+                </summary>
+                <ShapesPicker value={shapes} onChange={chooseShapes} watermark={watermark} onWatermark={chooseWatermark} plan={{ palette: plan.palette, font: plan.font, seed: plan.seed, bpm: plan.bpm, brand: plan.brand, look: plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look }} />
+                <p className="hint">{shapes === "off" ? "A clean stage with no floating shapes." : shapes === "text" ? "Your line in big, faint rows drifting behind every slide." : "They drift around the edges and pulse with the beat."}</p>
+              </details>
             </>
           )}
           {(style !== "trailer" || plan.product) && (

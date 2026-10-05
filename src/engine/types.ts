@@ -187,6 +187,10 @@ export const PALETTE_IDS = [
 
 export type PaletteId = (typeof PALETTE_IDS)[number];
 
+/** Background shape sets (or watermark text) for SaaS slides; see shapes.ts. */
+export const SHAPE_SETS = ["geometric", "soft", "tech", "sparkle", "lines", "text"] as const;
+export type ShapeSet = (typeof SHAPE_SETS)[number];
+
 export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid", "cube", "morph", "portal", "iris", "spin", "split", "swipe"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
@@ -373,6 +377,10 @@ export interface VideoPlan {
   glow?: boolean;
   /** Animated geometric shapes behind SaaS slides. On by default; false turns them off. */
   shapes?: boolean;
+  /** Which background shapes (default geometric), or "text" for watermark text. */
+  shapeSet?: ShapeSet;
+  /** The watermark line for the "text" set (default: the brand's name). */
+  watermark?: string;
   /** Headline text effect chosen in the studio; overrides the template's (look.text). */
   textFx?: TextFx;
   /** Flavour of the SaaS score. */
@@ -466,6 +474,9 @@ export interface SkillContext {
   genre?: string;
   /** The film's seed for the animated geometric background shapes; unset when they're off. */
   shapes?: number;
+  /** Which background shapes, or watermark text. */
+  shapeSet?: ShapeSet;
+  watermark?: string;
 }
 
 export interface MusicPulse {

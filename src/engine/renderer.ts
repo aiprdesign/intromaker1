@@ -76,6 +76,8 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   scheme?: VideoPlan["scheme"];
   glow?: VideoPlan["glow"];
   shapes?: VideoPlan["shapes"];
+  shapeSet?: VideoPlan["shapeSet"];
+  watermark?: VideoPlan["watermark"];
   textFx?: VideoPlan["textFx"];
   concept?: VideoPlan["concept"];
   trailerStyle?: VideoPlan["trailerStyle"];
@@ -134,6 +136,8 @@ function drawScene(
     genre: plan.style === "trailer" ? plan.trailerStyle?.replace(/^film-/, "") : undefined,
     // One set of shapes for the whole film, so they carry on across cuts.
     shapes: plan.style === "saas" && plan.shapes !== false ? plan.seed >>> 0 : undefined,
+    shapeSet: plan.shapeSet,
+    watermark: plan.watermark,
   };
   resetCtx(target);
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
