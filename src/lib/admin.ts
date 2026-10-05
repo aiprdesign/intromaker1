@@ -3,7 +3,7 @@ import { appendFile, chmod, mkdir, readFile, rename, rm, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { VideoPlan } from "@/engine/types";
-import { readAiConfig, type AiConfig } from "./ai";
+import { describe, readAiConfig, type AiConfig } from "./ai";
 import { cookieOf, isHttps, noStore, sameOrigin } from "./http";
 import { stripeLink, type BillingLinks } from "./stripe-links";
 import { DEFAULT_LIMITS, PLANS_VERSION, readLimits, type PlanId, type PlanLimits } from "./plans";
@@ -394,14 +394,46 @@ export async function writeSettings(patch: AdminSettings) {
 }
 
 /**
- * The AI the server pays for: the admin's saved provider, else ANTHROPIC_API_KEY from the
- * environment, else none (the built-in director).
+ * The server's AI from environment variables (Railway → Variables and the like), for any provider:
+ * INTROMAKER_AI_PROVIDER (a provider id such as openrouter, deepseek, openai, gemini, anthropic),
+ * INTROMAKER_AI_KEY, and optionally INTROMAKER_AI_MODEL, INTROMAKER_AI_BASE_URL and
+ * INTROMAKER_AI_MODE (fast, balanced or best). Else ANTHROPIC_API_KEY alone means Claude.
+ */
+export function envAi(): AiConfig | null {
+  const env = process.env;
+  const provider = env.INTROMAKER_AI_PROVIDER?.trim().toLowerCase();
+  if (provider && provider !== "builtin") {
+    return readAiConfig({
+      provider,
+      apiKey: env.INTROMAKER_AI_KEY,
+      model: env.INTROMAKER_AI_MODEL,
+      baseUrl: env.INTROMAKER_AI_BASE_URL,
+      mode: env.INTROMAKER_AI_MODE?.trim().toLowerCase(),
+      images: true,
+    });
+  }
+  if (env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN) return { provider: "anthropic", mode: "balanced", images: true };
+  return null;
+}
+
+/** What envAi() sets up, in words (for the admin pages), or why it can't be used. */
+export function envAiLabel(): string | null {
+  const provider = process.env.INTROMAKER_AI_PROVIDER?.trim();
+  const ai = envAi();
+  if (provider && provider.toLowerCase() !== "builtin" && !ai) return `INTROMAKER_AI_PROVIDER "${provider.slice(0, 40)}" isn't a known provider id`;
+  if (!ai) return null;
+  return provider ? `${describe(ai)} (environment variables)` : "Anthropic Claude (ANTHROPIC_API_KEY)";
+}
+
+/**
+ * The AI the server pays for: the admin's saved provider, else the one set in environment
+ * variables (see envAi), else none (the built-in director).
  */
 export async function serverAi(): Promise<{ ai: AiConfig; source: "admin" | "env" } | null> {
   const s = await readSettings();
   if (s.ai && s.ai.provider !== "builtin") return { ai: s.ai, source: "admin" };
-  if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) return { ai: { provider: "anthropic", mode: "balanced", images: true }, source: "env" };
-  return null;
+  const env = envAi();
+  return env ? { ai: env, source: "env" } : null;
 }
 
 /** The limits in force for each plan (the owner's, else the defaults). */

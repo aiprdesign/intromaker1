@@ -16,6 +16,8 @@ type Settings = {
   dailyBudget: number | null;
   perVisitor: number | null;
   envKey: boolean;
+  /** The AI set in environment variables, in words (or why it can't be used). */
+  envAi?: string | null;
   envBudget: number;
   active: string;
   updatedAt: number | null;
@@ -98,12 +100,13 @@ function DirectorAi() {
       <p className="hint">
         The AI the server&apos;s director uses when a visitor hasn&apos;t added a key of their own (their own keys stay in their browser). The key is stored on the
         server&apos;s data volume, readable only by the app, and isn&apos;t sent back to the browser.
-        {s.envKey && " ANTHROPIC_API_KEY is also set in the environment; it's used when no provider is chosen here."}
+        {s.envAi && ` Environment variables also set an AI: ${s.envAi}. It's used when no provider is chosen here.`}
+        {!s.envAi && " You can also set it in environment variables instead (INTROMAKER_AI_PROVIDER, INTROMAKER_AI_KEY, INTROMAKER_AI_MODEL): they survive redeploys without a data volume."}
       </p>
       <label className="fld">
         <span className="fld-cap">Provider</span>
         <select className="select" value={form.provider} onChange={(e) => set({ provider: e.target.value, model: "", baseUrl: "" })}>
-          <option value="builtin">None: built-in director{s.envKey ? " (or ANTHROPIC_API_KEY)" : ""}</option>
+          <option value="builtin">None: built-in director{s.envKey ? " (or the AI in environment variables)" : ""}</option>
           {PROVIDER_GROUPS.map((g) => (
             <optgroup key={g} label={g}>
               {PROVIDER_PRESETS.filter((p) => p.group === g).map((p) => (

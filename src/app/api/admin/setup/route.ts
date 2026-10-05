@@ -1,5 +1,5 @@
 import { describe } from "@/lib/ai";
-import { maskKey, noStore, planLimits, readSettings, requireAdmin, SERVICE_KEYS, writeSettings, type ServiceKeyName, type ServiceKeys } from "@/lib/admin";
+import { envAi as envAiConfig, envAiLabel, maskKey, noStore, planLimits, readSettings, requireAdmin, SERVICE_KEYS, writeSettings, type ServiceKeyName, type ServiceKeys } from "@/lib/admin";
 import { webhookConfigured } from "@/lib/billing";
 import { envStatus } from "@/lib/envvars";
 import { effectiveBilling } from "@/lib/stripe-links";
@@ -23,14 +23,15 @@ async function view() {
     }),
   ) as Record<ServiceKeyName, { label: string; env: string; source: "admin" | "env" | null; hint: string }>;
   const plans = await planLimits();
-  const envAi = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+  // The AI set in environment variables (only when it's usable: a typo'd provider isn't "set up").
+  const envAi = envAiConfig() ? envAiLabel() : null;
   const b = effectiveBilling(s.billing);
   return {
     keys,
     env: envStatus(),
     status: {
       persistent: dataIsPersistent(),
-      ai: s.ai && s.ai.provider !== "builtin" ? describe(s.ai) : envAi ? "Anthropic Claude (ANTHROPIC_API_KEY)" : null,
+      ai: s.ai && s.ai.provider !== "builtin" ? describe(s.ai) : envAi,
       voice: !!(keys.openaiVoice.source || keys.elevenlabs.source),
       stripeLinks: !!(b.monthlyLink || b.yearlyLink),
       stripeWebhook: webhookConfigured(),

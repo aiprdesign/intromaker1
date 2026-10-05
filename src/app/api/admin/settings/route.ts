@@ -1,5 +1,5 @@
 import { describe, readAiConfig } from "@/lib/ai";
-import { maskKey, noStore, readSettings, requireAdmin, writeSettings } from "@/lib/admin";
+import { envAiLabel, maskKey, noStore, readSettings, requireAdmin, writeSettings } from "@/lib/admin";
 import { PRESET_MAP } from "@/lib/providers";
 
 export const runtime = "nodejs";
@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 /** Server AI settings. The key never leaves the server: only a masked hint is returned. */
 async function view() {
   const s = await readSettings();
-  const envKey = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+  // The AI set in environment variables (INTROMAKER_AI_* or ANTHROPIC_API_KEY), in words.
+  const envAi = envAiLabel();
+  const envKey = !!envAi;
   return {
     provider: s.ai?.provider ?? "builtin",
     model: s.ai?.model ?? "",
@@ -20,8 +22,9 @@ async function view() {
     dailyBudget: s.dailyBudget ?? null,
     perVisitor: s.perVisitor ?? null,
     envKey,
+    envAi,
     envBudget: Number(process.env.INTROMAKER_AI_DAILY_BUDGET ?? 200) || 0,
-    active: s.ai && s.ai.provider !== "builtin" ? describe(s.ai) : envKey ? "Anthropic Claude (ANTHROPIC_API_KEY)" : "Built-in director (no AI)",
+    active: s.ai && s.ai.provider !== "builtin" ? describe(s.ai) : envAi ?? "Built-in director (no AI)",
     updatedAt: s.updatedAt ?? null,
   };
 }

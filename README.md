@@ -302,7 +302,9 @@ Set these as environment variables on your host (Railway: the service → **Vari
 | `INTROMAKER_RATE_LIMIT` | on in production | `off` disables the limits |
 | `INTROMAKER_LOGIN_TRIES` / `INTROMAKER_LOGIN_BLOCK_MIN` | 3 / 60 | Wrong passwords allowed before an address is blocked from signing in, and the block's length in minutes |
 | `NEXT_PUBLIC_INTROMAKER_LOCAL_VOICE` | on | Build-time. `off` removes the on-device Kokoro voice, whose phonemizer is GPL-3.0 (see Third-party and licences) |
-| `ANTHROPIC_API_KEY` | none | Optional Claude key for the AI director; visitors can bring their own. Admin → AI can choose any provider and key instead |
+| `INTROMAKER_AI_PROVIDER` / `INTROMAKER_AI_KEY` | none | The AI director for visitors without their own key, any provider by id (`openrouter`, `deepseek`, `openai`, `gemini`, `anthropic`, `groq`, `custom`…) and its key. Survives redeploys without a data volume. Admin → AI wins when a provider is chosen there |
+| `INTROMAKER_AI_MODEL` / `INTROMAKER_AI_BASE_URL` / `INTROMAKER_AI_MODE` | provider's first model / preset / `balanced` | Optional: the model (e.g. `deepseek/deepseek-v4-flash` on OpenRouter), an API address for custom OpenAI-compatible servers, and `fast`, `balanced` or `best` |
+| `ANTHROPIC_API_KEY` | none | Optional Claude key for the AI director, used when `INTROMAKER_AI_PROVIDER` isn't set; visitors can bring their own |
 | `INTROMAKER_AI_DAILY_BUDGET` | 200 | Generations per day, all visitors combined, paid by the server's key; after it, the built-in director is used |
 | `AMAZON_PAAPI_ACCESS_KEY`, `AMAZON_PAAPI_SECRET_KEY`, `AMAZON_PAAPI_PARTNER_TAG` | none | Reads Amazon listings through the Product Advertising API (reliable; pages often block servers). Can be pasted in Admin → Setup instead |
 | `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET` | none | Reads eBay listings through the Browse API. Can be pasted in Admin → Setup instead |
