@@ -529,7 +529,8 @@ function contactSheet(sc: SkillContext) {
   const items = itemsOr(scene, 3, REEL_FALLBACK).slice(0, 6);
   const n = items.length;
   const g = tokens(w, h);
-  const cols = portrait ? 2 : n <= 4 ? n : 3;
+  // Square frames: two columns, like vertical ones (a row of four is too tight).
+  const cols = portrait || w < h * 1.25 ? Math.min(2, n) : n <= 4 ? n : 3;
   const rows = Math.ceil(n / cols);
   const gap = 22 * u;
   const capH = 60 * u;
@@ -728,7 +729,7 @@ function widgetSet(sc: SkillContext) {
   const n = items.length;
   const g = tokens(w, h);
   const gap = 22 * u;
-  const cols = portrait ? 2 : n;
+  const cols = (portrait || w < h * 1.25) && n > 2 ? 2 : n;
   const rows = Math.ceil(n / cols);
   const ay = head.ys[head.ys.length - 1] + head.size * 1.0;
   const ah = h - g.safe.bottom - ay;

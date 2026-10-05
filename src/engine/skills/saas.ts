@@ -689,7 +689,9 @@ function microVisual(sc: SkillContext, kind: number, x: number, y: number, mw: n
 function bento(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene } = sc;
   saasBackground(sc, { beams: 2 });
-  const portrait = h > w;
+  // Square frames take the two-column layout too (a row of four is too tight).
+  const square = w <= h * 1.25 && w >= h;
+  const portrait = h > w || square;
   const items = bentoItems(scene);
   const n = items.length;
   const cells = (portrait ? BENTO_PORT : BENTO_LAND)[n];
@@ -697,7 +699,7 @@ function bento(sc: SkillContext) {
   const rows = portrait ? 4 : 2;
   topHeadline(sc);
   const gx0 = w * 0.07;
-  const gy0 = h * (portrait ? 0.2 : 0.25);
+  const gy0 = h * (square ? 0.25 : portrait ? 0.2 : 0.25);
   const gw = w * 0.86;
   const gh = Math.min(h * (portrait ? 0.74 : 0.68), h - tokens(w, h).safe.bottom - gy0);
   const gap = 16 * u;
@@ -840,21 +842,23 @@ function iconFeatures(sc: SkillContext) {
   const { ctx, w, h, t, u, palette, scene } = sc;
   saasBackground(sc, { beams: 2 });
   const portrait = h > w;
+  // Square frames are too narrow for a row of four: two columns, like vertical ones.
+  const square = !portrait && w / h < 1.25;
   topHeadline(sc);
   const items = iconFeatureItems(scene);
   const n = items.length;
-  const cols = portrait ? 2 : n <= 4 ? n : 3;
+  const cols = portrait || square ? Math.min(2, n) : n <= 4 ? n : 3;
   const rows = Math.ceil(n / cols);
   const times = iconFeaturesTiming(scene, sc.beat);
   const ex = ease.inCubic(exitT(sc, 0.4));
-  const gx0 = w * (portrait ? 0.07 : 0.08);
-  const gw = w * (portrait ? 0.86 : 0.84);
-  const gy0 = h * (portrait ? 0.26 : 0.32);
-  const gh = h * (portrait ? 0.62 : 0.56);
+  const gx0 = w * (portrait ? 0.07 : square ? 0.1 : 0.08);
+  const gw = w * (portrait ? 0.86 : square ? 0.8 : 0.84);
+  const gy0 = h * (portrait ? 0.26 : square ? 0.3 : 0.32);
+  const gh = h * (portrait ? 0.62 : square ? 0.62 : 0.56);
   const gap = 22 * u;
   const cw = (gw - gap * (cols - 1)) / cols;
-  const ch = Math.min((gh - gap * (rows - 1)) / rows, cw * (portrait ? 1.15 : 0.95));
-  const S = portrait ? 1.3 : 1;
+  const ch = Math.min((gh - gap * (rows - 1)) / rows, cw * (portrait ? 1.15 : square ? 0.8 : 0.95));
+  const S = portrait ? 1.3 : square ? 1.15 : 1;
   items.forEach((item, i) => {
     const [title, desc] = item.split(/\s+[—–]\s+/);
     const c = i % cols;

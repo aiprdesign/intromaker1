@@ -89,8 +89,8 @@ function iconReveal(sc: SkillContext) {
   ctx.fillStyle = headlineGradient(sc, head, palette.text, mixHex(palette.text, palette.secondary, 0.4));
   drawLayout(sc, head);
   ctx.restore();
-  // A row (2×2 in tall frames), each icon drawing on in its plate on the beat.
-  const cols = portrait && n > 2 ? 2 : n;
+  // A row (2×2 in tall frames, and in square ones from four icons), each icon drawing on in its plate on the beat.
+  const cols = (portrait && n > 2) || (w < h * 1.25 && n > 3) ? 2 : n;
   const rows = Math.ceil(n / cols);
   const cellW = (safe.width * 0.9) / cols;
   const r = Math.min(cellW * 0.32, short * (portrait ? 0.16 : 0.15));
