@@ -123,8 +123,11 @@ export default function AiSettings({
 
   const setKey = (key: string) => {
     const hit = detectProvider(key);
-    // A pasted key that clearly belongs to another provider switches to it.
-    if (hit && hit.id !== draft.provider && !(p?.keyPrefix && p.keyPrefix.test(key))) {
+    // A pasted key that clearly belongs to another provider switches to it: from the built-in
+    // director, or from a provider whose own keys look different. A provider without a key format
+    // of its own stays (DeepSeek, Moonshot, Qwen… keys start with "sk-" like OpenAI's).
+    const mismatch = !p || (p.keyPrefix ? !p.keyPrefix.test(key) : false);
+    if (hit && hit.id !== draft.provider && mismatch) {
       setDraft({ ...switchTo(draft, hit.id), apiKey: key });
       setDetected(hit.name);
     } else {
