@@ -89,7 +89,7 @@ export const DEFAULT_ROLE_SKILL: Record<Role, SkillId> = {
 };
 
 /** Interaction moments: the director picks one per film to suit the product, and templates keep it. */
-export const DEMO_SKILLS = new Set<SkillId>(["command-k", "ai-prompt", "click-flow", "notify-stack", "code-deploy", "kanban", "live-cursors", "chat-thread", "keycaps", "toggle-list", "changelog", "calendar-drop", "inbox-sweep", "comment-pins", "table-fill"]);
+export const DEMO_SKILLS = new Set<SkillId>(["command-k", "ai-prompt", "click-flow", "notify-stack", "code-deploy", "kanban", "live-cursors", "chat-thread", "keycaps", "toggle-list", "changelog", "calendar-drop", "inbox-sweep", "comment-pins", "table-fill", "phone-tour", "drop-zone"]);
 
 /** Base length of each role in beats (and a floor in seconds). */
 function roleLength(scene: Scene, role: Role): [number, number] {
@@ -1062,6 +1062,8 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "inbox-sweep": "demo",
   "comment-pins": "demo",
   "table-fill": "demo",
+  "phone-tour": "demo",
+  "drop-zone": "demo",
   "spotlight": "tour",
   "device-trio": "tour",
   "exploded-ui": "tour",

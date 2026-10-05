@@ -112,6 +112,15 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
   const titles = features.map((x) => x.split(/\s+[—–]\s+/)[0]);
   if (skill === "word-swap" && titles.length >= 2)
     return { text: plan.product ? `${name}:` : "One place for", items: titles.slice(0, 4).map((x) => (plan.product ? x : x.toLowerCase())), role };
+  // Who it's for: everyday team roles (not a profession the product may not serve).
+  if (skill === "persona-switch")
+    return {
+      text: name ? `Who *${name}* is for` : k.sample.text,
+      eyebrow: "Who it's for",
+      items: ["Team leads — Plans and priorities in one view", "Teammates — Your work and updates together", "New joiners — Getting started, organised"],
+      role,
+    };
+  if (skill === "unbox") return { text: name ? `What comes with *${name}*` : k.sample.text, eyebrow: "In the box", items: k.sample.items, role };
   if (skill === "steps" && plan.product) return { text: `Get started with *${name}*`, items: ["Unbox it", "Set it up", "Make it yours"], role };
   const promise = role === "promise" ? scenes.find((s) => s.skill === "word-swap") : undefined;
   if (promise && skill !== "word-swap") return { text: swapAsLine(promise.text), eyebrow: promise.eyebrow, items: k.itemsHint !== undefined ? itemsLike(skill, features) ?? k.sample.items : undefined, role };

@@ -477,10 +477,10 @@ export const ROLE_ICONS: Partial<Record<ConceptRole, string>> = {
  * is filled from the product's real features by the director.
  */
 export interface DemoSpec {
-  skill: "command-k" | "ai-prompt" | "click-flow" | "notify-stack" | "code-deploy" | "kanban" | "live-cursors" | "chat-thread" | "keycaps" | "toggle-list" | "changelog" | "calendar-drop" | "inbox-sweep" | "comment-pins" | "table-fill";
+  skill: "command-k" | "ai-prompt" | "click-flow" | "notify-stack" | "code-deploy" | "kanban" | "live-cursors" | "chat-thread" | "keycaps" | "toggle-list" | "changelog" | "calendar-drop" | "inbox-sweep" | "comment-pins" | "table-fill" | "phone-tour" | "drop-zone";
   title: string;
   eyebrow: string;
-  /** click-flow: the button label; kanban: its columns ("A / B / C"); live-cursors: the comment; chat-thread: the product's card ("Title — detail"). */
+  /** click-flow: the button label; phone-tour: a notification; drop-zone: the file's name; kanban: its columns ("A / B / C"); live-cursors: the comment; chat-thread: the product's card ("Title — detail"). */
   action?: string;
   /**
    * command-k: supporting commands; click-flow: tasks; notify-stack: "Event — detail"; ai-prompt: [prompt];
@@ -641,6 +641,10 @@ const MOMENT_SIGNALS: Record<MomentSkill, RegExp> = {
   "calendar-drop": /\b(calendars?|schedul\w*|meetings?|bookings?|book (a|your)|appointments?|availability|time[- ]?blocking|agendas?|week view)\b/gi,
   "inbox-sweep": /\b(e-?mails?|inbox(es)?|newsletters?|triage|mail ?box|follow[- ]ups?|unread)\b/gi,
   "comment-pins": /\b(comments?|annotat\w*|feedback|proofing|markups?|mentions?|review (cycles?|rounds?)|design reviews?|approve designs?)\b/gi,
+  // Story beats (see skills/beats.ts): the product on a phone; a file in, a result out.
+  "phone-tour": /\b(mobile apps?|ios|android|iphone|app store|google play|on the go|on your phone|download the app)\b/gi,
+  // (Not bare "files" or "docs": a workspace has those without anyone dropping a file in.)
+  "drop-zone": /\b(upload\w*|drag (and|&) drop|pdfs?|(your|any) (files?|documents?)|convert\w*|transcri\w*|summari[sz]\w*|extract\w*|resiz\w*|compress\w*)\b/gi,
   "table-fill": /\b(spreadsheets?|tables?|databases?|records?|rows?|columns?|csv|data(sets?| entry| grid)|crm|trackers?|inventory|catalogs?)\b/gi,
 };
 
@@ -665,6 +669,8 @@ const GENERIC_MOMENT: Record<MomentSkill, DemoSpec> = {
   "calendar-drop": { skill: "calendar-drop", title: "Your week, *planned*", eyebrow: "In action", items: ["Team standup", "Design review", "Launch planning", "Customer call", "Focus time"] },
   "inbox-sweep": { skill: "inbox-sweep", title: "Clear your *inbox*", eyebrow: "In action", items: ["Weekly summary is ready", "Notes from the design review", "Your invite to the launch", "Feedback on the new homepage"] },
   "comment-pins": { skill: "comment-pins", title: "Feedback, *in context*", eyebrow: "Collaboration", items: ["Love this direction", "@Leo can we try a lighter header?", "The new copy reads well"] },
+  "phone-tour": { skill: "phone-tour", title: "Your work, *in your pocket*", eyebrow: "Mobile app", action: "New update — Your summary is ready", items: ["Your day at a glance", "Updates as they happen", "Share in a tap"] },
+  "drop-zone": { skill: "drop-zone", title: "Drop it in, *get it back*", eyebrow: "In action", action: "meeting-notes.pdf", items: ["Summary", "Key points", "Next steps"] },
   "table-fill": { skill: "table-fill", title: "Your data, *organised*", eyebrow: "In action", items: ["Launch plan", "Homepage refresh", "Customer research", "Release notes", "Onboarding emails"] },
 };
 

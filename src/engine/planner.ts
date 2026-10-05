@@ -98,6 +98,56 @@ const MAP_WORDS = /\b(countries|country|regions?|currencies|languages|markets|of
 /** The site talks about helping its customers. */
 const SUPPORT = /\b(customer support|support team|help (center|centre|desk)|documentation|docs|knowledge base|onboarding|customer success|live chat|dedicated (support|success)|here to help)\b/i;
 
+/**
+ * Who a product is for, as the words a site uses when it names them ("for designers and developers"),
+ * each with a neutral line about the work it helps with (no promises, no numbers).
+ */
+const AUDIENCES: { re: RegExp; card: string }[] = [
+  { re: /\b(designers?|design teams?)\b/i, card: "Designers — Mockups, reviews and hand-offs in one place" },
+  { re: /\b(developers?|engineers?|engineering teams?|dev teams?)\b/i, card: "Developers — Specs and code right where you work" },
+  { re: /\b(product managers?|product teams?|pms)\b/i, card: "Product teams — Plans, priorities and feedback together" },
+  { re: /\b(marketers?|marketing teams?)\b/i, card: "Marketers — Campaigns from brief to launch" },
+  { re: /\b(sales (teams?|reps?)|account executives?|sellers)\b/i, card: "Sales teams — Your pipeline and follow-ups in view" },
+  { re: /\b(support (teams?|agents?)|customer success)\b/i, card: "Support teams — Customer questions in one place" },
+  { re: /\b(founders?|startups?)\b/i, card: "Founders — The whole business in one view" },
+  { re: /\b(agenc(y|ies)|freelancers?|consultants?)\b/i, card: "Agencies — Client work, organised" },
+  { re: /\b(creators?|youtubers?|podcasters?|influencers?)\b/i, card: "Creators — From idea to published" },
+  { re: /\b(teachers?|educators?|instructors?)\b/i, card: "Educators — Lessons and classes in one place" },
+  { re: /\b(students?|learners?)\b/i, card: "Students — Notes and study, organised" },
+  { re: /\b(recruiters?|hr teams?|people teams?|hiring managers?)\b/i, card: "People teams — Hiring and onboarding together" },
+  { re: /\b(finance teams?|accountants?|bookkeepers?|cfos?)\b/i, card: "Finance teams — Numbers and reports in one view" },
+  { re: /\b(IT (teams?|admins?|departments?)|sysadmins?|workspace admins?)\b/, card: "IT and admins — Access and settings under control" },
+];
+
+/** The audiences a site names itself (at least two, else none), in the order it names them. */
+export function audiencesOf(text: string): string[] {
+  const found = AUDIENCES.map((a) => ({ card: a.card, at: text.search(a.re) })).filter((a) => a.at >= 0);
+  return found.length >= 2 ? found.sort((a, b) => a.at - b.at).slice(0, 4).map((a) => a.card) : [];
+}
+
+/**
+ * What comes in the box, from a listing's own words ("In the box: earbuds, charging case, USB-C
+ * cable"; "Includes a carry pouch and a quick start guide"). Quantities are dropped (no numbers on
+ * slides); 2–5 short names, else none.
+ */
+export function boxContents(lines: string[]): string[] {
+  const lead = /\b(?:in the box|what'?s in the box|box contents|package (?:includes|contents)|(?:it )?comes with|what'?s included|included accessories)\s*[:\-–—]?\s*(.+)/i;
+  for (const line of lines) {
+    const m = (line ?? "").match(lead);
+    if (!m) continue;
+    const items = m[1]
+      .split(/[.;!?]/)[0]
+      .replace(/\s*\(.*?\)\s*/g, " ")
+      .split(/\s*(?:,|\+|\/|\band\b|\bplus\b|&)\s*/i)
+      .map((x) => x.replace(/\b\d+\s*(?:x|pcs?|pieces?|pack)?\b\s*/gi, "").replace(/^(?:a|an|the|one|two|three|four|your|our)\s+/i, "").replace(/^(?:pairs?|sets?) of\s+/i, "").trim())
+      .filter((x) => x && x.split(/\s+/).length <= 4 && x.length <= 28 && !/\d|%|free|warranty|guarantee/i.test(x));
+    const seen = new Set<string>();
+    const uniq = items.filter((x) => !seen.has(x.toLowerCase()) && !!seen.add(x.toLowerCase())).map((x) => x.charAt(0).toUpperCase() + x.slice(1));
+    if (uniq.length >= 2) return uniq.slice(0, 5);
+  }
+  return [];
+}
+
 /** Pair each pain with the feature that answers it: shared words, or words from the same family. */
 const FAMILIES = [
   ["spreadsheet", "sheet", "excel", "data", "dashboard", "report", "insight", "analytic", "chart", "metric"],
@@ -1599,6 +1649,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   } else if (demo.skill === "comment-pins") {
     // Comments land on the product's own screen.
     demoScene = { role: "demo", skill: "comment-pins", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip", media: tourMedia ?? undefined };
+  } else if (demo.skill === "phone-tour") {
+    // The phone's callouts are the product's own short features, when the film has spare ones.
+    const own = spareFeatures.filter((f) => f.split(/\s+/).length <= 4);
+    demoScene = { role: "demo", skill: "phone-tour", text: demo.title, subtext: demo.action, items: own.length >= 3 ? own.slice(0, 3) : demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
+  } else if (demo.skill === "drop-zone") {
+    demoScene = { role: "demo", skill: "drop-zone", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
   } else if (demo.skill === "keycaps" || demo.skill === "calendar-drop" || demo.skill === "inbox-sweep" || demo.skill === "table-fill") {
     demoScene = { role: "demo", skill: demo.skill, text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else {
@@ -1687,6 +1743,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       eyebrow: "Support",
       why: "The site talks about support, docs or onboarding",
       duration: beats(12),
+      transition: "dolly",
+    });
+  }
+
+  // 5g. Who it's for: when the site names two or more of the people it's for (designers and
+  // developers, founders and agencies), the audience chips with what each one gets.
+  const audiences = audiencesOf([whole.tagline, whole.description, ...whole.headlines, ...whole.features].join(" \n "));
+  if (target >= 20 && audiences.length >= 2) {
+    add(target >= 30 ? 5 : 7, {
+      role: "audience", skill: "persona-switch",
+      text: "Built for *your team*",
+      items: audiences,
+      eyebrow: "Who it's for",
+      why: `The site names who it's for: ${audiences.map((a) => a.split(" — ")[0].toLowerCase()).join(", ")}`,
+      duration: beats(Math.min(4, audiences.length) * 2.5 + 3),
       transition: "dolly",
     });
   }
@@ -1823,6 +1894,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     // Before / after follows the product's first appearance; the globe follows the features.
     if (role === "solve") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.6;
     if (role === "support") return rank.indexOf("cta") - 0.6;
+    // Who it's for follows the product's first appearance (after the reveal's positioning line).
+    if (role === "audience") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.7;
     if (role === "compare") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.6;
     if (role === "reach") return (["features", "bento", "tour"].map((r) => rank.indexOf(r)).find((i) => i >= 0) ?? rank.length - 2) + 0.6;
     // The product assembled from its own components is the first thing after the reveal.
@@ -2036,6 +2109,15 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
     const room = kept.filter((x) => x !== reveal);
     for (const x of room) x.duration += gap / Math.max(1, room.length);
   } else if (icons && fresh.length >= 2 && callouts && order.includes(callouts)) icons.items = fresh.slice(0, 4);
+  // What's in the box, when the listing says: after the callouts (or the reveal).
+  const box = target >= 20 ? boxContents([whole.description, ...whole.features, ...whole.headlines]) : [];
+  if (box.length >= 2) {
+    const after = callouts && kept.includes(callouts) ? callouts : reveal;
+    kept.splice(kept.indexOf(after) + 1, 0, {
+      role: "box", skill: "unbox", text: "What's in the *box*", eyebrow: "In the box", items: box,
+      duration: beats(box.length * 2 + 6), transition: "dolly", why: "The listing says what comes in the box",
+    });
+  }
   scenes.push(...kept);
   // Never the same product shot twice in a row (the reveal then its callouts is a different shot).
   for (let i = 1; i < scenes.length; i++)

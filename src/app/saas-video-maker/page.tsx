@@ -137,8 +137,9 @@ const SECTIONS: { id: string; title: string; body: React.ReactNode }[] = [
     body: (
       <p>
         Demo moments show the product doing its job, animated in your colours: a command palette searching and running an action, an AI prompt answering,
-        a one-click flow, a notification stack, code going to deploy, a kanban card moving across, live cursors working together and a chat thread. The
-        director picks the moment that fits your product from its own copy.
+        a one-click flow, a notification stack, code going to deploy, a kanban card moving across, live cursors working together, a chat thread, the app on a phone and a file dropped in
+        with its results popping out. The director picks the moment that fits your product from its own copy, and adds a who-it&apos;s-for slide when
+        your site names the teams it serves.
       </p>
     ),
   },

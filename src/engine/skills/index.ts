@@ -11,6 +11,7 @@ import { fastTypeSkills } from "./fastype";
 import { speedSkills } from "./speed";
 import { speedMoreSkills } from "./speed2";
 import { launchSkills } from "./launch";
+import { beatSkills } from "./beats";
 import { logo3dSkills } from "./logo3d";
 import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
@@ -38,8 +39,10 @@ export const SKILLS: Skill[] = [
   ...interactionSkills,
   ...momentSkills,
   ...launchSkills,
+  ...beatSkills.slice(0, 3),
   ...slideSkills,
   ...productSkills,
+  beatSkills[3],
   ...typeFxSkills,
   ...gallerySkills,
   ...cardSkills,
@@ -77,9 +80,9 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "3D logo", skills: logo3dSkills },
   { name: "Editorial system", skills: [...editorialSkills, ...editorialMoreSkills] },
   { name: "Fast type", skills: [...fastTypeSkills, ...speedSkills, ...speedMoreSkills] },
-  { name: "Product moments", skills: [...interactionSkills, ...momentSkills, ...launchSkills] },
+  { name: "Product moments", skills: [...interactionSkills, ...momentSkills, ...launchSkills, ...beatSkills.slice(0, 3)] },
   { name: "Slides", skills: slideSkills },
-  { name: "Media & gallery", skills: [...productSkills, ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
+  { name: "Media & gallery", skills: [...productSkills, beatSkills[3], ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Epic screens", skills: [...epicSkills, ...iconicSkills] },
   { name: "Movie trailer", skills: movieSkills },
