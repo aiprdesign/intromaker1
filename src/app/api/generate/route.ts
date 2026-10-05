@@ -34,6 +34,7 @@ import { TRAILER_STYLE_MAP } from "@/engine/trailers";
 import { rankMoments, detectConcept } from "@/engine/concepts";
 import { writeVoiceover } from "@/engine/script";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData, type VideoPlan } from "@/engine/types";
+import { noStore } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -136,7 +137,7 @@ export async function GET() {
     model: server ? modelOf(server.ai) || null : null,
     // Local AI goes through this server only when it runs on the user's machine.
     localViaServer: serverReachesLocal(),
-  });
+  }, { headers: noStore });
 }
 
 function siteAssets(site: SiteData): { media: Media; label: string }[] {

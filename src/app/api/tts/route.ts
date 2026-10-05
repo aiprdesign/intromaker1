@@ -2,6 +2,7 @@ import { AiError, checkBaseUrl, redact, serverReachesLocal } from "@/lib/ai";
 import { serviceKey } from "@/lib/admin";
 import { guardedFetch } from "@/lib/netguard";
 import { rateLimit } from "@/lib/ratelimit";
+import { noStore } from "@/lib/http";
 
 export const runtime = "nodejs";
 
@@ -82,5 +83,5 @@ export async function POST(req: Request) {
 
 /** Which voice keys the server itself holds, from Admin or the environment (so the studio can skip asking for one). */
 export async function GET() {
-  return Response.json({ openai: !!(await serviceKey("openaiVoice")), elevenlabs: !!(await serviceKey("elevenlabs")) });
+  return Response.json({ openai: !!(await serviceKey("openaiVoice")), elevenlabs: !!(await serviceKey("elevenlabs")) }, { headers: noStore });
 }
