@@ -71,28 +71,53 @@ function previewPlan(plan: VideoPlan, tr: Transition): VideoPlan {
   return { ...plan, aspect: "16:9", scenes: [a, b], voiceover: undefined };
 }
 
-/** Frames in a tile's looping strip, and the time between them. */
-const FRAMES = 14;
-const STEP = 0.085;
-const SW = 192;
-const SH = 108;
+/**
+ * The loop: the outgoing slide settled, the whole transition, the next slide settled; a short hold at
+ * each end, then a dissolve back to the start, so the loop never jumps mid-move.
+ */
+const WIN_START = A_LEN - 0.55;
+const WIN = 2;
+const FPS = 24;
+const FRAMES = Math.round(WIN * FPS) + 1;
+const HOLD_IN = 0.3;
+const HOLD_OUT = 0.5;
+const FADE = 0.35;
+const CYCLE = HOLD_IN + WIN + HOLD_OUT + FADE;
+/** Where the loop is `e` seconds in: the video time to show, and how far the dissolve back has got. */
+function phase(e: number) {
+  const x = e % CYCLE;
+  if (x < HOLD_IN) return { t: WIN_START, back: 0 };
+  if (x < HOLD_IN + WIN) return { t: WIN_START + (x - HOLD_IN), back: 0 };
+  if (x < HOLD_IN + WIN + HOLD_OUT) return { t: WIN_START + WIN, back: 0 };
+  return { t: WIN_START + WIN, back: ease((x - HOLD_IN - WIN - HOLD_OUT) / FADE) };
+}
+const ease = (k: number) => k * k * (3 - 2 * k);
+/** Strip frame size (small tiles; the tile under the pointer renders live at full size). */
+const SW = 144;
+const SH = 81;
 
 /**
- * Looping strips (like GIFs): each transition's frames rendered once into one sprite canvas, a few
- * frames at a time between other work, so opening the menu stays instant. Kept for the current look.
+ * Looping strips (like GIFs): each transition's frames at 24 fps rendered once into one sprite
+ * canvas, a few frames at a time between other work, so opening a picker stays instant. Kept for
+ * the current look only.
  */
 const strips = new Map<string, Promise<HTMLCanvasElement>>();
 let stripLook = "";
 let queue: Promise<void> = Promise.resolve();
-const idle = () => new Promise<void>((res) => setTimeout(res, 0));
+/** Wait for the browser to be idle (so building strips never stutters the player), at most ~200 ms. */
+const idle = () =>
+  new Promise<void>((res) => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(() => res(), { timeout: 200 });
+    else setTimeout(res, 16);
+  });
 
 function stripFor(lookKey: string, mini: VideoPlan, tr: Transition): Promise<HTMLCanvasElement> {
   if (lookKey !== stripLook) {
     strips.clear();
     stripLook = lookKey;
   }
-  const key = tr;
-  let p = strips.get(key);
+  let p = strips.get(tr);
   if (!p) {
     p = new Promise<HTMLCanvasElement>((resolve) => {
       queue = queue.then(async () => {
@@ -105,84 +130,100 @@ function stripFor(lookKey: string, mini: VideoPlan, tr: Transition): Promise<HTM
         c.width = SW;
         c.height = SH;
         const ctx = c.getContext("2d")!;
-        let until = performance.now() + 12;
+        await idle();
+        let until = performance.now() + 8;
         for (let i = 0; i < FRAMES; i++) {
           while (mediaState.exporting) await new Promise((r) => setTimeout(r, 500));
-          renderFrame(ctx, mini, A_LEN - 0.35 + i * STEP, SW, SH, { grain: false });
+          renderFrame(ctx, mini, WIN_START + i / FPS, SW, SH, { grain: false });
           out.drawImage(c, i * SW, 0);
           if (performance.now() > until) {
             await idle();
-            until = performance.now() + 12;
+            until = performance.now() + 8;
           }
         }
         resolve(sprite);
       });
     });
-    strips.set(key, p);
+    strips.set(tr, p);
   }
   return p;
 }
 
-/** One transition looping in its tile (from its strip), or playing live and smooth while `play`. */
-function TransitionPreview({ plan, lookKey, tr, play, w, h }: { plan: VideoPlan; lookKey: string; tr: Transition; play: boolean; w: number; h: number }) {
+/** One transition looping in its tile (from its strip), or rendered live at full size while `play`. */
+export function TransitionPreview({ plan, lookKey, tr, play, w, h }: { plan: VideoPlan; lookKey: string; tr: Transition; play: boolean; w: number; h: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const mini = useMemo(() => previewPlan(plan, tr), [plan, tr]);
   const [sprite, setSprite] = useState<HTMLCanvasElement | null>(null);
   const still = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // A first frame right away (the outgoing slide), then the strip once it's rendered.
   useEffect(() => {
     let alive = true;
     setSprite(null);
-    void stripFor(lookKey, mini, tr).then((s) => alive && setSprite(s));
+    void ensureFonts().then(() => {
+      const c = ref.current;
+      if (alive && c) renderFrame(c.getContext("2d")!, mini, still ? A_LEN + 0.6 : WIN_START, c.width, c.height, { grain: false });
+    });
+    if (!still) void stripFor(lookKey, mini, tr).then((s) => alive && setSprite(s));
     return () => {
       alive = false;
     };
-  }, [lookKey, mini, tr]);
-  // The strip on a loop (or, with reduced motion, its middle frame held).
+  }, [lookKey, mini, tr, still]);
+  // The strip on its loop.
   useEffect(() => {
     const c = ref.current;
-    if (!c || !sprite || play) return;
+    if (!c || !sprite || play || still) return;
     const ctx = c.getContext("2d")!;
-    const show = (i: number) => {
-      ctx.clearRect(0, 0, c.width, c.height);
-      ctx.drawImage(sprite, i * SW, 0, SW, SH, 0, 0, c.width, c.height);
-    };
-    if (still) {
-      show(Math.floor(FRAMES * 0.6));
-      return;
-    }
+    ctx.imageSmoothingQuality = "high";
     let raf = 0;
-    let shown = -1;
+    let shown = "";
     const t0 = performance.now();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      // Hold the last frame a moment before looping, so the landing reads.
-      const i = Math.min(FRAMES - 1, Math.floor(((now - t0) / 1000 / STEP) % (FRAMES + 6)));
-      if (i !== shown) {
-        shown = i;
-        show(i);
+      const { t, back } = phase((now - t0) / 1000);
+      const i = Math.min(FRAMES - 1, Math.round((t - WIN_START) * FPS));
+      const key = `${i}|${back.toFixed(2)}`;
+      if (key === shown) return;
+      shown = key;
+      ctx.globalAlpha = 1;
+      ctx.drawImage(sprite, i * SW, 0, SW, SH, 0, 0, c.width, c.height);
+      if (back > 0) {
+        ctx.globalAlpha = back;
+        ctx.drawImage(sprite, 0, 0, SW, SH, 0, 0, c.width, c.height);
+        ctx.globalAlpha = 1;
       }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [sprite, play, still]);
-  // Live: loop from just before the transition to the next slide settling, at full frame rate.
+  // Live, at full size: the same loop, rendered as it plays.
   useEffect(() => {
     if (!play || still) return;
     const c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d")!;
+    // The loop's first frame, kept to dissolve back to.
+    const first = document.createElement("canvas");
+    first.width = c.width;
+    first.height = c.height;
     let raf = 0;
     let last = 0;
     const t0 = performance.now();
-    const loop = 1.8;
     let alive = true;
     void ensureFonts().then(() => {
       if (!alive) return;
+      renderFrame(first.getContext("2d")!, mini, WIN_START, first.width, first.height, { grain: false });
       const tick = (now: number) => {
         raf = requestAnimationFrame(tick);
         if (mediaState.exporting || now - last < 1000 / 30 - 2) return;
         last = now;
-        renderFrame(ctx, mini, A_LEN - 0.55 + (((now - t0) / 1000) % loop), c.width, c.height, { grain: false });
+        const { t, back } = phase((now - t0) / 1000);
+        renderFrame(ctx, mini, t, c.width, c.height, { grain: false });
+        if (back > 0) {
+          ctx.save();
+          ctx.globalAlpha = back;
+          ctx.drawImage(first, 0, 0);
+          ctx.restore();
+        }
       };
       raf = requestAnimationFrame(tick);
     });
