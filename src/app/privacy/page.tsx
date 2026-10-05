@@ -11,8 +11,8 @@ import { CAPTURE_STORAGE } from "@/lib/storage";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Privacy · IntroMaker",
-  description: "What IntroMaker does with the websites you import, your API keys and your videos.",
+  title: "Privacy · Prodintro.com",
+  description: "What Prodintro.com does with the websites you import, your API keys and your videos.",
 };
 
 /** Plain-language privacy note for the hosted demo. Kept in step with what the code does. */
@@ -27,7 +27,7 @@ export default async function Privacy() {
       <article className="legal">
         <h1>Privacy</h1>
         <p className="lead">
-          IntroMaker is a portfolio project. Accounts are optional, and there are no tracking cookies and no analytics. Here is exactly what happens to what you give it.
+          Prodintro.com is a portfolio project. Accounts are optional, and there are no tracking cookies and no analytics. Here is exactly what happens to what you give it.
         </p>
 
         <h2>Your videos</h2>

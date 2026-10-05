@@ -135,7 +135,7 @@ export default function BillingTab({ onChange, onOpenPlans, onOpenEnvGuide }: { 
       title: "Create the Pro product and a Payment Link",
       body: (
         <>
-          In Stripe → <strong>Product catalog</strong>, add “IntroMaker Pro” with a recurring price (and a yearly one if you like). Then <strong>Payment Links</strong> →
+          In Stripe → <strong>Product catalog</strong>, add “Prodintro.com Pro” with a recurring price (and a yearly one if you like). Then <strong>Payment Links</strong> →
           New, pick the price, and under <strong>After payment</strong> choose “Don&apos;t show confirmation page” and redirect to:
           <span className="copy-line">
             <code>{view.successUrl}</code>

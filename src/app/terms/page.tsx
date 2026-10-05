@@ -10,8 +10,8 @@ import { effectiveBilling, REFUND_DAYS } from "@/lib/stripe-links";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Terms and refunds · IntroMaker",
-  description: `IntroMaker's plans, ${REFUND_DAYS}-day refunds, cancelling, and using what you make.`,
+  title: "Terms and refunds · Prodintro.com",
+  description: `Prodintro.com's plans, ${REFUND_DAYS}-day refunds, cancelling, and using what you make.`,
 };
 
 /** Plain-language terms: plans, the refund window, cancelling, and what you may import. */
@@ -21,14 +21,14 @@ export default async function Terms() {
   const b = effectiveBilling(s.billing);
   if (!b.monthlyLink && !b.yearlyLink) notFound();
   const contact = s.contactEmail?.trim();
-  const mail = contact ? `mailto:${contact}?subject=${encodeURIComponent("IntroMaker refund")}` : null;
+  const mail = contact ? `mailto:${contact}?subject=${encodeURIComponent("Prodintro.com refund")}` : null;
   return (
     <main>
       <Nav />
       <article className="legal">
         <h1>Terms and refunds</h1>
         <p className="lead">
-          IntroMaker is a portfolio project. These terms are short and in plain language. If something here is unclear, {mail ? <a href={mail}>email us</a> : "ask us"}{" "}
+          Prodintro.com is a portfolio project. These terms are short and in plain language. If something here is unclear, {mail ? <a href={mail}>email us</a> : "ask us"}{" "}
           before you pay.
         </p>
 

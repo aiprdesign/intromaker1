@@ -1,4 +1,4 @@
-# IntroMaker — production image: Next.js standalone server + headless Chromium for live capture.
+# Prodintro.com — production image: Next.js standalone server + headless Chromium for live capture.
 #   docker build -t intromaker .
 #   docker run -p 3000:3000 -v intromaker-data:/data intromaker
 

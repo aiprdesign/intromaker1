@@ -76,7 +76,7 @@ export default function AiSettings({
   onChange: (v: AiSettingsValue) => void;
   onClose: () => void;
   serverClaude: boolean;
-  /** False when IntroMaker is hosted online: local models are then called from this browser. */
+  /** False when Prodintro.com is hosted online: local models are then called from this browser. */
   localViaServer?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
@@ -163,7 +163,7 @@ export default function AiSettings({
       if (data.error) setModels({ state: "fail", list: [], msg: data.error });
       else setModels({ state: "ok", list: data.models, msg: `${data.models.length} models available` });
     } catch {
-      setModels({ state: "fail", list: [], msg: "Couldn't reach the IntroMaker server." });
+      setModels({ state: "fail", list: [], msg: "Couldn't reach the Prodintro.com server." });
     }
   };
 
@@ -182,7 +182,7 @@ export default function AiSettings({
       const data = await post("/api/ai-test");
       setTest(data.ok ? { state: "ok", msg: `Connected: ${data.label}` } : { state: "fail", msg: data.error });
     } catch {
-      setTest({ state: "fail", msg: "Couldn't reach the IntroMaker server." });
+      setTest({ state: "fail", msg: "Couldn't reach the Prodintro.com server." });
     }
   };
 
@@ -200,7 +200,7 @@ export default function AiSettings({
         </div>
         <p className="hint">
           Pick a provider (or just paste a key: it&apos;s recognised automatically), then choose a model. Endpoints are
-          built in. Keys are stored only in this browser and sent only to your own IntroMaker server.
+          built in. Keys are stored only in this browser and sent only to your own Prodintro.com server.
         </p>
 
         <div className="quick-setup">
@@ -283,9 +283,9 @@ export default function AiSettings({
             <p className="runs-on">
               {isLocal
                 ? inBrowser
-                  ? "Runs on your computer: this browser talks to the local model directly (IntroMaker is online)."
-                  : "Runs on your computer: the local IntroMaker server calls the model on localhost."
-                : "Runs in the cloud, through the IntroMaker server (your key isn't sent to other services)."}
+                  ? "Runs on your computer: this browser talks to the local model directly (Prodintro.com is online)."
+                  : "Runs on your computer: the local Prodintro.com server calls the model on localhost."
+                : "Runs in the cloud, through the Prodintro.com server (your key isn't sent to other services)."}
             </p>
             {detected && <p className="hint ok">Recognised a {detected} key.</p>}
             {p.note && <p className="hint">{p.note}</p>}

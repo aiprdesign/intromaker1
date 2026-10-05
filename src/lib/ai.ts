@@ -184,7 +184,7 @@ async function openAiEndpoint(cfg: AiConfig) {
     if (preset.authHeader === "api-key") headers["api-key"] = cfg.apiKey;
     else headers.Authorization = `Bearer ${cfg.apiKey}`;
   }
-  if (preset.id === "openrouter") Object.assign(headers, { "HTTP-Referer": "https://intromaker.local", "X-Title": "IntroMaker" });
+  if (preset.id === "openrouter") Object.assign(headers, { "HTTP-Referer": "https://prodintro.com", "X-Title": "Prodintro.com" });
   return { preset, base, headers };
 }
 

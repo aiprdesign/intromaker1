@@ -71,7 +71,7 @@ function plate(sc: SkillContext, cx: number, cy: number, r: number, k: number, l
 /* ───────────────────────── Icon Reveal ───────────────────────── */
 
 function iconReveal(sc: SkillContext) {
-  const { ctx, w, h, t, u, palette } = sc;
+  const { ctx, w, h, t, u, palette, scene } = sc;
   background(sc);
   dust(sc, 60, palette.secondary, 0.06);
   const ex = exitOf(sc);
@@ -89,13 +89,21 @@ function iconReveal(sc: SkillContext) {
   ctx.fillStyle = headlineGradient(sc, head, palette.text, mixHex(palette.text, palette.secondary, 0.4));
   drawLayout(sc, head);
   ctx.restore();
-  // A row (2×2 in tall frames, and in square ones from four icons), each icon drawing on in its plate on the beat.
-  const cols = (portrait && n > 2) || (w < h * 1.25 && n > 3) ? 2 : n;
+  // A row (2×2 in tall frames), each icon drawing on in its plate on the beat.
+  const cols = portrait && n > 2 ? 2 : n;
   const rows = Math.ceil(n / cols);
   const cellW = (safe.width * 0.9) / cols;
-  const r = Math.min(cellW * 0.32, short * (portrait ? 0.16 : 0.15));
-  const rowH = r * 2 + short * 0.12;
-  const top = h * (portrait ? 0.54 : 0.6) - ((rows - 1) * rowH) / 2;
+  // The icons fill the space between the heading and the foot of the frame (leaving room for each
+  // row's label and the line under them), so they never run up into the heading.
+  const labelH = short * 0.075;
+  const rowGap = short * 0.045;
+  const areaTop = head.ys[head.ys.length - 1] + head.size * 0.6 + short * 0.06;
+  const areaBottom = h - safe.bottom - (scene.subtext ? short * 0.09 : 0);
+  const fitR = (areaBottom - areaTop - rows * labelH - (rows - 1) * rowGap) / (2 * rows);
+  const r = Math.max(short * 0.05, Math.min(cellW * 0.32, short * (portrait ? 0.16 : 0.15), fitR));
+  const rowH = r * 2 + labelH + rowGap;
+  const gridH = rows * (r * 2 + labelH) + (rows - 1) * rowGap;
+  const top = areaTop + Math.max(0, (areaBottom - areaTop - gridH) / 2) + r;
   set.forEach((p, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
@@ -128,7 +136,7 @@ function iconReveal(sc: SkillContext) {
     }
   });
   const last = 0.45 + (n - 1) * step;
-  subline(sc, top + (rows - 1) * rowH + r + short * 0.12, range(t, last + 0.5, last + 1), { alpha: 1 - ex });
+  subline(sc, top + (rows - 1) * rowH + r + labelH + short * 0.03, range(t, last + 0.5, last + 1), { alpha: 1 - ex });
 }
 
 const revealSfx = (scene: Scene, beat: number): SfxCue[] => {

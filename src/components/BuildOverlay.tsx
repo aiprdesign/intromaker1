@@ -107,10 +107,10 @@ export function ImportFailure({
   const verdict =
     side === "ours"
       ? c?.online && !c.problem
-        ? `Your website looks fine: the problem was on IntroMaker's side.`
-        : "The problem was on IntroMaker's side."
+        ? `Your website looks fine: the problem was on Prodintro.com's side.`
+        : "The problem was on Prodintro.com's side."
       : side === "network"
-        ? "Your browser couldn't reach IntroMaker's server."
+        ? "Your browser couldn't reach Prodintro.com's server."
         : side === "limit"
           ? "You've reached a limit, not a problem with your website."
           : c && !c.online
@@ -121,7 +121,7 @@ export function ImportFailure({
         { ok: c.online, text: c.online ? `Website is online${c.ms !== undefined ? ` (answered in ${c.ms < 1000 ? `${c.ms} ms` : `${(c.ms / 1000).toFixed(1)}s`})` : ""}` : `Website didn't answer: ${c.problem?.message ?? "it may be down"}` },
         ...(c.online
           ? [
-              { ok: c.problem?.code !== "blocked" && c.problem?.code !== "busy", text: c.problem?.code === "blocked" ? "It blocks automated visitors (so it can't be imported)" : c.problem?.code === "busy" ? "It's limiting visits right now" : "It lets IntroMaker read it" },
+              { ok: c.problem?.code !== "blocked" && c.problem?.code !== "busy", text: c.problem?.code === "blocked" ? "It blocks automated visitors (so it can't be imported)" : c.problem?.code === "busy" ? "It's limiting visits right now" : "It lets Prodintro.com read it" },
               { ok: c.https ?? null, text: c.https ? "Uses https" : "Not on https" },
               { ok: !!c.title, text: c.title ? `Has a page title: “${c.title.length > 60 ? `${c.title.slice(0, 57).trimEnd()}…` : c.title}”` : "Has no page title" },
               { ok: !!c.hasText, text: c.hasText ? "Has readable text" : "Shows almost no text without running its scripts" },
@@ -149,7 +149,7 @@ export function ImportFailure({
             ))}
           </ul>
         )}
-        {check === "failed" && side !== "network" && <p className="build-meta">IntroMaker&apos;s server didn&apos;t answer the website check either: it may be restarting. Try again in a minute.</p>}
+        {check === "failed" && side !== "network" && <p className="build-meta">Prodintro.com&apos;s server didn&apos;t answer the website check either: it may be restarting. Try again in a minute.</p>}
         <div className="build-actions">
           {failure.suggestion && (
             <button className="btn btn-primary sm" onClick={onSuggestion}>

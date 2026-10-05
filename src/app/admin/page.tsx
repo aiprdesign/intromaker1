@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import AdminApp from "./AdminApp";
 
 export const metadata: Metadata = {
-  title: "Admin · IntroMaker",
+  title: "Admin · Prodintro.com",
   robots: { index: false, follow: false },
 };
 

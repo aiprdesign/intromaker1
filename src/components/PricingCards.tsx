@@ -25,7 +25,7 @@ export default function PricingCards() {
   const sellsPro = info.online && !!proPrice && JSON.stringify(plans.free) !== JSON.stringify(plans.pro);
   const f = plans.free;
   const freeUnlimited = f.savedFilms >= 100_000 && f.aiPerMonth >= 1_000_000 && f.importsPerDay >= 100_000 && !f.watermark;
-  const licenceHref = contactEmail ? `mailto:${contactEmail}?subject=${encodeURIComponent("IntroMaker commercial licence")}` : "/license";
+  const licenceHref = contactEmail ? `mailto:${contactEmail}?subject=${encodeURIComponent("Prodintro.com commercial licence")}` : "/license";
   return (
     <>
       <div className="section-head">
@@ -39,7 +39,7 @@ export default function PricingCards() {
           <>
             <h2>{freeUnlimited ? "Free and unlimited, for now." : "Free to start."}</h2>
             <p className="lead">
-              IntroMaker is a portfolio project: try it free{freeUnlimited ? " and unlimited" : ""}, for personal and non-commercial use. Want to use it commercially? Contact us for a licence.
+              Prodintro.com is a portfolio project: try it free{freeUnlimited ? " and unlimited" : ""}, for personal and non-commercial use. Want to use it commercially? Contact us for a licence.
             </p>
           </>
         )}
@@ -84,7 +84,7 @@ export default function PricingCards() {
             Contact us<small></small>
           </div>
           <ul>
-            {["Use IntroMaker for a business, a client or an agency", "Run it on your own servers or in your product", sellsPro ? "Pro features, for commercial work" : "The Free features, for commercial work", "Available on request"].map((f) => (
+            {["Use Prodintro.com for a business, a client or an agency", "Run it on your own servers or in your product", sellsPro ? "Pro features, for commercial work" : "The Free features, for commercial work", "Available on request"].map((f) => (
               <li key={f}>{f}</li>
             ))}
           </ul>

@@ -111,7 +111,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
               </select>
             </label>
             <label className="check-row">
-              <input type="checkbox" checked={plans[id].watermark} onChange={(e) => set(id, { watermark: e.target.checked })} /> “Made with IntroMaker” watermark on exports
+              <input type="checkbox" checked={plans[id].watermark} onChange={(e) => set(id, { watermark: e.target.checked })} /> “Made with Prodintro.com” watermark on exports
             </label>
           </div>
         ))}

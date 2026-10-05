@@ -1,5 +1,5 @@
 /**
- * Kaizen scorecard for IntroMaker's built-in director.
+ * Kaizen scorecard for Prodintro.com's built-in director.
  *
  *   npx tsx scripts/kaizen.ts            # summary
  *   npx tsx scripts/kaizen.ts --worst 5  # also print the 5 lowest-scoring storyboards

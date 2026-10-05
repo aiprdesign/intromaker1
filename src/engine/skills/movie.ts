@@ -242,7 +242,7 @@ export const movieSkills: Skill[] = [
     name: "Studio Ident",
     tagline: "A beam of light sweeps across black and leaves the studio's name in brushed metal, 'PRESENTS' beneath.",
     bestFor: "The opening card of a movie trailer. Text = the studio or production company (or the filmmaker); subtext = 'presents' or 'a film by'.",
-    sample: { text: "IntroMaker Pictures", subtext: "presents" },
+    sample: { text: "Prodintro Pictures", subtext: "presents" },
     render: studioIdent,
     sfx: () => [
       { t: 0.25, kind: "whoosh" },
@@ -263,7 +263,7 @@ export const movieSkills: Skill[] = [
     name: "Billing Block",
     tagline: "The trailer's end card: the title, the credits in tall condensed capitals, and the release line.",
     bestFor: "The last card of a movie trailer. Text = the film's title; items = credit lines ('DIRECTED BY …', 'STARRING …'); subtext = the release line ('Coming soon', 'In cinemas December 12').",
-    sample: { text: "The Lantern Deep", subtext: "Coming soon", items: ["IntroMaker Pictures presents", "A film by IntroMaker Pictures"] },
+    sample: { text: "The Lantern Deep", subtext: "Coming soon", items: ["Prodintro Pictures presents", "A film by Prodintro Pictures"] },
     itemsHint: "Credit lines, e.g. Directed by …, Starring …",
     render: billingBlock,
     sfx: () => [

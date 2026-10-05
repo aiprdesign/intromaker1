@@ -2,7 +2,7 @@ import { TEMPLATE_MAP } from "./templates";
 import type { Scene, VideoPlan } from "./types";
 
 /**
- * Sample films for the homepage: what IntroMaker makes for a SaaS launch, a physical product and a
+ * Sample films for the homepage: what Prodintro.com makes for a SaaS launch, a physical product and a
  * trailer. The brands are imaginary (Lumetrik, Kelvo, The Lantern Deep) and the product photos are illustrations
  * made for these samples (public/samples). Each one strings together the slides that show the
  * engine at its best for that kind of film.
@@ -84,16 +84,16 @@ export const TRAILER_SAMPLE: VideoPlan = {
   seed: 2026,
   style: "trailer",
   trailerStyle: "film-thriller",
-  brand: { name: "IntroMaker Pictures", images: [], videos: [] },
+  brand: { name: "Prodintro Pictures", images: [], videos: [] },
   scenes: [
-    trailerScene("studio-ident", "IntroMaker Pictures", 6, "cut", { subtext: "presents" }),
+    trailerScene("studio-ident", "Prodintro Pictures", 6, "cut", { subtext: "presents" }),
     trailerScene("intertitle", "This winter", 5, "cut"),
     trailerScene("split-wipe", "A lighthouse goes dark", 5, "shutter"),
     trailerScene("intertitle", "Its keeper is gone", 5, "cut"),
     trailerScene("glitch-reveal", "A storm is coming", 5, "flash"),
     trailerScene("intertitle", "Look again", 5, "cut"),
     trailerScene("cinematic-title", "The Lantern Deep", 7, "shutter"),
-    trailerScene("billing-block", "The Lantern Deep", 9, "cut", { subtext: "Coming soon", items: ["IntroMaker Pictures presents", "A film by IntroMaker Pictures"] }),
+    trailerScene("billing-block", "The Lantern Deep", 9, "cut", { subtext: "Coming soon", items: ["Prodintro Pictures presents", "A film by Prodintro Pictures"] }),
   ],
 };
 
@@ -124,6 +124,6 @@ export const SAMPLE_FILMS = [
     label: "Trailer",
     plan: TRAILER_SAMPLE,
     blurb: "The Lantern Deep is an imaginary thriller. Its trailer is cut like a film's: a studio card, title cards between the shots, the title and a billing block, in widescreen.",
-    prompt: 'Thriller film "THE LANTERN DEEP" from IntroMaker Pictures: a lighthouse goes dark, its keeper is gone, a storm is coming',
+    prompt: 'Thriller film "THE LANTERN DEEP" from Prodintro Pictures: a lighthouse goes dark, its keeper is gone, a storm is coming',
   },
 ] as const;

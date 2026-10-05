@@ -38,7 +38,8 @@ export function headline(
   const { ctx, w, h, scene } = sc;
   const font = opts.font ?? sc.font;
   const short = Math.min(w, h);
-  const layout = layoutHeadline(ctx, opts.text ?? scene.text, font, {
+  // *accent* marks colour a word in the SaaS headline styles; this one has no accent, so they go.
+  const layout = layoutHeadline(ctx, (opts.text ?? scene.text).replace(/\*/g, ""), font, {
     w,
     h,
     cx: w / 2,

@@ -15,7 +15,7 @@ export function Logo() {
           <path d="M12 9.5v13l10.5-6.5z" fill="#05030d" />
         </svg>
       </span>
-      IntroMaker
+      Prodintro.com
     </Link>
   );
 }

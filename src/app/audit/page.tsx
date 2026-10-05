@@ -3,8 +3,8 @@ import Nav from "@/components/Nav";
 import LayoutAudit from "./LayoutAudit";
 
 export const metadata: Metadata = {
-  title: "Layout audit · IntroMaker",
-  description: "The skills checked against IntroMaker's design system: title-safe areas, clipping and overlapping text.",
+  title: "Layout audit · Prodintro.com",
+  description: "The skills checked against Prodintro.com's design system: title-safe areas, clipping and overlapping text.",
   robots: { index: false },
 };
 

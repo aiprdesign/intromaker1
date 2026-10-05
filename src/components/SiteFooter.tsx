@@ -25,6 +25,7 @@ export default function SiteFooter() {
       <div className="footer-cols">
         <div className="footer-brand">
           <Logo />
+          <p className="footer-slogan">Instant Videos for Saas, Products, & Websites!</p>
           <p>An AI video maker for SaaS intros, product videos and launch trailers, rendered in your browser.</p>
         </div>
         <nav className="footer-col" aria-label="SaaS videos">
@@ -62,7 +63,7 @@ export default function SiteFooter() {
         </nav>
       </div>
       <div className="footer-legal">
-        © {new Date().getFullYear()} IntroMaker · <Link href="/privacy">Privacy</Link>
+        © {new Date().getFullYear()} Prodintro.com · <Link href="/privacy">Privacy</Link>
         <TermsLink /> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
       </div>
     </footer>

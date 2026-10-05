@@ -1,8 +1,8 @@
 /**
  * Browser-side AI for local model servers (Ollama, LM Studio, llama.cpp, Jan, vLLM…).
  *
- * Routing rule: local AI runs where the model is. When IntroMaker's server runs on your own
- * machine it calls localhost itself; when IntroMaker is hosted online the server can't reach
+ * Routing rule: local AI runs where the model is. When Prodintro.com's server runs on your own
+ * machine it calls localhost itself; when Prodintro.com is hosted online the server can't reach
  * your computer, so the browser talks to the local model directly. Cloud providers always go
  * through the server (keys stay out of third-party pages, no CORS limits).
  */

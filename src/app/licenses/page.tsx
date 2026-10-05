@@ -6,8 +6,8 @@ import TermsLink from "@/components/TermsLink";
 import notices from "./notices.json";
 
 export const metadata: Metadata = {
-  title: "Open-source licences · IntroMaker",
-  description: "The open-source software IntroMaker is built on, and its licences.",
+  title: "Open-source licences · Prodintro.com",
+  description: "The open-source software Prodintro.com is built on, and its licences.",
 };
 
 type Pkg = { name: string; version: string; licence: string; homepage?: string; note?: string; text?: string; notice?: string };
@@ -22,7 +22,7 @@ export default function Licenses() {
       <article className="legal">
         <h1>Open-source licences</h1>
         <p className="lead">
-          IntroMaker is built on open-source software. Its components are open source, with licences that allow commercial use. Their notices and licence
+          Prodintro.com is built on open-source software. Its components are open source, with licences that allow commercial use. Their notices and licence
           texts are reproduced here, as those licences ask.
         </p>
 

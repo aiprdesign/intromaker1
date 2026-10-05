@@ -2,7 +2,7 @@ import Nav from "@/components/Nav";
 import SiteFooter from "@/components/SiteFooter";
 import SkillGrid from "@/components/SkillGrid";
 
-export const metadata = { title: "Motion skills — IntroMaker" };
+export const metadata = { title: "Motion skills — Prodintro.com" };
 
 export default function SkillsPage() {
   return (

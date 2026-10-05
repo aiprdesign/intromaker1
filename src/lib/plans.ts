@@ -15,7 +15,7 @@ export interface PlanLimits {
   aiPerMonth: number;
   /** Website imports per day. */
   importsPerDay: number;
-  /** Exports carry a small "Made with IntroMaker" mark. */
+  /** Exports carry a small "Made with Prodintro.com" mark. */
   watermark: boolean;
   /** Largest export: long side in pixels, and frame rate. */
   maxLong: number;
@@ -31,7 +31,7 @@ export const DEFAULT_LIMITS: Record<PlanId, PlanLimits> = {
 
 export const PLAN_NAMES: Record<PlanId, string> = { free: "Free", pro: "Pro" };
 
-export const WATERMARK = "Made with IntroMaker";
+export const WATERMARK = "Made with Prodintro.com";
 
 /**
  * The defaults before plans went unlimited. A settings file from before then (no plansVersion)
@@ -75,6 +75,6 @@ export function describeLimits(l: PlanLimits): string[] {
     l.aiPerMonth >= 1_000_000 ? "Unlimited AI-directed videos" : l.aiPerMonth > 0 ? `AI director: ${l.aiPerMonth} videos a month` : "Built-in director (or your own AI key)",
     l.importsPerDay >= 100_000 ? "Unlimited website and listing imports" : `${l.importsPerDay} website import${l.importsPerDay === 1 ? "" : "s"} a day`,
     `Export up to ${res} at ${l.maxFps} fps`,
-    l.watermark ? "Small IntroMaker watermark" : "No watermark",
+    l.watermark ? "Small Prodintro.com watermark" : "No watermark",
   ];
 }

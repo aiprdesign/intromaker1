@@ -93,7 +93,7 @@ const HOSTS: { id: string; name: string; steps: React.ReactNode[] }[] = [
     id: "railway",
     name: "Railway",
     steps: [
-      <>Open your project on railway.com and click the IntroMaker service.</>,
+      <>Open your project on railway.com and click the Prodintro.com service.</>,
       <>
         Go to the <strong>Variables</strong> tab and press <strong>New Variable</strong>.
       </>,
@@ -110,7 +110,7 @@ const HOSTS: { id: string; name: string; steps: React.ReactNode[] }[] = [
     id: "render",
     name: "Render",
     steps: [
-      <>Open the IntroMaker web service on dashboard.render.com.</>,
+      <>Open the Prodintro.com web service on dashboard.render.com.</>,
       <>
         Go to <strong>Environment</strong> and press <strong>Add Environment Variable</strong>.
       </>,

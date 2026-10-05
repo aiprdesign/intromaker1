@@ -9,20 +9,20 @@ import { readSettings } from "@/lib/admin";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Licence · IntroMaker",
-  description: "IntroMaker is free and unlimited for personal and non-commercial use. Commercial use needs a licence: contact us.",
+  title: "Licence · Prodintro.com",
+  description: "Prodintro.com is free and unlimited for personal and non-commercial use. Commercial use needs a licence: contact us.",
 };
 
 /** The terms in plain language: free for non-commercial use, a commercial licence on request. */
 export default async function License() {
   const contact = (await readSettings().catch(() => null))?.contactEmail;
-  const mail = contact ? `mailto:${contact}?subject=${encodeURIComponent("IntroMaker commercial licence")}` : null;
+  const mail = contact ? `mailto:${contact}?subject=${encodeURIComponent("Prodintro.com commercial licence")}` : null;
   return (
     <main>
       <Nav />
       <article className="legal">
         <h1>Licence</h1>
-        <p className="lead">IntroMaker is a portfolio project. It is free and unlimited to use, for now, for personal and non-commercial purposes; commercial use needs a licence.</p>
+        <p className="lead">Prodintro.com is a portfolio project. It is free and unlimited to use, for now, for personal and non-commercial purposes; commercial use needs a licence.</p>
 
         <h2>Free: personal and non-commercial use</h2>
         <p>
@@ -32,13 +32,13 @@ export default async function License() {
 
         <h2>Commercial use: contact us</h2>
         <p>
-          Using IntroMaker for a business, for clients, in an agency, or running its code on your own servers or inside a product you sell needs a commercial
+          Using Prodintro.com for a business, for clients, in an agency, or running its code on your own servers or inside a product you sell needs a commercial
           licence. {mail ? <a href={mail}>Contact us at {contact}</a> : "Contact the site owner"} and tell us how you&apos;d like to use it.
         </p>
 
         <h2>The source code</h2>
         <p>
-          IntroMaker&apos;s own code is released under the{" "}
+          Prodintro.com&apos;s own code is released under the{" "}
           <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">
             PolyForm Noncommercial License 1.0.0
           </a>

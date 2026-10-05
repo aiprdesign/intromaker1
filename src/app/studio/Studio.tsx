@@ -797,13 +797,13 @@ export default function Studio() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // No message from IntroMaker itself: the hosting gateway answered (the server crashed,
+        // No message from Prodintro.com itself: the hosting gateway answered (the server crashed,
         // restarted or ran out of time), which is on our side, not the website's.
         const ours = !data.error && res.status >= 500;
         throw Object.assign(
           new Error(
             ours
-              ? `IntroMaker's server didn't finish reading the site (error ${res.status} from the hosting service). It may be restarting or short of memory while capturing the page.`
+              ? `Prodintro.com's server didn't finish reading the site (error ${res.status} from the hosting service). It may be restarting or short of memory while capturing the page.`
               : (data.error ?? `The import failed (${res.status}).`),
           ),
           { code: ours ? "server" : data.code, suggestion: data.suggestion, side: ours ? "ours" : res.status === 429 ? "limit" : data.code === "failed" ? "ours" : "site" },
@@ -835,7 +835,7 @@ export default function Studio() {
       const err = e as Error & { code?: string; suggestion?: string; side?: "site" | "ours" | "limit" | "network" };
       const network = err.name === "TypeError";
       setImportError({
-        message: network ? "Couldn't reach IntroMaker's server. Check your internet connection and try again." : err.message,
+        message: network ? "Couldn't reach Prodintro.com's server. Check your internet connection and try again." : err.message,
         code: network ? "failed" : err.code,
         suggestion: err.suggestion,
         url,

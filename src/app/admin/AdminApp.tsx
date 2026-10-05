@@ -58,7 +58,7 @@ export default function AdminApp() {
           </p>
           <ol className="env-steps">
             <li>
-              <strong>Railway</strong>: your project → the IntroMaker service → <strong>Variables</strong> → <strong>New Variable</strong>. Name{" "}
+              <strong>Railway</strong>: your project → the Prodintro.com service → <strong>Variables</strong> → <strong>New Variable</strong>. Name{" "}
               <code>ADMIN_PASSWORD</code>, value: a long, unique password. Press <strong>Deploy</strong>.
             </li>
             <li>

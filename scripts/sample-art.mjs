@@ -1,7 +1,7 @@
 /**
  * Draws the sample product photos used by the homepage's sample product video: "Kelvo", an
  * imaginary smart water bottle, from three angles on a white studio background. Original artwork
- * made for IntroMaker (plain SVG shapes and gradients, no third-party images; the lettering is set
+ * made for Prodintro.com (plain SVG shapes and gradients, no third-party images; the lettering is set
  * in the system sans-serif), so it is covered by the project's own licence.
  *
  *   node scripts/sample-art.mjs     # writes public/samples/kelvo-{front,angle,back}.jpg

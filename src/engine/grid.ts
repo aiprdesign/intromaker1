@@ -1,5 +1,5 @@
 /**
- * IntroMaker's design system: one spacing grid, safe areas, layout columns, a type scale and a
+ * Prodintro.com's design system: one spacing grid, safe areas, layout columns, a type scale and a
  * radius scale that every scene lays out on, so spacing and alignment are consistent across
  * skills and formats.
  *

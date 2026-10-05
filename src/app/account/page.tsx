@@ -3,7 +3,7 @@ import Nav from "@/components/Nav";
 import AccountApp from "./AccountApp";
 
 export const metadata: Metadata = {
-  title: "My intros · IntroMaker",
+  title: "My intros · Prodintro.com",
   description: "Sign in to save your intros and manage your plan.",
   robots: { index: false },
 };

@@ -48,7 +48,7 @@ export function effectiveBilling(saved: BillingLinks | undefined, env: Record<st
   return { monthlyLink: pick("monthlyLink"), yearlyLink: pick("yearlyLink"), portalLink: pick("portalLink"), yearlyPrice: pick("yearlyPrice"), fromEnv };
 }
 
-/** The webhook events IntroMaker handles: select these on the Stripe endpoint. */
+/** The webhook events Prodintro.com handles: select these on the Stripe endpoint. */
 export const STRIPE_EVENTS = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",

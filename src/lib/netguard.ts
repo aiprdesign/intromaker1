@@ -94,7 +94,7 @@ export async function assertPublicUrl(raw: string): Promise<URL> {
 }
 
 const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 IntroMaker/1.0";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 Prodintro/1.0";
 
 /**
  * DNS rebinding guard: the address is checked again at connect time, and the connection goes to

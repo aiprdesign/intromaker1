@@ -1,4 +1,4 @@
-// Generated list of Lucide icons (ISC licence, https://lucide.dev) used by IntroMaker.
+// Generated list of Lucide icons (ISC licence, https://lucide.dev) used by Prodintro.com.
 import {
   Zap,
   Rocket,

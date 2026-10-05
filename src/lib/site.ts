@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 
 /**
  * The site's public address, for the sitemap, robots.txt and canonical links. INTROMAKER_SITE_URL
- * when set (e.g. https://intromaker.example), else the address the request came in on.
+ * when set (e.g. https://prodintro.com), else the address the request came in on.
  */
 export const SITE_URL_ENV = (process.env.INTROMAKER_SITE_URL ?? "").trim().replace(/\/+$/, "");
 

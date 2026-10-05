@@ -4,9 +4,9 @@ import Nav from "@/components/Nav";
 import SiteFooter from "@/components/SiteFooter";
 import { SITE_URL_ENV } from "@/lib/site";
 
-const TITLE = "SaaS video maker: intro, launch and product videos from a URL · IntroMaker";
+const TITLE = "SaaS video maker: intro, launch and product videos from a URL · Prodintro.com";
 const DESCRIPTION =
-  "Turn your website URL into a SaaS intro video. IntroMaker imports your logo, UI, copy and colours, and its AI director cuts a product intro, launch or demo video with a 3D logo reveal, a soundtrack and voice-over, ready for your site, Reels, TikTok and Shorts.";
+  "Turn your website URL into a SaaS intro video. Prodintro.com imports your logo, UI, copy and colours, and its AI director cuts a product intro, launch or demo video with a 3D logo reveal, a soundtrack and voice-over, ready for your site, Reels, TikTok and Shorts.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -31,14 +31,14 @@ export const metadata: Metadata = {
   ],
   // The canonical address only when the public address is known (INTROMAKER_SITE_URL).
   ...(SITE_URL_ENV ? { alternates: { canonical: "/saas-video-maker" } } : {}),
-  openGraph: { title: TITLE, description: DESCRIPTION, type: "website", siteName: "IntroMaker", ...(SITE_URL_ENV ? { url: "/saas-video-maker" } : {}) },
+  openGraph: { title: TITLE, description: DESCRIPTION, type: "website", siteName: "Prodintro.com", ...(SITE_URL_ENV ? { url: "/saas-video-maker" } : {}) },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 const FAQ: { q: string; a: string }[] = [
   {
     q: "How do I turn a URL into a video?",
-    a: "Paste your website address on the homepage and press Import. IntroMaker opens the public page, reads its headline, features and calls to action, captures your logo, UI and colours, and the director storyboards a SaaS intro video from them. You can edit the result in the studio and export it.",
+    a: "Paste your website address on the homepage and press Import. Prodintro.com opens the public page, reads its headline, features and calls to action, captures your logo, UI and colours, and the director storyboards a SaaS intro video from them. You can edit the result in the studio and export it.",
   },
   {
     q: "What is a SaaS intro video?",
@@ -46,7 +46,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's the difference between a product intro video and a demo video?",
-    a: "A product intro video tells people what the product is and why it matters, in under a minute. A product demo video walks through how it works. IntroMaker's SaaS style mixes the two: intro beats for the story, and demo moments (a command palette, an AI prompt, a click flow, a kanban board) for the product in action.",
+    a: "A product intro video tells people what the product is and why it matters, in under a minute. A product demo video walks through how it works. Prodintro.com's SaaS style mixes the two: intro beats for the story, and demo moments (a command palette, an AI prompt, a click flow, a kanban board) for the product in action.",
   },
   {
     q: "Can I make a vertical video for Reels, TikTok and Shorts?",
@@ -73,7 +73,7 @@ const SECTIONS: { id: string; title: string; body: React.ReactNode }[] = [
     body: (
       <>
         <p>
-          A SaaS intro video has one job: to tell a visitor what your software does before they scroll away. IntroMaker builds it the way launch teams do. It
+          A SaaS intro video has one job: to tell a visitor what your software does before they scroll away. Prodintro.com builds it the way launch teams do. It
           opens on a hook taken from your own headline or the problem you solve, reveals the brand on the music&apos;s drop, shows the product in action,
           lays out the features and ends on your call to action.
         </p>
@@ -90,7 +90,7 @@ const SECTIONS: { id: string; title: string; body: React.ReactNode }[] = [
     body: (
       <>
         <p>
-          A product intro video introduces what you&apos;ve built in under a minute. IntroMaker writes it from the product&apos;s own words: your feature
+          A product intro video introduces what you&apos;ve built in under a minute. Prodintro.com writes it from the product&apos;s own words: your feature
           names become bento tiles and feature cards with matching icons, your screenshots become a zoom tour with callouts, and your tagline sits under
           the logo.
         </p>
@@ -106,7 +106,7 @@ const SECTIONS: { id: string; title: string; body: React.ReactNode }[] = [
     title: "URL to video: turn your website into a video",
     body: (
       <>
-        <p>Paste a URL and IntroMaker reads the page the way a visitor would:</p>
+        <p>Paste a URL and Prodintro.com reads the page the way a visitor would:</p>
         <ul>
           <li>your logo, captured at the sharpest size the site offers, and your brand colours;</li>
           <li>your headline, tagline, features and call to action;</li>
@@ -190,7 +190,7 @@ const SECTIONS: { id: string; title: string; body: React.ReactNode }[] = [
     title: "Product videos from a listing",
     body: (
       <p>
-        Selling a physical product? Paste an Amazon, eBay, Etsy, Walmart or Shopify product link, or upload your photos, and IntroMaker makes a product video:
+        Selling a physical product? Paste an Amazon, eBay, Etsy, Walmart or Shopify product link, or upload your photos, and Prodintro.com makes a product video:
         the product on stage within the first second, its benefits as callouts around it, different angles and an end card. Use listings and photos you
         have the right to use.
       </p>
@@ -203,7 +203,7 @@ export default function SaasVideoMaker() {
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      name: "IntroMaker",
+      name: "Prodintro.com",
       applicationCategory: "MultimediaApplication",
       operatingSystem: "Web browser",
       description: DESCRIPTION,

@@ -926,7 +926,7 @@ export const editorialSkills: Skill[] = [
     name: "Kinetic Poster",
     tagline: "A Swiss poster builds itself: hairline frame and column rules draw on, huge stacked type rises out of its masks, an accent disc lands.",
     bestFor: "A bold statement or positioning line set as a poster (3–8 words, the *accent* in italic serif). Items = up to 4 short list entries for the side column; subtext = a footer note.",
-    sample: { text: "Design that *moves*", subtext: "Made with IntroMaker", items: ["Motion", "Type", "Systems"] },
+    sample: { text: "Design that *moves*", subtext: "Made with Prodintro.com", items: ["Motion", "Type", "Systems"] },
     itemsHint: "Up to 4 short features for the list column",
     render: typePoster,
     sfx: () => [

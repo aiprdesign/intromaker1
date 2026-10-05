@@ -1,7 +1,7 @@
 import type { VideoPlan } from "./types";
 
 export const HERO_PLAN: VideoPlan = {
-  title: "IntroMaker",
+  title: "Prodintro.com",
   palette: "cosmos",
   font: "inter",
   aspect: "16:9",
@@ -9,7 +9,7 @@ export const HERO_PLAN: VideoPlan = {
   seed: 4242,
   style: "saas",
   scenes: [
-    { skill: "blur-reveal", text: "Turn a prompt into a *launch video*", items: ["Introducing IntroMaker"], duration: 3.5, transition: "cut" },
+    { skill: "blur-reveal", text: "Turn a prompt into a *launch video*", items: ["Introducing Prodintro.com"], duration: 3.5, transition: "cut" },
     { skill: "word-swap", text: "Make intros|trailers|launch videos|promos", subtext: "Or paste your website URL", duration: 4, transition: "dolly" },
     {
       skill: "bento",
@@ -27,7 +27,7 @@ export const HERO_PLAN: VideoPlan = {
  * transitions, with no words competing with the headline on top of it.
  */
 export const HOME_BACKDROP: VideoPlan = {
-  title: "IntroMaker",
+  title: "Prodintro.com",
   palette: "cosmos",
   font: "inter",
   aspect: "16:9",
