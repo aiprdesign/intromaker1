@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SKILL_GROUPS, SKILL_MAP } from "@/engine/skills";
-import type { SkillId, VideoPlan } from "@/engine/types";
+import type { Scene, SkillId, VideoPlan } from "@/engine/types";
 import { later, skillThumb, thumbsReady } from "@/lib/thumbs";
 
 /**
@@ -16,8 +16,11 @@ export default function SkillPicker({
   onPick,
   variant = "field",
   label,
+  scene,
 }: {
   plan: VideoPlan;
+  /** The slide being restyled: the menu previews every style with this slide's own content. */
+  scene?: Scene;
   value?: SkillId;
   onPick: (id: SkillId) => void;
   variant?: "field" | "add";
@@ -47,12 +50,12 @@ export default function SkillPicker({
     if (!value || variant !== "field") return;
     let alive = true;
     thumbsReady()
-      .then(() => later(() => skillThumb(value, plan), () => alive))
+      .then(() => later(() => skillThumb(value, plan, scene), () => alive))
       .then((src) => src && alive && setFieldThumb(src));
     return () => {
       alive = false;
     };
-  }, [value, plan, variant]);
+  }, [value, plan, variant, scene]);
 
   // Render the menu's thumbnails a few at a time so opening stays instant.
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function SkillPicker({
         const until = performance.now() + 12;
         while (todo.length && performance.now() < until) {
           const id = todo.shift()!;
-          batch[id] = skillThumb(id, plan);
+          batch[id] = skillThumb(id, plan, scene);
         }
         setThumbs((t) => ({ ...t, ...batch }));
         if (todo.length) timer = window.setTimeout(step, 0);
@@ -78,7 +81,7 @@ export default function SkillPicker({
       alive = false;
       clearTimeout(timer);
     };
-  }, [open, flat, plan]);
+  }, [open, flat, plan, scene]);
   // A new look (palette, font, style) means new thumbnails.
   useEffect(() => setThumbs({}), [plan]);
 

@@ -4,7 +4,9 @@ import { ensureFonts } from "@/engine/fonts";
 import { preloadImages } from "@/engine/media";
 import { placeholderSources, withPlaceholders } from "@/engine/placeholders";
 import { aspectSize, renderScene } from "@/engine/renderer";
+import { slideContent } from "@/engine/newslide";
 import { SKILL_MAP } from "@/engine/skills";
+import { DEMO_SKILLS, roleOf } from "@/engine/templates";
 import type { Scene, SkillId, VideoPlan } from "@/engine/types";
 
 /**
@@ -62,13 +64,78 @@ export function sceneThumb(scene: Scene, plan: VideoPlan): string {
   return cache.get(key) ?? remember(key, paint(scene, plan));
 }
 
-/** A thumbnail of a slide style with its sample content, in the film's look. */
-export function skillThumb(skill: SkillId, plan: VideoPlan): string {
-  const key = `k|${lookKey(plan)}|${skill}`;
+const LOGO_SKILL = /^logo-|^liquid-logo$|^particle-assemble$/;
+
+/**
+ * What a slide style shows in the menu: the video's own content, never the style's sample copy.
+ * For a slide being restyled (`base`), that slide's own headline, line, items and picture; for a
+ * new slide, copy written from the video itself (its features, moments and brand: see
+ * newslide.ts, without re-running the director, so the menu stays instant). Logo slides show the
+ * brand's name. The sample fills only what the video has nothing for.
+ */
+function thumbScene(skill: SkillId, plan: VideoPlan, base?: Scene): Scene {
+  const s = SKILL_MAP[skill];
+  const brand = plan.brand?.name?.trim();
+  let own: Partial<Scene> = {};
+  try {
+    own = slideContent(skill, plan, () => null);
+  } catch {
+    /* the sample stands in */
+  }
+  // The video's own slide of the same kind (this style, else the same part of the story: its end
+  // card for a call to action, its reveal for a logo) has the real lines.
+  const role = roleOf({ skill, text: "", duration: 3, transition: "cut" }, 1, 3);
+  // (A product moment only borrows from the very same moment: each reads its line and items in its
+  // own format, a board's columns, a chat's messages.)
+  const twin = plan.scenes.find((x) => x.skill === skill) ?? (role && !DEMO_SKILLS.has(skill) ? plan.scenes.find((x, i, all) => roleOf(x, i, all.length) === role) : undefined);
+  if (twin) own = { ...own, text: twin.text || own.text, subtext: twin.subtext, items: twin.items?.length ? twin.items : own.items, eyebrow: twin.eyebrow ?? own.eyebrow, media: twin.media ?? own.media };
+  // A style's sample line is never shown as if it were the video's (a moment's stock data line,
+  // a board's columns or a notification, is fine: it isn't a claim).
+  if (!DEMO_SKILLS.has(skill) && own.subtext === s.sample.subtext) own.subtext = "";
+  let c: Partial<Scene> = own;
+  // (An empty line is left empty: a style's sample line is never shown as if it were the video's.)
+  if (LOGO_SKILL.test(skill) && brand) c = { text: brand, subtext: plan.scenes.find((x) => x.role === "reveal" || LOGO_SKILL.test(x.skill))?.subtext ?? "" };
+  else if (base) {
+    // A product moment (a board, a chat, a file drop) reads its line as its own data (columns, a
+    // notification, a file name): that comes from the video's material, not the slide's line.
+    const moment = DEMO_SKILLS.has(skill);
+    c = {
+      text: base.text || own.text,
+      subtext: (moment ? own.subtext : base.subtext ?? own.subtext) ?? "",
+      items: base.items?.length ? base.items : own.items,
+      eyebrow: base.eyebrow ?? own.eyebrow,
+      media: base.media ?? own.media,
+    };
+  }
+  return {
+    skill,
+    text: c.text || s.sample.text,
+    subtext: c.subtext ?? (base ? "" : s.sample.subtext),
+    items: s.itemsHint !== undefined || c.items?.length ? (c.items?.length ? c.items : s.sample.items) : undefined,
+    eyebrow: plan.style === "saas" ? c.eyebrow ?? "Features" : undefined,
+    media: c.media,
+    role: c.role,
+    duration: 4.5,
+    transition: "cut",
+  };
+}
+
+/**
+ * A slide switched to another style, with the content its menu thumbnail showed (so what you pick
+ * is what you saw): its own headline and items, a moment's own data line, or the brand's name on a
+ * logo slide. Its picture, timing, transition and narration stay.
+ */
+export function restyleScene(base: Scene, skill: SkillId, plan: VideoPlan): Scene {
+  const t = thumbScene(skill, plan, base);
+  return { ...base, skill, text: t.text, subtext: t.subtext, items: t.items };
+}
+
+/** A thumbnail of a slide style in the film's look, showing the film's own content (see thumbScene). */
+export function skillThumb(skill: SkillId, plan: VideoPlan, base?: Scene): string {
+  const scene = thumbScene(skill, plan, base);
+  const key = `k|${lookKey(plan)}|${JSON.stringify(scene)}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const s = SKILL_MAP[skill];
-  const scene: Scene = { skill, text: s.sample.text, subtext: s.sample.subtext, items: s.sample.items, duration: 4.5, transition: "cut", eyebrow: plan.style === "saas" ? "Features" : undefined };
   // A style that shows your media previews with stand-in pictures when the film has none.
   const preview = withPlaceholders(scene, plan);
   return remember(key, paint(preview.scene, preview.plan));

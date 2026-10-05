@@ -9,7 +9,7 @@ import ShapesPicker from "@/components/ShapesPicker";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
 import type { PlanLimits } from "@/lib/plans";
-import { pauseThumbs, sceneThumb, thumbsReady } from "@/lib/thumbs";
+import { pauseThumbs, sceneThumb, thumbsReady, restyleScene } from "@/lib/thumbs";
 import SlideTimeline from "@/components/SlideTimeline";
 import Icon from "@/components/Icon";
 import { useReorder } from "@/components/useReorder";
@@ -1298,7 +1298,11 @@ export default function Studio() {
             </button>
           )}
           <span className="scene-n">{String(i + 1).padStart(2, "0")}</span>
-          <SkillPicker plan={plan} value={s.skill} onPick={(id) => id !== s.skill && updateScene(i, { skill: id })} />
+          <SkillPicker plan={plan} scene={s} value={s.skill} onPick={(id) => {
+            if (id === s.skill) return;
+            const r = restyleScene(s, id, plan);
+            updateScene(i, { skill: id, text: r.text, subtext: r.subtext, items: r.items });
+          }} />
         </div>
         {plan.style === "saas" && (
           <label className="fld">
