@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: "Prodintro.com is free and unlimited for personal and non-commercial use. Commercial use needs a licence: contact us.",
 };
 
-/** The terms in plain language: free for non-commercial use, a commercial licence on request. */
+/** The terms in plain language: free for non-commercial use, a commercial licence on request; the code is proprietary. */
 export default async function License() {
   const contact = (await readSettings().catch(() => null))?.contactEmail;
   const mail = contact ? `mailto:${contact}?subject=${encodeURIComponent("Prodintro.com commercial licence")}` : null;
@@ -32,19 +32,15 @@ export default async function License() {
 
         <h2>Commercial use: contact us</h2>
         <p>
-          Using Prodintro.com for a business, for clients, in an agency, or running its code on your own servers or inside a product you sell needs a commercial
+          Using Prodintro.com for a business, for clients or in an agency needs a commercial
           licence. {mail ? <a href={mail}>Contact us at {contact}</a> : "Contact the site owner"} and tell us how you&apos;d like to use it.
         </p>
 
         <h2>The source code</h2>
         <p>
-          Prodintro.com&apos;s own code is released under the{" "}
-          <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">
-            PolyForm Noncommercial License 1.0.0
-          </a>
-          : you may use, change and share it for any non-commercial purpose; commercial use needs a separate licence from us. Versions published earlier
-          under the MIT licence stay available under MIT. The open-source components it uses keep their own licences: see{" "}
-          <Link href="/licenses">open-source licences</Link>.
+          Prodintro.com is proprietary software: its code is not open source, and all rights are reserved. It may not be copied, changed, shared, hosted
+          or run without our written permission. The third-party components it&apos;s built on keep their own licences: see{" "}
+          <Link href="/licenses">third-party licences</Link>.
         </p>
 
         <p>

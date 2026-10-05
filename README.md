@@ -428,9 +428,9 @@ Every skill is a deterministic function of time: it takes a seeded RNG and no pe
 - Export renders every frame offline with WebCodecs (Chrome, Edge, Safari 17+), so videos come out smooth and exactly the right length on any machine. Other browsers fall back to real-time recording.
 
 
-## Open-source compliance
+## Third-party licence compliance
 
-Everything Prodintro.com ships is open source with a licence that allows commercial use, and `npm run check:licenses` enforces it:
+Every third-party component Prodintro.com ships is open source with a licence that allows commercial use, and `npm run check:licenses` enforces it:
 - **Packages**: every package in `package-lock.json` (production, dev tools and optional platform binaries) must be permissively licensed (MIT, ISC, Apache-2.0, BSD and similar), a font under the SIL Open Font License, or a copyleft package with a written reason it isn't shipped (the optional image optimiser, which is never loaded). The bundled fonts (Inter, Manrope, Space Grotesk, Jost, Playfair Display, Instrument Serif, JetBrains Mono, Cinzel, Bebas Neue, Anton) are all OFL-1.1.
 - **Components loaded at runtime** (the optional in-browser voice, Chromium for captures, Google Fonts for a site's brand font) are listed with their licences.
 - **Images and media**: every file served from `public/` must be listed with its source and licence; an unlisted file fails the check. The sample product photos are original illustrations drawn by `scripts/sample-art.mjs`.
@@ -441,11 +441,11 @@ The homepage's sample brands and video (Lumetrik, Kelvo, The Lantern Deep, Prodi
 
 ## Licence
 
-Prodintro.com is **free and unlimited, for now, for personal and non-commercial use**: every plan's limits are lifted (abuse rate limits and the AI budget still apply), and the pricing section offers a commercial licence on request (its button writes to the contact email set in Admin → Plans; the [/license](src/app/license/page.tsx) page explains the terms). Prodintro.com's own code is released under the [PolyForm Noncommercial License 1.0.0](LICENSE): use it, change it and share it for any non-commercial purpose; **commercial use needs a separate licence, so contact the copyright holder**. Versions published earlier under the MIT licence remain available under MIT. The third-party components below keep their own licences.
+Prodintro.com is **proprietary software: it is not open source, and all rights are reserved** (see [LICENSE](LICENSE)). The code may not be copied, changed, shared, hosted or run without the copyright holder's written permission. Using the hosted site is **free and unlimited, for now, for personal and non-commercial use**: every plan's limits are lifted (abuse rate limits and the AI budget still apply), and the pricing section offers a commercial licence on request (its button writes to the contact email set in Admin → Plans; the [/license](src/app/license/page.tsx) page explains the terms). The third-party components below keep their own licences.
 
 ## Third-party and licences
 
-Every component Prodintro.com uses is open source, and each licence allows commercial use. `npm run check:licenses` checks all of them: every production package in the lockfile (including optional platform binaries), the dev tools, and what's loaded at runtime. It fails if a licence isn't on the commercial-friendly allowlist. `npm run licenses` regenerates [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (full licence texts and NOTICE files) and the in-app **/licenses** page, which is linked from every footer and the studio.
+Every third-party component Prodintro.com uses is open source, and each licence allows commercial use. `npm run check:licenses` checks all of them: every production package in the lockfile (including optional platform binaries), the dev tools, and what's loaded at runtime. It fails if a licence isn't on the commercial-friendly allowlist. `npm run licenses` regenerates [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (full licence texts and NOTICE files) and the in-app **/licenses** page, which is linked from every footer and the studio.
 
 - **Permissive (MIT, ISC, Apache-2.0, BSD, 0BSD, Unlicense)**: Next.js, React, zod, undici, the Anthropic SDK, playwright-core, [OGL](https://github.com/oframe/ogl), [Lucide](https://lucide.dev) icons, [Paper Shaders](https://github.com/paper-design/shaders) (Apache-2.0, NOTICE reproduced; `src/engine/shaderbg.ts` includes their vertex shader source) and [gl-transitions](https://github.com/gl-transitions/gl-transitions) (MIT; two of its 125 shaders, which Gallery Flow doesn't use, are BSD).
 - **Fonts (SIL OFL-1.1)**: Inter, Space Grotesk, Anton, Instrument Serif and JetBrains Mono via Fontsource. They're free to use and embed commercially, including in rendered videos.

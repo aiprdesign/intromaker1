@@ -64,7 +64,7 @@ export default function SiteFooter() {
       </div>
       <div className="footer-legal">
         © {new Date().getFullYear()} Prodintro.com · <Link href="/privacy">Privacy</Link>
-        <TermsLink /> · <Link href="/license">Licence</Link> · <Link href="/licenses">Open-source licences</Link>
+        <TermsLink /> · <Link href="/license">Licence</Link> · <Link href="/licenses">Third-party licences</Link>
       </div>
     </footer>
   );
