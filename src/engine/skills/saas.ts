@@ -269,15 +269,24 @@ function uiTour(sc: SkillContext) {
   saasBackground(sc, { beams: 3 });
   const T = tourTiming(d);
   const portrait = h > w;
-  const ww = portrait ? w * 0.9 : Math.min(w * 0.74, h * 0.62 * 1.6);
-  const wh = portrait ? ww * 1.15 : ww / 1.6;
-  const fcx = w / 2;
-  const fcy = portrait ? h * 0.57 : h * 0.585;
-  const fx0 = fcx - ww / 2;
-  const fy0 = fcy - wh / 2;
+  const square = !portrait && w / h < 1.25;
   const bar = 30 * u;
   const r = rng(seed);
   const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
+  // The window takes the screenshot's own shape, so the whole UI shows in every format (a tall
+  // window would crop a desktop screenshot's sides). Vertical and square frames use their width;
+  // widescreen frames keep the window clear of the headline and the edges.
+  const shotAr = media ? clamp(mediaSize(media).w / Math.max(1, mediaSize(media).h), 0.9, 1.9) : 1.6;
+  const ww = portrait ? w * 0.86 : square ? w * 0.82 : Math.min(w * 0.74, (h * 0.62 - bar) * shotAr);
+  const wh = Math.min(ww / shotAr + bar, h * (portrait ? 0.5 : 0.66));
+  const fcx = w / 2;
+  const fcy = portrait ? h * 0.46 : square ? h * 0.57 : h * 0.585;
+  const fx0 = fcx - ww / 2;
+  const fy0 = fcy - wh / 2;
+  // How far a close-up may zoom: in vertical and square frames, until the component fills the width.
+  const zMax = portrait ? 2.6 : square ? 2.2 : 1.9;
+  const zoomFor = (c: { w: number; h: number }) =>
+    clamp(portrait || square ? Math.min((w * 0.86) / c.w, (h * (portrait ? 0.42 : 0.55)) / c.h) : Math.min((ww * 0.8) / c.w, ((wh - bar) * 0.8) / c.h), 1.1, zMax);
   // Zoom to the busiest real UI regions of the screenshot; seeded spots otherwise.
   const found = media ? findHotspots(media, ww, wh - bar, 0.5, 0.2) : null;
   const hot = (
@@ -310,7 +319,7 @@ function uiTour(sc: SkillContext) {
       // (a card's edge, a chart, a headline row) joins the framing, so nothing is cut.
       let c = { x: ox + fit.x * cs, y: oy + fit.y * cs, w: fit.w * cs, h: fit.h * cs };
       for (let pass = 0; pass < 3; pass++) {
-        const zz = clamp(Math.min((ww * 0.8) / c.w, ((wh - bar) * 0.8) / c.h), 1.1, 1.9);
+        const zz = zoomFor(c);
         const vw = ww / zz;
         const vh = (wh - bar) / zz;
         const vx = c.x + c.w / 2 - vw / 2;
@@ -341,7 +350,7 @@ function uiTour(sc: SkillContext) {
   const stops = hot.map((p, i) => {
     const c = comps[i];
     if (!c) return { x: p.x, y: p.y, z: 1.5 };
-    return { x: c.x + c.w / 2, y: c.y + c.h / 2, z: clamp(Math.min((ww * 0.8) / c.w, ((wh - bar) * 0.8) / c.h), 1.1, 1.9) };
+    return { x: c.x + c.w / 2, y: c.y + c.h / 2, z: zoomFor(c) };
   });
   let focus = { x: lerp(center.x, stops[0].x, kA), y: lerp(center.y, stops[0].y, kA) };
   focus = { x: lerp(focus.x, stops[1].x, kB), y: lerp(focus.y, stops[1].y, kB) };
@@ -445,6 +454,25 @@ function uiTour(sc: SkillContext) {
     ctx.fill();
     ctx.restore();
   });
+  // Vertical frames have room under the window: the tour's stops as numbered steps, the current one lit.
+  if (portrait) {
+    const active = t >= T.clickA && t < T.zoomB + 0.3 ? 0 : t >= T.clickB && t < T.out + 0.2 ? 1 : -1;
+    const k0 = ease.outCubic(range(t, 0.5, 1.1)) * (1 - ex);
+    const y0 = fcy + wh / 2 + 70 * u;
+    labels.forEach((label, i) => {
+      if (!label || k0 <= 0) return;
+      const on = i === active;
+      ctx.save();
+      ctx.globalAlpha = k0 * (on ? 1 : 0.7);
+      pill(sc, `${i + 1}   ${label}`, w / 2, y0 + i * 76 * u + (1 - k0) * 14 * u, {
+        size: 26 * u,
+        fill: on ? rgba(palette.primary, 0.22) : rgba(palette.bg0, 0.85),
+        border: on ? rgba(palette.primary, 0.9) : rgba(palette.text, 0.18),
+        color: palette.text,
+      });
+      ctx.restore();
+    });
+  }
   const a = toScreen(hot[0]);
   const b = toScreen(hot[1]);
   const start = { x: w * 0.92, y: h * 1.05 };

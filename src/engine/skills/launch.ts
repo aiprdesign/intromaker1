@@ -22,7 +22,7 @@
 import { exitT } from "../fx";
 import { tokens } from "../grid";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, TAU } from "../math";
-import { findHotspots, getMedia, type Drawable } from "../media";
+import { findHotspots, getMedia, mediaSize, type Drawable } from "../media";
 import { clickRipple, drawCursor, drawIcon, glassCard, iconsFor, pill, pillWidth, saasBackground, spring } from "../saasfx";
 import { fillTextFit, fitTextLines, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -217,9 +217,11 @@ function spotlight(sc: SkillContext) {
   const T = spotTiming(scene);
   const shot = shotOf(sc);
   // The screenshot in a window, as large as the stage allows (16:10 inside the chrome).
-  const ww = portrait ? st.width : Math.min(st.width, ((st.bottom - st.top) / 0.68) * 1.0);
-  // A tall frame shows more of the page (a 4:5 crop) and leaves room for the label under it.
-  const sh = Math.min(portrait ? ww * 1.1 : (ww * 10) / 16, st.bottom - st.top - (portrait ? 170 : 60) * u);
+  const ww = portrait ? st.width * 0.94 : Math.min(st.width, ((st.bottom - st.top) / 0.68) * 1.0);
+  // The window takes the screenshot's own shape, so a tall frame shows the whole page width (a tall
+  // crop would cut its sides) and leaves room for the label under it.
+  const ar = shot instanceof HTMLCanvasElement ? 1.6 : clamp(mediaSize(shot as Drawable).w / Math.max(1, mediaSize(shot as Drawable).h), 0.9, 1.9);
+  const sh = Math.min(portrait ? ww / ar : (ww * 10) / 16, st.bottom - st.top - (portrait ? 170 : 60) * u);
   const wh = sh + 46 * u;
   const wx = (w - ww) / 2;
   const wy = st.top + (st.bottom - st.top - wh) / 2 - (portrait ? 50 * u : 0);
@@ -516,13 +518,18 @@ function explodedUi(sc: SkillContext) {
   const labels = itemsOr(scene, ["Navigation", "Your workspace", "Live updates"], 3);
   const T = explodeTiming(scene);
   const room = st.bottom - st.top;
-  const pw = portrait ? st.width * 0.86 : Math.min(st.width * 0.7, room * 1.25);
-  const ph = (pw * 10) / 16;
-  const cx = portrait ? w / 2 : w / 2 - st.width * 0.08;
-  const cy = st.top + room * 0.5;
+  // Square frames stack the labels under the layers like tall ones (there's no room beside them).
+  const square = !portrait && w / sc.h < 1.25;
+  const stacked = portrait || square;
   // How far into the 3D view (tilt) and how far apart the layers float (apart), 0..1.
   // It tilts as it fades in (one change of brightness, not two), and flattens before it leaves.
   const tilt = ease.outCubic(range(t, 0.05, 0.6)) * (1 - ease.inOutCubic(range(t, T.close + 0.15, T.flat)));
+  // In tall and square frames the page grows as it tilts, making up for the isometric view's
+  // shrink, so it fills the width in 3D and still fits when it lies flat.
+  const pw = portrait ? st.safe.width * (0.84 + 0.14 * tilt) : square ? Math.min(st.safe.width * (0.78 + 0.14 * tilt), room * 1.3) : Math.min(st.width * 0.7, room * 1.25);
+  const ph = (pw * 10) / 16;
+  const cx = stacked ? w / 2 : w / 2 - st.width * 0.08;
+  const cy = st.top + room * (square ? 0.4 : portrait ? 0.42 : 0.5);
   const apart = ease.inOutCubic(range(t, T.apart, T.apart + 0.7)) * (1 - ease.inOutCubic(range(t, T.close, T.close + 0.6)));
   const layers = 4;
   const gap = ph * 0.22 * apart;
@@ -586,7 +593,7 @@ function explodedUi(sc: SkillContext) {
   }
   ctx.restore();
   // Labels for the floating layers (top first), each on a leader line.
-  if (apart > 0.5 && !portrait) {
+  if (apart > 0.5 && !stacked) {
     const lx = Math.min(w - st.safe.left - 10 * u, cx + pw * 0.62);
     labels.forEach((label, i) => {
       const L = layers - 1 - i;
@@ -619,14 +626,16 @@ function explodedUi(sc: SkillContext) {
       ctx.restore();
     });
   }
-  // In portrait the labels stack under the layers.
-  if (apart > 0.5 && portrait) {
+  // In tall and square frames the labels stack under the layers.
+  if (apart > 0.5 && stacked) {
     labels.forEach((label, i) => {
       const k = clamp(spring(t - T.label - i * 0.18, 14, 7), 0, 1.05) * clamp((apart - 0.5) * 2);
       if (k <= 0) return;
       ctx.save();
       ctx.globalAlpha = (1 - ex) * clamp(k);
-      pill(sc, label, w / 2, Math.min(st.bottom - 30 * u, cy + ph * 0.55 + 40 * u) + i * 64 * u * S, { size: 20 * u * S, weight: 650, border: palette.primary, color: palette.text });
+      const step = (square ? 52 : 64) * u * S;
+      const y0 = Math.min(st.bottom - 30 * u - (labels.length - 1) * step, cy + ph * 0.55 + 40 * u);
+      pill(sc, label, w / 2, y0 + i * step, { size: 20 * u * S, weight: 650, border: palette.primary, color: palette.text });
       ctx.restore();
     });
   }
