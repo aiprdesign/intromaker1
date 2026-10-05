@@ -234,8 +234,15 @@ export function shortTitle(title: string, _brand = ""): string {
   let t = clean(title.replace(/[【】[\]]/g, " "));
   t = t.split(/\s*(?:,|\||–|—|\s-\s|\(|;|:|\bwith\b|\bfor\b)\s*/i)[0] ?? t;
   const words = t.split(/\s+/).filter(Boolean);
-  return words.slice(0, 7).join(" ") || clean(title).split(/\s+/).slice(0, 6).join(" ");
+  // Up to the product's own noun ("… Hair Clipper", "… Wireless Earbuds"): a
+  // heading, not the listing's keyword string. (Without one, the brand and model: four words.)
+  const head = words.findIndex((w, i) => i >= 1 && i <= 6 && PRODUCT_NOUNS.test(w.replace(/[^A-Za-z-]/g, "")));
+  return (head >= 0 ? words.slice(0, head + 1) : words.slice(0, 4)).join(" ") || clean(title).split(/\s+/).slice(0, 4).join(" ");
 }
+
+/** What a listing's title is a name of: the noun its product name ends on. */
+const PRODUCT_NOUNS =
+  /^(clippers?|trimmers?|shavers?|razors?|earbuds|headphones|headsets?|speakers?|chargers?|cables?|cases?|covers?|bottles?|mugs?|cups?|tumblers?|lamps?|lights?|chairs?|desks?|tables?|bags?|backpacks?|wallets?|watch(es)?|rings?|necklaces?|bracelets?|earrings?|shoes|sneakers|boots|jackets?|shirts?|hoodies?|dress(es)?|kits?|sets?|cameras?|drones?|keyboards?|mice|mouse|monitors?|stands?|holders?|mounts?|mats?|pillows?|blankets?|knives|knife|pans?|pots?|blenders?|kettles?|toys?|games?|books?|creams?|serums?|oils?|shampoos?|brush(es)?|dryers?|straighteners?|purifiers?|humidifiers?|fans?|heaters?|trackers?|phones?|tablets?|laptops?|routers?|projectors?|scales?|toothbrush(es)?|organi[sz]ers?|racks?|shelves|shelf|rugs?|curtains?|sheets?|towels?|candles?|diffusers?|grinders?|makers?|machines?|cookers?|fryers?|ovens?|grills?|bikes?|scooters?|helmets?|gloves?|glasses|sunglasses|perfumes?|lipsticks?|palettes?|supplements?|vitamins?|leashes?|collars?|feeders?|beds?)$/i;
 
 /** "LONG BATTERY LIFE: up to 40 hours…" / "【Long Battery】 up to…" → ["Long battery life", "Up to 40 hours…"]. */
 export function splitBullet(b: string): [string, string] {

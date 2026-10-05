@@ -557,12 +557,19 @@ export function renderFrame(
     return;
   }
   const next = plan.scenes[at.index + 1];
-  renderScene(ctx, at.scene, plan, at.local, w, h, at.index, opts, time, {
+  // With captions on, the slide plays in the frame above a caption band (its photos, headings and
+  // cards a little smaller and higher), so the captions never cover them.
+  const band = captionBand(plan, w, h);
+  const stageH = h - band;
+  const stage = band ? scratch("caption-stage", w, stageH, false).ctx : ctx;
+  if (band) resetCtx(stage);
+  renderScene(stage, at.scene, plan, at.local, w, stageH, at.index, opts, time, {
     prev: at.index > 0 ? { scene: plan.scenes[at.index - 1], index: at.index - 1 } : undefined,
     extendSelf: !!next && OVERLAP.has(next.transition),
     music: musicPulse(plan, time),
   });
-  if (plan.style === "saas" && opts.grade !== false) epicPass(ctx, plan, at.local, at.index, time, musicPulse(plan, time), w, h);
+  if (plan.style === "saas" && opts.grade !== false) epicPass(stage, plan, at.local, at.index, time, musicPulse(plan, time), w, stageH);
+  if (band) captionFloor(ctx, stage.canvas, plan, w, h, stageH);
   // Movie trailers play in widescreen: black bars to 2.39:1 on landscape frames.
   if (plan.style === "trailer" && isMovieStyle(plan.trailerStyle) && w > h * 1.2) {
     resetCtx(ctx);
@@ -614,6 +621,42 @@ export function renderFrameBlurred(
   }
   resetCtx(ctx);
   ctx.drawImage(acc.canvas, 0, 0);
+}
+
+/** The height kept free for captions at the bottom of the frame (0 when captions are off). */
+export function captionBand(plan: Pick<VideoPlan, "voiceover">, w: number, h: number) {
+  if (!plan.voiceover?.enabled || !plan.voiceover.captions) return 0;
+  const bold = plan.voiceover.captionStyle === "pop" || plan.voiceover.captionStyle === "box";
+  return Math.round(h * (h > w ? (bold ? 0.22 : 0.2) : bold ? 0.19 : 0.15));
+}
+
+/**
+ * The caption band under the slide: the slide's own colours carried down, with a soft, blurred
+ * reflection of its lower edge fading into the background, so the band reads as part of the shot.
+ */
+function captionFloor(ctx: CanvasRenderingContext2D, stage: HTMLCanvasElement, plan: VideoPlan, w: number, h: number, stageH: number) {
+  const band = h - stageH;
+  const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  const u = Math.min(w, h) / 1080;
+  resetCtx(ctx);
+  ctx.drawImage(stage, 0, 0);
+  // The slide's last rows, stretched down: its background continues under it.
+  ctx.drawImage(stage, 0, stageH - 2, w, 2, 0, stageH, w, band);
+  // A soft reflection of the slide's lower edge.
+  ctx.save();
+  ctx.globalAlpha = palette.light ? 0.18 : 0.26;
+  ctx.filter = `blur(${Math.round(16 * u)}px)`;
+  ctx.setTransform(1, 0, 0, -1, 0, stageH * 2);
+  // (Only the slide's lowest strip, so headings never show up mirrored.)
+  const src = Math.min(Math.round(band * 0.5), stageH);
+  ctx.drawImage(stage, 0, stageH - src, w, src, 0, stageH - src, w, src);
+  ctx.restore();
+  // Fading into the background colour towards the bottom.
+  const g = ctx.createLinearGradient(0, stageH, 0, h);
+  g.addColorStop(0, rgba(palette.bg0, 0.15));
+  g.addColorStop(1, rgba(palette.bg0, palette.light ? 0.75 : 0.9));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, stageH, w, band);
 }
 
 /**
