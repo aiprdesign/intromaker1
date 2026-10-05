@@ -243,6 +243,14 @@ const addOp = (sc: SkillContext): GlobalCompositeOperation => (sc.palette.light 
 /** The hottest colour of a light: near white on dark stages, the brand colour on light ones. */
 const hotOf = (sc: SkillContext) => (sc.palette.light ? sc.palette.primary : mixHex(sc.palette.primary, "#ffffff", 0.75));
 
+/** "#rrggbb" (or "#rgb") as [r, g, b]. */
+function hexRgb(hex: string): [number, number, number] {
+  let h = hex.replace("#", "").trim();
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const n = parseInt(h.slice(0, 6), 16) || 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 /** A glow of light around the mark's own shape. */
 function haloAt(sc: SkillContext, m: Mark, cx: number, cy: number, fw: number, fh: number, k: number) {
   const { ctx } = sc;
@@ -302,6 +310,9 @@ function withReflection(sc: SkillContext, floorY: number, strength: number, pain
     refl.ctx.fillStyle = g;
     refl.ctx.fillRect(0, 0, lw, lh);
     refl.ctx.globalCompositeOperation = "source-over";
+    // A reflection only exists below the floor: what was drawn under the floor line (glow, sparks)
+    // would otherwise be mirrored up into the sky as a shaft of light.
+    refl.ctx.clearRect(0, 0, lw, Math.max(0, Math.floor(floorY * res)));
     ctx.drawImage(refl.canvas, 0, 0, lw, lh, 0, 0, w, h);
   }
   ctx.drawImage(layer.canvas, 0, 0, lw, lh, 0, 0, w, h);
@@ -416,27 +427,74 @@ function backLight(sc: SkillContext, S: Shot, k: number, cy = S.P.cy, floorY = S
   core.addColorStop(0.4, rgba(c1, light ? 0.15 : 0.38));
   core.addColorStop(1, rgba(c1, 0));
   g.fillStyle = core;
-  g.fillRect(cx - size * 1.1, cy - size * 1.1, size * 2.2, size * 2.2);
+  // (Over the whole layer: a glow painted into a square can show the square's edge.)
+  g.fillRect(0, 0, w, h);
   g.globalCompositeOperation = "lighter";
+  // The shafts: soft-sided rays from the mark, as conic gradients (light fading smoothly across
+  // each ray's width, so no ray ever ends in a hard edge), in three lengths. Each length's rays
+  // share one gradient, faded with distance by a radial mask.
   const r = rng(seed ^ 0x51ab);
+  type Ray = { a: number; wd: number; al: number; col: string };
+  const buckets: Ray[][] = [[], [], []];
   for (let i = 0; i < 22; i++) {
     const dir = r() < 0.5 ? -1 : 1;
     const a = r() * TAU + t * (0.04 + r() * 0.05) * dir;
     const wd = 0.012 + r() * 0.05;
-    const len = R * (0.5 + r() * 0.5);
+    const lenF = r();
     const al = (0.16 + r() * 0.38) * (light ? 0.5 : 1);
     const col = r() < 0.6 ? c1 : c2;
-    const gr = g.createRadialGradient(cx, cy, size * 0.12, cx, cy, len);
-    gr.addColorStop(0, rgba(col, al));
-    gr.addColorStop(0.35, rgba(col, al * 0.45));
-    gr.addColorStop(1, rgba(col, 0));
-    g.fillStyle = gr;
-    g.beginPath();
-    g.moveTo(cx, cy);
-    g.arc(cx, cy, len, a - wd, a + wd);
-    g.closePath();
-    g.fill();
+    buckets[Math.min(2, Math.floor(lenF * 3))].push({ a, wd, al, col });
   }
+  const T = scratch("logo3d-rays-one", lw, lh);
+  const [r1, g1, b1] = hexRgb(c1);
+  const [r2, g2, b2] = hexRgb(c2);
+  const N = 720;
+  buckets.forEach((rays, b) => {
+    if (!rays.length) return;
+    const len = R * (0.58 + b * 0.18);
+    // The light around the circle: every ray's soft (bell-shaped) profile summed, so overlapping
+    // rays blend into one smooth fan, never a notch or an edge.
+    const lum1 = new Float32Array(N);
+    const lum2 = new Float32Array(N);
+    for (const ray of rays) {
+      const sigma = ray.wd * 0.8;
+      const to = ray.col === c1 ? lum1 : lum2;
+      const span = Math.ceil(((sigma * 3) / TAU) * N);
+      const centre = (((ray.a / TAU) % 1) + 1) % 1;
+      const ci = Math.round(centre * N);
+      for (let d = -span; d <= span; d++) {
+        const i = (((ci + d) % N) + N) % N;
+        const ang = (d / N) * TAU;
+        to[i] += ray.al * Math.exp(-(ang * ang) / (2 * sigma * sigma));
+      }
+    }
+    const cg = T.ctx.createConicGradient(0, cx * q, cy * q);
+    for (let i = 0; i <= N; i += 2) {
+      const a1 = lum1[i % N];
+      const a2 = lum2[i % N];
+      const a = Math.min(1, a1 + a2);
+      const m = a1 + a2 > 1e-4 ? a2 / (a1 + a2) : 0;
+      cg.addColorStop(i / N, `rgba(${Math.round(r1 + (r2 - r1) * m)},${Math.round(g1 + (g2 - g1) * m)},${Math.round(b1 + (b2 - b1) * m)},${a.toFixed(3)})`);
+    }
+    T.ctx.globalCompositeOperation = "source-over";
+    T.ctx.clearRect(0, 0, lw, lh);
+    T.ctx.fillStyle = cg;
+    T.ctx.fillRect(0, 0, lw, lh);
+    // Fading with distance from the mark.
+    const fade = T.ctx.createRadialGradient(cx * q, cy * q, size * 0.12 * q, cx * q, cy * q, len * q);
+    fade.addColorStop(0, "rgba(0,0,0,1)");
+    fade.addColorStop(0.35, "rgba(0,0,0,0.45)");
+    fade.addColorStop(1, "rgba(0,0,0,0)");
+    T.ctx.globalCompositeOperation = "destination-in";
+    T.ctx.fillStyle = fade;
+    T.ctx.fillRect(0, 0, lw, lh);
+    T.ctx.globalCompositeOperation = "source-over";
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = "lighter";
+    g.drawImage(T.canvas, 0, 0);
+    g.restore();
+  });
   // Calmer below the floor, where the name sits.
   g.globalCompositeOperation = "destination-out";
   const calm = g.createLinearGradient(0, floorY - S.P.mh * 0.1, 0, floorY + h * 0.2);
@@ -445,11 +503,19 @@ function backLight(sc: SkillContext, S: Shot, k: number, cy = S.P.cy, floorY = S
   g.fillStyle = calm;
   g.fillRect(0, floorY - S.P.mh * 0.1, w, h);
   g.globalCompositeOperation = "source-over";
+  // A light blur at the layer's low resolution (cheap) softens what's left of the edges.
+  const B = scratch("logo3d-rays-soft", lw, lh);
+  B.ctx.filter = `blur(${Math.max(1, Math.round(lw / 420))}px)`;
+  B.ctx.drawImage(L.canvas, 0, 0);
+  B.ctx.filter = "none";
   ctx.save();
   ctx.globalCompositeOperation = addOp(sc);
   ctx.globalAlpha *= k * (light ? 0.6 : 0.55);
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(L.canvas, 0, 0, lw, lh, 0, 0, w, h);
+  // (Bilinear: the "high" scaler draws a big upscaled image in tiles, and under the camera's
+  // slight roll their seams can show as a straight edge through the glow.)
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "low";
+  ctx.drawImage(B.canvas, 0, 0, lw, lh, 0, 0, w, h);
   ctx.restore();
 }
 
@@ -1181,14 +1247,19 @@ function logoStage(sc: SkillContext) {
         cg.addColorStop(0, rgba(palette.light ? palette.primary : "#ffffff", palette.light ? 0.05 : 0.1));
         cg.addColorStop(1, rgba(palette.primary, palette.light ? 0.1 : 0.16));
         ctx.fillStyle = cg;
+        // Nested cones, narrower and brighter towards the middle: the beam's sides fade out softly
+        // instead of ending in a hard line.
+        for (const f of [1.15, 0.9, 0.68, 0.46]) {
+          ctx.globalAlpha = cone * 0.3;
+          ctx.beginPath();
+          ctx.moveTo(P.cx - coneTop * f, 0);
+          ctx.lineTo(P.cx + coneTop * f, 0);
+          ctx.lineTo(P.cx + coneBottom * f, floorY);
+          ctx.lineTo(P.cx - coneBottom * f, floorY);
+          ctx.closePath();
+          ctx.fill();
+        }
         ctx.globalAlpha = cone;
-        ctx.beginPath();
-        ctx.moveTo(P.cx - coneTop, 0);
-        ctx.lineTo(P.cx + coneTop, 0);
-        ctx.lineTo(P.cx + coneBottom, floorY);
-        ctx.lineTo(P.cx - coneBottom, floorY);
-        ctx.closePath();
-        ctx.fill();
         const pool = ctx.createRadialGradient(P.cx, floorY, 0, P.cx, floorY, P.mw);
         pool.addColorStop(0, rgba(palette.primary, palette.light ? 0.16 : 0.26));
         pool.addColorStop(1, rgba(palette.primary, 0));

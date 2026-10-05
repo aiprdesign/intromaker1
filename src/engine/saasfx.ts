@@ -54,7 +54,8 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
     ctx.save();
     ctx.globalAlpha = look?.shaderStrength ?? 1;
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    // (Bilinear for soft, upscaled layers: the "high" scaler tiles them and can show seams.)
+    ctx.imageSmoothingQuality = "low";
     ctx.drawImage(shaded, -w * 0.03, -h * 0.03, w * 1.06, h * 1.06);
     ctx.restore();
   }
@@ -591,7 +592,7 @@ function bloomStage(sc: SkillContext, glowOp: GlobalCompositeOperation) {
   ctx.globalCompositeOperation = glowOp;
   ctx.globalAlpha = light ? 0.55 : 0.62;
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
+  ctx.imageSmoothingQuality = "low";
   ctx.drawImage(canvas, 0, 0, w, h);
   ctx.restore();
   // A calm pocket of shade where the headline sits keeps the type crisp over the colour.
