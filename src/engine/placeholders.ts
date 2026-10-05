@@ -61,10 +61,19 @@ function product(alt: boolean) {
   const [c, g] = canvas(900, 900);
   g.fillStyle = "#ffffff";
   g.fillRect(0, 0, 900, 900);
+  productTile(g, alt);
+  return c.toDataURL("image/png");
+}
+
+/** Where the product tile sits on its 900×900 picture. */
+const tileBox = (alt: boolean) => {
   const w = alt ? 440 : 560;
   const h = alt ? 620 : 560;
-  const x = 450 - w / 2;
-  const y = 450 - h / 2;
+  return { x: 450 - w / 2, y: 450 - h / 2, w, h };
+};
+
+function productTile(g: CanvasRenderingContext2D, alt: boolean) {
+  const { x, y, w, h } = tileBox(alt);
   const fill = g.createLinearGradient(0, y, 0, y + h);
   fill.addColorStop(0, "#f1f3f8");
   fill.addColorStop(1, "#d9dee8");
@@ -87,7 +96,27 @@ function product(alt: boolean) {
   g.font = "500 22px sans-serif";
   g.fillStyle = "#8b94a8";
   g.fillText(alt ? "another angle" : "add yours to this slide", 450, 450 + 130);
-  return c.toDataURL("image/png");
+}
+
+const cutCache = new Map<string, { canvas: HTMLCanvasElement; x: number; y: number }>();
+/**
+ * The product placeholder already cut out of its white background (it's our own drawing, so the
+ * outline is known): product slides use it as they would a keyed-out photo, without the seconds
+ * of pixel work a real photo's cut-out takes. Null for any other picture.
+ */
+export function placeholderCut(src: string) {
+  const hit = cutCache.get(src);
+  if (hit) return hit;
+  const alt = src === cache.get("product2");
+  if (!alt && src !== cache.get("product")) return null;
+  const { x, y, w, h } = tileBox(alt);
+  const pad = 2;
+  const [c, g] = canvas(w + pad * 2, h + pad * 2);
+  g.translate(pad - x, pad - y);
+  productTile(g, alt);
+  const cut = { canvas: c, x: x - pad, y: y - pad };
+  cutCache.set(src, cut);
+  return cut;
 }
 
 /** An app screen: sidebar, header, stat cards, a chart and table rows. */

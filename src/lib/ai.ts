@@ -188,6 +188,30 @@ async function openAiEndpoint(cfg: AiConfig) {
   return { preset, base, headers };
 }
 
+/** OpenRouter models that take text only (screenshots would make the request fail). */
+const TEXT_ONLY = /deepseek|gpt-oss|llama-3\.[0-3]-|mixtral/i;
+
+/** One AI call's time limit (the generate route allows enough for a draft and a review). */
+const AI_TIMEOUT_MS = 150_000;
+
+/** A provider's error in plain words, with its own message so the real cause shows. */
+function providerError(name: string, model: string, status: number, body: string, key?: string) {
+  let detail = body;
+  try {
+    const j = JSON.parse(body) as { error?: { message?: string; metadata?: { raw?: string } } | string; message?: string };
+    const e = typeof j.error === "string" ? j.error : j.error?.message;
+    detail = [e ?? j.message ?? body, typeof j.error === "object" ? j.error?.metadata?.raw : ""].filter(Boolean).join(" — ");
+  } catch {
+    /* not JSON */
+  }
+  detail = redact(detail.replace(/\s+/g, " ").trim(), key).slice(0, 220);
+  if (status === 401 || status === 403) return `${name} rejected the API key${detail ? ` (${detail})` : ""}.`;
+  if (status === 402) return `${name}: not enough credits for this request — add credits or pick a cheaper model${detail ? ` (${detail})` : ""}.`;
+  if (status === 404) return `${name} couldn't run "${model}"${detail ? `: ${detail}` : " — check the model name"}.`;
+  if (status === 429) return `${name} rate limit or quota reached${detail ? ` (${detail})` : ""} — try again shortly.`;
+  return `${name} error ${status}${detail ? `: ${detail}` : ""}`;
+}
+
 async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: DirectorCall<T>): Promise<z.infer<T>> {
   const { preset, base, headers } = await openAiEndpoint(cfg);
   const model = modelOf(cfg);
@@ -195,7 +219,7 @@ async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: Di
   const schemaText = JSON.stringify(z.toJSONSchema(call.schema));
   const instruction = `\n\nRespond with ONLY a JSON object (no prose, no markdown) that matches this JSON Schema:\n${schemaText}`;
 
-  const attempt = async (withImages: boolean, jsonMode: boolean) => {
+  const attempt = async (withImages: boolean, jsonMode: boolean, maxTokens: number) => {
     const userContent = [
       { type: "text", text: call.text + instruction },
       ...(withImages ? call.images.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mediaType};base64,${i.data}` } })) : []),
@@ -211,29 +235,40 @@ async function callOpenAiCompatible<T extends z.ZodType>(cfg: AiConfig, call: Di
           { role: "user", content: withImages ? userContent : call.text + instruction },
         ],
         ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        ...(maxTokens ? { max_tokens: maxTokens } : {}),
       }),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
     });
   };
 
-  // Send screenshots only to vision models (a custom model name may be; the 400 retry covers it).
-  let images = cfg.images !== false && call.images.length > 0 && (preset.vision || (!!cfg.model && !preset.models.includes(cfg.model)));
+  // Send screenshots only to vision models (a custom model name may be; the retries below cover it).
+  // On OpenRouter the model decides: text-only models there (DeepSeek and friends) get no images.
+  const textOnly = preset.id === "openrouter" && TEXT_ONLY.test(model);
+  let images = cfg.images !== false && call.images.length > 0 && !textOnly && (preset.vision || (!!cfg.model && !preset.models.includes(cfg.model)));
   let jsonMode = true;
-  let res = await attempt(images, jsonMode);
-  // Older/local models may not support images or JSON mode: degrade gracefully.
-  for (let i = 0; i < 2 && res.status === 400; i++) {
+  // A reply-length cap where the provider wants one: OpenRouter reserves credit for the model's
+  // whole output window without it (a low balance then fails with 402), and DeepSeek allows 8K.
+  let maxTokens = preset.id === "openrouter" || preset.id === "deepseek" ? 8000 : 0;
+  let res = await attempt(images, jsonMode, maxTokens);
+  // Older/local models may not support images, JSON mode or a length cap: degrade gracefully.
+  // (OpenRouter answers 404 "no endpoints found" when no host of the model supports a feature.)
+  for (let i = 0; i < 3 && (res.status === 400 || res.status === 404 || res.status === 422); i++) {
     const body = await res.text();
-    if (images) images = false;
-    else if (jsonMode && /response_format|json/i.test(body)) jsonMode = false;
-    else throw new AiError(`Provider error 400: ${redact(body, cfg.apiKey)}`);
-    res = await attempt(images, jsonMode);
+    // OpenRouter's privacy settings can rule out every host of a model: nothing to retry.
+    if (/data policy|privacy/i.test(body)) throw new AiError(`${preset.name} blocks "${model}" under your privacy settings — allow it at openrouter.ai/settings/privacy, or pick another model.`);
+    if (maxTokens && /max_tokens|max tokens/i.test(body)) maxTokens = 0;
+    else if (images && (res.status !== 404 || /image|vision|modalit|endpoint/i.test(body))) images = false;
+    else if (jsonMode && /response_format|json|endpoint|parameter/i.test(body)) jsonMode = false;
+    else throw new AiError(providerError(preset.name, model, res.status, body, cfg.apiKey));
+    res = await attempt(images, jsonMode, maxTokens);
   }
-  if (res.status === 401 || res.status === 403) throw new AiError("The provider rejected the API key.");
-  if (res.status === 404) throw new AiError(`Model "${model}" or endpoint not found.`);
-  if (res.status === 429) throw new AiError("Provider rate limit or quota reached.");
-  if (!res.ok) throw new AiError(`Provider error ${res.status}: ${redact(await res.text(), cfg.apiKey)}`);
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = data.choices?.[0]?.message?.content ?? "";
+  if (!res.ok) throw new AiError(providerError(preset.name, model, res.status, await res.text(), cfg.apiKey));
+  const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[]; error?: { message?: string } };
+  // OpenRouter can answer 200 with an error from the model's host.
+  if (data.error?.message && !data.choices?.length) throw new AiError(`${preset.name}: ${redact(data.error.message, cfg.apiKey)}`);
+  // Reasoning models (DeepSeek R1 and others) may think out loud before the JSON.
+  const text = (data.choices?.[0]?.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "");
+  if (!text.trim()) throw new AiError(`${preset.name} returned an empty answer — try again, or pick another model.`);
   return coerce(call.schema, extractJson(text));
 }
 
@@ -258,7 +293,7 @@ async function callGemini<T extends z.ZodType>(cfg: AiConfig, call: DirectorCall
         ],
         generationConfig: { responseMimeType: "application/json" },
       }),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
     });
   let res = await attempt(cfg.images !== false && call.images.length > 0);
   if (res.status === 400 && call.images.length) res = await attempt(false);

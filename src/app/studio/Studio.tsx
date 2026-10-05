@@ -677,7 +677,9 @@ export default function Studio() {
       const plan = s
         ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, trailerStyle, template, angle: opts.angle, safe: safeCopy, variant: opts.variant, direction: p })
         : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, trailerStyle, template, safe: safeCopy, variant: opts.variant });
-      return { plan, engine: "builtin", engineLabel: "", label };
+      const why = e instanceof Error && /^HTTP 50[234]$/.test(e.message) ? "the server stopped waiting for the AI's answer" : e instanceof Error && e.message.startsWith("HTTP") ? `server error ${e.message.slice(5)}` : "couldn't reach the server";
+      const note = aiCfg.provider !== "builtin" ? `AI director unavailable (${why}); used the built-in director.` : undefined;
+      return { plan, engine: "builtin", engineLabel: "", note, label };
     }
   };
 
@@ -1887,7 +1889,7 @@ export default function Studio() {
               Off
             </button>
           </div>
-          <p className="hint">{motionBlur ? "Fast moves streak like a film camera's; still parts stay sharp. Full quality in the export." : "Every frame pin-sharp, even mid-move."}</p>
+          <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Every exported frame pin-sharp, even mid-move."}</p>
           {(style !== "trailer" || plan.product) && (
             <>
               <details className="fold">

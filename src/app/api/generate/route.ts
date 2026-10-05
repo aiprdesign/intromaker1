@@ -36,7 +36,7 @@ import { writeVoiceover } from "@/engine/script";
 import { FONTS, PALETTE_IDS, SKILL_IDS, TRANSITIONS, type Aspect, type Brand, type Media, type PaletteId, type SiteData, type VideoPlan } from "@/engine/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 
 
@@ -491,6 +491,7 @@ export async function POST(req: Request) {
 
   try {
     const { schema, images, text, system } = await directorRequest(c);
+    const started = Date.now();
     const result = await runDirector(ai, { system, text, images, schema });
     if (result === "refusal") {
       return film({ plan: c.builtin(), engine: "builtin", note: "AI director declined; used built-in director." });
@@ -501,7 +502,9 @@ export async function POST(req: Request) {
     const issues = lintStoryboard(out, lintCtx);
     const mode = ai.mode ?? "balanced";
     let reviewed = "";
-    if (mode === "best" || (mode === "balanced" && issues.length)) {
+    // A slow model skips the review so the answer arrives inside the route's time limit.
+    const slow = Date.now() - started > 90_000;
+    if (!slow && (mode === "best" || (mode === "balanced" && issues.length))) {
       try {
         const revised = await runDirector(ai, { system, text: text + "\n" + reviewBrief(out, issues), images: [], schema });
         if (revised !== "refusal") {

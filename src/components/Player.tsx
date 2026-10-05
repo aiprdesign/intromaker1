@@ -7,7 +7,7 @@ import { ensureFonts } from "@/engine/fonts";
 import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
-import { aspectSize, renderFrameBlurred, totalDuration } from "@/engine/renderer";
+import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
 import { previewsQuiet } from "./previewScheduler";
 import { SKILL_MAP } from "@/engine/skills";
 import type { Aspect, VideoPlan } from "@/engine/types";
@@ -115,31 +115,15 @@ export default function Player({
   const duration = totalDuration(plan);
   const { w, h } = aspectSize(plan.aspect, 1280);
 
-  // Motion blur in the preview follows what this device can afford: measured per sample, so a
-  // fast machine plays with the export's blur and a slow one plays sharp. A paused frame always
-  // shows the full blur.
-  const sampleMs = useRef(8);
-  const refine = useRef(0);
+  // Previews draw sharp frames: motion blur is part of the final render (the export) only.
   const pending = useRef<{ raf: number; t: number }>({ raf: 0, t: 0 });
   const paint = useCallback(
     (t: number) => {
       const c = canvasRef.current;
       if (!c) return;
       const ctx = c.getContext("2d")!;
-      const still = !playingRef.current;
-      // A paused frame shows at once, sharp; its motion blur follows a moment later if it's still
-      // the frame on screen (so scrubbing and loading never wait on it).
-      window.clearTimeout(refine.current);
-      if (still && !grid && plan.motionBlur !== false)
-        refine.current = window.setTimeout(() => {
-          const c2 = canvasRef.current;
-          if (c2 && !playingRef.current && timeRef.current === t) renderFrameBlurred(c2.getContext("2d")!, plan, t, c2.width, c2.height, {}, { samples: 5, fps: 30 });
-        }, 300);
-      const samples = grid || still ? 1 : sampleMs.current < 3.5 ? 3 : sampleMs.current < 6 ? 2 : 1;
-      const t0 = performance.now();
       // Grid view shows the layout itself: the lens (push-in, drift, beat punches) holds still.
-      renderFrameBlurred(ctx, plan, t, c.width, c.height, grid ? { camera: false } : {}, { samples, fps: 30 });
-      if (!still) sampleMs.current = sampleMs.current * 0.85 + ((performance.now() - t0) / samples) * 0.15;
+      renderFrame(ctx, plan, t, c.width, c.height, grid ? { camera: false } : {});
       if (grid) drawGridOverlay(ctx, c.width, c.height);
     },
     [plan, grid],

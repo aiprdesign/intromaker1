@@ -7,6 +7,7 @@
 import { exitT, lightSweep } from "../fx";
 import { clamp, ease, mixHex, range, rgba } from "../math";
 import { getImage } from "../media";
+import { placeholderCut } from "../placeholders";
 import { backLight, blurInLayout, drawIcon, glassCard, iconsFor, saasBackground, sentence, spring } from "../saasfx";
 import { scratch } from "../scratch";
 import { fillTextFit, fitTextLines, subFont } from "../text";
@@ -30,6 +31,12 @@ export function productCutout(img: HTMLImageElement, key: string): Cut | null {
   if (!img.naturalWidth || typeof document === "undefined") return null;
   const hit = cuts.get(key);
   if (hit) return hit;
+  const pre = placeholderCut(key);
+  if (pre) {
+    const out: Cut = { canvas: pre.canvas, cut: true, x: pre.x, y: pre.y, scale: 1, visible: 1 };
+    cuts.set(key, out);
+    return out;
+  }
   const long = Math.max(img.naturalWidth, img.naturalHeight);
   const k = Math.min(1, 1000 / long);
   const W = Math.max(1, Math.round(img.naturalWidth * k));

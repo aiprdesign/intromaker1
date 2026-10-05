@@ -57,33 +57,72 @@ export default function SkillPicker({
     };
   }, [value, plan, variant, scene]);
 
-  // Render the menu's thumbnails a few at a time so opening stays instant.
+  // Thumbnails paint only for the tiles in view (and just below), a few milliseconds at a time,
+  // with one update per frame: opening and scrolling stay instant, and a style far down the menu
+  // (the product-photo ones cut their photo out on first use) costs nothing until it's scrolled to.
+  const body = useRef<HTMLDivElement>(null);
+  const shown = pos !== null;
+  const done = useRef(new Set<string>());
   useEffect(() => {
-    if (!open) return;
+    done.current = new Set();
+  }, [plan, scene]);
+  useEffect(() => {
+    if (!open || !shown || !body.current) return;
     let alive = true;
     let timer = 0;
-    const todo = flat.map((s) => s.id);
-    thumbsReady().then(() => {
-      const step = () => {
-        if (!alive) return;
-        const batch: Record<string, string> = {};
-        const until = performance.now() + 12;
-        while (todo.length && performance.now() < until) {
-          const id = todo.shift()!;
-          batch[id] = skillThumb(id, plan, scene);
+    let raf = 0;
+    let ready = false;
+    const inView = new Set<string>();
+    let batch: Record<string, string> = {};
+    const flush = () => {
+      raf = 0;
+      const b = batch;
+      batch = {};
+      setThumbs((t) => ({ ...t, ...b }));
+    };
+    const step = () => {
+      timer = 0;
+      if (!alive) return;
+      const until = performance.now() + 8;
+      for (const id of inView) {
+        if (done.current.has(id)) continue;
+        done.current.add(id);
+        batch[id] = skillThumb(id as SkillId, plan, scene);
+        if (performance.now() > until) break;
+      }
+      if (Object.keys(batch).length && !raf) raf = requestAnimationFrame(flush);
+      if ([...inView].some((id) => !done.current.has(id))) timer = window.setTimeout(step, 0);
+    };
+    const kick = () => {
+      if (ready && !timer) timer = window.setTimeout(step, 0);
+    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const id = (e.target as HTMLElement).dataset.skill!;
+          if (e.isIntersecting) inView.add(id);
+          else inView.delete(id);
         }
-        setThumbs((t) => ({ ...t, ...batch }));
-        if (todo.length) timer = window.setTimeout(step, 0);
-      };
-      step();
+        kick();
+      },
+      { root: body.current, rootMargin: "120px 0px" },
+    );
+    body.current.querySelectorAll<HTMLElement>("[data-skill]").forEach((el) => io.observe(el));
+    thumbsReady().then(() => {
+      ready = true;
+      kick();
     });
     return () => {
       alive = false;
+      io.disconnect();
       clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      // Painted but not yet shown: keep them (they're cached), shown on the next open.
+      if (Object.keys(batch).length) setThumbs((t) => ({ ...t, ...batch }));
     };
-  }, [open, flat, plan, scene]);
+  }, [open, shown, flat, plan, scene]);
   // A new look (palette, font, style) means new thumbnails.
-  useEffect(() => setThumbs({}), [plan]);
+  useEffect(() => setThumbs({}), [plan, scene]);
 
   // Place the menu under the button (or above it when there is no room), inside the viewport.
   useLayoutEffect(() => {
@@ -111,10 +150,9 @@ export default function SkillPicker({
   }, [open]);
 
   // Focus the search once the menu is placed; close on a click outside or Escape anywhere.
-  const placed = pos !== null;
   useEffect(() => {
-    if (open && placed) search.current?.focus({ preventScroll: true });
-  }, [open, placed]);
+    if (open && shown) search.current?.focus({ preventScroll: true });
+  }, [open, shown]);
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => {
@@ -183,7 +221,7 @@ export default function SkillPicker({
           <div className="skill-menu-head">
             <input ref={search} className="input sm" placeholder={`Search ${flat.length} slide styles…`} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search slide styles" />
           </div>
-          <div className="skill-menu-body">
+          <div className="skill-menu-body" ref={body}>
             {groups.map((g) => (
               <section key={g.name}>
                 <h4>{g.name}</h4>
@@ -196,6 +234,7 @@ export default function SkillPicker({
                         key={s.id}
                         type="button"
                         data-i={i}
+                        data-skill={s.id}
                         className={`skill-tile${s.id === value ? " current" : ""}${i === cursor ? " cursor" : ""}`}
                         onClick={() => choose(s.id)}
                         onMouseEnter={() => setCursor(i)}
