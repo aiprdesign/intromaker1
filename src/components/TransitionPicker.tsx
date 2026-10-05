@@ -194,6 +194,51 @@ function TransitionPreview({ plan, lookKey, tr, play, w, h }: { plan: VideoPlan;
   return <canvas ref={ref} width={w} height={h} />;
 }
 
+/** The video's look for previews (they only depend on the look, not on the storyboard's words). */
+function useLook(plan: VideoPlan) {
+  const lookKey = JSON.stringify([plan.palette, plan.font, plan.style, plan.template, plan.trailerStyle, plan.look, plan.brand?.name, plan.brand?.logo, plan.brand?.colors, plan.seed, plan.glow, plan.shapes, plan.scheme, plan.bpm]);
+  const look = useMemo(
+    () => ({ ...plan, scenes: [] }) as VideoPlan,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lookKey],
+  );
+  return { look, lookKey };
+}
+
+/**
+ * The video's transition, for the Style panel (like Heading font and Text effect): "Style default"
+ * keeps the director's mix; any other choice applies to every slide. Each tile loops its transition
+ * in the current look, and the one under the pointer plays live.
+ */
+export function TransitionStylePicker({ plan, value, onChange }: { plan: VideoPlan; value: Transition | null; onChange: (t: Transition | null) => void }) {
+  const { look, lookKey } = useLook(plan);
+  const [hover, setHover] = useState<Transition | null>(null);
+  return (
+    <div className="fx-grid" role="listbox" aria-label="Transitions">
+      <button role="option" aria-selected={value === null} className={`fx-card default ${value === null ? "active" : ""}`} onClick={() => onChange(null)}>
+        <span className="fx-name">Style default</span>
+        <span className="fx-note">The director&apos;s mix</span>
+      </button>
+      {TRANSITIONS.map((tr) => (
+        <button
+          key={tr}
+          role="option"
+          aria-selected={value === tr}
+          className={`fx-card ${value === tr ? "active" : ""}`}
+          onClick={() => onChange(tr)}
+          onMouseEnter={() => setHover(tr)}
+          onMouseLeave={() => setHover((h) => (h === tr ? null : h))}
+          onFocus={() => setHover(tr)}
+          title={TRANSITION_HINTS[tr]}
+        >
+          <TransitionPreview plan={look} lookKey={lookKey} tr={tr} play={hover === tr} w={240} h={135} />
+          <span className="fx-name">{TRANSITION_NAMES[tr]}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Transition picker: the field shows the current transition; the menu shows every transition as a
  * preview in the video's own look, the one under the pointer (or keyboard) playing on a loop.
@@ -204,13 +249,7 @@ export default function TransitionPicker({ plan, value, onPick }: { plan: VideoP
   const [pos, setPos] = useState<{ left: number; top: number; maxH: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  // Previews only depend on the look, not on the storyboard's words.
-  const lookKey = JSON.stringify([plan.palette, plan.font, plan.style, plan.template, plan.trailerStyle, plan.look, plan.brand?.name, plan.brand?.logo, plan.brand?.colors, plan.seed, plan.glow, plan.shapes, plan.scheme, plan.bpm]);
-  const look = useMemo(
-    () => ({ ...plan, scenes: [] }) as VideoPlan,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plan.palette, plan.font, plan.style, plan.template, plan.trailerStyle, plan.look, plan.brand, plan.seed, plan.glow, plan.shapes, plan.scheme, plan.bpm],
-  );
+  const { look, lookKey } = useLook(plan);
 
   useLayoutEffect(() => {
     if (!open || !btn.current) {

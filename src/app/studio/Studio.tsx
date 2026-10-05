@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import SkillPicker from "@/components/SkillPicker";
-import TransitionPicker from "@/components/TransitionPicker";
+import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
 import type { PlanLimits } from "@/lib/plans";
 import { pauseThumbs, sceneThumb, thumbsReady } from "@/lib/thumbs";
 import SlideTimeline from "@/components/SlideTimeline";
@@ -42,7 +42,7 @@ import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
-import { PALETTE_IDS, TEXT_FX, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 const FILM_KEY = "intromaker.film";
@@ -161,6 +161,35 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.textFx ?? null) !== textFx) setPlan((p) => ({ ...p, textFx: textFx ?? undefined }));
   }, [plan, textFx]);
+  // Transitions: null keeps the director's mix; a choice applies to every slide (and to new takes),
+  // remembering each slide's own so "Style default" brings it back.
+  const [transFx, setTransFx] = useState<Transition | null>(null);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("intromaker.transition");
+      if (v && (TRANSITIONS as readonly string[]).includes(v)) setTransFx(v as Transition);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const rememberTransFx = (tr: Transition | null) => {
+    setTransFx(tr);
+    try {
+      if (tr) localStorage.setItem("intromaker.transition", tr);
+      else localStorage.removeItem("intromaker.transition");
+    } catch {
+      /* ignore */
+    }
+  };
+  const chooseTransFx = (tr: Transition | null) => {
+    rememberTransFx(tr);
+    // Back to the director's mix: each slide gets its own transition back.
+    if (!tr) setPlan((p) => ({ ...p, scenes: p.scenes.map(({ baseTransition, ...s }) => ({ ...s, transition: baseTransition ?? s.transition })) }));
+  };
+  useEffect(() => {
+    if (!transFx || !plan.scenes.some((s, i) => i > 0 && s.transition !== transFx)) return;
+    setPlan((p) => ({ ...p, scenes: p.scenes.map((s, i) => (i === 0 ? s : { ...s, baseTransition: s.baseTransition ?? s.transition, transition: transFx })) }));
+  }, [plan, transFx]);
   // Heading font: null keeps the style's own; a choice (kept separately for SaaS films and
   // trailers, and remembered) applies to every film of that kind, across styles and remakes.
   const [fonts, setFonts] = useState<{ saas: FontId | null; trailer: FontId | null }>({ saas: null, trailer: null });
@@ -1325,7 +1354,15 @@ export default function Studio() {
           <label title="Length in seconds">
             <input className="input sm" type="number" step={0.1} min={1.6} max={8} value={Number(s.duration.toFixed(1))} onChange={(e) => updateScene(i, { duration: Number(e.target.value) })} aria-label="Length in seconds" />s
           </label>
-          <TransitionPicker plan={plan} value={s.transition} onPick={(tr) => updateScene(i, { transition: tr })} />
+          <TransitionPicker
+            plan={plan}
+            value={s.transition}
+            onPick={(tr) => {
+              // A slide of its own: the video-wide transition steps aside (the other slides keep theirs).
+              if (transFx) rememberTransFx(null);
+              updateScene(i, { transition: tr });
+            }}
+          />
           <div className="scene-actions">
             <button className="icon-btn sm" onClick={() => moveScene(i, i - 1)} disabled={i === 0} aria-label="Move earlier" title="Move earlier">←</button>
             <button className="icon-btn sm" onClick={() => moveScene(i, i + 1)} disabled={i === plan.scenes.length - 1} aria-label="Move later" title="Move later">→</button>
@@ -1770,6 +1807,13 @@ export default function Studio() {
             </summary>
             <FontPicker value={fontChoice} onChange={chooseFont} kind={fontKind} current={fontChoice ? (plan.style === "trailer" ? TRAILER_STYLE_MAP[plan.trailerStyle ?? ""]?.mood.font ?? plan.font : TEMPLATE_MAP[plan.template ?? template]?.font ?? plan.font) : plan.font} />
             <p className="hint">{fontKind === "trailer" ? "Movie-title faces, paired with their own subtitle faces." : "Applies to the headlines; subtitles stay in a clean sans."}</p>
+          </details>
+          <details className="fold">
+            <summary>
+              <span className="field-label inline">Transitions</span> <span className="tpl-desc">{transFx ? TRANSITION_NAMES[transFx] : "Style default"}</span>
+            </summary>
+            <TransitionStylePicker plan={plan} value={transFx} onChange={chooseTransFx} />
+            <p className="hint">{transFx ? `${TRANSITION_NAMES[transFx]} between every slide. Change one slide's under that slide.` : "The director's mix of transitions. Pick one to use it between every slide."}</p>
           </details>
           <label className="field-label">
             Text glow <span className="tpl-desc">{glow ? "On" : "Off"}</span>

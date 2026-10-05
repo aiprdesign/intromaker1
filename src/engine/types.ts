@@ -294,6 +294,8 @@ export interface Scene {
   duration: number;
   /** How this scene enters. */
   transition: Transition;
+  /** The director's transition, kept while one transition is applied to the whole video (to restore it). */
+  baseTransition?: Transition;
   /** Image or video shown by media skills. */
   media?: Media;
   /** List content for multi-item skills (bento features, pain points, logos…). */
