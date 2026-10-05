@@ -631,32 +631,25 @@ export function captionBand(plan: Pick<VideoPlan, "voiceover">, w: number, h: nu
 }
 
 /**
- * The caption band under the slide: the slide's own colours carried down, with a soft, blurred
- * reflection of its lower edge fading into the background, so the band reads as part of the shot.
+ * The caption band under the slide: the slide fades softly into its own background colour over
+ * its last stretch, and the band is that colour, so the captions sit on calm ground with no seam.
+ * (No pixels are stretched or mirrored down from the slide: a glowing arc or line crossing its
+ * bottom edge would turn into hard-sided bars.)
  */
 function captionFloor(ctx: CanvasRenderingContext2D, stage: HTMLCanvasElement, plan: VideoPlan, w: number, h: number, stageH: number) {
   const band = h - stageH;
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
-  const u = Math.min(w, h) / 1080;
   resetCtx(ctx);
   ctx.drawImage(stage, 0, 0);
-  // The slide's last rows, stretched down: its background continues under it.
-  ctx.drawImage(stage, 0, stageH - 2, w, 2, 0, stageH, w, band);
-  // A soft reflection of the slide's lower edge.
-  ctx.save();
-  ctx.globalAlpha = palette.light ? 0.18 : 0.26;
-  ctx.filter = `blur(${Math.round(16 * u)}px)`;
-  ctx.setTransform(1, 0, 0, -1, 0, stageH * 2);
-  // (Only the slide's lowest strip, so headings never show up mirrored.)
-  const src = Math.min(Math.round(band * 0.5), stageH);
-  ctx.drawImage(stage, 0, stageH - src, w, src, 0, stageH - src, w, src);
-  ctx.restore();
-  // Fading into the background colour towards the bottom.
-  const g = ctx.createLinearGradient(0, stageH, 0, h);
-  g.addColorStop(0, rgba(palette.bg0, 0.15));
-  g.addColorStop(1, rgba(palette.bg0, palette.light ? 0.75 : 0.9));
-  ctx.fillStyle = g;
+  ctx.fillStyle = palette.bg0;
   ctx.fillRect(0, stageH, w, band);
+  const fade = Math.min(h * 0.16, band * 1.1);
+  const g = ctx.createLinearGradient(0, stageH - fade, 0, stageH);
+  g.addColorStop(0, rgba(palette.bg0, 0));
+  g.addColorStop(0.55, rgba(palette.bg0, 0.45));
+  g.addColorStop(1, rgba(palette.bg0, 1));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, stageH - fade, w, fade);
 }
 
 /**

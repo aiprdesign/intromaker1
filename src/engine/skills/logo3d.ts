@@ -216,7 +216,8 @@ function glowOf(m: Mark, color: string) {
   let g = glows.get(key);
   if (!g) {
     if (glows.size > 32) glows.clear();
-    const f = Math.min(1, 220 / Math.max(m.src.width, m.src.height));
+    // (Large enough to be drawn near 1:1: a small glow scaled up shows creases.)
+    const f = Math.min(1, 480 / Math.max(m.src.width, m.src.height));
     const w0 = Math.max(1, Math.round(m.src.width * f));
     const h0 = Math.max(1, Math.round(m.src.height * f));
     const pad = Math.ceil(Math.max(w0, h0) * 0.32);
@@ -409,8 +410,10 @@ function rayLevel(sc: SkillContext, S: Shot) {
 function backLight(sc: SkillContext, S: Shot, k: number, cy = S.P.cy, floorY = S.floorY) {
   if (k <= 0.01) return;
   const { ctx, w, h, t, palette, seed } = sc;
+  // At full resolution: the light is drawn 1:1, never scaled up from a smaller layer (a browser's
+  // image scaler can leave tile seams or creases through a soft glow, as straight edges).
   const res = Math.max(1, Math.hypot(ctx.getTransform().a, ctx.getTransform().b));
-  const q = 0.4 * res;
+  const q = res;
   const lw = Math.ceil(w * q);
   const lh = Math.ceil(h * q);
   const L = scratch("logo3d-rays", lw, lh);
@@ -503,19 +506,12 @@ function backLight(sc: SkillContext, S: Shot, k: number, cy = S.P.cy, floorY = S
   g.fillStyle = calm;
   g.fillRect(0, floorY - S.P.mh * 0.1, w, h);
   g.globalCompositeOperation = "source-over";
-  // A light blur at the layer's low resolution (cheap) softens what's left of the edges.
-  const B = scratch("logo3d-rays-soft", lw, lh);
-  B.ctx.filter = `blur(${Math.max(1, Math.round(lw / 420))}px)`;
-  B.ctx.drawImage(L.canvas, 0, 0);
-  B.ctx.filter = "none";
   ctx.save();
   ctx.globalCompositeOperation = addOp(sc);
   ctx.globalAlpha *= k * (light ? 0.6 : 0.55);
-  // (Bilinear: the "high" scaler draws a big upscaled image in tiles, and under the camera's
-  // slight roll their seams can show as a straight edge through the glow.)
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "low";
-  ctx.drawImage(B.canvas, 0, 0, lw, lh, 0, 0, w, h);
+  ctx.drawImage(L.canvas, 0, 0, lw, lh, 0, 0, w, h);
   ctx.restore();
 }
 
