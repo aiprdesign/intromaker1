@@ -212,7 +212,8 @@ function experience(plan: VideoPlan, site: SiteData | null, requested: number, a
   }
   // Brand: the real logo is revealed when there is one; the close names the brand.
   // (Video in text shows the logo above its letters; the liquid sting pours the logo itself in.)
-  if (plan.brand?.logo && !sc.some((s) => ["logo-reveal", "type-mask", "liquid-logo"].includes(s.skill))) add("brand", 3, "site has a logo but the film never reveals it");
+  // (The 3D logo intros extrude the logo itself.)
+  if (plan.brand?.logo && !sc.some((s) => ["logo-reveal", "type-mask", "liquid-logo"].includes(s.skill) || s.skill.startsWith("logo-") && s.skill !== "logo-marquee")) add("brand", 3, "site has a logo but the film never reveals it");
   const last = sc[sc.length - 1];
   if (last?.role === "cta" && last.vo && !last.vo.includes(name) && !(plan.brand?.domain && last.vo.includes(plan.brand.domain))) add("brand", 1, "CTA line doesn't name the brand");
   // The real product: captured UI and imagery should be on screen.

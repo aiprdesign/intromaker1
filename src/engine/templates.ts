@@ -1,3 +1,4 @@
+import { cinematography } from "./cinema";
 import { clamp, hashString, rng } from "./math";
 import type { FontId, Look, PaletteId, Scene, SkillId, Transition, VideoPlan } from "./types";
 
@@ -1190,7 +1191,9 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     look: tpl.look,
     scenes: scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round((s.duration * fit) / beat)) * beat })),
   };
-  return plan.target ? fitLength(styledPlan, plan.target) : styledPlan;
+  const fitted = plan.target ? fitLength(styledPlan, plan.target) : styledPlan;
+  // The cinematography pass: transition grammar, holds and variety, in this style's own vocabulary.
+  return cinematography(fitted, { pool: tpl.transitions, roleSkill: (role) => (role in DEFAULT_ROLE_SKILL ? (tpl.roles[role as Role] ?? DEFAULT_ROLE_SKILL[role as Role]) : undefined) });
 }
 
 /**
