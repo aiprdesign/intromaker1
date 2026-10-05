@@ -82,17 +82,20 @@ export function topHeadline(sc: SkillContext) {
   const { w, h, t, d, u, scene } = sc;
   const portrait = h > w;
   const hasEb = !!scene.eyebrow;
-  const cy = h * (portrait ? 0.12 : 0.12) + (hasEb ? h * 0.04 : 0);
+  // With an eyebrow the block sits lower, so the pill clears the top and the headline sits closer
+  // to the content under it.
+  const cy = h * 0.12 + (hasEb ? h * (portrait ? 0.04 : 0.065) : 0);
   const layout = sentence(sc, { text: accented(scene.text), cy, sizeFrac: portrait ? 0.075 : 0.068, widthFrac: 0.84, maxLines: 2 });
-  // Design grid: the eyebrow pill (27pt type, 54pt tall) sits 2 grid steps above the headline's cap
-  // line, and the whole block never rises above the title-safe top.
+  // Design grid: the eyebrow pill (27pt type, 54pt tall) sits 4 grid steps above the headline's
+  // ascenders, and the whole block never rises above the title-safe top.
   const g = tokens(w, h);
   const ebH = 27 * u;
-  const capTop = layout.ys[0] - layout.size * 0.4;
-  const blockTop = hasEb ? capTop - g.space(2) - ebH * 2 : capTop;
+  const capTop = layout.ys[0] - layout.size * 0.5;
+  const gap = g.space(4);
+  const blockTop = hasEb ? capTop - gap - ebH * 2 : capTop;
   const shift = Math.max(0, g.safe.top - blockTop);
   if (shift) layout.ys = layout.ys.map((y) => y + shift);
-  if (hasEb) eyebrow(sc, scene.eyebrow!, capTop + shift - g.space(2) - ebH, range(t, 0.05, 0.45) * (1 - range(t, d - 0.4, d)));
+  if (hasEb) eyebrow(sc, scene.eyebrow!, capTop + shift - gap - ebH, range(t, 0.05, 0.45) * (1 - range(t, d - 0.4, d)));
   blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
   return layout;
 }
@@ -100,7 +103,7 @@ export function topHeadline(sc: SkillContext) {
 /** Chapter eyebrow above a centred block whose first line sits at `top`. */
 function chapter(sc: SkillContext, top: number, start = 0.05) {
   const { t, d, u, scene } = sc;
-  if (scene.eyebrow) eyebrow(sc, scene.eyebrow, top - 40 * u, range(t, start, start + 0.4) * (1 - range(t, d - 0.4, d)));
+  if (scene.eyebrow) eyebrow(sc, scene.eyebrow, top - 52 * u, range(t, start, start + 0.4) * (1 - range(t, d - 0.4, d)));
 }
 
 function drawLogoMark(sc: SkillContext, src: string | undefined, cx: number, cy: number, box: number, alpha = 1) {
@@ -141,7 +144,7 @@ function blurReveal(sc: SkillContext) {
   // Light gathers behind the sentence as it forms; a lens streak flashes as the last word lands.
   const land = landedAt(sc, layout, 0.2, stagger(sc));
   backLight(sc, w / 2, midY, w * 0.36, layout.size * (layout.lines.length + 1.2), ease.inOutCubic(range(t, 0.2, land + 0.3)) * (1 - range(t, exitAt, exitAt + 0.4)));
-  eyebrow(sc, scene.eyebrow ?? scene.items?.[0] ?? "", top - 44 * u, range(t, 0.05, 0.5) * (1 - range(t, exitAt, exitAt + 0.3)));
+  eyebrow(sc, scene.eyebrow ?? scene.items?.[0] ?? "", top - 52 * u, range(t, 0.05, 0.5) * (1 - range(t, exitAt, exitAt + 0.3)));
   const n = blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt });
   lensStreak(sc, w / 2, midY, range(t, land - 0.2, land + 0.9));
   const bottom = layout.ys[layout.ys.length - 1] + layout.size * 0.62;

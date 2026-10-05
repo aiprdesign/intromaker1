@@ -369,6 +369,8 @@ export interface VideoPlan {
   scheme?: "60-30-10" | "vibrant";
   /** Glow on type and the highlight bloom. Off by default (crisp, halo-free text); true turns it on. */
   glow?: boolean;
+  /** Animated geometric shapes behind SaaS slides. On by default; false turns them off. */
+  shapes?: boolean;
   /** Headline text effect chosen in the studio; overrides the template's (look.text). */
   textFx?: TextFx;
   /** Flavour of the SaaS score. */
@@ -460,6 +462,8 @@ export interface SkillContext {
   music?: MusicPulse;
   /** A trailer's style id (e.g. a movie genre: "horror", "comedy"), so cards can play it their way. */
   genre?: string;
+  /** The film's seed for the animated geometric background shapes; unset when they're off. */
+  shapes?: number;
 }
 
 export interface MusicPulse {

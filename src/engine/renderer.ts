@@ -11,6 +11,7 @@ import { withPlaceholders } from "./placeholders";
 import { isMovieStyle } from "./trailers";
 import { pairedSubFamily, setBrandFont, setSubFamily, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
+import { LOGO_3D_IDS } from "./skills/logo3d";
 import { saasBackground } from "./saasfx";
 import { setCrispText } from "./fx";
 import { liquidWipe, loadTransitions, renderTransition, transitionsReady } from "./gl";
@@ -74,6 +75,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
   glow?: VideoPlan["glow"];
+  shapes?: VideoPlan["shapes"];
   textFx?: VideoPlan["textFx"];
   concept?: VideoPlan["concept"];
   trailerStyle?: VideoPlan["trailerStyle"];
@@ -130,16 +132,20 @@ function drawScene(
     product: plan.product,
     music,
     genre: plan.style === "trailer" ? plan.trailerStyle?.replace(/^film-/, "") : undefined,
+    // One set of shapes for the whole film, so they carry on across cuts.
+    shapes: plan.style === "saas" && plan.shapes !== false ? plan.seed >>> 0 : undefined,
   };
   resetCtx(target);
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
   // set their own depth); headline, logo and closing shots stay flat so their type reads cleanly.
-  const styleDepth = plan.style === "saas" ? plan.look?.depth ?? 0 : 0;
+  // The 3D logo intros stage their own 3D, so they're never put on a tilted panel as well.
+  const own3d = LOGO_3D_IDS.has(scene.skill);
+  const styleDepth = plan.style === "saas" && !own3d ? plan.look?.depth ?? 0 : 0;
   const depth = styleDepth || (plan.style === "saas" && PRODUCT_SHOTS.has(scene.skill) ? 10 : 0);
   // The default product stage only leans back: rows and cards stay perfectly level.
   const level = !styleDepth;
-  const turn = plan.style === "saas" ? plan.look?.turn ?? 0 : 0;
-  const slab = plan.style === "saas" && !!plan.look?.slab;
+  const turn = plan.style === "saas" && !own3d ? plan.look?.turn ?? 0 : 0;
+  const slab = plan.style === "saas" && !own3d && !!plan.look?.slab;
   // Exit: when the next shot simply cuts in, this shot's content leaves on its last beat (lifts,
   // softens and fades) while the background stays; the cut lands mid-exit, so there's no dead air. Overlapping transitions are their own exit
   // (they extend d); the last shot and end cards always hold.

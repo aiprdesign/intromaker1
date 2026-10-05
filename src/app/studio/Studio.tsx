@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import SkillPicker from "@/components/SkillPicker";
+import TransitionPicker from "@/components/TransitionPicker";
 import type { PlanLimits } from "@/lib/plans";
 import { pauseThumbs, sceneThumb, thumbsReady } from "@/lib/thumbs";
 import SlideTimeline from "@/components/SlideTimeline";
@@ -41,31 +42,10 @@ import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
-import { PALETTE_IDS, TEXT_FX, TRANSITIONS, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { PALETTE_IDS, TEXT_FX, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 const FILM_KEY = "intromaker.film";
-const TRANSITION_NAMES: Record<string, string> = {
-  cut: "Cut",
-  flash: "Flash",
-  zoom: "Zoom through",
-  glitch: "Glitch",
-  wipe: "Wipe",
-  whip: "Whip pan",
-  dolly: "Dolly",
-  leak: "Light leak",
-  shutter: "Shutter",
-  push: "Push",
-  dissolve: "Dissolve",
-  liquid: "Liquid",
-  cube: "3D cube",
-  morph: "Morph",
-  portal: "Portal",
-  iris: "Iris",
-  spin: "Spin",
-  split: "Split",
-  swipe: "Card swipe",
-};
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
 
 const PRODUCT_VOICE_OFF = "intromaker.product-voice-off";
@@ -233,6 +213,26 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.glow === true) !== glow) setPlan((p) => ({ ...p, glow: glow ? true : undefined }));
   }, [plan, glow]);
+  // Animated geometric shapes behind SaaS slides. On by default.
+  const [shapes, setShapes] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.shapes") === "off") setShapes(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseShapes = (on: boolean) => {
+    setShapes(on);
+    try {
+      localStorage.setItem("intromaker.shapes", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.shapes !== false) !== shapes) setPlan((p) => ({ ...p, shapes: shapes ? undefined : false }));
+  }, [plan, shapes]);
   const [bg, setBg] = useState<BgChoice>("template");
   const bgRef = useRef(bg);
   bgRef.current = bg;
@@ -1325,13 +1325,7 @@ export default function Studio() {
           <label title="Length in seconds">
             <input className="input sm" type="number" step={0.1} min={1.6} max={8} value={Number(s.duration.toFixed(1))} onChange={(e) => updateScene(i, { duration: Number(e.target.value) })} aria-label="Length in seconds" />s
           </label>
-          <select className="select sm" value={s.transition} onChange={(e) => updateScene(i, { transition: e.target.value as Scene["transition"] })} aria-label="Transition in" title="Transition into this slide">
-            {TRANSITIONS.map((tr) => (
-              <option key={tr} value={tr}>
-                {TRANSITION_NAMES[tr] ?? tr}
-              </option>
-            ))}
-          </select>
+          <TransitionPicker plan={plan} value={s.transition} onPick={(tr) => updateScene(i, { transition: tr })} />
           <div className="scene-actions">
             <button className="icon-btn sm" onClick={() => moveScene(i, i - 1)} disabled={i === 0} aria-label="Move earlier" title="Move earlier">←</button>
             <button className="icon-btn sm" onClick={() => moveScene(i, i + 1)} disabled={i === plan.scenes.length - 1} aria-label="Move later" title="Move later">→</button>
@@ -1789,6 +1783,22 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{glow ? "Soft halo around text and highlights." : "Sharp text, no halo or bloom."}</p>
+          {(style !== "trailer" || plan.product) && (
+            <>
+              <label className="field-label">
+                Background shapes <span className="tpl-desc">{shapes ? "On" : "Off"}</span>
+              </label>
+              <div className="seg-control">
+                <button className={shapes ? "active" : ""} onClick={() => chooseShapes(true)} aria-pressed={shapes}>
+                  Shapes
+                </button>
+                <button className={!shapes ? "active" : ""} onClick={() => chooseShapes(false)} aria-pressed={!shapes}>
+                  Off
+                </button>
+              </div>
+              <p className="hint">{shapes ? "Rings, triangles, hexagons and dot grids drift around the edges and pulse with the beat." : "A clean stage with no floating shapes."}</p>
+            </>
+          )}
           {(style !== "trailer" || plan.product) && (
             <details className="fold">
               <summary>

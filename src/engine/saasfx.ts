@@ -3,6 +3,7 @@
  * sentence-case type with blur-in, spring physics, grid + spotlight + travelling beams,
  * glass cards with animated border beams, a macOS cursor with click ripples, and icon glyphs.
  */
+import { geoShapes } from "./shapes";
 import { headline } from "./fx";
 import { clamp, mixHex, range, rgba, rng, TAU } from "./math";
 import { CONCEPT_MAP, ROLE_ICONS, type ConceptRole } from "./concepts";
@@ -311,6 +312,9 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
       ctx.restore();
     }
   }
+
+  // Animated geometric shapes floating around the edges (when the film has them on).
+  geoShapes(sc);
 
   // Spotlight cone from above.
   if (light || backdrop === "plain" || backdrop === "scanlines" || backdrop === "beam" || backdrop === "studio") return;
@@ -806,7 +810,7 @@ export function pill(
   text: string,
   cx: number,
   cy: number,
-  opts: { size?: number; fill?: string; color?: string; border?: string; weight?: number; padX?: number } = {},
+  opts: { size?: number; fill?: string; color?: string; border?: string; weight?: number; padX?: number; lead?: number } = {},
 ) {
   const { ctx, u, palette } = sc;
   const size = opts.size ?? 22 * u;
@@ -815,7 +819,9 @@ export function pill(
   ctx.font = subFont(size, opts.weight ?? 600);
   const tw = ctx.measureText(text).width;
   const px = opts.padX ?? size * 0.9;
-  const pw = tw + px * 2;
+  // Room on the left for an icon (the label shifts right to make it).
+  const lead = opts.lead ?? 0;
+  const pw = tw + px * 2 + lead;
   const ph = size * 2;
   ctx.beginPath();
   ctx.roundRect(cx - pw / 2, cy - ph / 2, pw, ph, ph / 2);
@@ -829,7 +835,7 @@ export function pill(
   ctx.fillStyle = opts.color ?? (light ? palette.text : "#fff");
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  fillTextMid(ctx, text, cx, cy);
+  fillTextMid(ctx, text, cx + lead / 2, cy);
   ctx.restore();
   return pw;
 }
@@ -1368,20 +1374,21 @@ export function eyebrow(sc: SkillContext, text: string, y: number, k: number) {
   const size = 27 * u;
   ctx.save();
   ctx.globalAlpha = clamp(k);
-  // Pad the label on the left to make room for the chapter icon.
-  const label = icon ? `\u2002\u2002 ${text}` : text;
+  // A measured slot on the left for the chapter icon (font-independent), with a clear gap before
+  // the label.
+  const iconSize = size * 0.9;
+  const padX = size * 0.8;
+  const lead = icon ? iconSize + size * 0.45 : 0;
   const cy = y + (1 - k) * 10 * u;
-  pill(sc, label, sc.w / 2, cy, {
+  const pw = pill(sc, text, sc.w / 2, cy, {
     size,
+    padX,
+    lead,
     fill: rgba(palette.primary, 0.12),
     border: rgba(palette.primary, 0.45),
     color: palette.text,
   });
-  if (icon) {
-    ctx.font = subFont(size, 600);
-    const tw = ctx.measureText(label).width;
-    drawLucide(ctx, icon, sc.w / 2 - tw / 2 + size * 0.55, cy, size * 0.95, palette.primary, { progress: k });
-  }
+  if (icon) drawLucide(ctx, icon, sc.w / 2 - pw / 2 + padX * 0.85 + iconSize / 2, cy, iconSize, palette.primary, { progress: k });
   ctx.restore();
 }
 
