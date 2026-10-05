@@ -2,16 +2,16 @@ import type { FontId } from "./types";
 
 export const FONT_FAMILY: Record<FontId, { display: string; weight: number; tracking: number }> = {
   anton: { display: "Anton", weight: 400, tracking: 0.02 },
-  grotesk: { display: "Space Grotesk", weight: 700, tracking: -0.02 },
-  inter: { display: "Inter", weight: 800, tracking: -0.045 },
+  grotesk: { display: "Space Grotesk", weight: 700, tracking: -0.012 },
+  inter: { display: "Inter", weight: 800, tracking: -0.022 },
   serif: { display: "Instrument Serif", weight: 400, tracking: -0.01 },
-  mono: { display: "JetBrains Mono", weight: 800, tracking: -0.03 },
+  mono: { display: "JetBrains Mono", weight: 800, tracking: -0.01 },
   // Classic movie-poster capitals (the Trajan look), set wide like a film title.
   cinzel: { display: "Cinzel", weight: 700, tracking: 0.1 },
   // Tall condensed trailer type.
   bebas: { display: "Bebas Neue", weight: 400, tracking: 0.04 },
   playfair: { display: "Playfair Display", weight: 800, tracking: -0.01 },
-  manrope: { display: "Manrope", weight: 800, tracking: -0.035 },
+  manrope: { display: "Manrope", weight: 800, tracking: -0.018 },
   jost: { display: "Jost", weight: 600, tracking: -0.01 },
 };
 
@@ -64,7 +64,7 @@ export function setBrandFont(name: string | null) {
 
 /** Letter tracking (em) for a face; brand fonts get a neutral tight setting. */
 export function trackingOf(font: FontId) {
-  return font === "inter" && brandFont ? -0.02 : FONT_FAMILY[font].tracking;
+  return font === "inter" && brandFont ? -0.012 : FONT_FAMILY[font].tracking;
 }
 
 export function displayFont(font: FontId, size: number) {
@@ -124,14 +124,20 @@ export function layoutChars(
   cx: number,
   tracking: number,
 ) {
+  // Positions from the measured prefix, so the font's kerning pairs ("Yo", "Te", "AV") are kept.
   const chars = [...text];
-  const widths = chars.map((c) => ctx.measureText(c).width);
-  const total = widths.reduce((a, b) => a + b, 0) + tracking * Math.max(0, chars.length - 1);
-  let x = cx - total / 2;
+  const ends: number[] = [];
+  let prefix = "";
+  for (const c of chars) {
+    prefix += c;
+    ends.push(ctx.measureText(prefix).width);
+  }
+  const total = (ends[ends.length - 1] ?? 0) + tracking * Math.max(0, chars.length - 1);
+  const x0 = cx - total / 2;
   return chars.map((c, i) => {
-    const out = { char: c, x: x + widths[i] / 2, w: widths[i], i };
-    x += widths[i] + tracking;
-    return out;
+    // The glyph ends where the prefix through it ends, so the pair kerning before it is applied.
+    const w = ctx.measureText(c).width;
+    return { char: c, x: x0 + ends[i] - w + tracking * i + w / 2, w, i };
   });
 }
 

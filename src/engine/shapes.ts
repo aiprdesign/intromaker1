@@ -16,7 +16,7 @@
  * default for SaaS videos (VideoPlan.shapes = false turns them off).
  */
 import { clamp, noise1, rgba, rng, TAU } from "./math";
-import { displayFont } from "./text";
+import { subFont } from "./text";
 import { SHAPE_SETS, type ShapeSet, type SkillContext } from "./types";
 
 type Kind =
@@ -101,36 +101,30 @@ export function geoShapes(sc: SkillContext) {
 function watermark(sc: SkillContext) {
   const { ctx, w, h, u, palette } = sc;
   const T = sc.globalT ?? sc.t;
-  const raw = (sc.watermark ?? "").trim() || sc.brand?.name?.trim() || "Your brand";
-  const text = raw.toUpperCase().slice(0, 40);
+  // (The renderer has already chosen the words: the typed text, else the site's or product's name,
+  // else the title or main heading.)
+  const text = ((sc.watermark ?? "").trim() || sc.brand?.name?.trim() || "Your brand").toUpperCase().slice(0, 40);
   const light = !!palette.light;
-  const size = Math.min(w, h) * 0.16;
+  // Small, widely tracked caps in level rows: a fine pattern, like a brand's printed tissue paper.
+  const size = Math.max(9, Math.min(w, h) * 0.022);
   const fadeIn = clamp(T / 0.8);
   ctx.save();
-  ctx.font = displayFont(sc.font, size);
+  ctx.font = subFont(size, 650);
+  ctx.letterSpacing = `${Math.round(size * 0.32)}px`;
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
-  const unit = `${text}   ·   `;
+  const unit = `${text}      `;
   const uw = Math.max(1, ctx.measureText(unit).width);
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(-0.12);
-  const rows = Math.ceil((Math.hypot(w, h) / (size * 1.25)) / 2) * 2 + 1;
-  const span = Math.hypot(w, h);
-  ctx.lineWidth = 1.4 * u;
-  ctx.lineJoin = "round";
+  const gap = size * 3.4;
+  const rows = Math.ceil(h / gap) + 1;
+  const a = (light ? 0.1 : 0.075) * fadeIn;
+  ctx.fillStyle = rgba(light ? palette.primary : palette.text, a);
   for (let i = 0; i < rows; i++) {
-    const y = (i - (rows - 1) / 2) * size * 1.25;
+    const y = (i + 0.5) * gap - ((rows * gap - h) / 2);
+    // Rows drift slowly in alternate directions, offset like brickwork.
     const dir = i % 2 ? -1 : 1;
-    const speed = (14 + (i % 3) * 5) * u;
-    const off = (((T * speed * dir + i * uw * 0.37) % uw) + uw) % uw;
-    const near = 1 - Math.abs(y) / (span / 2);
-    const a = (light ? 0.11 : 0.1) * (0.6 + 0.4 * near) * fadeIn;
-    ctx.strokeStyle = rgba(light ? palette.primary : palette.text, a);
-    ctx.fillStyle = rgba(i % 3 === 1 ? palette.primary : light ? palette.primary : palette.text, a * 0.35);
-    for (let x = -span / 2 - uw + off; x < span / 2; x += uw) {
-      if (i % 3 === 1) ctx.fillText(unit, x, y);
-      ctx.strokeText(unit, x, y);
-    }
+    const off = (((T * 9 * u * dir + (i % 2) * uw * 0.5) % uw) + uw) % uw;
+    for (let x = -uw + off; x < w; x += uw) ctx.fillText(unit, x, y);
   }
   ctx.restore();
 }

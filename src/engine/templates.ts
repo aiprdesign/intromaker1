@@ -207,8 +207,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: true, beams: 0, aurora: 0.6, text: "mask", bokeh: false, grain: 0.3, shader: "mesh", shaderStrength: 0.7 },
     transitions: ["dissolve", "push", "cut", "swipe"],
     pace: 1.15,
-    roles: {},
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-draw" },
+    revealNoLogo: "logo-draw",
     sample: sample("Simple. Powerful. *Yours*."),
   },
   {
@@ -225,8 +225,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: true, beams: 2, aurora: 0.25, text: "mask", bokeh: false, grain: 1.4, vignette: 1.2, shader: "grain", shaderStrength: 0.55 },
     transitions: ["cut", "shutter", "push"],
     pace: 0.9,
-    roles: { promise: "slice-switch" },
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-dots", promise: "slice-switch" },
+    revealNoLogo: "logo-dots",
     sample: sample("Ship it. *Scale it.*"),
   },
   {
@@ -243,7 +243,7 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 1.4, text: "pop", grain: 0.5, shader: "mesh", shaderStrength: 1 },
     transitions: ["whip", "push", "zoom", "spin", "swipe"],
     pace: 0.85,
-    roles: { promise: "rapid-fire" },
+    roles: { promise: "rapid-fire", how: "arrow-rise" },
     revealNoLogo: "flip-3d",
     sample: sample("Plans with friends, *sorted*."),
   },
@@ -297,8 +297,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 1, backdrop: "blobs", card: "frost", text: "blur", bokeh: false, grain: 0.3, shader: "mesh", shaderStrength: 1 },
     transitions: ["dissolve", "push", "dolly", "iris"],
     pace: 1.05,
-    roles: {},
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-morph" },
+    revealNoLogo: "logo-morph",
     sample: sample("Work that feels *calm*."),
   },
   {
@@ -315,8 +315,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.5, backdrop: "dots", card: "flat", text: "mask", bokeh: false, grain: 0.2, shader: "grain", shaderStrength: 0.85 },
     transitions: ["push", "dissolve", "cut"],
     pace: 1.05,
-    roles: { bento: "spec-sheet" },
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-wipe", bento: "spec-sheet" },
+    revealNoLogo: "logo-wipe",
     sample: sample("Revenue, *finally in sync*."),
   },
   {
@@ -351,8 +351,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.2, backdrop: "plain", card: "flat", text: "pop", textScale: 1.35, bokeh: false, grain: 0.8, shader: "grain", shaderStrength: 0.55 },
     transitions: ["cut", "whip", "zoom", "split", "spin"],
     pace: 0.8,
-    roles: { promise: "type-rows" },
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-shapes", promise: "type-rows" },
+    revealNoLogo: "logo-shapes",
     sample: sample("Design. Ship. *Repeat.*"),
   },
   {
@@ -387,8 +387,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.35, backdrop: "plain", card: "flat", text: "mask", textScale: 1.12, bokeh: false, grain: 0.7, vignette: 0.6, shader: "grain", shaderStrength: 0.9 },
     transitions: ["dissolve", "leak", "push", "swipe"],
     pace: 1.15,
-    roles: { promise: "type-poster" },
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-type", promise: "type-poster" },
+    revealNoLogo: "logo-type",
     sample: sample("Crafted for the *curious*."),
   },
   {
@@ -621,8 +621,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0, backdrop: "plain", card: "flat", text: "mask", textScale: 1.2, grain: 0.2, vignette: 0.3, overlay: "frame" },
     transitions: ["cut", "push", "split"],
     pace: 0.95,
-    roles: { bento: "card-system" },
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-slices", bento: "card-system" },
+    revealNoLogo: "logo-slices",
     sample: sample("Less, but *considered*."),
   },
   {
@@ -639,8 +639,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.5, card: "clay", text: "pop", grain: 0.2, vignette: 0.3, shader: "metaballs", shaderStrength: 0.9, depth: 7 },
     transitions: ["push", "zoom", "dissolve", "swipe", "iris"],
     pace: 0.95,
-    roles: { promise: "stretch-snap" },
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-pop", promise: "stretch-snap" },
+    revealNoLogo: "logo-pop",
     sample: sample("Software that feels *squishy*."),
   },
   {
@@ -837,8 +837,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0, backdrop: "beam", card: "flat", text: "focus", textScale: 1.1, grain: 0.8, vignette: 1.3, depth: 6 },
     transitions: ["cut", "push", "zoom", "split"],
     pace: 0.94,
-    roles: {},
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-draw" },
+    revealNoLogo: "logo-draw",
     sample: sample("Ship at the *speed of light*."),
   },
   {
@@ -873,8 +873,8 @@ export const TEMPLATES: Template[] = [
     look: { grid: false, beams: 0, aurora: 0.3, backdrop: "eclipse", card: "frost", text: "highlight", textScale: 1.1, bokeh: false, grain: 0.3, vignette: 0.4, depth: 6 },
     transitions: ["push", "dissolve", "dolly", "morph"],
     pace: 1,
-    roles: {},
-    revealNoLogo: "logo-reveal",
+    roles: { reveal: "logo-wipe" },
+    revealNoLogo: "logo-wipe",
     sample: sample("A brighter way to *work*."),
   },
   {
@@ -989,6 +989,14 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "logo-layers": "reveal",
   "logo-tunnel": "reveal",
   "logo-flip": "reveal",
+  "logo-draw": "reveal",
+  "logo-wipe": "reveal",
+  "logo-pop": "reveal",
+  "logo-morph": "reveal",
+  "logo-slices": "reveal",
+  "logo-dots": "reveal",
+  "logo-type": "reveal",
+  "logo-shapes": "reveal",
   "particle-assemble": "reveal",
   "site-scroll": "meet",
   steps: "how",
@@ -1064,6 +1072,7 @@ const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "table-fill": "demo",
   "phone-tour": "demo",
   "drop-zone": "demo",
+  "arrow-rise": "how",
   "spotlight": "tour",
   "device-trio": "tour",
   "exploded-ui": "tour",
@@ -1158,7 +1167,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

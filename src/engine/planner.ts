@@ -26,8 +26,8 @@ import {
   type VideoPlan,
 } from "./types";
 
-/** The 3D logo intros, in the order remakes try them. */
-const LOGO_3D = ["logo-extrude", "logo-stage", "logo-spin", "logo-shatter", "logo-orbit", "logo-layers", "logo-tunnel", "logo-flip"] as const;
+/** The 3D and clean logo intros, in the order remakes try them (a 3D one, then a clean one). */
+const LOGO_3D = ["logo-extrude", "logo-draw", "logo-stage", "logo-wipe", "logo-spin", "logo-pop", "logo-shatter", "logo-morph", "logo-orbit", "logo-slices", "logo-layers", "logo-dots", "logo-tunnel", "logo-type", "logo-flip", "logo-shapes"] as const;
 
 export type Length = "short" | "standard" | "long";
 export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20, long: 34 };
@@ -1460,7 +1460,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     add(target >= 30 ? 3 : 5, {
       // AI and creative tools show their steps as a node workflow (ComfyUI-style).
       // (Or any product whose steps read as a pipeline: connect, trigger, transform, publish.)
-      role: "how", skill: site.steps.length >= 3 && alt !== (concept.id === "ai" || concept.id === "creative" || /\b(workflows?|pipelines?|automat\w*|nodes?|connect\w*|triggers?|integrat\w*)\b/i.test(site.steps.join(" "))) ? "node-graph" : "steps",
+      // Every third remake with short steps rides them on a big 3D arrow.
+      role: "how", skill: variant % 3 === 2 && site.steps.slice(0, 4).every((x) => x.split(/\s+/).length <= 3) ? "arrow-rise" : site.steps.length >= 3 && alt !== (concept.id === "ai" || concept.id === "creative" || /\b(workflows?|pipelines?|automat\w*|nodes?|connect\w*|triggers?|integrat\w*)\b/i.test(site.steps.join(" "))) ? "node-graph" : "steps",
       text: `Get started in *${site.steps.length} steps*`,
       items: site.steps.slice(0, 4),
       eyebrow: "How it works",
@@ -2388,6 +2389,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     flavor: ["tech", "soft", "pop", "minimal", "neon"].includes(raw.flavor as string) ? raw.flavor : undefined,
     scheme: raw.scheme === "vibrant" || raw.scheme === "60-30-10" ? raw.scheme : undefined,
     glow: raw.glow === true ? true : undefined,
+    motionBlur: raw.motionBlur === false ? false : undefined,
     shapes: raw.shapes === false ? false : undefined,
     shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) && raw.shapeSet !== "geometric" ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,

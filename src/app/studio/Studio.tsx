@@ -40,6 +40,7 @@ import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, safePlan,
 import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import { LOGO_3D_IDS } from "@/engine/skills/logo3d";
+import { LOGO_CLEAN_IDS } from "@/engine/skills/logoclean";
 import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
@@ -244,6 +245,26 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.glow === true) !== glow) setPlan((p) => ({ ...p, glow: glow ? true : undefined }));
   }, [plan, glow]);
+  // Camera motion blur: on by default (moving things streak like film); remembered.
+  const [motionBlur, setMotionBlur] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.motionblur") === "off") setMotionBlur(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseMotionBlur = (on: boolean) => {
+    setMotionBlur(on);
+    try {
+      localStorage.setItem("intromaker.motionblur", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.motionBlur !== false) !== motionBlur) setPlan((p) => ({ ...p, motionBlur: motionBlur ? undefined : false }));
+  }, [plan, motionBlur]);
   // What floats behind SaaS slides: a set of animated shapes (geometric by default), watermark
   // text, or nothing. Remembered, and saved with the video.
   const [shapes, setShapes] = useState<ShapeSet | "off">("geometric");
@@ -1201,7 +1222,7 @@ export default function Studio() {
     const k = SKILL_MAP[skill];
     const at = selected !== null ? selected + 1 : plan.scenes.length;
     // Brand slides start from the film's own brand; the QR code uses the website unless a link is added.
-    const brandName = (skill === "liquid-logo" || skill === "logo-reveal" || LOGO_3D_IDS.has(skill)) && plan.brand?.name;
+    const brandName = (skill === "liquid-logo" || skill === "logo-reveal" || LOGO_3D_IDS.has(skill) || LOGO_CLEAN_IDS.has(skill)) && plan.brand?.name;
     // Everything else is written from the film's own material, not the slide's sample: the
     // built-in director's version of this slide for the same website, listing or prompt.
     const source = promptRef.current.trim() || prompt.trim();
@@ -1846,6 +1867,18 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{glow ? "Soft halo around text and highlights." : "Sharp text, no halo or bloom."}</p>
+          <label className="field-label">
+            Motion blur <span className="tpl-desc">{motionBlur ? "On" : "Off"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={motionBlur ? "active" : ""} onClick={() => chooseMotionBlur(true)}>
+              Film blur
+            </button>
+            <button className={!motionBlur ? "active" : ""} onClick={() => chooseMotionBlur(false)}>
+              Off
+            </button>
+          </div>
+          <p className="hint">{motionBlur ? "Fast moves streak like a film camera's; still parts stay sharp. Full quality in the export." : "Every frame pin-sharp, even mid-move."}</p>
           {(style !== "trailer" || plan.product) && (
             <>
               <details className="fold">

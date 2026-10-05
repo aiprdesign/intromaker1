@@ -14,7 +14,7 @@
 import { exitT } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
-import { drawIcon, glassCard, iconsFor, pill, saasBackground, spring } from "../saasfx";
+import { arrow3d, drawIcon, glassCard, iconsFor, pill, saasBackground, spring } from "../saasfx";
 import { fillTextFit, fillTextMid, fitTextLines, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { coverDraw, gallery } from "./gallery";
@@ -666,28 +666,9 @@ function problemSolution(sc: SkillContext) {
     });
     ctx.restore();
   };
+  // A chunky 3D arrow in the brand gradient, drawing itself from the problem to its answer.
   const arrow = (x0: number, y0: number, x1: number, y1: number, k: number) => {
-    if (k <= 0) return;
-    const x = lerp(x0, x1, k);
-    const y = lerp(y0, y1, k);
-    ctx.save();
-    ctx.strokeStyle = palette.accent;
-    ctx.fillStyle = palette.accent;
-    ctx.lineWidth = 2.5 * u * S;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    const ang = Math.atan2(y1 - y0, x1 - x0);
-    const hs = 10 * u * S;
-    ctx.beginPath();
-    ctx.moveTo(x + Math.cos(ang) * 2, y + Math.sin(ang) * 2);
-    ctx.lineTo(x - Math.cos(ang - 0.5) * hs, y - Math.sin(ang - 0.5) * hs);
-    ctx.lineTo(x - Math.cos(ang + 0.5) * hs, y - Math.sin(ang + 0.5) * hs);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    arrow3d(sc, [{ x: x0, y: y0 }, { x: x1, y: y1 }], { k, width: 13 * u * S, depth: 9 * u * S, colors: [palette.primary, palette.accent] });
   };
   const rowK = (i: number) => {
     const t0 = T.rows[i];

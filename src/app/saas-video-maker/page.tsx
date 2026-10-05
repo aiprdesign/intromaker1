@@ -172,7 +172,8 @@ const SECTIONS: { id: string; title: string; body: React.ReactNode }[] = [
         The brand reveal is the moment of the video, so it gets its own section of eight 3D logo animations. Your logo becomes a solid object with depth, a
         floor reflection and a sweep of light: it can snap into a 3D block, spin like a coin, assemble from shards, rise through a reflective floor under a
         spotlight, collapse from glass layers, sit inside orbiting rings, arrive down a fly-through tunnel or flip in strips. They land on the drop of
-        the soundtrack. <Link href="/skills#3d-logo">See the 3D logo intros →</Link>
+        the soundtrack. For a calmer brand there are eight clean, flat logo animations too: a line drawing itself on, a wipe into a lock-up with the name, a pop
+        and burst, a dot morphing into the logo, slices, a dot grid, a typed lock-up and shapes collapsing into the mark. <Link href="/skills#3d-logo">See the 3D logo intros →</Link>
       </p>
     ),
   },

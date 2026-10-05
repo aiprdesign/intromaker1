@@ -7,7 +7,7 @@ import { ensureFonts } from "@/engine/fonts";
 import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
-import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
+import { aspectSize, renderFrameBlurred, totalDuration } from "@/engine/renderer";
 import { SKILL_MAP } from "@/engine/skills";
 import type { Aspect, VideoPlan } from "@/engine/types";
 import { WATERMARK, type PlanLimits } from "@/lib/plans";
@@ -114,13 +114,21 @@ export default function Player({
   const duration = totalDuration(plan);
   const { w, h } = aspectSize(plan.aspect, 1280);
 
+  // Motion blur in the preview follows what this device can afford: measured per sample, so a
+  // fast machine plays with the export's blur and a slow one plays sharp. A paused frame always
+  // shows the full blur.
+  const sampleMs = useRef(8);
   const draw = useCallback(
     (t: number) => {
       const c = canvasRef.current;
       if (!c) return;
       const ctx = c.getContext("2d")!;
+      const still = !playingRef.current;
+      const samples = grid ? 1 : still ? 5 : sampleMs.current < 3.5 ? 3 : sampleMs.current < 6 ? 2 : 1;
+      const t0 = performance.now();
       // Grid view shows the layout itself: the lens (push-in, drift, beat punches) holds still.
-      renderFrame(ctx, plan, t, c.width, c.height, grid ? { camera: false } : {});
+      renderFrameBlurred(ctx, plan, t, c.width, c.height, grid ? { camera: false } : {}, { samples, fps: 30 });
+      if (!still) sampleMs.current = sampleMs.current * 0.85 + ((performance.now() - t0) / samples) * 0.15;
       if (grid) drawGridOverlay(ctx, c.width, c.height);
     },
     [plan, grid],

@@ -9,6 +9,7 @@
  *                   drops in and callouts pop out beside the taps. Mobile apps; vertical videos.
  * - drop-zone:      File in, result out: a file is dragged into a drop zone, a progress bar runs
  *                   through its steps, and the results pop out as cards. AI, document and media tools.
+ * - arrow-rise:     a big glossy 3D arrow in the brand gradient sweeps up, milestones popping as it passes.
  * - unbox:          "What's in the box": the box opens and its contents rise out of it, one by one,
  *                   each as an icon tile with its name. Physical products.
  *
@@ -18,7 +19,7 @@ import { exitT } from "../fx";
 import { tokens } from "../grid";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, TAU } from "../math";
 import { findHotspots, getImage, getMedia, mediaSize, type Drawable } from "../media";
-import { clickRipple, drawCursor, drawIcon, glassCard, iconsFor, pill, pillWidth, saasBackground, spring } from "../saasfx";
+import { arrow3d, bezierPts, clickRipple, drawCursor, drawIcon, glassCard, iconsFor, pill, pillWidth, saasBackground, spring } from "../saasfx";
 import { fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { mockShot } from "./gallery";
@@ -679,6 +680,105 @@ const boxSfx = (scene: Scene): SfxCue[] => {
   return [at(T.box, "whoosh"), at(T.open, "swoosh"), ...Array.from({ length: T.n }, (_, i) => at(T.first + i * T.step, "pop"))];
 };
 
+/* ───────────────────────── 3D Arrow ───────────────────────── */
+
+const ARROW_STEPS = ["Plan", "Build", "Launch"];
+
+function arrowTiming(scene: Scene) {
+  const n = itemsOr(scene, ARROW_STEPS, 4).length;
+  const T = { start: 0.35, end: 2.1 };
+  const f = fitTimes(T, T.end + 0.9, scene.duration);
+  // Milestones sit along the curve; each pops as the arrow passes it.
+  const at = Array.from({ length: n }, (_, i) => 0.22 + (0.62 * i) / Math.max(1, n - 1 || 1));
+  return { ...f, n, at };
+}
+
+/** The curve the arrow sweeps along: low on the left, rising steeply to the upper right. */
+function arrowPath(sc: SkillContext, st: ReturnType<typeof stage>) {
+  const { w } = sc;
+  const room = st.bottom - st.top;
+  const y0 = st.bottom - room * 0.04;
+  const y1 = st.top + room * (st.portrait ? 0.08 : 0.12);
+  const x0 = st.portrait ? w * 0.1 : w * 0.1;
+  const x1 = st.portrait ? w * 0.84 : w * 0.8;
+  return bezierPts({ x: x0, y: y0 }, { x: lerp(x0, x1, 0.45), y: y0 + room * 0.02 }, { x: lerp(x0, x1, 0.62), y: lerp(y0, y1, 0.55) }, { x: x1, y: y1 }, 64);
+}
+
+function arrowRise(sc: SkillContext) {
+  const { ctx, t, u, palette, scene } = sc;
+  saasBackground(sc, { beams: 1 });
+  const st = stage(sc);
+  const { S, ex } = st;
+  const T = arrowTiming(scene);
+  const labels = itemsOr(scene, ARROW_STEPS, 4).map((x) => split(x).title);
+  const path = arrowPath(sc, st);
+  const short = Math.min(sc.w, sc.h);
+  const W = short * (st.portrait ? 0.06 : 0.05);
+  const k = ease.inOutCubic(range(t, T.start, T.end));
+  const bob = Math.sin(t * 1.3) * 3 * u * range(t, T.end, T.end + 0.5);
+  ctx.save();
+  ctx.globalAlpha *= 1 - ex;
+  ctx.translate(0, bob);
+  // A soft glow where the arrow lands.
+  const land = range(t, T.end - 0.1, T.end + 0.6);
+  const end = path[path.length - 1];
+  if (land > 0) {
+    const r = W * 4 * (0.6 + 0.4 * ease.outCubic(land));
+    const g = ctx.createRadialGradient(end.x, end.y, 0, end.x, end.y, r);
+    g.addColorStop(0, rgba(palette.secondary, (palette.light ? 0.22 : 0.35) * Math.min(1, land * 2)));
+    g.addColorStop(1, rgba(palette.secondary, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(end.x - r, end.y - r, r * 2, r * 2);
+  }
+  arrow3d(sc, path, { k, width: W, depth: W * 0.75, colors: [palette.primary, palette.accent ?? palette.secondary] });
+  ctx.restore();
+  // Milestones: a dot on the arrow and a label above it, popping as the arrow passes.
+  const lens = [0];
+  for (let i = 1; i < path.length; i++) lens.push(lens[i - 1] + Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y));
+  const total = lens[lens.length - 1];
+  T.at.forEach((f, i) => {
+    const label = labels[i];
+    if (!label) return;
+    // When the head passes this point (in the eased draw-on).
+    const pass = T.start + (T.end - T.start) * invEase(f);
+    const pk = clamp(spring(t - pass, 13, 7), 0, 1.06);
+    if (pk <= 0) return;
+    let j = lens.findIndex((L) => L >= total * f);
+    if (j < 0) j = path.length - 1;
+    const p = path[j];
+    const size = 21 * u * S;
+    const lw = pillWidth(sc, label, { size, weight: 700 });
+    const lx = clamp(p.x - W * 0.4, st.safe.left + lw / 2, st.safe.left + st.safe.width - lw / 2);
+    const ly = p.y - W * 1.7 - size;
+    ctx.save();
+    ctx.globalAlpha *= (1 - ex) * clamp(pk);
+    ctx.translate(0, bob + (1 - Math.min(1, pk)) * 14 * u);
+    // The stem from the arrow up to the label.
+    ctx.strokeStyle = rgba(palette.text, 0.35);
+    ctx.lineWidth = Math.max(1, 1.5 * u);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - W * 0.55);
+    ctx.lineTo(lx, ly + size);
+    ctx.stroke();
+    ctx.fillStyle = palette.light ? "#ffffff" : mixHex(palette.bg1, "#ffffff", 0.9);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - W * 0.05, W * 0.22 * Math.min(1, pk), 0, TAU);
+    ctx.fill();
+    pill(sc, label, lx, ly, { size, weight: 700, fill: palette.light ? "#ffffff" : mixHex(palette.bg1, "#ffffff", 0.08), border: rgba(palette.primary, 0.6), color: palette.text });
+    ctx.restore();
+  });
+}
+
+/** The inverse of ease.inOutCubic (when the eased draw-on reaches `y`). */
+function invEase(y: number) {
+  return y < 0.5 ? Math.cbrt(y / 4) : 1 - Math.cbrt(2 * (1 - y)) / 2;
+}
+
+const arrowSfx = (scene: Scene): SfxCue[] => {
+  const T = arrowTiming(scene);
+  return [at(T.start, "whoosh"), ...T.at.map((f) => at(T.start + (T.end - T.start) * invEase(f), "pop")), at(T.end, "shimmer")];
+};
+
 /* ───────────────────────── Registry ───────────────────────── */
 
 export const beatSkills: Skill[] = [
@@ -721,5 +821,15 @@ export const beatSkills: Skill[] = [
     itemsHint: "2–5 things in the box",
     render: unbox,
     sfx: boxSfx,
+  },
+  {
+    id: "arrow-rise",
+    name: "3D Arrow",
+    tagline: "A big, glossy 3D arrow in the brand gradient sweeps up across the frame, its milestones popping up as it passes, and lands with a glow.",
+    bestFor: "Steps or a journey (items: 2–4 short milestones), and launch videos that want a bold, upward move.",
+    sample: { text: "Your next *chapter*", items: ARROW_STEPS },
+    itemsHint: "2–4 short milestones",
+    render: arrowRise,
+    sfx: arrowSfx,
   },
 ];

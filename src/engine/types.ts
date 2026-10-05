@@ -54,6 +54,15 @@ export const SKILL_IDS = [
   "phone-tour",
   "drop-zone",
   "unbox",
+  "arrow-rise",
+  "logo-draw",
+  "logo-wipe",
+  "logo-pop",
+  "logo-morph",
+  "logo-slices",
+  "logo-dots",
+  "logo-type",
+  "logo-shapes",
   "anamorphic-flare",
   "monolith",
   "sand-reveal",
@@ -379,6 +388,8 @@ export interface VideoPlan {
   scheme?: "60-30-10" | "vibrant";
   /** Glow on type and the highlight bloom. Off by default (crisp, halo-free text); true turns it on. */
   glow?: boolean;
+  /** Camera motion blur (a 180° shutter). On by default; false turns it off. */
+  motionBlur?: boolean;
   /** Animated geometric shapes behind SaaS slides. On by default; false turns them off. */
   shapes?: boolean;
   /** Which background shapes (default geometric), or "text" for watermark text. */

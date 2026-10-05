@@ -45,7 +45,7 @@ export default function ShapesPicker({
       {value === "text" && (
         <label className="watermark-field">
           <span className="field-label">Watermark text</span>
-          <input className="input sm" value={watermark} maxLength={40} placeholder={plan.brand?.name || "Your brand"} onChange={(e) => onWatermark(e.target.value)} aria-label="Watermark text" />
+          <input className="input sm" value={watermark} maxLength={40} placeholder={plan.brand?.name ? `${plan.brand.name} (automatic)` : "Site or product name (automatic)"} onChange={(e) => onWatermark(e.target.value)} aria-label="Watermark text" />
         </label>
       )}
     </>

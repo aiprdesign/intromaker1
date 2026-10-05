@@ -54,6 +54,9 @@ export default function SiteFooter() {
               <Link href="/skills#3d-logo">3D logo slides</Link>
             </li>
             <li>
+              <Link href="/skills#clean-logo">Clean logo intros</Link>
+            </li>
+            <li>
               <Link href="/#samples">Sample videos</Link>
             </li>
             <li>

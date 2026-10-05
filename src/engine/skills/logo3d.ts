@@ -32,12 +32,12 @@ import type { Scene, SfxCue, Skill, SkillContext, SkillId } from "../types";
 /* ───────────────────────── The mark ───────────────────────── */
 
 type Src = HTMLCanvasElement | HTMLImageElement;
-type Mark = { src: Src; key: string; ar: number; wide: boolean };
+export type Mark = { src: Src; key: string; ar: number; wide: boolean };
 
 const glyphs = new Map<string, HTMLCanvasElement>();
 
 /** The brand's mark: its logo, else its app icon, else the generated brand mark. */
-function markOf(sc: SkillContext): Mark {
+export function markOf(sc: SkillContext): Mark {
   const light = !!sc.palette.light;
   const logo = getImage(sc.brand?.logo);
   if (logo?.naturalWidth) {
@@ -60,7 +60,7 @@ function markOf(sc: SkillContext): Mark {
 
 const tints = new Map<string, HTMLCanvasElement>();
 /** The mark's silhouette in one colour (its sides and back). */
-function tint(m: Mark, color: string) {
+export function tint(m: Mark, color: string) {
   const key = `${m.key}|${color}|${m.src.width}`;
   let c = tints.get(key);
   if (!c) {
@@ -137,7 +137,7 @@ function solid(sc: SkillContext, m: Mark, cx: number, cy: number, mw: number, mh
   // The light comes from the upper left: the left side, turned towards it, is brighter (in steps, so
   // the tinted silhouettes stay cached).
   const lit = Math.round((0.5 + 0.5 * sy0) * 4) / 4;
-  const dark = mixHex(palette.primary, "#000000", (palette.light ? 0.28 : 0.48) + (1 - lit) * 0.16);
+  const dark = mixHex(palette.primary, "#000000", (palette.light ? 0.26 : 0.38) + (1 - lit) * 0.14);
   const lite = mixHex(palette.primary, "#ffffff", palette.light ? 0.05 : 0.12 + lit * 0.12);
   const sideDark = tint(m, dark);
   const sideLite = tint(m, lite);
@@ -145,7 +145,8 @@ function solid(sc: SkillContext, m: Mark, cx: number, cy: number, mw: number, mh
   const fh = mh * s * cp;
   ctx.save();
   ctx.globalAlpha *= p.alpha ?? 1;
-  if (p.halo && p.halo > 0.01) haloAt(sc, m, cx + dx / 2, cy + dy / 2, Math.max(fw, mw * s * 0.25) + Math.abs(dx), fh + Math.abs(dy), p.halo);
+  // (The halo covers the whole body, face and sides, with room to spare on every side.)
+  if (p.halo && p.halo > 0.01) haloAt(sc, m, cx + dx / 2, cy + dy / 2, (Math.max(fw, mw * s * 0.25) + Math.abs(dx)) * 1.08, (fh + Math.abs(dy)) * 1.08, p.halo);
   // The body: copies a pixel or so apart, so the sides read as continuous surfaces.
   const n = reach > 1 ? clamp(Math.round(reach / (1.4 * u)), 3, 40) : 0;
   for (let i = n; i >= 1; i--) {
@@ -164,6 +165,9 @@ function solid(sc: SkillContext, m: Mark, cx: number, cy: number, mw: number, mh
       ctx.restore();
     }
   }
+  // The glow wraps over the sides too (a softer second pass), so the body's edge never cuts it off
+  // in a hard dark line.
+  if (n && p.halo && p.halo > 0.01) haloAt(sc, m, cx + dx * 0.6, cy + dy * 0.6, fw + Math.abs(dx) * 0.8, fh + Math.abs(dy) * 0.8, p.halo * 0.45);
   // A bright bevel just behind the face catches the light.
   if (n) {
     ctx.save();

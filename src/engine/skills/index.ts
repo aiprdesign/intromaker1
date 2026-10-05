@@ -13,6 +13,7 @@ import { speedMoreSkills } from "./speed2";
 import { launchSkills } from "./launch";
 import { beatSkills } from "./beats";
 import { logo3dSkills } from "./logo3d";
+import { logoCleanSkills } from "./logoclean";
 import { interactionSkills } from "./interactions";
 import { typeFxSkills } from "./typefx";
 import { gallerySkills } from "./gallery";
@@ -31,6 +32,7 @@ export const SKILLS: Skill[] = [
   ...saasSkills,
   ...endingSkills,
   ...logo3dSkills,
+  ...logoCleanSkills,
   ...editorialSkills,
   ...editorialMoreSkills,
   ...fastTypeSkills,
@@ -41,6 +43,7 @@ export const SKILLS: Skill[] = [
   ...launchSkills,
   ...beatSkills.slice(0, 3),
   ...slideSkills,
+  beatSkills[4],
   ...productSkills,
   beatSkills[3],
   ...typeFxSkills,
@@ -78,10 +81,11 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "SaaS essentials", skills: saasSkills },
   { name: "Openers & end cards", skills: endingSkills },
   { name: "3D logo", skills: logo3dSkills },
+  { name: "Clean logo", skills: logoCleanSkills },
   { name: "Editorial system", skills: [...editorialSkills, ...editorialMoreSkills] },
   { name: "Fast type", skills: [...fastTypeSkills, ...speedSkills, ...speedMoreSkills] },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills, ...launchSkills, ...beatSkills.slice(0, 3)] },
-  { name: "Slides", skills: slideSkills },
+  { name: "Slides", skills: [...slideSkills, beatSkills[4]] },
   { name: "Media & gallery", skills: [...productSkills, beatSkills[3], ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Epic screens", skills: [...epicSkills, ...iconicSkills] },

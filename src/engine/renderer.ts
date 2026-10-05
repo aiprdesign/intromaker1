@@ -78,10 +78,25 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   shapes?: VideoPlan["shapes"];
   shapeSet?: VideoPlan["shapeSet"];
   watermark?: VideoPlan["watermark"];
+  title?: VideoPlan["title"];
+  scenes?: VideoPlan["scenes"];
   textFx?: VideoPlan["textFx"];
   concept?: VideoPlan["concept"];
   trailerStyle?: VideoPlan["trailerStyle"];
 };
+
+const PLACEHOLDER_NAMES = /^(your (brand|product|company)|acme|untitled)$/i;
+/**
+ * The watermark's words: the text typed for it, else the website's or product's name, else the
+ * video's title, else its main heading (the hook, or the first slide's line).
+ */
+function watermarkText(plan: PlanLike) {
+  const clean = (x?: string) => (x ?? "").replace(/[*|]/g, " ").replace(/\s+/g, " ").trim();
+  const name = clean(plan.brand?.name);
+  const heading = clean((plan.scenes?.find((s) => s.role === "hook") ?? plan.scenes?.[0])?.text);
+  const pick = [clean(plan.watermark), name && !PLACEHOLDER_NAMES.test(name) ? name : "", clean(plan.title), heading, name].find((x) => x && !PLACEHOLDER_NAMES.test(x)) ?? name;
+  return (pick || "Your brand").slice(0, 40);
+}
 
 /** Renders exactly like an absent look (bokeh on, one beam set, full aurora, grid). */
 const NO_LOOK: NonNullable<VideoPlan["look"]> = { grid: true, beams: 1, aurora: 1, bokeh: true };
@@ -137,7 +152,7 @@ function drawScene(
     // One set of shapes for the whole film, so they carry on across cuts.
     shapes: plan.style === "saas" && plan.shapes !== false ? plan.seed >>> 0 : undefined,
     shapeSet: plan.shapeSet,
-    watermark: plan.watermark,
+    watermark: plan.shapeSet === "text" ? watermarkText(plan) : undefined,
   };
   resetCtx(target);
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
@@ -559,6 +574,46 @@ export function renderFrame(
   if (plan.style === "saas" && plan.look?.overlay) filmOverlay(ctx, plan, time, w, h, at.index);
   else brandBug(ctx, plan, time, w, h);
   drawCaptions(ctx, plan, time, w, h);
+}
+
+/**
+ * Render a frame with camera motion blur: the average of `samples` renders spread across a
+ * 180-degree shutter (half the frame interval), as a film camera exposes it. Anything moving
+ * streaks along its own path; anything still stays sharp (its samples are identical). Samples
+ * never cross a cut: they stay inside the slide on screen at `time`. One sample (or a plan with
+ * motionBlur: false) is a plain renderFrame.
+ */
+export function renderFrameBlurred(
+  ctx: CanvasRenderingContext2D,
+  plan: VideoPlan,
+  time: number,
+  w: number,
+  h: number,
+  opts: RenderOptions = {},
+  blur: { samples: number; fps?: number; shutter?: number } = { samples: 1 },
+) {
+  const n = Math.max(1, Math.min(16, Math.round(blur.samples)));
+  const at = sceneAt(plan, time);
+  if (n <= 1 || plan.motionBlur === false || !at) {
+    renderFrame(ctx, plan, time, w, h, opts);
+    return;
+  }
+  const span = (blur.shutter ?? 0.5) / (blur.fps ?? 30);
+  const lo = at.start;
+  const hi = at.start + at.scene.duration - 1e-4;
+  const acc = scratch("motion-blur-acc", w, h);
+  const one = scratch("motion-blur-one", w, h, false);
+  for (let i = 0; i < n; i++) {
+    const tt = Math.min(hi, Math.max(lo, time - span / 2 + (span * (i + 0.5)) / n));
+    one.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    one.ctx.clearRect(0, 0, w, h);
+    renderFrame(one.ctx, plan, tt, w, h, opts);
+    // A running average: sample i weighs 1/(i+1), so every sample counts equally.
+    acc.ctx.globalAlpha = 1 / (i + 1);
+    acc.ctx.drawImage(one.canvas, 0, 0);
+  }
+  resetCtx(ctx);
+  ctx.drawImage(acc.canvas, 0, 0);
 }
 
 /**

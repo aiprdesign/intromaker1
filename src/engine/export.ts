@@ -11,7 +11,7 @@ import {
 import { Soundtrack } from "./audio";
 import { ensureFonts } from "./fonts";
 import { mediaState, preloadPlanMedia, syncVideos } from "./media";
-import { aspectSize, renderFrame, sceneAt, totalDuration } from "./renderer";
+import { aspectSize, renderFrame, sceneAt, totalDuration, renderFrameBlurred } from "./renderer";
 import type { VideoPlan } from "./types";
 
 const MIME_CANDIDATES = [
@@ -98,7 +98,8 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
       if (opts.signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
       const at = sceneAt(plan, i * dt);
       if (at) await syncVideos(plan, at.index, at.local);
-      renderFrame(ctx, plan, i * dt, w, h, { watermark: opts.watermark });
+      // Offline, so every frame gets full camera motion blur (6 samples across a 180° shutter).
+      renderFrameBlurred(ctx, plan, i * dt, w, h, { watermark: opts.watermark }, { samples: 6, fps: opts.fps });
       await video.add(i * dt, dt);
       opts.onProgress((i + 1) / frames);
       // Let the page repaint the progress UI now and then.

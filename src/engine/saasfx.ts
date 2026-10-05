@@ -945,7 +945,8 @@ export function blurInLayout(
       const k = clamp(range(t, t0, t0 + pace.dur));
       const e = mode === "glow" ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 3);
       const size = layout.size;
-      const charX = (ci: number) => x + (ci ? ctx.measureText(clean.slice(0, ci)).width : 0) + tracking * ci;
+      // (Where the prefix through the glyph ends, less its advance: the pair kerning before it is kept.)
+      const charX = (ci: number) => x + (ci ? ctx.measureText(clean.slice(0, ci + 1)).width - ctx.measureText(clean[ci]).width : 0) + tracking * ci;
       const accentFill = () => {
         // The brand gradient flows through the accent word (a slow, endless colour current).
         const [c0, c1] = opts.gradient ?? [palette.primary, palette.secondary];
@@ -1502,4 +1503,123 @@ export function iconConstellation(sc: SkillContext, opts: { count?: number; star
     drawIcon(ctx, p.icon, 0, 0, size * 0.46, p.hue, clamp(k));
     ctx.restore();
   }
+}
+
+/* ───────────────────────── 3D arrow ───────────────────────── */
+
+type Pt = { x: number; y: number };
+
+/** Points along a cubic Bézier (for curved arrows). */
+export function bezierPts(p0: Pt, p1: Pt, p2: Pt, p3: Pt, n = 48): Pt[] {
+  return Array.from({ length: n + 1 }, (_, i) => {
+    const s = i / n;
+    const a = (1 - s) ** 3;
+    const b = 3 * (1 - s) ** 2 * s;
+    const c = 3 * (1 - s) * s * s;
+    const d = s ** 3;
+    return { x: a * p0.x + b * p1.x + c * p2.x + d * p3.x, y: a * p0.y + b * p1.y + c * p2.y + d * p3.y };
+  });
+}
+
+/**
+ * A chunky 3D arrow along a path: an extruded body (darker sides stacked towards the lower right),
+ * a face in the brand gradient from tail to tip, a gloss line along its lit edge and a soft shadow.
+ * `k` draws it on from the tail (0..1); the head rides the front. Returns the tip.
+ */
+export function arrow3d(sc: SkillContext, path: Pt[], opts: { k: number; width: number; depth?: number; colors?: [string, string]; alpha?: number }): Pt | null {
+  const { ctx, palette } = sc;
+  if (opts.k <= 0 || path.length < 2) return null;
+  const W = opts.width;
+  const lens = [0];
+  for (let i = 1; i < path.length; i++) lens.push(lens[i - 1] + Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y));
+  const total = lens[lens.length - 1];
+  const headL = Math.min(W * 2.3, total * 0.45);
+  const at = (len: number): Pt & { a: number } => {
+    const L = clamp(len, 0, total);
+    let i = 1;
+    while (i < lens.length - 1 && lens[i] < L) i++;
+    const f = (L - lens[i - 1]) / Math.max(1e-6, lens[i] - lens[i - 1]);
+    const a = Math.atan2(path[i].y - path[i - 1].y, path[i].x - path[i - 1].x);
+    return { x: path[i - 1].x + (path[i].x - path[i - 1].x) * f, y: path[i - 1].y + (path[i].y - path[i - 1].y) * f, a };
+  };
+  const tipLen = Math.max(headL * 0.6, total * clamp(opts.k));
+  const tip = at(tipLen);
+  const baseLen = Math.max(0, tipLen - headL);
+  // The outline: the shaft's two edges, then the head.
+  const left: Pt[] = [];
+  const right: Pt[] = [];
+  const steps = Math.max(2, Math.ceil(baseLen / Math.max(2, W * 0.35)));
+  for (let s = 0; s <= steps; s++) {
+    const p = at((baseLen * s) / steps);
+    const nx = -Math.sin(p.a);
+    const ny = Math.cos(p.a);
+    left.push({ x: p.x + (nx * W) / 2, y: p.y + (ny * W) / 2 });
+    right.push({ x: p.x - (nx * W) / 2, y: p.y - (ny * W) / 2 });
+  }
+  const base = at(baseLen);
+  const hn = { x: -Math.sin(tip.a), y: Math.cos(tip.a) };
+  const hw = W * 1.35;
+  const outline = (dx: number, dy: number) => {
+    ctx.beginPath();
+    ctx.moveTo(left[0].x + dx, left[0].y + dy);
+    for (const p of left) ctx.lineTo(p.x + dx, p.y + dy);
+    ctx.lineTo(base.x + hn.x * hw + dx, base.y + hn.y * hw + dy);
+    ctx.lineTo(tip.x + Math.cos(tip.a) * W * 0.15 + dx, tip.y + Math.sin(tip.a) * W * 0.15 + dy);
+    ctx.lineTo(base.x - hn.x * hw + dx, base.y - hn.y * hw + dy);
+    for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x + dx, right[i].y + dy);
+    ctx.closePath();
+  };
+  const [c0, c1] = opts.colors ?? [palette.primary, palette.secondary];
+  const D = opts.depth ?? W * 0.6;
+  const ddx = D * 0.45;
+  const ddy = D * 0.8;
+  ctx.save();
+  ctx.globalAlpha *= opts.alpha ?? 1;
+  ctx.lineJoin = "round";
+  // Shadow, then the body: copies stacked along the depth, darkest at the back.
+  ctx.save();
+  ctx.shadowColor = `rgba(0,0,0,${palette.light ? 0.22 : 0.45})`;
+  ctx.shadowBlur = W * 1.2;
+  ctx.shadowOffsetY = W * 0.6;
+  ctx.fillStyle = mixHex(c1, "#000000", 0.55);
+  outline(ddx, ddy);
+  ctx.fill();
+  ctx.restore();
+  const layers = Math.max(3, Math.min(14, Math.round(D / 2)));
+  for (let i = layers; i >= 1; i--) {
+    const f = i / layers;
+    ctx.fillStyle = mixHex(mixHex(c0, c1, 0.6), "#000000", 0.25 + 0.3 * f);
+    outline(ddx * f, ddy * f);
+    ctx.fill();
+  }
+  // The face: the brand gradient from tail to tip, with a soft top-lit sheen.
+  const g = ctx.createLinearGradient(path[0].x, path[0].y, tip.x, tip.y);
+  // (Deeper at the tail, brighter at the tip, so the gradient reads even when the two colours are close.)
+  g.addColorStop(0, mixHex(c0, "#000000", 0.18));
+  g.addColorStop(0.55, c0);
+  g.addColorStop(1, mixHex(c1, "#ffffff", 0.22));
+  ctx.fillStyle = g;
+  outline(0, 0);
+  ctx.fill();
+  const sheen = ctx.createLinearGradient(0, tip.y - W * 2, 0, tip.y + W * 2);
+  sheen.addColorStop(0, "rgba(255,255,255,0.22)");
+  sheen.addColorStop(0.5, "rgba(255,255,255,0.04)");
+  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen;
+  ctx.fill();
+  // Gloss along the lit (upper-left) edge.
+  ctx.save();
+  outline(0, 0);
+  ctx.clip();
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = Math.max(1, W * 0.14);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  // (The edge nearer the top of the frame catches the light.)
+  const upper = left.reduce((a, p) => a + p.y, 0) <= right.reduce((a, p) => a + p.y, 0) ? left : right;
+  upper.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+  return tip;
 }
