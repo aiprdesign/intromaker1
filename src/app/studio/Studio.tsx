@@ -2222,6 +2222,13 @@ export default function Studio() {
             onDuplicate={duplicateScene}
             onMove={moveScene}
             onAdd={addScene}
+            onRestyle={(i, id) => {
+              const s = plan.scenes[i];
+              if (!s || id === s.skill) return;
+              // The same as picking the design from the slide's menu: its words carried over.
+              const r = restyleScene(s, id, plan);
+              updateScene(i, { skill: id, text: r.text, subtext: r.subtext, items: r.items });
+            }}
           />
           {selected !== null && plan.scenes[selected] && <div className="inspector">{sceneCard(plan.scenes[selected], selected, "inspector")}</div>}
 

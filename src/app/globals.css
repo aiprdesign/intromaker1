@@ -2907,6 +2907,48 @@ button.brand-colors.on {
   overflow: hidden;
   background: var(--bg-2);
 }
+.slide-thumb {
+  position: relative;
+}
+/* Previous / next design: arrows on the thumbnail's edges, shown on hover or when picked. */
+.slide-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 30px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(6, 5, 12, 0.72);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.slide-nav.prev {
+  left: 4px;
+}
+.slide-nav.next {
+  right: 4px;
+}
+.slide-nav:hover,
+.slide-nav:focus-visible {
+  border-color: var(--cyan);
+}
+.slide-chip:hover .slide-nav,
+.slide-chip:focus-within .slide-nav,
+.slide-chip.selected .slide-nav {
+  opacity: 1;
+}
+@media (hover: none) {
+  .slide-nav {
+    opacity: 1;
+  }
+}
 .slide-thumb.tall {
   aspect-ratio: 9 / 16;
   width: 50%;

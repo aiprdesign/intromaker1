@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { onMediaReady } from "@/engine/media";
+import { SKILL_GROUPS } from "@/engine/skills";
 import type { SkillId, VideoPlan } from "@/engine/types";
 import { later, sceneThumb, thumbsReady } from "@/lib/thumbs";
 import { beatOf } from "./ArcStrip";
@@ -12,8 +13,18 @@ import { useReorder } from "./useReorder";
 /**
  * The film as editable slides: a thumbnail per slide, sized by its length. Click to select and
  * jump to it, drag to reorder, and duplicate or remove from the slide itself (or with Delete).
- * The + at the end adds a slide after the selected one.
+ * The + at the end adds a slide after the selected one. The ‹ › arrows on a slide flip it to the
+ * previous or next design in its category (its words kept), to try designs quickly.
  */
+
+/** The design before or after this one in its category (wrapping round), with the category's name. */
+export function nearDesign(skill: SkillId, step: 1 | -1) {
+  const group = SKILL_GROUPS.find((g) => g.skills.some((k) => k.id === skill));
+  if (!group || group.skills.length < 2) return null;
+  const i = group.skills.findIndex((k) => k.id === skill);
+  const k = group.skills[(i + step + group.skills.length) % group.skills.length];
+  return { id: k.id, name: k.name, group: group.name };
+}
 export default function SlideTimeline({
   plan,
   selected,
@@ -23,6 +34,7 @@ export default function SlideTimeline({
   onDuplicate,
   onMove,
   onAdd,
+  onRestyle,
 }: {
   plan: VideoPlan;
   selected: number | null;
@@ -33,6 +45,8 @@ export default function SlideTimeline({
   onDuplicate: (i: number) => void;
   onMove: (from: number, to: number) => void;
   onAdd: (skill: SkillId) => void;
+  /** Switch a slide to another design (from its ‹ › arrows). */
+  onRestyle?: (i: number, skill: SkillId) => void;
 }) {
   const [thumbs, setThumbs] = useState<string[]>([]);
   const reorder = useReorder("timeline", onMove);
@@ -89,11 +103,42 @@ export default function SlideTimeline({
                 } else if ((e.key === "Delete" || e.key === "Backspace") && !one) {
                   e.preventDefault();
                   onRemove(i);
+                } else if ((e.key === "[" || e.key === "]") && onRestyle) {
+                  // [ and ] flip through the slide's designs, like its arrows.
+                  const d = nearDesign(s.skill, e.key === "]" ? 1 : -1);
+                  if (d) {
+                    e.preventDefault();
+                    onRestyle(i, d.id);
+                  }
                 } else if (e.key === "ArrowLeft" && e.altKey && i > 0) onMove(i, i - 1);
                 else if (e.key === "ArrowRight" && e.altKey && i < plan.scenes.length - 1) onMove(i, i + 1);
               }}
             >
-              <span className={`slide-thumb${tall ? " tall" : ""}`}>{thumbs[i] && <img src={thumbs[i]} alt="" draggable={false} />}</span>
+              <span className={`slide-thumb${tall ? " tall" : ""}`}>
+                {thumbs[i] && <img src={thumbs[i]} alt="" draggable={false} />}
+                {onRestyle &&
+                  ([-1, 1] as const).map((step) => {
+                    const d = nearDesign(s.skill, step);
+                    if (!d) return null;
+                    return (
+                      <button
+                        key={step}
+                        type="button"
+                        className={`slide-nav ${step < 0 ? "prev" : "next"}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRestyle(i, d.id);
+                        }}
+                        aria-label={`${step < 0 ? "Previous" : "Next"} design for slide ${i + 1}: ${d.name}`}
+                        title={`${step < 0 ? "Previous" : "Next"} design in ${d.group}: ${d.name} (${step < 0 ? "[" : "]"})`}
+                      >
+                        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden>
+                          <path d={step < 0 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    );
+                  })}
+              </span>
               <span className="slide-meta">
                 <span className="slide-name">
                   <Icon name={icon} size={12} />
