@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { onMediaReady } from "@/engine/media";
 import { aspectSize } from "@/engine/renderer";
+import { withPlaceholders } from "@/engine/placeholders";
 import { tourAreas } from "@/engine/skills/saas";
 import type { Scene, VideoPlan } from "@/engine/types";
 
@@ -25,7 +26,9 @@ export default function TourAreaEditor({ scene, index, plan, onChange }: { scene
   useEffect(() => onMediaReady(() => setTick((n) => n + 1)), []);
 
   const { w, h } = aspectSize(plan.aspect, 1920);
-  const source = tourAreas(scene, plan.brand, w, h, (plan.seed + index * 7919) >>> 0);
+  // The screenshot the slide shows: its own, the site's, or the stand-in a video without one uses.
+  const shown = withPlaceholders(scene, plan);
+  const source = tourAreas(shown.scene, shown.plan.brand, w, h, (plan.seed + index * 7919) >>> 0);
   const areas = drag?.areas ?? source?.areas ?? [];
   const geom = source
     ? (() => {
