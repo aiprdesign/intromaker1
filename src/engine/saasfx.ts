@@ -804,7 +804,8 @@ type PointerLook = {
 
 function pointerLook(style: Exclude<PointerStyle, "auto" | "classic">, p: Palette): PointerLook {
   const lin = (ctx: CanvasRenderingContext2D, a: string, b: string, c = b) => {
-    const g = ctx.createLinearGradient(0, 0, 15, 18);
+    // Horizontal: the colour runs left to right across the pointer.
+    const g = ctx.createLinearGradient(0, 0, 19, 0);
     g.addColorStop(0, a);
     g.addColorStop(0.6, b);
     g.addColorStop(1, c);
@@ -841,7 +842,7 @@ function pointerLook(style: Exclude<PointerStyle, "auto" | "classic">, p: Palett
     case "clay":
       return {
         face: (c) => {
-          const g = c.createRadialGradient(4, 6, 0.5, 6, 10, 14);
+          const g = c.createLinearGradient(0, 0, 19, 0);
           g.addColorStop(0, mixHex(p.primary, "#ffffff", 0.55));
           g.addColorStop(0.45, p.primary);
           g.addColorStop(1, mixHex(p.primary, "#000000", 0.28));
@@ -909,10 +910,10 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
     ctx.save();
     ctx.translate(depth * 0.55 * k, depth * k);
     if (L.side[0].startsWith("#")) {
-      // A gradient along the side: lit near the tip, falling into shade towards the wings, and
-      // darker the further back the layer.
+      // A horizontal gradient along the side: lit at the left, falling into shade towards the
+      // right wing, and darker the further back the layer.
       const base = mixHex(L.side[0], L.side[1], 1 - k);
-      const sg = ctx.createLinearGradient(0, 0, 16, 20);
+      const sg = ctx.createLinearGradient(0, 0, 19, 0);
       sg.addColorStop(0, mixHex(base, "#ffffff", 0.28));
       sg.addColorStop(0.55, base);
       sg.addColorStop(1, mixHex(base, "#000000", 0.3));
@@ -935,8 +936,9 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
   ctx.save();
   path(ctx);
   ctx.clip();
-  const spec = ctx.createRadialGradient(3, 5, 0, 3, 5, 12);
-  spec.addColorStop(0, `rgba(255,255,255,${L.spec})`);
+  // The light: a horizontal sheen, brightest along the left edge and fading across.
+  const spec = ctx.createLinearGradient(0, 0, 12, 0);
+  spec.addColorStop(0, `rgba(255,255,255,${L.spec * 0.85})`);
   spec.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = spec;
   ctx.fillRect(-2, -2, 24, 30);
