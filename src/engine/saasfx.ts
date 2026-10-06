@@ -813,7 +813,7 @@ function pointerLook(style: Exclude<PointerStyle, "auto" | "classic">, p: Palett
   };
   switch (style) {
     case "graphite":
-      return { face: (c) => lin(c, "#646b7c", "#262a34", "#07080b"), side: ["#030304", "#2c303b"], rim: "rgba(255,255,255,0.96)", rimW: 1.6, depth: 2.8, round: 1, spec: 0.45, shadow: 0.42 };
+      return { face: (c) => lin(c, "#646b7c", "#262a34", "#07080b"), side: ["#5d6472", "#b9bfca"], rim: "rgba(255,255,255,0.96)", rimW: 1.6, depth: 2.8, round: 1, spec: 0.45, shadow: 0.42 };
     case "brand":
       return {
         face: (c) => lin(c, mixHex(p.primary, "#ffffff", 0.38), p.primary, mixHex(p.secondary, "#000000", 0.12)),
@@ -903,8 +903,10 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
     ctx.restore();
   }
   // Extrusion: the body's side, swept back and down as one solid (darker towards the back).
-  const depth = L.depth * (1 - p * 0.55);
-  const steps = 12;
+  // Bordered pointers extrude their border too (each layer is stroked as wide as the rim), and
+  // sit deeper, so the 3D side shows below the border instead of hiding behind it.
+  const depth = L.depth * (L.rimW ? 1.45 : 1) * (1 - p * 0.55);
+  const steps = 14;
   for (let i = steps; i >= 1; i--) {
     const k = i / steps;
     ctx.save();
@@ -918,13 +920,20 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
       sg.addColorStop(0.55, base);
       sg.addColorStop(1, mixHex(base, "#000000", 0.3));
       ctx.fillStyle = sg;
-    } else ctx.fillStyle = k > 0.5 ? L.side[0] : L.side[1];
+      ctx.strokeStyle = sg;
+    } else ctx.fillStyle = ctx.strokeStyle = k > 0.5 ? L.side[0] : L.side[1];
     path(ctx);
-    ctx.fill();
     if (i === steps && L.rimW) {
-      // Only the far edge gets a soft dark line, so the side reads against light pages.
-      ctx.strokeStyle = "rgba(20,24,36,0.28)";
-      ctx.lineWidth = 0.8;
+      // The far edge gets a soft dark line, so the side reads against light pages.
+      ctx.save();
+      ctx.strokeStyle = "rgba(20,24,36,0.3)";
+      ctx.lineWidth = L.rimW + 0.9;
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fill();
+    if (L.rimW) {
+      ctx.lineWidth = L.rimW;
       ctx.stroke();
     }
     ctx.restore();
