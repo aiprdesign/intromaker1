@@ -6,7 +6,7 @@
  * and a CTA lock-up with a clicked button.
  */
 import { exitT } from "../fx";
-import { clamp, ease, lerp, range, rgba, rng, TAU } from "../math";
+import { clamp, ease, hashString, lerp, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
 import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, pageBands, segmentShot, snapBands } from "../media";
 import {
@@ -37,7 +37,7 @@ import { autoAccent, displayFont, fillTextFit, fillTextMid, fitTextLines, subFon
 import { drawLucide } from "../icons";
 import { ctaClickAt } from "../arrange";
 import { CONCEPT_MAP } from "../concepts";
-import type { Scene, SfxCue, Skill, SkillContext } from "../types";
+import type { Brand, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { parseStat } from "./worlds";
 import { drawCover, mockUi } from "./media";
 
@@ -265,15 +265,18 @@ function tourTiming(d: number) {
   return { zoomA, clickA, zoomB, clickB, out };
 }
 
-function uiTour(sc: SkillContext) {
-  const { ctx, w, h, t, d, u, palette, scene, brand, seed } = sc;
-  saasBackground(sc, { beams: 3 });
-  const T = tourTiming(d);
+type Box = { x: number; y: number; w: number; h: number };
+
+/**
+ * The tour's layout in a w×h frame: the browser window, the two stops (hot) and the real UI
+ * component framed at each stop (comps). Areas set in the studio (scene.tour, as fractions of the
+ * screenshot) take the place of the automatic ones. `img` maps screenshot pixels onto the frame.
+ */
+function tourGeometry(w: number, h: number, u: number, seed: number, scene: Scene, media: ReturnType<typeof getMedia>, src: string | undefined) {
   const portrait = h > w;
   const square = !portrait && w / h < 1.25;
   const bar = 30 * u;
   const r = rng(seed);
-  const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
   // The window takes the screenshot's own shape, so the whole UI shows in every format (a tall
   // window would crop a desktop screenshot's sides). Vertical and square frames use their width;
   // widescreen frames keep the window clear of the headline and the edges.
@@ -288,6 +291,24 @@ function uiTour(sc: SkillContext) {
   const zMax = portrait ? 2.6 : square ? 2.2 : 1.9;
   const zoomFor = (c: { w: number; h: number }) =>
     clamp(portrait || square ? Math.min((w * 0.86) / c.w, (h * (portrait ? 0.42 : 0.55)) / c.h) : Math.min((ww * 0.8) / c.w, ((wh - bar) * 0.8) / c.h), 1.1, zMax);
+  // Screenshot pixels → frame: the shot covers the window's content area, anchored as drawCover is.
+  let img: { ox: number; oy: number; cs: number; iw: number; ih: number } | null = null;
+  if (media) {
+    const { w: iw, h: ih } = mediaSize(media);
+    const cs = Math.max(ww / iw, (wh - bar) / ih);
+    img = { ox: fx0 + (ww - iw * cs) * 0.5, oy: fy0 + bar + (wh - bar - ih * cs) * 0.2, cs, iw, ih };
+  }
+  // Areas set in the studio, for this screenshot.
+  const set = img && scene.tour?.areas?.length && (!scene.tour.src || scene.tour.src === tourSrcKey(src)) ? scene.tour.areas : null;
+  if (set && img) {
+    const I = img;
+    const comps: (Box | null)[] = [0, 1].map((i) => {
+      const a = set[Math.min(i, set.length - 1)];
+      return { x: I.ox + a[0] * I.iw * I.cs, y: I.oy + a[1] * I.ih * I.cs, w: Math.max(8 * u, a[2] * I.iw * I.cs), h: Math.max(8 * u, a[3] * I.ih * I.cs) };
+    });
+    const hot = comps.map((c) => ({ x: c!.x + c!.w / 2, y: c!.y + c!.h / 2 }));
+    return { portrait, square, bar, ww, wh, fcx, fcy, fx0, fy0, zoomFor, hot, comps, img };
+  }
   // Zoom to the busiest real UI regions of the screenshot; seeded spots otherwise.
   const found = media ? findHotspots(media, ww, wh - bar, 0.5, 0.2) : null;
   const hot = (
@@ -296,17 +317,11 @@ function uiTour(sc: SkillContext) {
       { x: 0.62 + r() * 0.12, y: 0.55 + r() * 0.15 },
     ]
   ).map((p) => ({ x: fx0 + p.x * ww, y: fy0 + bar + p.y * (wh - bar) }));
-  const Z = 1.85;
   // The real UI component under each hotspot (from segmenting the screenshot), so the focus ring
   // hugs an actual card or panel and everything around it can be dimmed.
-  const comps = hot.map(() => null as { x: number; y: number; w: number; h: number } | null);
-  if (media instanceof HTMLImageElement && found) {
-    const { w: iw, h: ih } = mediaSize(media);
-    const fw = ww;
-    const fh = wh - bar;
-    const cs = Math.max(fw / iw, fh / ih);
-    const ox = fx0 + (fw - iw * cs) * 0.5;
-    const oy = fy0 + bar + (fh - ih * cs) * 0.2;
+  const comps = hot.map(() => null as Box | null);
+  if (media instanceof HTMLImageElement && found && img) {
+    const { ox, oy, cs, iw, ih } = img;
     const segs = segmentShot(media);
     const onScreen = segs.map((g) => ({ x: ox + g.x * cs, y: oy + g.y * cs, w: g.w * cs, h: g.h * cs }));
     hot.forEach((p, i) => {
@@ -340,6 +355,56 @@ function uiTour(sc: SkillContext) {
       comps[i] = c;
     });
   }
+  return { portrait, square, bar, ww, wh, fcx, fcy, fx0, fy0, zoomFor, hot, comps, img };
+}
+
+/** The screenshot the tour shows: the scene's own, else the site's first. */
+const mediaSrc = (scene: Scene, brand?: Brand) => (scene.media ? scene.media.src : brand?.images[0]);
+
+/** What scene.tour.src stores for a screenshot (a short key for long data URLs; the last one is kept, as frames ask every time). */
+let keyMemo: [string, string] | null = null;
+export function tourSrcKey(src: string | undefined) {
+  if (!src) return undefined;
+  if (src.length <= 300) return src;
+  if (keyMemo?.[0] !== src) keyMemo = [src, `#${hashString(src).toString(36)}-${src.length}`];
+  return keyMemo[1];
+}
+
+/**
+ * For the studio's area editor: the tour's screenshot, the two highlight areas the slide uses in a
+ * w×h frame (as fractions of the screenshot: x, y, width, height) and the part of the
+ * screenshot that frame shows. Null until the screenshot has loaded (or without one).
+ */
+export function tourAreas(scene: Scene, brand: Brand | undefined, w: number, h: number, seed: number) {
+  const src = mediaSrc(scene, brand);
+  const kind = scene.media?.kind ?? "image";
+  if (!src || kind !== "image") return null;
+  const media = getMedia({ src, kind: "image" }, 0);
+  if (!(media instanceof HTMLImageElement)) return null;
+  const u = Math.min(w, h) / 1080;
+  const g = tourGeometry(w, h, u, seed, scene, media, src);
+  if (!g.img) return null;
+  const { ox, oy, cs, iw, ih } = g.img;
+  const toImg = (b: Box): [number, number, number, number] => [(b.x - ox) / (iw * cs), (b.y - oy) / (ih * cs), b.w / (iw * cs), b.h / (ih * cs)];
+  // (An automatic area that takes in most of the screenshot starts as a box at its stop instead,
+  // so the boxes can be told apart and moved.)
+  const areas = g.hot.map((p, i) => {
+    const a = toImg(g.comps[i] ?? { x: p.x - g.ww * 0.12, y: p.y - (g.wh - g.bar) * 0.09, w: g.ww * 0.24, h: (g.wh - g.bar) * 0.18 });
+    if (scene.tour?.areas?.length || a[2] * a[3] < 0.35) return a;
+    const [px, py] = toImg({ x: p.x, y: p.y, w: 0, h: 0 });
+    return [clamp(px - 0.16, 0, 0.68), clamp(py - 0.14, 0, 0.72), 0.32, 0.28] as [number, number, number, number];
+  });
+  const visible = toImg({ x: g.fx0, y: g.fy0 + g.bar, w: g.ww, h: g.wh - g.bar });
+  return { image: media, key: tourSrcKey(src), areas, visible };
+}
+
+function uiTour(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene, brand, seed } = sc;
+  saasBackground(sc, { beams: 3 });
+  const T = tourTiming(d);
+  const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
+  const { portrait, bar, ww, wh, fcx, fcy, fx0, fy0, zoomFor, hot, comps } = tourGeometry(w, h, u, seed, scene, media, mediaSrc(scene, brand));
+  const Z = 1.85;
 
   // Camera keyframes.
   const center = { x: fcx, y: fcy };
@@ -348,11 +413,18 @@ function uiTour(sc: SkillContext) {
   const kOut = ease.inOutCubic(range(t, T.out, T.out + 0.75));
   // Each stop frames a whole component (never cutting through it): zoomed until the component
   // fills about three quarters of the window, gentler when no clear component was found.
-  const stops = hot.map((p, i) => {
-    const c = comps[i];
-    if (!c) return { x: p.x, y: p.y, z: 1.5 };
-    return { x: c.x + c.w / 2, y: c.y + c.h / 2, z: zoomFor(c) };
-  });
+  // The camera stays inside the window where the zoom lets it, so a component near the window's
+  // edge is framed without showing the empty stage past it (at the top, the stage under the
+  // headline band may show, so a component at the top isn't hidden under the headline). Vertical
+  // frames keep the stage above and below the window (the stops are listed under it).
+  const inside = (v: number, lo: number, hi: number) => (lo <= hi ? clamp(v, lo, hi) : v);
+  const stops = hot
+    .map((p, i) => {
+      const c = comps[i];
+      if (!c) return { x: p.x, y: p.y, z: 1.5 };
+      return { x: c.x + c.w / 2, y: c.y + c.h / 2, z: zoomFor(c) };
+    })
+    .map((st) => ({ ...st, x: inside(st.x, fx0 + w / 2 / st.z, fx0 + ww - w / 2 / st.z), y: portrait ? st.y : inside(st.y, fy0 + (fcy - h * 0.3) / st.z, fy0 + wh - (h - fcy) / st.z) }));
   let focus = { x: lerp(center.x, stops[0].x, kA), y: lerp(center.y, stops[0].y, kA) };
   focus = { x: lerp(focus.x, stops[1].x, kB), y: lerp(focus.y, stops[1].y, kB) };
   focus = { x: lerp(focus.x, center.x, kOut), y: lerp(focus.y, center.y, kOut) };

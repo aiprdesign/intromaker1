@@ -351,6 +351,11 @@ export interface Scene {
    * Anything left out stays automatic.
    */
   zoom?: { points?: [number, number][]; size?: number; power?: number };
+  /**
+   * UI Zoom Tour's highlight areas, as set in the studio: one [x, y, width, height] box per stop
+   * (fractions of the screenshot), for the screenshot `src` they were set on.
+   */
+  tour?: { areas?: [number, number, number, number][]; src?: string };
 }
 
 export type VoiceSource = "local" | "openai" | "elevenlabs" | "custom" | "upload";

@@ -45,6 +45,7 @@ import { LOGO_CLEAN_IDS } from "@/engine/skills/logoclean";
 import { marketOf } from "@/lib/markets";
 import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
+import TourAreaEditor from "@/components/TourAreaEditor";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
 import { PALETTE_IDS, POINTER_STYLES, SHAPE_SETS, TEXT_FX, TRANSITIONS, type PointerStyle, type ShapeSet, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
@@ -1406,6 +1407,7 @@ export default function Studio() {
           />
         )}
         {s.skill === "product-zoom" && <ZoomLensEditor scene={s} brand={plan.brand} onChange={(z) => updateScene(i, { zoom: z })} />}
+        {s.skill === "ui-tour" && <TourAreaEditor scene={s} index={i} plan={plan} onChange={(tour) => updateScene(i, { tour })} />}
         {narrating && (
           <div className="vo-line">
             <label className="fld">

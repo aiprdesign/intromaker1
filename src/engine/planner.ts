@@ -2398,6 +2398,21 @@ function sanitizeZoom(z: unknown): Scene["zoom"] {
   return out.points || out.size !== undefined || out.power !== undefined ? out : undefined;
 }
 
+function sanitizeTour(v: unknown): Scene["tour"] {
+  if (!v || typeof v !== "object") return undefined;
+  const o = v as Record<string, unknown>;
+  const ok = (n: unknown) => typeof n === "number" && Number.isFinite(n);
+  const c = (n: number) => Math.min(1, Math.max(0, n));
+  const areas = Array.isArray(o.areas)
+    ? o.areas
+        .filter((a): a is [number, number, number, number] => Array.isArray(a) && a.length === 4 && a.every(ok))
+        .slice(0, 2)
+        .map(([x, y, w, h]) => [c(x), c(y), Math.min(1 - c(x), Math.max(0.01, w)), Math.min(1 - c(y), Math.max(0.01, h))] as [number, number, number, number])
+    : undefined;
+  if (!areas?.length) return undefined;
+  return { areas, src: typeof o.src === "string" && o.src.length < 4096 ? o.src : undefined };
+}
+
 export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>[] }): VideoPlan {
   const scenes: Scene[] = (raw.scenes ?? [])
     .slice(0, 16)
@@ -2419,6 +2434,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
       vo: typeof s.vo === "string" && s.vo.trim() ? s.vo.trim().slice(0, 240) : undefined,
       why: typeof s.why === "string" && s.why.trim() ? s.why.trim().slice(0, 160) : undefined,
       zoom: sanitizeZoom(s.zoom),
+      tour: sanitizeTour(s.tour),
     }));
   if (!scenes.length) scenes.push({ skill: "particle-assemble", text: "HELLO", duration: 3, transition: "cut" });
   return {
