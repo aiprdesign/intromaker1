@@ -764,15 +764,15 @@ function classicPath(ctx: CanvasRenderingContext2D) {
 
 /**
  * The modern pointer: a rounded arrowhead with a notch at its back (no stem), the shape design
- * tools and launch videos use. Tip at the origin, about 15 × 20 pointer units; `r` rounds every
+ * tools and launch videos use, wide and stable. Tip at the origin, about 18 × 19 pointer units; `r` rounds every
  * corner (the tip a little less).
  */
 function modernPath(ctx: CanvasRenderingContext2D, r = 1) {
   const P: [number, number, number][] = [
     [0, 0, 1.3 * r],
-    [0.9, 19.6, 2.3 * r],
-    [6.2, 14.6, 1.5 * r],
-    [14.4, 13.4, 2.3 * r],
+    [1.6, 19, 2.4 * r],
+    [7.8, 13.6, 1.6 * r],
+    [18.4, 11.8, 2.4 * r],
   ];
   ctx.beginPath();
   // Start halfway along the last edge so every corner can be rounded with arcTo.
@@ -803,7 +803,7 @@ type PointerLook = {
 
 function pointerLook(style: Exclude<PointerStyle, "auto" | "classic">, p: Palette): PointerLook {
   const lin = (ctx: CanvasRenderingContext2D, a: string, b: string, c = b) => {
-    const g = ctx.createLinearGradient(0, 0, 12, 20);
+    const g = ctx.createLinearGradient(0, 0, 15, 18);
     g.addColorStop(0, a);
     g.addColorStop(0.6, b);
     g.addColorStop(1, c);
