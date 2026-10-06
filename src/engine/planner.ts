@@ -187,6 +187,34 @@ const FAMILIES = [
   ["lost", "find", "search", "organi", "track", "miss", "forget", "remind"],
   ["deploy", "release", "ship", "build", "preview", "rollback"],
 ];
+/**
+ * Problems written from a product's own features or services, for a problem → solution film on a
+ * site that names none ("SEO" → "Stuck on SEO"): plain struggle lines, never a claim. Two to three.
+ */
+export function problemsFrom(features: string[]) {
+  const lead = [(x: string) => `Struggling with ${x}`, (x: string) => `Stuck on ${x}`, (x: string) => `Falling behind on ${x}`];
+  const mid = (x: string) => (/^[A-Z][a-z]/.test(x) ? x[0].toLowerCase() + x.slice(1) : x);
+  const seen = new Set<string>();
+  const out: { pain: string; feature: string }[] = [];
+  for (const f of features) {
+    const t = f.split(/\s+[—–]\s+/)[0].trim();
+    const k = t.toLowerCase();
+    if (!t || t.split(/\s+/).length > 4 || seen.has(k)) continue;
+    seen.add(k);
+    out.push({ pain: lead[out.length % lead.length](mid(t)), feature: t });
+    if (out.length === 3) break;
+  }
+  return out.length >= 2 ? out : [];
+}
+
+/** The answer to a written problem: the feature's own line from the site ("SEO — Rank for what you sell"), else its name. */
+function solutionLine(feature: string, described: string[]) {
+  const hit = described.find((d) => d.split(/\s+[—–]\s+/)[0].trim().toLowerCase() === feature.toLowerCase());
+  const detail = hit?.split(/\s+[—–]\s+/)[1]?.trim().replace(/[.!]+$/, "");
+  // (Without a line of its own: the feature itself, taken care of.)
+  return detail && detail.split(/\s+/).length <= 10 ? detail : `${feature}, sorted`;
+}
+
 export function pairPains(pains: string[], fixes: string[]) {
   const words = (x: string) => new Set(x.toLowerCase().split(/[^a-z]+/).filter((wd) => wd.length >= 4).map((wd) => wd.replace(/(ing|ed|es|s)$/, "")));
   const fam = (x: string) => new Set(FAMILIES.map((f, i) => (f.some((k) => x.toLowerCase().includes(k)) ? i : -1)).filter((i) => i >= 0));
@@ -222,6 +250,8 @@ export type StyleChoice = "auto" | "saas" | "trailer";
 
 export interface PlanRequest {
   prompt: string;
+  /** Story angle for SaaS films (problem → solution, product-first…); see ANGLES. */
+  angle?: Angle;
   aspect: Aspect;
   length: Length;
   palette?: PaletteId | "auto";
@@ -605,6 +635,18 @@ function promptDescription(brand: string | null, pitch: string, features: string
   return `${head}${doing.length ? "" : ","}${parts.join("")}.`.replace(/,\s*,/g, ",");
 }
 
+/** Problems a prompt names: "tired of X", "no more X", "instead of X", "struggling with X". */
+function promptPains(prompt: string) {
+  const out: string[] = [];
+  for (const m of prompt.matchAll(/\b(tired of|no more|instead of|struggling with|sick of|without the)\s+([^,.;!?]+?)(?=\s+(?:and|or|with|so|for)\b|[,.;!?]|$)/gi)) {
+    const phrase = m[2].trim();
+    if (!phrase || phrase.split(/\s+/).length > 6) continue;
+    const p = m[1].toLowerCase() === "no more" ? `No more ${phrase}` : phrase.charAt(0).toUpperCase() + phrase.slice(1);
+    if (!out.some((x) => x.toLowerCase() === p.toLowerCase())) out.push(p);
+  }
+  return out.slice(0, 3);
+}
+
 function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const prompt = req.prompt.trim();
   const seed = (req.seed ?? hashString(prompt)) >>> 0;
@@ -636,7 +678,8 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     testimonials: [],
     clientLogos: [],
     steps: [],
-    pains: [],
+    // Problems the prompt names ("for teams tired of spreadsheets", "no more missed calls").
+    pains: promptPains(prompt),
     font: null,
     shots: { hero: null, full: null, sections: [] },
     cta: null,
@@ -645,7 +688,7 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     videos: [],
     themeColor: null,
   };
-  const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas", variant: req.variant });
+  const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas", variant: req.variant, angle: req.angle });
   const shown = typical.filter((f) => plan.scenes.some((sc) => sc.items?.some((it) => norm(it.split(/\s+[—–]\s+/)[0]) === norm(f))));
   if (shown.length) {
     const why = named.length ? "the prompt named only one feature" : "the prompt didn't name any features";
@@ -1070,9 +1113,15 @@ export function contextCta(site: Pick<SiteData, "cta" | "name" | "tagline" | "de
 /** Films for a room (talks, booths, TV): the end card carries a QR code of the website. */
 export const BIG_SCREEN = /\b(event|conference|keynote|presentation|booth|trade ?show|expo|meetup|tv|big screen|signage|webinar|demo day|qr)\b/i;
 
-export type Angle = "story" | "product" | "proof";
+export type Angle = "story" | "problem" | "product" | "proof";
 export const ANGLES: { id: Angle; name: string; brief: string }[] = [
   { id: "story", name: "Story-led", brief: "Problem → solution: open on the pain, reveal the product as the better way." },
+  {
+    id: "problem",
+    name: "Problem → solution",
+    brief:
+      "Open on the problems the audience has (the site's own pains, or the problems its services or features take on), cross them out, reveal the product or service as the answer, then pair each problem with the feature or service that solves it.",
+  },
   { id: "product", name: "Product-first", brief: "Open on the promise and get to the product in action within seconds; demo-heavy." },
   { id: "proof", name: "Proof-first", brief: "Lead with social proof (customers, real numbers, a real quote), then show why." },
 ];
@@ -1080,6 +1129,7 @@ export const ANGLES: { id: Angle; name: string; brief: string }[] = [
 const VALUE_ORDER = ["hook", "reveal", "demo", "features", "bento", "meet", "tour", "how", "cards", "integrations", "cta"];
 const ANGLE_ORDER: Record<Angle, string[]> = {
   story: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
+  problem: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
   product: ["hook", "pain", "reveal", "tour", "features", "meet", "bento", "how", "cards", "quote", "logos", "integrations", "cta"],
   proof: ["hook", "pain", "reveal", "quote", "logos", "meet", "tour", "features", "how", "bento", "cards", "integrations", "cta"],
 };
@@ -1385,7 +1435,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const stat = site.stats.find((st) => /team|customer|compan|user|business|developer|people|brand|org/i.test(st));
   const quote = site.testimonials.find((q) => q.quote.length <= 190 && q.author);
   const integrationLine = site.headlines.find((h) => /integrat|connect|tools|apps|stack|plug/i.test(h));
-  const pains = (site.pains ?? []).slice(0, 3);
+  const sitePains = (site.pains ?? []).slice(0, 3);
 
   type Beat = { scene: Scene; priority: number };
   const candidates: Beat[] = [];
@@ -1396,6 +1446,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const variant = Math.max(0, Math.floor(req.variant ?? 0));
   const alt = variant % 2 === 1;
   const angle: Angle = req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
+  // Problem → solution: the site's own pains, else the problems its services or features take on,
+  // written from them ("Stuck on SEO"), so the film opens on the problem whatever the site says.
+  const problemLed = angle === "problem";
+  const featurePains = problemLed && sitePains.length < 2 ? problemsFrom(shortFeatures) : [];
+  const serviceWord = SERVICE_BIZ.test([site.tagline, site.description, ...site.headlines.slice(0, 8)].join(" \n ")) ? "services" : "features";
+  const pains = featurePains.length >= 2 ? featurePains.map((p) => p.pain) : sitePains;
   // What kind of product this is decides the arc, chapter labels, CTA voice and icons.
   // (From the site as captured: screening a claim out mustn't change what kind of product it is.)
   const whole = ORIGINAL.get(site) ?? site;
@@ -1408,7 +1464,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const visuals = brand.images.length + (shots.parts ?? []).filter((p) => p.kind !== "button" && p.w * p.h > 120 * 90).length;
   // 1. Hook: the problem, the promise, or the proof.
   // Open on the problem only in categories whose films do (e-commerce / creative lead with the promise).
-  const painHook = angle === "story" && target >= 20 && pains.length >= 2 && concept.arc.indexOf("pain") < concept.arc.indexOf("reveal");
+  const painHook = (problemLed && pains.length >= 2) || (angle === "story" && target >= 20 && pains.length >= 2 && concept.arc.indexOf("pain") < concept.arc.indexOf("reveal"));
   const proofHook = angle === "proof" && !!teamStat;
   // Proof-first with no proof to show (claim-safe, or a site without any) becomes value-first:
   // it opens on the positioning line and leads with the product doing its job.
@@ -1448,7 +1504,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       role: "pain", skill: "pain-strike",
       text: pick(["There's *another* way.", "It doesn't have to be *this hard*.", "Time for a *new* way."]),
       items: pains,
-      eyebrow: "The old way",
+      eyebrow: problemLed ? "The problem" : "The old way",
+      why: problemLed ? (featurePains.length ? `Problem → solution: the problems its ${serviceWord} take on, written from them (edit them to match)` : "Problem → solution: the site's own pains") : undefined,
       duration: beats(pains.length * 2 + 5),
       transition: "cut",
     });
@@ -1759,15 +1816,19 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 5e. The site's own pains, when the film doesn't open on them: each answered by the feature that
   // solves it (when they line up), else the old way next to the product on a before/after slider.
   const compareMedia = images[0] ?? img(shots.hero) ?? img(shots.sections[0]);
-  const pairs = target >= 20 && pains.length >= 2 && !painHook ? pairPains(pains, [...spareFeatures, ...shortFeatures]) : [];
+  // (Problem → solution films answer each problem they opened on; written problems answer with
+  // the feature or service each was written from, in the site's words where it has a line on it.)
+  const pairs = featurePains.length >= 2
+    ? featurePains.map((p) => ({ pain: p.pain, fix: solutionLine(p.feature, [...bentoItems, ...site.features, ...site.headlines]), score: 1 }))
+    : (target >= 20 || problemLed) && pains.length >= 2 && (!painHook || problemLed) ? pairPains(pains, [...spareFeatures, ...shortFeatures]) : [];
   const matched = pairs.filter((p) => p.score > 0).length;
-  if (pairs.length >= 2 && ((matched >= 2) !== (alt && !!compareMedia) || !compareMedia)) {
-    add(target >= 30 ? 4 : 6, {
+  if (pairs.length >= 2 && (problemLed || (matched >= 2) !== (alt && !!compareMedia) || !compareMedia)) {
+    add(problemLed ? (target >= 20 ? 2 : 3) : target >= 30 ? 4 : 6, {
       role: "solve", skill: "problem-solution",
-      text: "From problem to *solution*",
+      text: problemLed ? `How *${site.name === "Your product" ? "it" : site.name}* solves it` : "From problem to *solution*",
       items: pairs.slice(0, 3).map((p) => `${p.pain} → ${p.fix}`),
       eyebrow: "Problem → solution",
-      why: matched >= 2 ? "The site's pains line up with its features" : "The site names the problems it solves",
+      why: featurePains.length >= 2 ? `Each problem answered by the ${serviceWord === "services" ? "service" : "feature"} it was written from` : matched >= 2 ? "The site's pains line up with its features" : "The site names the problems it solves",
       duration: beats(Math.min(3, pairs.length) * 2.5 + 4),
       transition: "whip",
     });
@@ -2057,7 +2118,8 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   const variant = Math.max(0, Math.floor(req.variant ?? 0));
   // Remakes and takes tell it from another angle: story (a hook first), product-first (open on the
   // product itself), or a gallery-led cut.
-  const angle: Angle = req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
+  // (A physical product has no software problems to stage: problem → solution plays as story-led.)
+  const angle: Angle = req.angle === "problem" ? "story" : req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
   const bpm = 116;
   const beat = 60 / bpm;
   const beats = (n: number) => n * beat;

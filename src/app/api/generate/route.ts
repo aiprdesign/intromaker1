@@ -278,7 +278,7 @@ function readBody(body: Body) {
   const trailerStyle = typeof body.trailerStyle === "string" && TRAILER_STYLE_MAP[body.trailerStyle] ? body.trailerStyle : undefined;
   const variant = Math.min(50, Math.max(0, Math.floor(Number(body.variant) || 0)));
   const wantSaas = style === "saas" || site?.kind === "product" || (style === "auto" && (site ? true : isSaasPrompt(prompt)));
-  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, trailerStyle, template, safe, variant };
+  const request: PlanRequest = { prompt, aspect, length, palette, seed, style, trailerStyle, template, safe, variant, angle };
   const concept = rawSite
     ? detectConcept(`${rawSite.name} ${rawSite.tagline} ${rawSite.description}`, [...rawSite.headlines, ...rawSite.features, ...rawSite.steps, ...rawSite.pains].join(" "))
     : detectConcept(prompt);

@@ -64,6 +64,10 @@ export default function Studio() {
   const promptRef = useRef(prompt);
   const [aspect, setAspect] = useState<Aspect>("16:9");
   const [length, setLength] = useState<Length>("standard");
+  // The story's shape: the director's pick (Auto), or one asked for (problem → solution…).
+  const [story, setStory] = useState<"auto" | Angle>("auto");
+  const storyRef = useRef(story);
+  storyRef.current = story;
   const [palette, setPalette] = useState<PaletteId | "auto">("auto");
   const [plan, setPlan] = useState<VideoPlan>(HERO_PLAN);
   const planRef = useRef(plan);
@@ -661,11 +665,12 @@ export default function Studio() {
     const template = templateRef.current;
     const style = styleRef.current;
     const trailerStyle = trailerStyleRef.current !== "auto" ? trailerStyleRef.current : undefined;
+    const angle = opts.angle ?? (storyRef.current !== "auto" ? storyRef.current : undefined);
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
     const aiCfg = aiForRequest(loadAiSettings());
     const safeCopy = safeRef.current;
     const shots = photosRef.current.length ? photosRef.current : undefined;
-    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, photos: shots, colors, style, trailerStyle, ai: aiCfg, template, angle: opts.angle, safe: safeCopy, variant: opts.variant };
+    const body = { prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, site: s, photos: shots, colors, style, trailerStyle, ai: aiCfg, template, angle, safe: safeCopy, variant: opts.variant };
     // Local AI runs where the model is: from this browser when the server is online.
     if (isLocalProvider(aiCfg.provider) && !localViaServerRef.current) {
       try {
@@ -699,8 +704,8 @@ export default function Studio() {
       if (opts.signal?.aborted || stopped(e)) throw new DOMException("Stopped", "AbortError");
       // Offline or API unavailable: the director also runs in the browser.
       const plan = s
-        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, trailerStyle, template, angle: opts.angle, safe: safeCopy, variant: opts.variant, direction: p })
-        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, trailerStyle, template, safe: safeCopy, variant: opts.variant });
+        ? planFromSite(s, { aspect: a, length: len, palette: pal, seed: opts.seed, colors, style, trailerStyle, template, angle, safe: safeCopy, variant: opts.variant, direction: p })
+        : planFromPrompt({ prompt: p, aspect: a, length: len, palette: pal, seed: opts.seed, style, trailerStyle, template, safe: safeCopy, variant: opts.variant, angle });
       const why = e instanceof Error && /^HTTP 50[234]$/.test(e.message) ? "the server stopped waiting for the AI's answer" : e instanceof Error && e.message.startsWith("HTTP") ? `server error ${e.message.slice(5)}` : "couldn't reach the server";
       const note = aiCfg.provider !== "builtin" ? `AI director unavailable (${why}); used the built-in director.` : undefined;
       return { plan, engine: "builtin", engineLabel: "", note, label };
@@ -1807,6 +1812,25 @@ export default function Studio() {
               </button>
             ))}
           </div>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="story-pick">
+                Story
+              </label>
+              <select
+                id="story-pick"
+                className="select"
+                value={story}
+                onChange={(e) => setStory(e.target.value as "auto" | Angle)}
+                title="How the video tells it. Problem → solution opens on the problems (the site's own, or ones written from its services or features), then shows how each is solved."
+              >
+                <option value="auto">Auto (director&apos;s pick)</option>
+                {ANGLES.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <details className="hint claim-note">
