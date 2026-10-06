@@ -2,6 +2,7 @@ import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { ownMoment } from "./momentitems";
+import { DEMO_SKILLS } from "./templates";
 import { hasSpecificIcon } from "./icons";
 import { writeVoiceover } from "./script";
 import { isClaimWord, isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
@@ -31,8 +32,18 @@ import {
 /** The 3D and clean logo intros, in the order remakes try them (a 3D one, then a clean one). */
 const LOGO_3D = ["logo-extrude", "logo-draw", "logo-stage", "logo-wipe", "logo-spin", "logo-pop", "logo-shatter", "logo-morph", "logo-orbit", "logo-slices", "logo-layers", "logo-dots", "logo-tunnel", "logo-type", "logo-flip", "logo-shapes"] as const;
 
-export type Length = "short" | "standard" | "long";
-export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20, long: 34 };
+export type Length = "short" | "standard" | "long" | "minute" | "ninety" | "two";
+export const LENGTH_SECONDS: Record<Length, number> = { short: 12, standard: 20, long: 34, minute: 60, ninety: 90, two: 120 };
+/** The lengths offered in the studio, shortest first (34s is the default). */
+export const LENGTHS: { id: Length; label: string }[] = [
+  { id: "short", label: "12s" },
+  { id: "standard", label: "20s" },
+  { id: "long", label: "34s" },
+  { id: "minute", label: "1m" },
+  { id: "ninety", label: "1.5m" },
+  { id: "two", label: "2m" },
+];
+export const isLength = (x: unknown): x is Length => typeof x === "string" && x in LENGTH_SECONDS;
 
 /** The site talks about being used across countries (the globe beat's evidence). */
 const GLOBAL = /\b(global(ly)?|worldwide|international(ly)?|countries|currencies|cross-border|around the world|multi-region|edge network|borders)\b/i;
@@ -197,7 +208,8 @@ export function problemsFrom(features: string[]) {
   const seen = new Set<string>();
   const out: { pain: string; feature: string }[] = [];
   for (const f of features) {
-    const t = f.split(/\s+[—–]\s+/)[0].trim();
+    // ("Social media for small businesses" → "Social media": who it's for isn't the problem.)
+    const t = f.split(/\s+[—–]\s+/)[0].replace(/\s+(?:for|to|with|so)\s+.*$/i, "").trim();
     const k = t.toLowerCase();
     if (!t || t.split(/\s+/).length > 4 || seen.has(k)) continue;
     seen.add(k);
@@ -772,7 +784,21 @@ export function planFromPrompt(req: PlanRequest): VideoPlan {
     .map((part) => (isNumericClaim(part) || isUnsafe(part) ? "" : safeCopy(part.trim())))
     .filter((part) => part.replace(/[^a-z0-9]/gi, "").length > 1)
     .join(", ");
-  return safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt })));
+  return noteShort(safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt }))), LENGTH_SECONDS[req.length], false);
+}
+
+/**
+ * A video the material can't stretch to the length asked for (a minute or two from a one-line
+ * prompt) stays the length its material makes, unpadded, and says so, once.
+ */
+function noteShort(plan: VideoPlan, target: number, fromSite: boolean): VideoPlan {
+  const total = plan.scenes.reduce((a, sc) => a + sc.duration, 0);
+  if (total >= target * 0.85 || plan.notes?.some((n) => /enough material/.test(n))) return plan;
+  const cut = Math.round(total);
+  const hint = fromSite
+    ? "Sites with more feature headlines, steps or testimonials make longer videos."
+    : "Describe more in your prompt (features, what makes it different, who it's for) or import the website for a longer cut.";
+  return { ...plan, target: cut, notes: [...(plan.notes ?? []), `There's enough material for a ${cut}s video rather than ${target}s, with no padding or invented lines. ${hint}`] };
 }
 
 function planFromPromptRaw(req: PlanRequest): VideoPlan {
@@ -1166,7 +1192,7 @@ export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
         ? planFromSiteTrailer(input, req)
         : trimToTarget(planFromSiteSaas(input, req)),
   );
-  return safe ? safePlan(plan) : healthPlan(plan);
+  return noteShort(safe ? safePlan(plan) : healthPlan(plan), LENGTH_SECONDS[req.length], true);
 }
 
 /**
@@ -1705,6 +1731,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       transition: "dolly",
     });
   }
+  // A minute and a half or more: the features the first feature slide had no room for.
+  if (target >= 90) {
+    const shownNow = new Set(featureItems.slice(0, 4).map((it) => norm(it.split(/\s+[—–]\s+/)[0])));
+    const rest = bentoItems.filter((it) => !shownNow.has(norm(it.split(/\s+[—–]\s+/)[0]))).slice(0, 4);
+    if (rest.length >= 3)
+      add(6, {
+        role: "more", skill: "icon-features",
+        text: `More in *${site.name}*`,
+        items: rest,
+        eyebrow: "Features",
+        why: "A longer video: the features the first feature slide had no room for",
+        duration: Math.max(4.6, beats(rest.length * 1.5 + 6)),
+        transition: "dolly",
+      });
+  }
   // 5b. The signature interaction moment: the product *doing* something (a command palette,
   // a streamed AI answer, a one-click cascade, live notifications), chosen for the category.
   // Products that lead with AI get the AI moment whatever their category.
@@ -1770,6 +1811,32 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // (When the film already shows the real product — a tour or the assembled page — it's optional.)
   const productShown = !!tourMedia || !!shots.hero;
   if (demoScene) demoScene.why = demoWhy;
+  // Longer videos (a minute and up) show the product at work in more ways: the next moments that
+  // suit it (one per extra half-minute), each filled from its own features, never stock copy.
+  if (target >= 60) {
+    const extra = Math.round((target - 34) / 28);
+    const usedMoments = new Set<string>([demo.skill]);
+    for (const m of moments) {
+      if (usedMoments.size > extra) break;
+      const sk = m.spec.skill;
+      if (usedMoments.has(sk) || m.score <= 0 || sk === "ai-prompt") continue;
+      const more = ownMoment(sk, { name: site.name, features: ownFeatures, steps: site.steps ?? [] }, m.spec);
+      if (!more) continue;
+      usedMoments.add(sk);
+      add(4 + usedMoments.size, {
+        // (Numbered, so the extra moments spread through the video rather than play back to back.)
+        role: `showcase${usedMoments.size - 1}`, skill: sk,
+        text: more.title ?? m.spec.title,
+        subtext: more.action ?? m.spec.action,
+        items: more.items,
+        eyebrow: m.spec.eyebrow,
+        why: `A longer video: another moment that suits it${m.because.length ? ` (the site talks about ${m.because.slice(0, 2).join(", ")})` : ""}, from its own features`,
+        duration: beats(11),
+        transition: "whip",
+        media: sk === "comment-pins" ? tourMedia ?? undefined : undefined,
+      });
+    }
+  }
   add(valueFirst && target >= 20 ? 2 : target < 20 ? (angle === "product" && !productShown ? 3 : 6) : !productShown ? 2 : target >= 30 ? 3 : 4, demoScene);
   // 5c. Gallery: the product's own images and UI components, animated (GPU transitions, or a 3D
   // carousel for visual products).
@@ -2009,6 +2076,14 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     // Before / after follows the product's first appearance; the globe follows the features.
     if (role === "solve") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.6;
     if (role === "support") return rank.indexOf("cta") - 0.6;
+    // A longer video's extra moments follow the features (spread out, not back to back with the demo).
+    if (role?.startsWith("showcase")) {
+      // The first after the features, the next after the proof, a third just before the close.
+      const n = Number(role.slice(8)) || 1;
+      const after = n === 1 ? ["features", "bento", "tour"] : n === 2 ? ["cards", "quote", "how"] : ["integrations", "logos"];
+      return (after.map((r) => rank.indexOf(r)).find((i) => i >= 0) ?? rank.indexOf("cta") - 1) + 0.55;
+    }
+    if (role === "more") return (["features", "bento", "tour"].map((r) => rank.indexOf(r)).find((i) => i >= 0) ?? rank.length - 2) + 0.7;
     // Who it's for follows the product's first appearance (after the reveal's positioning line).
     if (role === "audience") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.7;
     if (role === "compare") return (rank.indexOf("meet") >= 0 ? rank.indexOf("meet") : rank.indexOf("reveal")) + 0.6;
@@ -2023,6 +2098,14 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     .filter((c) => chosen.has(c.i))
     .sort((a, b) => rankOf(a.scene.role) - rankOf(b.scene.role) || a.i - b.i)
     .map((c) => c.scene);
+  // Two product moments never play back to back: the next other beat (not the close) goes between.
+  for (let i = 1; i < scenes.length - 1; i++) {
+    if (!(DEMO_SKILLS.has(scenes[i].skill) && DEMO_SKILLS.has(scenes[i - 1].skill))) continue;
+    const j = scenes.findIndex((sc, k) => k > i && k < scenes.length - 1 && !DEMO_SKILLS.has(sc.skill));
+    if (j > i) scenes.splice(i, 0, scenes.splice(j, 1)[0]);
+    // (With nothing else to put between them, the extra moment is left out.)
+    else scenes.splice(i--, 1);
+  }
   // Product-first is a cold open: the first product beat plays before the logo.
   if (angle === "product") {
     const r = scenes.findIndex((sc) => sc.role === "reveal");
@@ -2062,10 +2145,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
   const total = styled.scenes.reduce((a, sc) => a + sc.duration, 0);
+  if (problemLed && !painHook)
+    styled.notes = [
+      ...(styled.notes ?? []),
+      "Problem → solution needs two or more problems to open on: name them in your prompt (\"for teams tired of X and Y\"), or list two or more features or services.",
+    ];
   if (total < target * 0.9) {
     const cut = Math.round(total);
     styled.target = cut;
     styled.notes = [
+      ...(styled.notes ?? []),
       `There's enough material for a tight ${cut}s video rather than ${target}s, with no padding or invented lines. ` +
         (site.url
           ? "Sites with more feature headlines, steps or testimonials make longer videos."

@@ -37,7 +37,7 @@ import { DEFAULT_VOICE, speakable, wordBudget } from "@/engine/voice";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
-import { ANGLES, decodePlan, encodePlan, planFromPrompt, planFromSite, safePlan, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
+import { ANGLES, LENGTHS, decodePlan, encodePlan, isLength, planFromPrompt, planFromSite, safePlan, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import { LOGO_3D_IDS } from "@/engine/skills/logo3d";
@@ -63,7 +63,7 @@ export default function Studio() {
   /** The prompt the film on screen was made from (the box may already hold the next one). */
   const promptRef = useRef(prompt);
   const [aspect, setAspect] = useState<Aspect>("16:9");
-  const [length, setLength] = useState<Length>("standard");
+  const [length, setLength] = useState<Length>("long");
   // The story's shape: the director's pick (Auto), or one asked for (problem → solution…).
   const [story, setStory] = useState<"auto" | Angle>("auto");
   const storyRef = useRef(story);
@@ -1070,7 +1070,7 @@ export default function Studio() {
     const fl = params.get("length");
     const fmt = {
       aspect: fa === "9:16" || fa === "1:1" || fa === "16:9" ? (fa as Aspect) : undefined,
-      length: fl === "short" || fl === "standard" || fl === "long" ? (fl as Length) : undefined,
+      length: isLength(fl) ? fl : undefined,
     };
     if (fmt.aspect) setAspect(fmt.aspect);
     if (fmt.length) setLength(fmt.length);
@@ -1802,13 +1802,13 @@ export default function Studio() {
           )}
 
           {/* The format (9:16, 16:9, 1:1) is picked in the player's toolbar, under the video. */}
-          <div className="field-pair">
+          <div className="field-stack">
             <div>
           <label className="field-label">Length</label>
           <div className="seg-control">
-            {(["short", "standard", "long"] as Length[]).map((l) => (
-              <button key={l} className={length === l ? "active" : ""} onClick={() => setLength(l)}>
-                {l === "short" ? "12s" : l === "standard" ? "20s" : "34s"}
+            {LENGTHS.map((l) => (
+              <button key={l.id} className={length === l.id ? "active" : ""} onClick={() => setLength(l.id)}>
+                {l.label}
               </button>
             ))}
           </div>

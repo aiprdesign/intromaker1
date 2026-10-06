@@ -11,6 +11,7 @@ import {
   beatSync,
   brandFromSite,
   LENGTH_SECONDS,
+  isLength,
   planFromPrompt,
   isSaasPrompt,
   ANGLES,
@@ -238,7 +239,7 @@ const PHOTO = /^\/api\/shot\?id=[a-f0-9]{16}-u\d{1,2}$/;
 function readBody(body: Body) {
   const prompt = String(body.prompt ?? "").slice(0, 1000);
   const aspect: Aspect = body.aspect === "9:16" || body.aspect === "1:1" ? body.aspect : "16:9";
-  const length: Length = body.length === "short" || body.length === "long" ? body.length : "standard";
+  const length: Length = isLength(body.length) ? body.length : "long";
   const palette: PaletteId | "auto" = (PALETTE_IDS as readonly string[]).includes(body.palette as string) ? (body.palette as PaletteId) : "auto";
   const seed = Number(body.seed) || undefined;
   // Claim-safe, always (the studio no longer offers the site's own claims).
