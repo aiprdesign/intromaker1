@@ -38,7 +38,7 @@ import { DEFAULT_VOICE, speakable, wordBudget } from "@/engine/voice";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
-import { ANGLES, LENGTHS, decodePlan, encodePlan, isLength, planFromPrompt, planFromSite, safePlan, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
+import { ANGLES, LENGTHS, decodePlan, encodePlan, isLength, parseSaasPrompt, planFromPrompt, planFromSite, safePlan, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
 import { MEDIA_SKILLS, SKILL_MAP } from "@/engine/skills";
 import { qrTarget } from "@/engine/skills/endings";
 import { LOGO_3D_IDS } from "@/engine/skills/logo3d";
@@ -1838,9 +1838,13 @@ export default function Studio() {
             </div>
           )}
 
-          <label className="field-label">{site ? "Extra direction (optional)" : "Or describe it"}</label>
+          <label className="field-label" htmlFor="studio-prompt">
+            {site ? "Extra direction (optional)" : "Or describe it"}
+          </label>
           <textarea
             id="studio-prompt"
+            maxLength={PROMPT_MAX}
+            aria-describedby="prompt-meter"
             aria-label={site ? "Extra direction for the video" : "Describe your video"}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -1850,6 +1854,7 @@ export default function Studio() {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) generate();
             }}
           />
+          <PromptMeter text={prompt} optional={!!site} />
           {!site && (
             <details className="examples-fold">
               <summary>Example prompts</summary>
@@ -2396,6 +2401,48 @@ export default function Studio() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The longest description the director reads (the server keeps the first 1,000 characters). */
+const PROMPT_MAX = 1000;
+/** Enough for a good video: the name, what it does and two or three features. */
+const PROMPT_GOOD = 60;
+
+/**
+ * Under the description: how far it is from a good length (the name, what it does, two or three
+ * features), what the director found in it, and the characters left.
+ */
+function PromptMeter({ text, optional }: { text: string; optional: boolean }) {
+  const n = text.trim().length;
+  const left = PROMPT_MAX - text.length;
+  const parsed = useMemo(() => (n >= 12 ? parseSaasPrompt(text) : null), [text, n]);
+  const features = parsed?.features.length ?? 0;
+  let hint: string;
+  let state: "low" | "ok" | "good" = "good";
+  if (optional) {
+    hint = n ? "Extra direction for the director: what to focus on, how to end." : "Optional: what to focus on, or how to end (\u201cend with Book a demo\u201d).";
+  } else if (n < PROMPT_GOOD) {
+    state = "low";
+    hint = n ? `${PROMPT_GOOD - n} more characters for a stronger video: the name, what it does and 2\u20133 features.` : `Aim for ${PROMPT_GOOD}+ characters: the name, what it does and 2\u20133 features.`;
+  } else if (features < 2) {
+    state = "ok";
+    hint = "Good length. Tip: list 2\u20133 features (\u201cwith X, Y and Z\u201d) for feature slides of your own.";
+  } else {
+    hint = `\u2713 Good: ${parsed?.brand ? `${parsed.brand}, ` : ""}${features} features found.`;
+  }
+  return (
+    <div className={`prompt-meter ${state}`} id="prompt-meter" aria-live="polite">
+      {!optional && (
+        <span className="prompt-progress" aria-hidden>
+          <span style={{ width: `${Math.min(100, (n / PROMPT_GOOD) * 100)}%` }} />
+        </span>
+      )}
+      <span className="prompt-hint">{hint}</span>
+      <span className={`prompt-left${left <= 100 ? " few" : ""}`} title={`${text.length} of ${PROMPT_MAX} characters`}>
+        {left <= 100 ? `${left} left` : `${text.length}/${PROMPT_MAX}`}
+      </span>
     </div>
   );
 }
