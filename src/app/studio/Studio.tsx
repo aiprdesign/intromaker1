@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiSettingsValue } from "@/components/AiSettings";
 import { Logo } from "@/components/Nav";
 import SkillPicker from "@/components/SkillPicker";
+import PointerPicker, { POINTER_NAMES } from "@/components/PointerPicker";
 import ShapesPicker from "@/components/ShapesPicker";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
@@ -46,7 +47,7 @@ import SlideMedia from "@/components/SlideMedia";
 import ZoomLensEditor from "@/components/ZoomLensEditor";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
-import { PALETTE_IDS, SHAPE_SETS, TEXT_FX, TRANSITIONS, type ShapeSet, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { PALETTE_IDS, POINTER_STYLES, SHAPE_SETS, TEXT_FX, TRANSITIONS, type PointerStyle, type ShapeSet, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual";
 const FILM_KEY = "intromaker.film";
@@ -266,6 +267,27 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.motionBlur !== false) !== motionBlur) setPlan((p) => ({ ...p, motionBlur: motionBlur ? undefined : false }));
   }, [plan, motionBlur]);
+  // The mouse pointer's look (auto: white on dark styles, graphite on light); remembered.
+  const [pointer, setPointer] = useState<PointerStyle>("auto");
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("intromaker.pointer") as PointerStyle | null;
+      if (v && (POINTER_STYLES as readonly string[]).includes(v)) setPointer(v);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const choosePointer = (v: PointerStyle) => {
+    setPointer(v);
+    try {
+      localStorage.setItem("intromaker.pointer", v);
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.pointer ?? "auto") !== pointer) setPlan((p) => ({ ...p, pointer: pointer === "auto" ? undefined : pointer }));
+  }, [plan, pointer]);
   // What floats behind SaaS slides: a set of animated shapes (geometric by default), watermark
   // text, or nothing. Remembered, and saved with the video.
   const [shapes, setShapes] = useState<ShapeSet | "off">("geometric");
@@ -1890,6 +1912,13 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Every exported frame pin-sharp, even mid-move."}</p>
+          <details className="fold">
+            <summary>
+              <span className="field-label inline">Mouse pointer</span> <span className="tpl-desc">{POINTER_NAMES[pointer]}</span>
+            </summary>
+            <PointerPicker plan={plan} value={pointer} onChange={choosePointer} />
+            <p className="hint">{pointer === "auto" ? "A 3D pointer that suits the colours: white on dark styles, graphite on light ones." : `The ${POINTER_NAMES[pointer].toLowerCase()} pointer in product demos, tours and buttons.`}</p>
+          </details>
           {(style !== "trailer" || plan.product) && (
             <>
               <details className="fold">

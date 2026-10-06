@@ -1180,6 +1180,40 @@ textarea {
   color: var(--text);
   box-shadow: inset 0 0 0 1px var(--line-2);
 }
+.pointer-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.pointer-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--muted);
+  font-size: 12px;
+}
+.pointer-tile canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  border-radius: 7px;
+  display: block;
+}
+.pointer-tile.active {
+  border-color: var(--accent, #22d3ee);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--accent, #22d3ee);
+}
+.pointer-tile:focus-visible {
+  outline: 2px solid var(--accent, #22d3ee);
+  outline-offset: 2px;
+}
 .swatches {
   display: flex;
   flex-wrap: wrap;

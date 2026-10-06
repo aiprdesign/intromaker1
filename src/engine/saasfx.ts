@@ -13,7 +13,7 @@ import { scratch } from "./scratch";
 import { planetStage, plexusStage, rainStage, warpStage, wormholeStage } from "./scifi";
 import { renderShaderBg } from "./shaderbg";
 import { fillTextMid, subFont, type HeadlineLayout } from "./text";
-import type { FontId, SkillContext, TextFx } from "./types";
+import type { FontId, Palette, PointerStyle, SkillContext, TextFx } from "./types";
 
 /** Critically-damped-ish spring: fast settle with a gentle overshoot. t in seconds since start. */
 export function spring(t: number, stiffness = 12, damping = 7) {
@@ -749,8 +749,8 @@ export function borderBeam(sc: SkillContext, x: number, y: number, cw: number, c
 }
 
 /** macOS-style arrow cursor with a soft shadow; `press` 0..1 squashes it on click. */
-/** The pointer's outline, tip at the origin, in pointer units (about 16 × 26). */
-function pointerPath(ctx: CanvasRenderingContext2D) {
+/** The classic pointer's outline (arrow and stem), tip at the origin, in pointer units (about 16 × 26). */
+function classicPath(ctx: CanvasRenderingContext2D) {
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(0, 22);
@@ -763,15 +763,118 @@ function pointerPath(ctx: CanvasRenderingContext2D) {
 }
 
 /**
- * The mouse pointer, large and three-dimensional like a modern launch video's: a glossy white
- * body extruded with a soft grey side, a fine dark rim, a specular edge and a soft shadow on the
- * page. A click presses it into the screen (it sinks and its depth and shadow tighten). `lean`
- * (-1..1, from the pointer's horizontal speed: see cursorPath) tilts it slightly into its motion.
+ * The modern pointer: a rounded arrowhead with a notch at its back (no stem), the shape design
+ * tools and launch videos use. Tip at the origin, about 15 × 20 pointer units; `r` rounds every
+ * corner (the tip a little less).
+ */
+function modernPath(ctx: CanvasRenderingContext2D, r = 1) {
+  const P: [number, number, number][] = [
+    [0, 0, 1.3 * r],
+    [0.9, 19.6, 2.3 * r],
+    [6.2, 14.6, 1.5 * r],
+    [14.4, 13.4, 2.3 * r],
+  ];
+  ctx.beginPath();
+  // Start halfway along the last edge so every corner can be rounded with arcTo.
+  const [lx, ly] = P[P.length - 1];
+  ctx.moveTo((lx + P[0][0]) / 2, (ly + P[0][1]) / 2);
+  for (let i = 0; i < P.length; i++) {
+    const [x, y, rad] = P[i];
+    const [nx, ny] = P[(i + 1) % P.length];
+    ctx.arcTo(x, y, nx, ny, rad);
+  }
+  ctx.closePath();
+}
+
+type PointerLook = {
+  /** Face fill (a colour or gradient in pointer units). */
+  face: (ctx: CanvasRenderingContext2D) => string | CanvasGradient;
+  /** Side colours, back to front (hex blends smoothly; rgba steps). */
+  side: [string, string];
+  rim: string;
+  rimW: number;
+  depth: number;
+  round: number;
+  /** Specular strength. */
+  spec: number;
+  glow?: string;
+  shadow: number;
+};
+
+function pointerLook(style: Exclude<PointerStyle, "auto" | "classic">, p: Palette): PointerLook {
+  const lin = (ctx: CanvasRenderingContext2D, a: string, b: string, c = b) => {
+    const g = ctx.createLinearGradient(0, 0, 12, 20);
+    g.addColorStop(0, a);
+    g.addColorStop(0.6, b);
+    g.addColorStop(1, c);
+    return g;
+  };
+  switch (style) {
+    case "graphite":
+      return { face: (c) => lin(c, "#4a505e", "#1d2028", "#0b0c11"), side: ["#020203", "#23262f"], rim: "rgba(255,255,255,0.96)", rimW: 1.7, depth: 2.2, round: 1, spec: 0.45, shadow: 0.42 };
+    case "brand":
+      return {
+        face: (c) => lin(c, mixHex(p.primary, "#ffffff", 0.18), p.primary, mixHex(p.primary, p.secondary, 0.7)),
+        side: [mixHex(p.primary, "#000000", 0.55), mixHex(p.primary, "#000000", 0.3)],
+        rim: "rgba(255,255,255,0.95)",
+        rimW: 1.6,
+        depth: 2.2,
+        round: 1,
+        spec: 0.55,
+        glow: rgba(p.primary, 0.55),
+        shadow: 0.34,
+      };
+    case "glass":
+      return {
+        // See-through: a pale tint of the brand colour with a bright top edge, so the page shows through.
+        face: (c) => lin(c, "rgba(255,255,255,0.5)", rgba(p.primary, p.light ? 0.2 : 0.14), rgba(p.secondary, p.light ? 0.3 : 0.24)),
+        side: [rgba(p.primary, p.light ? 0.3 : 0.22), rgba(p.primary, p.light ? 0.16 : 0.1)],
+        rim: p.light ? rgba(mixHex(p.primary, "#000000", 0.2), 0.9) : rgba(mixHex(p.primary, "#ffffff", 0.55), 0.95),
+        rimW: 1.4,
+        depth: 1.4,
+        round: 1.1,
+        spec: 0.7,
+        glow: rgba(p.primary, p.light ? 0.22 : 0.5),
+        shadow: 0.16,
+      };
+    case "clay":
+      return {
+        face: (c) => {
+          const g = c.createRadialGradient(4, 6, 0.5, 6, 10, 14);
+          g.addColorStop(0, mixHex(p.primary, "#ffffff", 0.55));
+          g.addColorStop(0.45, p.primary);
+          g.addColorStop(1, mixHex(p.primary, "#000000", 0.28));
+          return g;
+        },
+        side: [mixHex(p.primary, "#000000", 0.45), mixHex(p.primary, "#000000", 0.25)],
+        rim: "rgba(0,0,0,0)",
+        rimW: 0,
+        depth: 2.4,
+        round: 1.3,
+        spec: 0.7,
+        shadow: 0.36,
+      };
+    default:
+      return { face: (c) => lin(c, "#ffffff", "#f3f5fa", "#dde2ec"), side: ["#7c8599", "#bcc3d0"], rim: "rgba(17,20,30,0.9)", rimW: 1.15, depth: 2.2, round: 1, spec: 0.95, shadow: 0.34 };
+  }
+}
+
+/**
+ * The mouse pointer, large and three-dimensional like a modern launch video's, in the film's
+ * chosen look (sc.pointer): white, graphite, brand gradient, glass or clay on the modern rounded
+ * arrowhead, or the classic arrow; "auto" (the default) is white on dark styles and graphite on
+ * light ones. A click presses it into the screen (it sinks and its depth and shadow tighten).
+ * `lean` (-1..1, from the pointer's horizontal speed: see cursorPath) tilts it into its motion.
  */
 export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, scale = 1, lean = 0) {
-  const { ctx, u } = sc;
+  const { ctx, u, palette } = sc;
+  const pick = sc.pointer ?? "auto";
+  const style = pick === "auto" ? (palette.light ? "graphite" : "white") : pick;
   const p = clamp(press);
-  const s = 2.6 * u * scale * (1 - p * 0.08);
+  const classic = style === "classic";
+  const L = pointerLook(classic ? "white" : style, palette);
+  const path = classic ? classicPath : (c: CanvasRenderingContext2D) => modernPath(c, L.round);
+  const s = (classic ? 2.6 : 2.9) * u * scale * (1 - p * 0.08);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(clamp(lean, -1, 1) * 0.16);
@@ -780,24 +883,34 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
   // Shadow on the page: further away and softer while the pointer floats, tight when pressed.
   const lift = 1 - p * 0.65;
   ctx.save();
-  ctx.translate(2.2 * lift + 0.6, 3.4 * lift + 0.8);
-  ctx.shadowColor = `rgba(0,0,0,${0.32 + 0.12 * p})`;
-  ctx.shadowBlur = (10 * lift + 4) * s * 0.55;
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  pointerPath(ctx);
+  ctx.translate(2.4 * lift + 0.6, 3.8 * lift + 0.8);
+  ctx.shadowColor = `rgba(0,0,0,${L.shadow + 0.12 * p})`;
+  ctx.shadowBlur = (11 * lift + 4) * s * 0.55;
+  ctx.fillStyle = "rgba(0,0,0,0.16)";
+  path(ctx);
   ctx.fill();
   ctx.restore();
+  // A soft glow round brand and glass pointers.
+  if (L.glow) {
+    ctx.save();
+    ctx.shadowColor = L.glow;
+    ctx.shadowBlur = 14 * s * 0.55;
+    ctx.fillStyle = L.glow;
+    path(ctx);
+    ctx.fill();
+    ctx.restore();
+  }
   // Extrusion: the body's side, swept back and down as one solid (darker towards the back).
-  const depth = 2.4 * (1 - p * 0.55);
+  const depth = L.depth * (1 - p * 0.55);
   const steps = 12;
   for (let i = steps; i >= 1; i--) {
     const k = i / steps;
     ctx.save();
     ctx.translate(depth * 0.55 * k, depth * k);
-    ctx.fillStyle = mixHex("#7c8599", "#bcc3d0", 1 - k);
-    pointerPath(ctx);
+    ctx.fillStyle = L.side[0].startsWith("#") ? mixHex(L.side[0], L.side[1], 1 - k) : k > 0.5 ? L.side[0] : L.side[1];
+    path(ctx);
     ctx.fill();
-    if (i === steps) {
+    if (i === steps && L.rimW) {
       // Only the far edge gets a soft dark line, so the side reads against light pages.
       ctx.strokeStyle = "rgba(20,24,36,0.28)";
       ctx.lineWidth = 0.8;
@@ -805,33 +918,44 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
     }
     ctx.restore();
   }
-  // The face: white with a soft cool falloff, a fine dark rim and a highlight on the long edge.
-  const face = ctx.createLinearGradient(0, 0, 12, 26);
-  face.addColorStop(0, "#ffffff");
-  face.addColorStop(0.55, "#f4f6fb");
-  face.addColorStop(1, "#dfe4ee");
-  pointerPath(ctx);
-  ctx.fillStyle = face;
+  // The face, its specular light and rim.
+  path(ctx);
+  ctx.fillStyle = L.face(ctx);
   ctx.fill();
   ctx.save();
-  pointerPath(ctx);
+  path(ctx);
   ctx.clip();
-  const spec = ctx.createRadialGradient(2.5, 5, 0, 2.5, 5, 11);
-  spec.addColorStop(0, "rgba(255,255,255,0.95)");
+  const spec = ctx.createRadialGradient(3, 5, 0, 3, 5, 12);
+  spec.addColorStop(0, `rgba(255,255,255,${L.spec})`);
   spec.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = spec;
-  ctx.fillRect(-2, -2, 20, 30);
-  ctx.strokeStyle = "rgba(255,255,255,0.9)";
-  ctx.lineWidth = 1.1;
-  ctx.beginPath();
-  ctx.moveTo(1.1, 2.4);
-  ctx.lineTo(1.1, 18.5);
-  ctx.stroke();
+  ctx.fillRect(-2, -2, 24, 30);
+  // A bevel: light along the upper edges, shade along the lower ones (clay is lit by its face).
+  if (style !== "clay") {
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * L.spec})`;
+    ctx.translate(0.6, 0.8);
+    path(ctx);
+    ctx.stroke();
+    ctx.translate(-1.2, -1.4);
+    ctx.strokeStyle = "rgba(0,0,0,0.12)";
+    path(ctx);
+    ctx.stroke();
+  }
   ctx.restore();
-  pointerPath(ctx);
-  ctx.strokeStyle = "rgba(17,20,30,0.92)";
-  ctx.lineWidth = 1.15;
-  ctx.stroke();
+  if (style === "clay") {
+    // Clay's soft gloss.
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(2.6, 6.2, 0.9, 2.3, -0.12, 0, TAU);
+    ctx.fill();
+  }
+  if (L.rimW) {
+    path(ctx);
+    ctx.strokeStyle = L.rim;
+    ctx.lineWidth = L.rimW;
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

@@ -208,6 +208,10 @@ export type PaletteId = (typeof PALETTE_IDS)[number];
 export const SHAPE_SETS = ["geometric", "soft", "tech", "sparkle", "lines", "text"] as const;
 export type ShapeSet = (typeof SHAPE_SETS)[number];
 
+/** The mouse pointer's look in product moments: "auto" is white on dark styles, graphite on light. */
+export const POINTER_STYLES = ["auto", "white", "graphite", "brand", "glass", "clay", "classic"] as const;
+export type PointerStyle = (typeof POINTER_STYLES)[number];
+
 export const TRANSITIONS = ["cut", "flash", "zoom", "glitch", "wipe", "whip", "dolly", "leak", "shutter", "push", "dissolve", "liquid", "cube", "morph", "portal", "iris", "spin", "split", "swipe"] as const;
 export type Transition = (typeof TRANSITIONS)[number];
 
@@ -394,6 +398,8 @@ export interface VideoPlan {
   glow?: boolean;
   /** Camera motion blur (a 180° shutter). On by default; false turns it off. */
   motionBlur?: boolean;
+  /** The mouse pointer's look (unset: auto). */
+  pointer?: PointerStyle;
   /** Animated geometric shapes behind SaaS slides. On by default; false turns them off. */
   shapes?: boolean;
   /** Which background shapes (default geometric), or "text" for watermark text. */
@@ -496,6 +502,8 @@ export interface SkillContext {
   /** Which background shapes, or watermark text. */
   shapeSet?: ShapeSet;
   watermark?: string;
+  /** The mouse pointer's look (unset: auto). */
+  pointer?: PointerStyle;
 }
 
 export interface MusicPulse {

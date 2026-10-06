@@ -78,6 +78,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   shapes?: VideoPlan["shapes"];
   shapeSet?: VideoPlan["shapeSet"];
   watermark?: VideoPlan["watermark"];
+  pointer?: VideoPlan["pointer"];
   title?: VideoPlan["title"];
   scenes?: VideoPlan["scenes"];
   textFx?: VideoPlan["textFx"];
@@ -153,6 +154,7 @@ function drawScene(
     shapes: plan.style === "saas" && plan.shapes !== false ? plan.seed >>> 0 : undefined,
     shapeSet: plan.shapeSet,
     watermark: plan.shapeSet === "text" ? watermarkText(plan) : undefined,
+    pointer: plan.pointer,
   };
   resetCtx(target);
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
