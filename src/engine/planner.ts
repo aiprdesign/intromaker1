@@ -199,6 +199,30 @@ const FAMILIES = [
   ["deploy", "release", "ship", "build", "preview", "rollback"],
 ];
 /**
+ * Who the product is for, from its own words ("bookkeeping for freelancers" → "freelancers"): the
+ * audience call-out an opener carries ("For freelancers"). Plural groups only, not "for you".
+ */
+export function audienceOf(lines: string[]) {
+  const SKIP = /^(you|your|everyone|anyone|all|the|free|less|more|good|life|now|today|ever|teams? of one|years?|months?|weeks?|days?|hours?|minutes?|seconds?|people|users|customers|business|work)$/i;
+  for (const line of lines) {
+    const m = (line ?? "").match(/\bfor\s+((?:[a-z][a-z-]*\s){0,2}[a-z][a-z-]*s)\b/i);
+    const who = m?.[1]?.trim();
+    if (!who || who.split(/\s+/).some((w) => SKIP.test(w)) || who.length > 28) continue;
+    return who.toLowerCase();
+  }
+  return "";
+}
+
+/** The site's own risk-reversal line, for under the end card's button ("Cancel anytime"). */
+export function reassuranceOf(lines: string[]) {
+  for (const line of lines) {
+    const m = (line ?? "").match(/\b(cancel any ?time|no (?:long[- ]term )?contracts?|no lock-?in|no credit card(?: required| needed)?|no setup fees?)\b/i);
+    if (m) return m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase().replace("anytime", "anytime");
+  }
+  return "";
+}
+
+/**
  * Problems written from a product's own features or services, for a problem → solution film on a
  * site that names none ("SEO" → "Stuck on SEO"): plain struggle lines, never a claim. Two to three.
  */
@@ -211,7 +235,8 @@ export function problemsFrom(features: string[]) {
     // ("Social media for small businesses" → "Social media": who it's for isn't the problem.)
     const t = f.split(/\s+[—–]\s+/)[0].replace(/\s+(?:for|to|with|so)\s+.*$/i, "").trim();
     const k = t.toLowerCase();
-    if (!t || t.split(/\s+/).length > 4 || seen.has(k)) continue;
+    // (Whole phrases — "Funnels that explain themselves", "The tools you need" — don't make problems.)
+    if (!t || t.split(/\s+/).length > 4 || /\b(that|which|who|you|your|our|we|the|a|an)\b/i.test(t) || seen.has(k)) continue;
     seen.add(k);
     out.push({ pain: lead[out.length % lead.length](mid(t)), feature: t });
     if (out.length === 3) break;
@@ -666,7 +691,8 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const brand = parsed.brand ?? "Your product";
   const numbers = parsed.numbers;
   const tagline = parsed.pitch || `Meet ${brand}`;
-  const named = parsed.features.filter((f) => norm(f) !== norm(tagline));
+  // (A reassurance in the prompt — "Cancel anytime" — goes under the end card's button, not into the features.)
+  const named = parsed.features.filter((f) => norm(f) !== norm(tagline) && !reassuranceOf([f]));
   // A prompt that names fewer than two features ("an intro for my bakery booking app") still gets
   // feature cards: what a product of its kind typically offers, said plainly (no claims), and the
   // film's director's note says so, so they can be edited to match.
@@ -700,7 +726,7 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     videos: [],
     themeColor: null,
   };
-  const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas", variant: req.variant, angle: req.angle });
+  const plan = planFromSiteSaas(site, { aspect: req.aspect, length: req.length, palette: req.palette, seed, template: req.template, style: "saas", variant: req.variant, angle: req.angle, reassure: reassuranceOf([prompt]) });
   const shown = typical.filter((f) => plan.scenes.some((sc) => sc.items?.some((it) => norm(it.split(/\s+[—–]\s+/)[0]) === norm(f))));
   if (shown.length) {
     const why = named.length ? "the prompt named only one feature" : "the prompt didn't name any features";
@@ -1042,6 +1068,8 @@ export interface SiteRequest {
   trailerStyle?: string;
   /** Creative angle for the story: problem-led (default), product-first or proof-first. */
   angle?: Angle;
+  /** A reassurance the prompt gives ("Cancel anytime"), for under the end card's button. */
+  reassure?: string;
   /** Claim-safe copy (default on): generic wording, no superlatives, guarantees or numbers. */
   safe?: boolean;
   /** Remake number: 0 is the director's best fit; each remake picks other slides for its sections. */
@@ -1139,7 +1167,7 @@ export function contextCta(site: Pick<SiteData, "cta" | "name" | "tagline" | "de
 /** Films for a room (talks, booths, TV): the end card carries a QR code of the website. */
 export const BIG_SCREEN = /\b(event|conference|keynote|presentation|booth|trade ?show|expo|meetup|tv|big screen|signage|webinar|demo day|qr)\b/i;
 
-export type Angle = "story" | "problem" | "product" | "proof";
+export type Angle = "story" | "problem" | "bab" | "product" | "proof";
 export const ANGLES: { id: Angle; name: string; brief: string }[] = [
   { id: "story", name: "Story-led", brief: "Problem → solution: open on the pain, reveal the product as the better way." },
   {
@@ -1148,6 +1176,12 @@ export const ANGLES: { id: Angle; name: string; brief: string }[] = [
     brief:
       "Open on the problems the audience has (the site's own pains, or the problems its services or features take on), cross them out, reveal the product or service as the answer, then pair each problem with the feature or service that solves it.",
   },
+  {
+    id: "bab",
+    name: "Before → after → bridge",
+    brief:
+      "Before: the audience's problems as they are today, crossed out (or the old way beside the product). After: the outcome, in the site's own promise. Bridge: the product revealed as how to get there, with its how-it-works steps.",
+  },
   { id: "product", name: "Product-first", brief: "Open on the promise and get to the product in action within seconds; demo-heavy." },
   { id: "proof", name: "Proof-first", brief: "Lead with social proof (customers, real numbers, a real quote), then show why." },
 ];
@@ -1155,7 +1189,8 @@ export const ANGLES: { id: Angle; name: string; brief: string }[] = [
 const VALUE_ORDER = ["hook", "reveal", "demo", "features", "bento", "meet", "tour", "how", "cards", "integrations", "cta"];
 const ANGLE_ORDER: Record<Angle, string[]> = {
   story: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
-  problem: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
+  problem: ["pain", "agitate", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
+  bab: ["pain", "compare", "after", "hook", "reveal", "how", "meet", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
   product: ["hook", "pain", "reveal", "tour", "features", "meet", "bento", "how", "cards", "quote", "logos", "integrations", "cta"],
   proof: ["hook", "pain", "reveal", "quote", "logos", "meet", "tour", "features", "how", "bento", "cards", "integrations", "cta"],
 };
@@ -1474,7 +1509,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const angle: Angle = req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
   // Problem → solution: the site's own pains, else the problems its services or features take on,
   // written from them ("Stuck on SEO"), so the film opens on the problem whatever the site says.
-  const problemLed = angle === "problem";
+  const problemLed = angle === "problem" || angle === "bab";
   const featurePains = problemLed && sitePains.length < 2 ? problemsFrom(shortFeatures) : [];
   const serviceWord = SERVICE_BIZ.test([site.tagline, site.description, ...site.headlines.slice(0, 8)].join(" \n ")) ? "services" : "features";
   const pains = featurePains.length >= 2 ? featurePains.map((p) => p.pain) : sitePains;
@@ -1523,39 +1558,67 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const taglineFree = painHook || proofHook || !!valueHook || !!productHook || (!!openHook && norm(openHook.text) !== norm(tagline));
   // Whether the film opens on the wall of product images (then the gallery beat is optional).
   let wall = false;
+  // Call out who it's for in the opener ("For freelancers"): viewers stay when it's about them.
+  const audience = audienceOf([site.tagline, site.description, ...site.headlines.slice(0, 2)]);
+  const opener = audience ? `For ${audience}` : `Introducing ${site.name}`;
   if (proofHook) {
-    add(1, { role: "hook", skill: "blur-reveal", text: `Trusted by *${teamStat.toLowerCase()}*`, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
+    add(1, { role: "hook", skill: "blur-reveal", text: `Trusted by *${teamStat.toLowerCase()}*`, eyebrow: opener, duration: beats(7), transition: "cut", why: audience ? `Calls out who it's for: ${audience}` : undefined });
   } else if (painHook) {
-    add(1, {
-      role: "pain", skill: "pain-strike",
-      text: pick(["There's *another* way.", "It doesn't have to be *this hard*.", "Time for a *new* way."]),
-      items: pains,
-      eyebrow: problemLed ? "The problem" : "The old way",
-      why: problemLed ? (featurePains.length ? `Problem → solution: the problems its ${serviceWord} take on, written from them (edit them to match)` : "Problem → solution: the site's own pains") : undefined,
-      duration: beats(pains.length * 2 + 5),
-      transition: "cut",
-    });
+    const written = featurePains.length ? ` (written from its ${serviceWord}: edit them to match)` : "";
+    // Before → after → bridge with a picture of the product: the old way beside it, on a slider.
+    const beforeMedia = angle === "bab" && target >= 20 ? images[0] ?? img(shots.hero) ?? img(shots.sections[0]) : undefined;
+    add(1, beforeMedia
+      ? { role: "pain", skill: "before-after", text: "Leave the old way *behind*", items: pains, eyebrow: "Before", why: `Before → after → bridge: before, the problems${written}`, duration: beats(10), transition: "cut", media: beforeMedia }
+      : {
+          role: "pain", skill: "pain-strike",
+          text: pick(["There's *another* way.", "It doesn't have to be *this hard*.", "Time for a *new* way."]),
+          items: pains,
+          eyebrow: angle === "bab" ? "Before" : problemLed ? "The problem" : "The old way",
+          why: angle === "bab" ? `Before → after → bridge: before, the problems${written}` : problemLed ? `Problem → agitate → solve (PAS): the ${featurePains.length ? "problems" : "site's own pains"}${written}` : undefined,
+          duration: beats(pains.length * 2 + 5),
+          transition: "cut",
+        });
+    // PAS: agitate. A beat on what the problem costs, before the answer arrives (no numbers, no claims).
+    if (angle === "problem" && target >= 20)
+      add(2, {
+        role: "agitate", skill: "blur-reveal",
+        text: pick(["Week after week, *it adds up*.", "And it *keeps piling up*.", "Meanwhile, *it adds up*."]),
+        eyebrow: "Sound familiar?",
+        why: "PAS: agitate the problem for a beat before the solution",
+        duration: beats(5),
+        transition: "whip",
+      });
+    // Before → after → bridge: after, the outcome in the site's own promise, before the product.
+    if (angle === "bab")
+      add(1, {
+        role: "after", skill: "blur-reveal",
+        text: tagline,
+        eyebrow: "After",
+        why: "Before → after → bridge: after, the outcome (the site's own promise); the product is the bridge",
+        duration: beats(6),
+        transition: "whip",
+      });
   } else if (valueFirst && valueHook) {
-    add(1, { role: "hook", skill: "blur-reveal", text: valueHook, eyebrow: `Introducing ${site.name}`, duration: beats(7), transition: "cut" });
+    add(1, { role: "hook", skill: "blur-reveal", text: valueHook, eyebrow: opener, duration: beats(7), transition: "cut", why: audience ? `Calls out who it's for: ${audience}` : undefined });
   } else {
     // Story-led films with plenty of product imagery open on the whole product: a tilted wall of
     // its screenshots drifting behind the promise (Linear / Vercel hero look).
     wall = angle === "story" && !productHook && target >= 20 && visuals >= 4 && !alt;
     const hookText = productHook || openHook?.text || tagline;
     const hookWhy = [openHook?.why, wall ? `${visuals} product images and UI components: a wall of the product behind it` : ""].filter(Boolean).join("; ");
-    add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: hookText, eyebrow: wall ? undefined : `Introducing ${site.name}`, duration: beats(wall ? 9 : 7), transition: "cut", why: hookWhy || undefined });
+    add(1, { role: "hook", skill: wall ? "tilt-wall" : "blur-reveal", text: hookText, eyebrow: wall ? undefined : opener, duration: beats(wall ? 9 : 7), transition: "cut", why: [hookWhy, audience && !wall ? `calls out who it's for (${audience})` : ""].filter(Boolean).join("; ") || undefined });
   }
   // 2. Reveal.
   // Product-first with real product footage: the name as giant type filled with the product,
   // diving through a letter into it (Runway-style). Otherwise the logo reveal.
   const revealMedia = angle === "product" && target >= 20 ? (video ?? images[0] ?? img(shots.hero)) : undefined;
   add(1, revealMedia && site.name.length <= 14
-    ? { role: "reveal", skill: "type-mask", text: site.name, subtext: taglineFree ? tagline : undefined, duration: beats(9), transition: "dolly", media: revealMedia }
+    ? { role: "reveal", skill: "type-mask", text: site.name, subtext: taglineFree && angle !== "bab" ? tagline : undefined, duration: beats(9), transition: "dolly", media: revealMedia }
     : {
         // Remakes cycle through the 3D logo intros; the first take keeps the style's own reveal.
         role: "reveal", skill: brand.logo ? (variant ? LOGO_3D[(variant - 1) % LOGO_3D.length] : "logo-reveal") : "particle-assemble",
         text: site.name,
-        subtext: taglineFree ? tagline : site.domain,
+        subtext: taglineFree && angle !== "bab" ? tagline : site.domain,
         duration: beats(6),
         transition: "dolly",
       });
@@ -1564,7 +1627,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     const assemble = !!shots.hero && !(alt && shots.full);
     add(!(video ?? images[0] ?? shots.sections[0] ?? shots.hero) && target >= 20 ? 2 : assemble && target >= 20 ? 2 : 3, {
       role: "meet", skill: assemble ? "ui-assemble" : "site-scroll",
-      text: taglineFree && !(valueHook && descClause && norm(valueHook) !== norm(descClause)) ? tagline : descClause || `Say hello to *${site.name}*`,
+      text: taglineFree && angle !== "bab" && !(valueHook && descClause && norm(valueHook) !== norm(descClause)) ? tagline : descClause || `Say hello to *${site.name}*`,
       eyebrow: `Meet ${site.name}`,
       duration: Math.max(5, beats(10)),
       transition: "whip",
@@ -1573,7 +1636,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // 4. How it works.
   if (site.steps && site.steps.length >= 2) {
-    add(target >= 30 ? 3 : 5, {
+    // (Before → after → bridge: the steps are the bridge, so they're kept.)
+    add(angle === "bab" ? 2 : target >= 30 ? 3 : 5, {
       // AI and creative tools show their steps as a node workflow (ComfyUI-style).
       // (Or any product whose steps read as a pipeline: connect, trigger, transform, publish.)
       // Every third remake with short steps rides them on a big 3D arrow.
@@ -1889,7 +1953,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     ? featurePains.map((p) => ({ pain: p.pain, fix: solutionLine(p.feature, [...bentoItems, ...site.features, ...site.headlines]), score: 1 }))
     : (target >= 20 || problemLed) && pains.length >= 2 && (!painHook || problemLed) ? pairPains(pains, [...spareFeatures, ...shortFeatures]) : [];
   const matched = pairs.filter((p) => p.score > 0).length;
-  if (pairs.length >= 2 && (problemLed || (matched >= 2) !== (alt && !!compareMedia) || !compareMedia)) {
+  if (angle !== "bab" && pairs.length >= 2 && (problemLed || (matched >= 2) !== (alt && !!compareMedia) || !compareMedia)) {
     add(problemLed ? (target >= 20 ? 2 : 3) : target >= 30 ? 4 : 6, {
       role: "solve", skill: "problem-solution",
       text: problemLed ? `How *${site.name === "Your product" ? "it" : site.name}* solves it` : "From problem to *solution*",
@@ -1899,7 +1963,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: beats(Math.min(3, pairs.length) * 2.5 + 4),
       transition: "whip",
     });
-  } else if (target >= 20 && pains.length >= 2 && !painHook && compareMedia) {
+  } else if (target >= 20 && pains.length >= 2 && !painHook && compareMedia && angle !== "bab") {
     add(target >= 30 ? 4 : 6, {
       role: "compare", skill: "before-after",
       text: "Leave the old way *behind*",
@@ -2047,10 +2111,14 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // 8. CTA (with a QR code when the film is for a room: "Scan to book a demo").
   const qr = BIG_SCREEN.test(req.direction ?? "") && !!brand.domain;
   const ctaLabel = contextCta(site, concept.id).replace(/[→›>»]+/g, "").trim();
+  const reassurance = reassuranceOf([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features]) || req.reassure || "";
   add(1, {
     role: "cta", skill: qr ? "qr-end" : "cta",
     text: `Try *${site.name}* today`,
     subtext: qr ? `Scan to ${lowerFirst(ctaLabel)}` : ctaLabel,
+    // Risk reversal, only in the site's own words ("Cancel anytime"): it lowers the bar to click.
+    items: !qr && reassurance ? [reassurance] : undefined,
+    why: !qr && reassurance ? `One clear action, with the site's own reassurance under it ("${reassurance}")` : undefined,
     duration: Math.max(3.6, beats(8)),
     transition: "dolly",
   });
@@ -2148,7 +2216,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (problemLed && !painHook)
     styled.notes = [
       ...(styled.notes ?? []),
-      "Problem → solution needs two or more problems to open on: name them in your prompt (\"for teams tired of X and Y\"), or list two or more features or services.",
+      `${angle === "bab" ? "Before → after → bridge" : "Problem → solution"} needs two or more problems to open on: name them in your prompt (\"for teams tired of X and Y\"), or list two or more features or services.`,
     ];
   if (total < target * 0.9) {
     const cut = Math.round(total);
@@ -2208,7 +2276,7 @@ function planFromProduct(site: SiteData, req: SiteRequest): VideoPlan {
   // Remakes and takes tell it from another angle: story (a hook first), product-first (open on the
   // product itself), or a gallery-led cut.
   // (A physical product has no software problems to stage: problem → solution plays as story-led.)
-  const angle: Angle = req.angle === "problem" ? "story" : req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
+  const angle: Angle = req.angle === "problem" || req.angle === "bab" ? "story" : req.angle ?? (variant ? (["product", "story", "proof"] as Angle[])[(variant - 1) % 3] : "story");
   const bpm = 116;
   const beat = 60 / bpm;
   const beats = (n: number) => n * beat;

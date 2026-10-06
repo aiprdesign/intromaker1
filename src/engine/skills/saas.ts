@@ -1728,6 +1728,18 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
     });
     ctx.restore();
   }
+  // Risk reversal: one reassurance line under the button ("Cancel anytime"), when the site says it.
+  const sure = (scene.items ?? []).find((x) => x.trim())?.trim();
+  if (sure && dk > 0) {
+    ctx.save();
+    ctx.globalAlpha = dk * 0.9;
+    ctx.font = subFont(22 * u * S, 500);
+    ctx.fillStyle = rgba(palette.text, 0.66);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    fillTextMid(ctx, `✓  ${sure}`, cx, by + bh / 2 + (brand?.domain ? 118 : 58) * u * S + (1 - dk) * 10 * u);
+    ctx.restore();
+  }
   return { bw, bh };
 }
 
@@ -2264,6 +2276,7 @@ export const saasSkills: Skill[] = [
     tagline: "Logo, closing line and a glowing button that the cursor clicks — with your URL.",
     bestFor: "The final scene. Headline = closing line; subtext = button label ('Start free trial').",
     sample: { text: "Start building *today*", subtext: "Start free trial" },
+    itemsHint: "optional: one reassurance line under the button, in the site's own words ('Cancel anytime')",
     render: ctaLockup,
     sfx: (scene, beat) => {
       const T = ctaTiming(scene.duration, beat);
