@@ -50,7 +50,7 @@ import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
 import { PALETTE_IDS, POINTER_STYLES, SHAPE_SETS, TEXT_FX, TRANSITIONS, type PointerStyle, type ShapeSet, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
-type Engine = "ai" | "builtin" | "manual";
+type Engine = "ai" | "builtin" | "manual" | "sample";
 const FILM_KEY = "intromaker.film";
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
 
@@ -82,7 +82,8 @@ export default function Studio() {
   const [activeScene, setActiveScene] = useState(0);
   const [seek, setSeek] = useState<{ t: number; key: number } | undefined>(undefined);
   const [toast, setToast] = useState<{ text: string; key: number; undo?: () => void; link?: { label: string; href: string } } | null>(null);
-  const [engine, setEngine] = useState<Engine>("manual");
+  // (The sample on first open is labelled as one, not as a manual edit.)
+  const [engine, setEngine] = useState<Engine>("sample");
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   /** Whether the server can reach this computer's local AI (else local models run from the browser). */
   const [localViaServer, setLocalViaServer] = useState(true);
@@ -762,6 +763,9 @@ export default function Studio() {
             setVersion((v) => v + 1);
           },
         });
+      // On a phone the preview sits below the form: bring the new video into view.
+      if (booted.current && !bootingRef.current && window.matchMedia("(max-width: 900px)").matches)
+        requestAnimationFrame(() => document.querySelector(".studio .player")?.scrollIntoView({ behavior: "smooth", block: "start" }));
       bootingRef.current = false;
       if (take.note || take.plan.notes?.length) setNote([take.note, ...(take.plan.notes ?? [])].filter(Boolean).join(" "));
     } catch (e) {
@@ -823,9 +827,17 @@ export default function Studio() {
   };
 
   /** Scrape a website, pull its brand colours, then storyboard an intro from it. */
+  const [urlHint, setUrlHint] = useState<string | null>(null);
   const importSite = async (raw?: string, fmt: { aspect?: Aspect; length?: Length } = {}) => {
     const url = (raw ?? siteUrl).trim();
     if (!url) return;
+    // Not an address at all (words, no domain): say so here instead of trying to import it.
+    // (A bare 10-character Amazon product code still imports.)
+    if (/\s/.test(url) || (!url.includes(".") && !/^[A-Z0-9]{10}$/i.test(url))) {
+      setUrlHint("That doesn't look like a web address. Paste a link like yourproduct.com or a product listing, or describe your product below.");
+      return;
+    }
+    setUrlHint(null);
     const { run, signal } = startRun();
     setImporting(true);
     // Narrate what's happening while the site is captured and read.
@@ -1522,9 +1534,9 @@ export default function Studio() {
     <div className="studio">
       <header className="studio-bar">
         <Logo />
-        <span className="studio-title">{plan.title}</span>
+        <h1 className="studio-title">{plan.title}</h1>
         <span className={`engine-badge ${engine}`}>
-          {engine === "ai" ? `✦ ${engineLabel || "AI director"}` : engine === "builtin" ? "Built-in director" : "Manual edit"}
+          {engine === "ai" ? `✦ ${engineLabel || "AI director"}` : engine === "builtin" ? "Built-in director" : engine === "sample" ? "Sample video" : "Manual edit"}
         </span>
         <button className="btn btn-ghost" onClick={() => setAiOpen(true)} title={`AI director: ${aiLabel(ai)}. Choose provider, key, model and mode.`}>
           ⚙ AI settings
@@ -1579,9 +1591,15 @@ export default function Studio() {
             <input
               className="input"
               value={siteUrl}
-              onChange={(e) => setSiteUrl(e.target.value)}
-              placeholder="yourproduct.com, or an Amazon / eBay / AliExpress listing"
+              onChange={(e) => {
+                setSiteUrl(e.target.value);
+                if (urlHint) setUrlHint(null);
+              }}
+              placeholder="Website or listing link"
+              title="Your website (yourproduct.com), or an Amazon, eBay, AliExpress, Etsy or Shopify product listing"
               aria-label="Website or listing URL"
+              aria-invalid={!!urlHint}
+              aria-describedby={urlHint ? "url-hint" : undefined}
               inputMode="url"
             />
             {importing ? (
@@ -1594,6 +1612,11 @@ export default function Studio() {
               </button>
             )}
           </form>
+          {urlHint && (
+            <p id="url-hint" className="hint url-hint" role="alert">
+              {urlHint}
+            </p>
+          )}
           {(() => {
             const m = siteUrl.trim().includes(".") ? marketOf(siteUrl) : null;
             return m && !importing ? <p className="hint">{m.id === "shop" ? "A shop's product page" : `${m.name} listing`}: imports as a product video, from the product&apos;s own title, bullet points and photos.</p> : null;
@@ -1751,6 +1774,7 @@ export default function Studio() {
           <label className="field-label">{site ? "Extra direction (optional)" : "Or describe it"}</label>
           <textarea
             id="studio-prompt"
+            aria-label={site ? "Extra direction for the video" : "Describe your video"}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={site ? "e.g. focus on the dashboard, end with 'Book a demo'" : "Describe your video: product, what it does, the vibe…"}
@@ -1785,10 +1809,11 @@ export default function Studio() {
           </div>
             </div>
           </div>
-          <p className="hint claim-note" title="Automated screening, not legal advice.">
-            ✓ Claim-safe wording, automatically: superlatives, guarantees, numbers, offers (&ldquo;free&rdquo;, trials, discounts) and health claims are reworded
-            or left out, in what the director writes and in your own edits.
-          </p>
+          <details className="hint claim-note">
+            <summary>✓ Claim-safe wording, automatically</summary>
+            Superlatives, guarantees, numbers, offers (&ldquo;free&rdquo;, trials, discounts) and health claims are reworded or left out, in what the
+            director writes and in your own edits. (Automated screening, not legal advice.)
+          </details>
 
               </>
             )}
@@ -2043,7 +2068,14 @@ export default function Studio() {
               Licences
             </a>
           </p>
-          {note && <p className="hint warn">{note}</p>}
+          {note && (
+            <div className="director-note" role="status">
+              <p>{note}</p>
+              <button type="button" className="director-note-close" onClick={() => setNote(null)} aria-label="Dismiss this note">
+                ×
+              </button>
+            </div>
+          )}
 
 
           </div>

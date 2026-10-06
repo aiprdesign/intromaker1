@@ -80,7 +80,7 @@ export default async function Terms() {
 
         <p className="back">
           <Link href="/studio" className="btn btn-primary">
-            Try for Free!
+            Try it free
           </Link>
         </p>
       </article>

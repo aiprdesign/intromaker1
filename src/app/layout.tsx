@@ -24,7 +24,7 @@ import { SITE_URL_ENV } from "@/lib/site";
 export const metadata: Metadata = {
   // Absolute links (canonical, Open Graph) need the public address: INTROMAKER_SITE_URL.
   ...(SITE_URL_ENV ? { metadataBase: new URL(SITE_URL_ENV) } : {}),
-  title: "Prodintro.com — Instant Videos for Saas, Products, & Websites!",
+  title: "Prodintro.com · Launch videos for SaaS, products and websites",
   description:
     "Paste your website URL or type a prompt and get a SaaS intro video: an AI director, 167 motion skills, 3D logo intros, a produced soundtrack, voice-over and 1080p export for your landing page, Reels, TikTok and Shorts.",
   keywords: ["SaaS video maker", "SaaS intro video", "product intro video", "URL to video", "website to video", "product demo video", "launch video", "3D logo intro", "motion graphics", "AI video generator"],

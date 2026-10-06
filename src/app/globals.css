@@ -49,6 +49,8 @@ h3 {
   font-family: var(--display);
   letter-spacing: -0.02em;
   margin: 0;
+  /* Lines of even length: no lone word left on a heading's last line. */
+  text-wrap: balance;
 }
 
 button,
@@ -222,8 +224,26 @@ textarea {
   color: var(--muted);
   font-size: 14px;
 }
-.nav-links a:hover {
+.nav-links a:hover,
+.nav-links a[aria-current="page"] {
   color: var(--text);
+}
+.nav-links a[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-color: var(--cyan);
+  text-underline-offset: 6px;
+  text-decoration-thickness: 2px;
+}
+.nav-menu-btn {
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
 }
 
 /* ───────── Hero ───────── */
@@ -300,6 +320,11 @@ textarea {
   border: 1px solid var(--line-2);
   box-shadow: 0 20px 80px -20px rgba(124, 77, 255, 0.6);
   backdrop-filter: blur(12px);
+}
+/* The input has no outline of its own, so the whole bar shows keyboard focus. */
+.prompt-bar:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.22), 0 20px 80px -20px rgba(124, 77, 255, 0.6);
 }
 .prompt-bar input {
   flex: 1;
@@ -443,7 +468,8 @@ textarea {
   max-width: 720px;
   margin: 0 auto 48px;
 }
-.section-head h2 {
+.section-head h2,
+.section-head h1 {
   font-size: clamp(30px, 4vw, 48px);
   line-height: 1.05;
 }
@@ -671,6 +697,25 @@ textarea {
   justify-content: center;
   margin: -16px 0 36px;
 }
+/* Phones: the palettes scroll sideways in one row, so the skills start on the first screen. */
+@media (max-width: 640px) {
+  .palette-row {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    margin: -16px -16px 28px;
+    padding: 2px 16px 8px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .palette-row::-webkit-scrollbar {
+    display: none;
+  }
+  .palette-row > * {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+  }
+}
 
 .skill-grid {
   display: grid;
@@ -721,6 +766,10 @@ textarea {
   font-size: 13px;
   font-weight: 600;
   color: var(--cyan);
+  /* A finger-sized target, not just the line of text. */
+  display: inline-block;
+  padding: 8px 0;
+  margin: -8px 0;
 }
 
 .steps {
@@ -997,6 +1046,10 @@ textarea {
 }
 .studio-title {
   font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: normal;
+  text-wrap: nowrap;
+  min-width: 0;
   font-weight: 600;
   color: var(--muted);
   margin-right: auto;
@@ -1249,6 +1302,43 @@ textarea {
 }
 .hint.warn {
   color: #ffc93c;
+}
+/* The director's note about the video it made: a readable card, dismissible. */
+.director-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 201, 60, 0.35);
+  background: rgba(255, 201, 60, 0.08);
+}
+.director-note p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #f6e7bd;
+}
+.director-note-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #f6e7bd;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.director-note-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+details.claim-note summary {
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.8;
 }
 
 .main {
@@ -1674,6 +1764,19 @@ textarea {
 .seg.now span {
   color: #fff;
 }
+/* A segment shows its slide's name only when the name fits; a narrow one shows its number
+   rather than a clipped "3 Bl…" (the full name is in its tooltip). */
+.seg {
+  container-type: inline-size;
+}
+.seg .seg-name {
+  display: none;
+}
+@container (min-width: 96px) {
+  .seg .seg-name {
+    display: inline;
+  }
+}
 .playhead {
   position: absolute;
   top: 0;
@@ -1847,15 +1950,48 @@ textarea {
   .studio-bar {
     flex-wrap: wrap;
     gap: 8px;
+    /* Two rows of buttons on a phone: scrolls away with the page rather than covering it. */
+    position: static;
   }
   .studio-bar .engine-badge {
+    display: none;
+  }
+  /* The preview already fills a phone's width: the size switch has nothing to change. */
+  .view-size button[role="radio"] {
     display: none;
   }
   .nav-links {
     display: none;
   }
+  /* Phones: the links open from a menu button, as a panel under the header. */
+  .nav-links.open {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 8px clamp(16px, 4vw, 48px) 14px;
+    background: rgba(6, 5, 12, 0.96);
+    border-bottom: 1px solid var(--line);
+    font-size: 16px;
+  }
+  .nav-links.open a {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-links.open a:last-child {
+    border-bottom: 0;
+  }
+  .nav-menu-btn {
+    display: grid;
+  }
   .nav {
-    justify-content: space-between;
+    gap: 10px;
+  }
+  .nav .logo {
+    margin-right: auto;
   }
   .prompt-bar {
     flex-direction: column;
@@ -2678,6 +2814,10 @@ button.brand-colors.on {
 .edit-bar-actions {
   display: flex;
   gap: 16px;
+  flex-shrink: 0;
+}
+.edit-bar-actions .link-btn {
+  white-space: nowrap;
 }
 .edit-bar-actions .link-btn:disabled {
   opacity: 0.35;
@@ -3512,12 +3652,34 @@ button.brand-colors.on {
   gap: 14px;
 }
 .pw-row {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 .pw-row .input {
   flex: 1;
+  padding-right: 64px;
+}
+/* Show / Hide sits inside the field, as password fields usually have it. */
+.pw-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pw-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.plan-cards.single {
+  grid-template-columns: minmax(240px, 520px);
 }
 .plan-cards {
   display: grid;
@@ -4708,3 +4870,18 @@ code.secret {
 .zoom-editor .zoom-sliders { display: grid; gap: 6px; margin-top: 8px; }
 .zoom-editor .zoom-sliders label { display: grid; grid-template-columns: 70px 1fr 44px; align-items: center; gap: 8px; font-size: 12px; }
 .zoom-editor .zoom-sliders output { text-align: right; font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+/* ───────── Missing page ───────── */
+.not-found {
+  min-height: 50vh;
+}
+.not-found-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.url-hint {
+  color: #ffb4a8;
+}

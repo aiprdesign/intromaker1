@@ -104,7 +104,7 @@ export default function HeroPrompt() {
   const product = mode === "product";
   return (
     <>
-      <span className="eyebrow slogan">✦ Instant Videos for Saas, Products, &amp; Websites!</span>
+      <span className="eyebrow slogan">✦ Launch videos for SaaS, products and websites</span>
       <h1>
         {product ? "Product videos," : "SaaS launch videos,"}
         <br />

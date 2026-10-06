@@ -395,7 +395,12 @@ function extractBrand(prompt: string): string | null {
   // "Grand opening of Sunny Side Bakery" / "Welcome to Casa Verde": the name after the occasion.
   const occasion = prompt.match(/\b(?:opening of|launch of|welcome to|reopening of)\s+([A-Z][\w'&.-]*(?:\s+[A-Z][\w'&.-]*){0,3})/i);
   if (occasion && /^[A-Z]/.test(occasion[1])) return occasion[1].trim();
-  const named = prompt.match(/\b(?:called|named|for|brand|channel|company|startup|product)\s+([A-Z][\w.&-]*(?:\s+(?:&\s+)?[A-Z0-9][\w.&-]*){0,2})/);
+  // "Orbitly: product analytics…" / "Orbitly — …": a name opening the prompt before a colon or
+  // dash is the clearest signal, ahead of a capitalised word later on ("…for SaaS teams").
+  const titledLead = prompt.match(/^\s*(?:meet\s+|introducing\s+)?([A-Z][\w.&-]{1,24}(?:\s+[A-Z][\w.&-]{1,24})?)\s*(?::|—|–|\s-\s)/);
+  if (titledLead && !/^(an?|the|my|our|this|make|create|build|launch)$/i.test(titledLead[1]) && !NOT_BRAND.test(titledLead[1])) return titledLead[1].trim();
+  // ("for SaaS teams", "for Shopify stores": who or what it's for, not its name; a name can follow.)
+  const named = [...prompt.matchAll(/\b(?:called|named|for|brand|channel|company|startup|product)\s+([A-Z][\w.&-]*(?:\s+(?:&\s+)?[A-Z0-9][\w.&-]*){0,2})/g)].find((m) => !NOT_BRAND.test(m[1].split(/\s+/)[0]));
   if (named) return named[1].trim();
   // "Sentinel stops threats…" / "Shopwave helps brands…": a capitalised name opening a sentence.
   const opener = prompt.match(/^\s*(?:meet\s+|introducing\s+)?([A-Z][a-z][\w.&-]{1,24})\s+(?:is|are|helps|lets|makes|stops|keeps|turns|gives|brings|writes|runs|puts|connects|automates|finds|builds|ships)\b/);
@@ -417,6 +422,9 @@ function extractBrand(prompt: string): string | null {
   if (named2 && !named2[1].split(/\s+/).some((w) => NOT_A_NAME.has(w.toLowerCase()))) return named2[1].trim();
   return null;
 }
+
+/** Acronyms and platforms a prompt names as the audience or the stack, not as the product. */
+const NOT_BRAND = /^(?:AI|API|APIs|SDK|CRM|HR|SEO|SaaS|UI|UX|B2B|B2C|D2C|DTC|CEO|CTO|CFO|SQL|LLM|LLMs|iOS|Android|Mac|macOS|Windows|Linux|Slack|Shopify|Notion|Figma|GitHub|Stripe|Salesforce|HubSpot|Google|Amazon|Etsy|eBay|WordPress)$/;
 
 /** Opening words that describe the request or its look, never the product's name. */
 const NOT_A_NAME = new Set(

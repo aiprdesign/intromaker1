@@ -439,7 +439,8 @@ export default function Player({
                 title={`${i + 1}. ${SKILL_MAP[s.skill].name}: ${s.text.replace(/\*/g, "")}`}
               >
                 <span>
-                  {i + 1} {SKILL_MAP[s.skill].name}
+                  {i + 1}
+                  <span className="seg-name"> {SKILL_MAP[s.skill].name}</span>
                 </span>
               </div>
             );

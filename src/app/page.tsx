@@ -23,7 +23,7 @@ const STEPS = [
   {
     n: "03",
     title: "Tweak & export",
-    body: "Edit any scene’s text, skill or timing live, then export 1080p video with a generated trailer soundtrack.",
+    body: "Edit any scene’s text, skill or timing live, then export a 1080p video with a generated soundtrack.",
   },
 ];
 
@@ -83,7 +83,7 @@ export default function Home() {
       <section className="section" id="how">
         <div className="section-head">
           <span className="eyebrow">How it works</span>
-          <h2>From idea to export in under a minute.</h2>
+          <h2>From idea to export, in three steps.</h2>
         </div>
         <div className="steps">
           {STEPS.map((s) => (
@@ -103,7 +103,7 @@ export default function Home() {
       <section className="section cta-band">
         <h2>Your next intro is one prompt away.</h2>
         <Link href="/studio" className="btn btn-primary btn-lg">
-          Try for Free!
+          Try it free
         </Link>
       </section>
 

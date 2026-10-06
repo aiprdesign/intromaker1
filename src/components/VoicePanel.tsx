@@ -113,17 +113,17 @@ export default function VoicePanel({
                 </select>
               )}
               {voice.source === "openai" && !server.openai && (
-                <input className="input" type="password" value={keys.openai ?? ""} onChange={(e) => setKey({ openai: e.target.value.trim() })} placeholder="OpenAI API key (sk-…)" aria-label="OpenAI API key" />
+                <input className="input" type="password" autoComplete="off" value={keys.openai ?? ""} onChange={(e) => setKey({ openai: e.target.value.trim() })} placeholder="OpenAI API key (sk-…)" aria-label="OpenAI API key" />
               )}
               {voice.source === "elevenlabs" && !server.elevenlabs && (
-                <input className="input" type="password" value={keys.elevenlabs ?? ""} onChange={(e) => setKey({ elevenlabs: e.target.value.trim() })} placeholder="ElevenLabs API key" aria-label="ElevenLabs API key" />
+                <input className="input" type="password" autoComplete="off" value={keys.elevenlabs ?? ""} onChange={(e) => setKey({ elevenlabs: e.target.value.trim() })} placeholder="ElevenLabs API key" aria-label="ElevenLabs API key" />
               )}
               {voice.source === "custom" && (
                 <>
                   <input className="input" value={keys.customBase ?? ""} onChange={(e) => setKey({ customBase: e.target.value.trim() })} placeholder="http://localhost:8880/v1" aria-label="Voice server base URL" />
                   <div className="voice-row">
                     <input className="input grow" value={voice.model ?? ""} onChange={(e) => set({ model: e.target.value.trim() || undefined })} placeholder="model (e.g. kokoro, tts-1)" aria-label="Voice model" />
-                    <input className="input grow" type="password" value={keys.customKey ?? ""} onChange={(e) => setKey({ customKey: e.target.value.trim() })} placeholder="key (optional)" aria-label="Voice server key" />
+                    <input className="input grow" type="password" autoComplete="off" value={keys.customKey ?? ""} onChange={(e) => setKey({ customKey: e.target.value.trim() })} placeholder="key (optional)" aria-label="Voice server key" />
                   </div>
                 </>
               )}

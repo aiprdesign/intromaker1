@@ -49,8 +49,8 @@ const safeNext = (n: string | null) => {
 /** Came to buy Pro (from the pricing page): after signing in, go straight to the plans. */
 const wantsPro = () => typeof location !== "undefined" && new URLSearchParams(location.search).get("plan") === "pro";
 const showPlans = () => setTimeout(() => document.getElementById("plan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
-/** Big limits read as unlimited. */
-const amount = (n: number) => (n >= 100_000 ? "unlimited" : String(n));
+/** The limit after a usage count: "of 50", or "(no limit)" for the big ones. */
+const usageOf = (n: number) => (n >= 100_000 ? "(no limit)" : `of ${n}`);
 
 export default function AccountApp() {
   const [me, setMe] = useState<Me | null>(null);
@@ -118,7 +118,7 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <button type="button" className="link-btn" onClick={() => setShow((v) => !v)}>
+              <button type="button" className="pw-toggle" onClick={() => setShow((v) => !v)} aria-pressed={show} aria-label={show ? "Hide password" : "Show password"}>
                 {show ? "Hide" : "Show"}
               </button>
             </span>
@@ -142,9 +142,11 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
 function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: PlanId; onRequest?: () => void; requested?: boolean }) {
   // No checkout while Pro unlocks nothing over Free: nobody should pay for the same limits.
   const proWorth = JSON.stringify(me.plans.free) !== JSON.stringify(me.plans.pro);
+  // While Pro unlocks nothing more, one card shows the one plan (two identical cards only confuse).
+  const ids: PlanId[] = proWorth ? ["free", "pro"] : [current ?? "free"];
   return (
-    <div className="plan-cards">
-      {(["free", "pro"] as PlanId[]).map((id) => (
+    <div className={`plan-cards${ids.length === 1 ? " single" : ""}`}>
+      {ids.map((id) => (
         <div key={id} className={`account-card plan-card ${id}${current === id ? " current" : ""}`}>
           <header>
             <h2>{PLAN_NAMES[id]}</h2>
@@ -179,7 +181,7 @@ function PlanCards({ me, current, onRequest, requested }: { me: Me; current?: Pl
             </button>
           )}
           {id === "pro" && !current && me.billing.online && proWorth && <span className="hint">Create an account or sign in, then upgrade with Stripe.</span>}
-          {id === "pro" && !proWorth && <span className="hint">Pro has the same limits as Free for now, so there&apos;s nothing to upgrade.</span>}
+          {!proWorth && <span className="hint">One plan for now: no upgrade needed.</span>}
         </div>
       ))}
     </div>
@@ -295,7 +297,7 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
 
       <section>
         <p className="hint">
-          {films ? `${films.length} of ${limit >= 100_000 ? "unlimited" : limit} saved` : "Loading…"}
+          {films ? (limit >= 100_000 ? `${films.length} saved` : `${films.length} of ${limit} saved`) : "Loading…"}
           {films && films.length >= limit && u.plan === "free" ? ` · Your Free plan is full: delete one or ${me.billing.online ? "upgrade to Pro" : "request Pro"} to keep more.` : ""}
         </p>
         {films && !films.length && (
@@ -354,10 +356,10 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
         <h2>Plan</h2>
         <div className="account-card usage">
           <span>
-            AI videos this month: <strong>{me.usage.ai}</strong> / {amount(me.limits.aiPerMonth)}
+            AI videos this month: <strong>{me.usage.ai}</strong> {usageOf(me.limits.aiPerMonth)}
           </span>
           <span>
-            Website imports today: <strong>{me.usage.imports}</strong> / {amount(me.limits.importsPerDay)}
+            Website imports today: <strong>{me.usage.imports}</strong> {usageOf(me.limits.importsPerDay)}
           </span>
         </div>
         {(u.plan === "pro" || me.billing.portal) && (u.billingStatus || me.billing.portal) && (
@@ -435,7 +437,7 @@ function Security({ mustChange, onChanged, onSignOutAll }: { mustChange: boolean
         {error && <p className="error">{error}</p>}
         <div className="admin-row actions">
           <button type="button" className="btn btn-ghost" onClick={onSignOutAll}>
-            Sign out on your devices
+            Sign out everywhere
           </button>
           <button className="btn btn-primary">Change password</button>
         </div>

@@ -25,7 +25,7 @@ export default function SiteFooter() {
       <div className="footer-cols">
         <div className="footer-brand">
           <Logo />
-          <p className="footer-slogan">Instant Videos for Saas, Products, & Websites!</p>
+          <p className="footer-slogan">Launch videos for SaaS, products and websites</p>
           <p>An AI video maker for SaaS intros, product videos and launch trailers, rendered in your browser.</p>
         </div>
         <nav className="footer-col" aria-label="SaaS videos">
