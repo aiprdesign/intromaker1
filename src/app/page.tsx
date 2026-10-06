@@ -23,7 +23,7 @@ const STEPS = [
   {
     n: "03",
     title: "Tweak & export",
-    body: "Edit any scene’s text, skill or timing live, then export a 1080p video with a generated soundtrack.",
+    body: "Edit any scene’s text, skill or timing live, then export a 1080p or 4K video with a generated soundtrack.",
   },
 ];
 

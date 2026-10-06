@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Soundtrack } from "@/engine/audio";
-import { canExport, exportFormat, exportThumbnail, exportVideo } from "@/engine/export";
+import { canEncodeSize, canExport, exportFormat, exportThumbnail, exportVideo, sizeLabel } from "@/engine/export";
 import { ensureFonts } from "@/engine/fonts";
 import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
@@ -104,8 +104,38 @@ export default function Player({
   const [exporting, setExporting] = useState<number | null>(null);
   // Designer's grid overlay: preview only, never part of an export.
   const [grid, setGrid] = useState(false);
-  // Export what's being watched: the format on screen, at 1080p.
-  const preset = exportFormat(plan.aspect);
+  // Export what's being watched: the format on screen, at 1080p or the larger size the plan
+  // allows (4K by default), chosen beside the Export button and remembered.
+  const maxLong = limits?.maxLong ?? 1920;
+  const sizes = maxLong > 1920 ? [1920, maxLong] : [];
+  const [bigSize, setBigSize] = useState(false);
+  const [bigOk, setBigOk] = useState(true);
+  useEffect(() => {
+    try {
+      setBigSize(localStorage.getItem("intromaker.export-size") === "large");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    if (maxLong <= 1920) return;
+    let live = true;
+    const { w: bw, h: bh } = aspectSize("16:9", maxLong);
+    void canEncodeSize(bw, bh).then((ok) => live && setBigOk(ok));
+    return () => {
+      live = false;
+    };
+  }, [maxLong]);
+  const chooseSize = (big: boolean) => {
+    setBigSize(big);
+    try {
+      localStorage.setItem("intromaker.export-size", big ? "large" : "1080p");
+    } catch {
+      /* ignore */
+    }
+  };
+  const exportLong = bigSize && bigOk && maxLong > 1920 ? maxLong : Math.min(1920, maxLong);
+  const preset = exportFormat(plan.aspect, exportLong);
   const fileBase = (p: VideoPlan) => `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "intro"}-${p.aspect.replace(":", "x")}`;
   const download = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -354,7 +384,7 @@ export default function Player({
     try {
       const out = film;
       const { blob, ext } = await exportVideo(out, {
-        long: Math.min(preset.long, limits?.maxLong ?? preset.long),
+        long: preset.long,
         fps: Math.min(preset.fps, limits?.maxFps ?? preset.fps),
         watermark: limits?.watermark ? WATERMARK : undefined,
         audio: !muted,
@@ -507,7 +537,7 @@ export default function Player({
           onClick={async () => {
             try {
               const out = plan;
-              download(await exportThumbnail(out, Math.min(preset.long, limits?.maxLong ?? preset.long), limits?.watermark ? WATERMARK : undefined), `${fileBase(out)}-thumbnail.png`);
+              download(await exportThumbnail(out, preset.long, limits?.watermark ? WATERMARK : undefined), `${fileBase(out)}-thumbnail.png`);
             } catch (e) {
               setError((e as Error).message);
             }
@@ -517,6 +547,33 @@ export default function Player({
         >
           PNG
         </button>
+        {sizes.length > 0 && (
+          <div className="view-size export-size" role="radiogroup" aria-label="Export size">
+            {sizes.map((long) => {
+              const big = long > 1920;
+              const on = big ? bigSize && bigOk : !(bigSize && bigOk);
+              return (
+                <button
+                  key={long}
+                  role="radio"
+                  aria-checked={on}
+                  className={on ? "active" : ""}
+                  onClick={() => chooseSize(big)}
+                  disabled={exporting !== null || (big && !bigOk)}
+                  title={
+                    !big
+                      ? "Export at 1080p: quick, and right for most sites and social posts"
+                      : bigOk
+                        ? `Export at ${sizeLabel(long)}: sharper on large screens, slower to make and a bigger file`
+                        : `This browser can't encode ${sizeLabel(long)} video. Try the latest Chrome or Edge.`
+                  }
+                >
+                  {sizeLabel(long)}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <button className="btn btn-primary" onClick={onExport} disabled={exporting !== null || preparing || !canRecord} title={canRecord ? `Exports what you're watching: ${preset.name}` : "Recording not supported in this browser"}>
           Export video
         </button>

@@ -50,7 +50,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I make a vertical video for Reels, TikTok and Shorts?",
-    a: "Yes. Switch the format to 9:16 (or 1:1 for feeds) and the layout reflows for it. Exports are 1080p.",
+    a: "Yes. Switch the format to 9:16 (or 1:1 for feeds) and the layout reflows for it. Exports are 1080p or 4K.",
   },
   {
     q: "Do I need a logo?",
@@ -183,7 +183,7 @@ const SECTIONS: { id: string; title: string; body: React.ReactNode }[] = [
     body: (
       <p>
         One storyboard plays in three formats: 16:9 for your landing page, YouTube and demos, 9:16 for Reels, TikTok and Shorts, and 1:1 for feeds. The
-        layout reflows for the format, with text kept inside title-safe areas. Export the format on screen as a 1080p video.
+        layout reflows for the format, with text kept inside title-safe areas. Export the format on screen as a 1080p or 4K video.
       </p>
     ),
   },
@@ -264,7 +264,7 @@ export default function SaasVideoMaker() {
             </li>
             <li>
               <strong>Edit and export</strong>: change any slide&apos;s words, style, timing or transition, add voice-over, pick the format and export a
-              1080p video.
+              1080p or 4K video.
             </li>
           </ol>
         </section>

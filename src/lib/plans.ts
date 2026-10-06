@@ -69,9 +69,7 @@ export function readLimits(raw: unknown, { legacy = false }: { legacy?: boolean 
 
 /** One line per limit, for the pricing and account pages. */
 export function describeLimits(l: PlanLimits): string[] {
-  // (The studio exports at most 1920 px on the long side, whatever a plan allows: say what you get.)
-  const long = Math.min(l.maxLong, 1920);
-  const res = long >= 1920 ? "1080p" : "720p";
+  const res = l.maxLong >= 3840 ? "4K" : l.maxLong >= 2560 ? "1440p" : l.maxLong >= 1920 ? "1080p" : "720p";
   return [
     l.savedFilms >= 100_000 ? "Unlimited saved intros" : `${l.savedFilms} saved intro${l.savedFilms === 1 ? "" : "s"}`,
     l.aiPerMonth >= 1_000_000 ? "Unlimited AI-directed videos" : l.aiPerMonth > 0 ? `AI director: ${l.aiPerMonth} videos a month` : "Built-in director (or your own AI key)",

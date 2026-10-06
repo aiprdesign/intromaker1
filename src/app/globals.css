@@ -1957,7 +1957,7 @@ details.claim-note summary {
     display: none;
   }
   /* The preview already fills a phone's width: the size switch has nothing to change. */
-  .view-size:not(.aspect-pick) button[role="radio"] {
+  .view-size:not(.aspect-pick):not(.export-size) button[role="radio"] {
     display: none;
   }
   .nav-links {

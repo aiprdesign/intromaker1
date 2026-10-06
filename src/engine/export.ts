@@ -58,9 +58,11 @@ export async function exportVideo(plan: VideoPlan, opts: ExportOptions): Promise
     } catch (e) {
       if ((e as Error).name === "AbortError") throw e;
       console.warn("[export] offline encoding failed, falling back to realtime capture:", e);
+      if (opts.long > 1920) throw new Error(`This browser couldn't encode a video this large. Export at 1080p, or try the latest Chrome or Edge.`);
     }
   }
-  return exportRealtime(plan, opts);
+  // Realtime capture drops frames above 1080p, so it never records larger.
+  return exportRealtime(plan, { ...opts, long: Math.min(opts.long, 1920) });
 }
 
 async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<ExportResult> {
@@ -179,16 +181,42 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
   return { blob: new Blob(chunks, { type: mime.split(";")[0] }), ext: mime.startsWith("video/mp4") ? "mp4" : "webm" };
 }
 
-/** Export presets: one storyboard, re-framed for each platform. */
+/** Export sizes, by the long side of a 16:9 or 9:16 video. */
+export const EXPORT_SIZES = [
+  { long: 1280, label: "720p" },
+  { long: 1920, label: "1080p" },
+  { long: 2560, label: "1440p" },
+  { long: 3840, label: "4K" },
+] as const;
+export const sizeLabel = (long: number) => [...EXPORT_SIZES].reverse().find((s) => long >= s.long)?.label ?? "720p";
+
 /**
- * The export takes the format being watched (chosen in the player's toolbar) at 1080p:
+ * The export takes the format being watched (chosen in the player's toolbar) at 1080p, or the
+ * size chosen beside the Export button (`long`, the long side of a 16:9 video: 3840 for 4K):
  * 1920×1080 at 60 fps for 16:9, 1080×1920 at 30 fps for 9:16 (Reels, TikTok, Shorts) and
- * 1080×1080 at 30 fps for 1:1 (feeds).
+ * 1080×1080 at 30 fps for 1:1 (feeds), each scaled up together.
  */
-export function exportFormat(aspect: VideoPlan["aspect"]) {
-  if (aspect === "9:16") return { name: "9:16 · 1080×1920", long: 1920, fps: 30 };
-  if (aspect === "1:1") return { name: "1:1 · 1080×1080", long: 1080, fps: 30 };
-  return { name: "16:9 · 1920×1080", long: 1920, fps: 60 };
+export function exportFormat(aspect: VideoPlan["aspect"], long = 1920) {
+  const k = long / 1920;
+  const px = (n: number) => Math.round(n * k);
+  const tag = long === 1920 ? "" : ` (${sizeLabel(long)})`;
+  if (aspect === "9:16") return { name: `9:16 · ${px(1080)}×${px(1920)}${tag}`, long: px(1920), fps: 30 };
+  if (aspect === "1:1") return { name: `1:1 · ${px(1080)}×${px(1080)}${tag}`, long: px(1080), fps: 30 };
+  return { name: `16:9 · ${px(1920)}×${px(1080)}${tag}`, long: px(1920), fps: 60 };
+}
+
+/**
+ * Whether this browser can encode a video this large. Sizes above 1080p need frame-accurate
+ * offline encoding (WebCodecs): realtime capture can't keep up and would drop frames.
+ */
+export async function canEncodeSize(w: number, h: number): Promise<boolean> {
+  if (Math.max(w, h) <= 1920) return canExport();
+  if (typeof VideoEncoder === "undefined") return false;
+  try {
+    return (await getFirstEncodableVideoCodec(["avc", "vp9", "av1"], { width: w, height: h })) !== null;
+  } catch {
+    return false;
+  }
 }
 
 /** PNG thumbnail/poster: the held end card (logo, closing line and button). */
