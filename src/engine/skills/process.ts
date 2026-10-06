@@ -4,8 +4,9 @@
  * generic, claim-free sample copy. Items read "Title — short detail".
  *
  * - process-chevrons: the consulting-deck process: arrow-shaped chevrons in a row (a column in
- *                     vertical frames) fill with the brand gradient one by one, each with its icon,
- *                     and the step's name and detail rise in under it.
+ *                     vertical frames) work like tabs: each fills with the brand gradient and lifts
+ *                     as it becomes active, and the active step's name appears large under them,
+ *                     animated, with its detail, so the viewer knows which step is being told.
  * - process-cycle:    how a business works as a loop: steps sit around a ring, a glowing head runs
  *                     the ring from step to step and closes the loop, the current step in the centre.
  * - step-stairs:      a 3D staircase rises from the floor, a marker hops up it stair by stair, each
@@ -17,8 +18,8 @@
  * Every frame is a pure function of time, so preview, seek and export match.
  */
 import { clamp, ease, lerp, mixHex, range, rgba, TAU } from "../math";
-import { drawIcon, glassCard, iconsFor, saasBackground, spring } from "../saasfx";
-import { fillTextFit, subFont } from "../text";
+import { drawIcon, glassCard, iconsFor, saasBackground, saasFont, spring } from "../saasfx";
+import { displayFont, fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { hair, itemsOr, split, stage } from "./beats";
 import { iconTile } from "./interactions";
@@ -103,6 +104,78 @@ function chevronPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
   ctx.closePath();
 }
 
+/**
+ * The current step's name, large, with its detail under it: it swaps as each arrow becomes the
+ * active tab (the old name slides away, the new one's words rise in one after another), so the
+ * viewer always knows which step is being talked about.
+ */
+function stepFocus(
+  sc: SkillContext,
+  P: { title: string; detail: string }[],
+  T: number[],
+  box: { x: number; y: number; w: number; size: number; align: CanvasTextAlign },
+) {
+  const { ctx, t, u, palette } = sc;
+  const current = T.reduce((c, ti, i) => (t >= ti ? i : c), -1);
+  if (current < 0) return;
+  const local = t - T[current];
+  const font = displayFont(saasFont(sc), box.size);
+  const draw = (i: number, kIn: number, out: number) => {
+    const p = P[i];
+    ctx.save();
+    ctx.globalAlpha *= 1 - out;
+    ctx.translate(-out * 40 * u, 0);
+    ctx.font = font;
+    ctx.textBaseline = "alphabetic";
+    // Fit the name to the box (one line), then lay its words out so each can rise on its own.
+    let size = box.size;
+    while (size > box.size * 0.55 && ctx.measureText(p.title).width > box.w) {
+      size *= 0.94;
+      ctx.font = displayFont(saasFont(sc), size);
+    }
+    const words = p.title.split(/\s+/);
+    const space = ctx.measureText(" ").width;
+    const widths = words.map((wd) => ctx.measureText(wd).width);
+    const total = widths.reduce((a, b) => a + b, 0) + space * (words.length - 1);
+    let x = box.align === "center" ? box.x - total / 2 : box.x;
+    const base = box.y + size * 0.8;
+    ctx.textAlign = "left";
+    words.forEach((wd, wi) => {
+      const k = ease.outCubic(clamp((kIn - wi * 0.12) / 0.6));
+      ctx.save();
+      ctx.globalAlpha *= k;
+      ctx.fillStyle = palette.text;
+      ctx.fillText(wd, x, base + (1 - k) * size * 0.45);
+      ctx.restore();
+      x += widths[wi] + space;
+    });
+    // An accent underline grows under the name.
+    const lk = ease.outCubic(clamp((kIn - 0.25) / 0.6));
+    const ux = box.align === "center" ? box.x - (total * lk) / 2 : box.x;
+    const g = ctx.createLinearGradient(ux, 0, ux + total, 0);
+    g.addColorStop(0, palette.primary);
+    g.addColorStop(1, palette.secondary);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.roundRect(ux, base + size * 0.2, Math.max(1, total * lk), Math.max(3, size * 0.06), size * 0.03);
+    ctx.fill();
+    if (p.detail) {
+      const dk = ease.outCubic(clamp((kIn - 0.35) / 0.6));
+      ctx.globalAlpha *= dk;
+      ctx.fillStyle = rgba(palette.text, 0.7);
+      ctx.font = subFont(Math.max(box.size * 0.36, 20 * u), 500);
+      ctx.textAlign = box.align;
+      ctx.textBaseline = "top";
+      fillTextFit(ctx, p.detail, box.x, base + size * 0.48 + (1 - dk) * 10 * u, box.w, { maxLines: 2, lineHeight: 1.2, minScale: 0.7 });
+    }
+    ctx.restore();
+  };
+  // The outgoing name leaves first, then the new one comes in, so the two never overlap.
+  const out = current > 0 ? clamp(local / 0.16) : 1;
+  if (out < 1) draw(current - 1, 1, ease.inCubic(out));
+  draw(current, clamp((local - (current > 0 ? 0.12 : 0)) / 0.7), 0);
+}
+
 function processChevrons(sc: SkillContext) {
   const { ctx, t, u, palette, scene } = sc;
   saasBackground(sc, { beams: 1 });
@@ -114,51 +187,66 @@ function processChevrons(sc: SkillContext) {
   const icons = iconsFor(P.map((p) => p.title), sc);
   const room = st.bottom - st.top;
   const gap = 10 * u;
-  // The step whose turn it is glows.
+  // The active tab: the step whose turn it is.
   const current = T.reduce((c, ti, i) => (t >= ti ? i : c), -1);
   ctx.save();
   ctx.globalAlpha = 1 - ex;
-  // Geometry: a row of chevrons with their text under them (wide frames), or a column of
-  // downward chevrons with their text beside them (vertical and square frames).
+  // Geometry: a row of chevrons with small labels under them (wide frames), or a column of
+  // downward chevrons with their names beside them (vertical and square frames); the current
+  // step's name, large, under it all.
   let boxes: { x: number; y: number; w: number; h: number }[];
   let notch: number;
-  let textAt: (i: number) => { x: number; y: number; w: number; align: CanvasTextAlign };
-  const size = (narrow ? 36 : 34) * u * S;
+  let labelAt: (i: number) => { x: number; y: number; w: number; align: CanvasTextAlign };
+  let focus: { x: number; y: number; w: number; size: number; align: CanvasTextAlign };
+  const size = (narrow ? 30 : 26) * u * S;
   if (!narrow) {
-    const ch = Math.min(room * 0.4, 150 * u * S);
+    const big = Math.min(90 * u * S, room * 0.19);
+    const ch = Math.min(room * 0.3, 128 * u * S);
     notch = ch * 0.34;
     const cw = (st.width + (n - 1) * (notch - gap)) / n;
-    const textH = size * 3.9;
-    const y0 = st.top + Math.max(0, (room - ch - 30 * u - textH) * 0.5);
+    const labelH = size * 1.9;
+    const focusH = big * 1.35 + big * 0.36 * 2.6;
+    const total = ch + 22 * u + labelH + 40 * u + focusH;
+    const y0 = st.top + Math.max(0, (room - total) * 0.5);
     boxes = P.map((_, i) => ({ x: st.left + i * (cw - notch + gap), y: y0, w: cw, h: ch }));
-    textAt = (i) => {
+    labelAt = (i) => {
       const b = boxes[i];
-      return { x: b.x + b.w / 2 + (i === 0 ? -notch / 4 : 0), y: b.y + b.h + 30 * u, w: Math.min(cw - notch * 0.5, 360 * u * S), align: "center" };
+      return { x: b.x + b.w / 2 + (i === 0 ? -notch / 4 : 0), y: b.y + b.h + 22 * u, w: Math.min(cw - notch * 0.5, 360 * u * S), align: "center" };
     };
+    focus = { x: st.left + st.width / 2, y: y0 + ch + 22 * u + labelH + 40 * u, w: st.width * 0.9, size: big, align: "center" };
   } else {
-    const cw = Math.min(st.width * 0.3, 210 * u * S);
+    const big = Math.min(70 * u * S, st.width * 0.12);
+    const focusH = big * 1.35 + big * 0.36 * 2.6;
+    const cw = Math.min(st.width * 0.24, 170 * u * S);
     notch = cw * 0.24;
-    const rowMax = 240 * u * S;
-    const ch = Math.min(rowMax, (room * 0.96 + (n - 1) * (notch - gap)) / n);
-    const total = n * ch - (n - 1) * (notch - gap);
+    const colRoom = room - focusH - 50 * u;
+    const ch = Math.min(170 * u * S, (colRoom + (n - 1) * (notch - gap)) / n);
+    const colH = n * ch - (n - 1) * (notch - gap);
+    const total = colH + 50 * u + focusH;
     const y0 = st.top + Math.max(0, (room - total) * 0.45);
     boxes = P.map((_, i) => ({ x: st.left, y: y0 + i * (ch - notch + gap), w: cw, h: ch }));
-    textAt = (i) => {
+    labelAt = (i) => {
       const b = boxes[i];
       const mid = b.y + (i === 0 ? (b.h - notch) / 2 : notch / 2 + (b.h - notch) / 2);
-      return { x: b.x + cw + 30 * u, y: mid - size * 1.05, w: st.width - cw - 30 * u, align: "left" };
+      return { x: b.x + cw + 28 * u, y: mid - size * 0.95, w: st.width - cw - 28 * u, align: "left" };
     };
+    focus = { x: st.left, y: y0 + colH + 50 * u, w: st.width, size: big, align: "left" };
   }
   P.forEach((p, i) => {
     const b = boxes[i];
     const k = clamp(spring(t - 0.15 - i * 0.09, 11, 7), 0, 1.04);
     if (k <= 0) return;
     const lit = ease.outCubic(range(t, T[i] - 0.05, T[i] + 0.45));
+    const active = i === current;
+    // The active tab lifts and stays bright; finished steps keep their colour, dimmed.
+    const nextT = i + 1 < n ? T[i + 1] : Infinity;
+    const lift = active ? ease.outCubic(range(t, T[i], T[i] + 0.3)) : i < current ? 1 - ease.outCubic(range(t, nextT, nextT + 0.3)) : 0;
+    const dim = i < current ? 0.45 * ease.outCubic(range(t, nextT, nextT + 0.3)) : 0;
     ctx.save();
     ctx.globalAlpha *= clamp(k);
     // Each chevron slides in along the flow.
-    if (narrow) ctx.translate(0, (1 - Math.min(1, k)) * -28 * u);
-    else ctx.translate((1 - Math.min(1, k)) * -36 * u, 0);
+    if (narrow) ctx.translate((1 - Math.min(1, k)) * -28 * u + lift * 8 * u, 0);
+    else ctx.translate((1 - Math.min(1, k)) * -36 * u, -lift * 8 * u);
     const first = i === 0;
     // The track: a quiet glass chevron.
     chevronPath(ctx, b.x, b.y, b.w, b.h, notch, first, narrow);
@@ -171,6 +259,7 @@ function processChevrons(sc: SkillContext) {
     // Its turn: the brand gradient sweeps through it along the flow.
     if (lit > 0) {
       ctx.save();
+      ctx.globalAlpha *= 1 - dim;
       chevronPath(ctx, b.x, b.y, b.w, b.h, notch, first, narrow);
       ctx.clip();
       const c0 = stepColor(palette, i, n);
@@ -187,13 +276,13 @@ function processChevrons(sc: SkillContext) {
       ctx.fillStyle = sh;
       ctx.fillRect(b.x, b.y, b.w, b.h);
       ctx.restore();
-      if (i === current) {
+      if (active) {
         ctx.save();
         ctx.shadowColor = rgba(palette.primary, 0.75);
-        ctx.shadowBlur = (18 + 6 * Math.sin(t * 3)) * u;
+        ctx.shadowBlur = (20 + 6 * Math.sin(t * 3)) * u;
         chevronPath(ctx, b.x, b.y, b.w, b.h, notch, first, narrow);
-        ctx.strokeStyle = rgba(c0, 0.9);
-        ctx.lineWidth = 2 * u;
+        ctx.strokeStyle = rgba(palette.light ? c0 : "#ffffff", 0.9);
+        ctx.lineWidth = 2.5 * u;
         ctx.stroke();
         ctx.restore();
       }
@@ -205,18 +294,49 @@ function processChevrons(sc: SkillContext) {
     if (lit < 1) drawIcon(ctx, icons[i], icx, icy, is, rgba(palette.text, 0.42 * (1 - lit)));
     if (lit > 0) {
       ctx.save();
-      ctx.globalAlpha *= lit;
+      ctx.globalAlpha *= lit * (1 - dim * 0.6);
       drawIcon(ctx, icons[i], icx, icy, is, onFill(palette), ease.outCubic(range(t, T[i], T[i] + 0.6)));
       ctx.restore();
     }
     ctx.restore();
-    // The step's number, name and detail.
-    const tx = textAt(i);
+    // The tab's label: its number and name (the details live in the large heading).
+    const tx = labelAt(i);
     ctx.save();
-    ctx.globalAlpha *= clamp(k) * (1 - ex);
-    stepText(sc, p, tx.x, tx.y, tx.w, { align: tx.align, size, lit, label: `STEP ${num(i)}` });
+    ctx.globalAlpha *= clamp(k) * (1 - ex) * (active ? 1 : current >= 0 && i < current ? 0.6 : 0.75);
+    stepText(sc, { title: p.title, detail: "" }, tx.x, tx.y, tx.w, { align: tx.align, size, lit: active ? 1 : lit * 0.55, label: `STEP ${num(i)}` });
     ctx.restore();
   });
+  // A marker under (or beside) the active tab glides to it and points at the large heading.
+  if (current >= 0) {
+    const from = boxes[Math.max(0, current - 1)];
+    const to = boxes[current];
+    const gk = current === 0 ? 1 : clamp(spring(t - T[current], 12, 8), 0, 1.04);
+    const ms = 11 * u * S;
+    ctx.save();
+    ctx.globalAlpha *= clamp((t - T[0]) / 0.3);
+    ctx.fillStyle = palette.primary;
+    ctx.beginPath();
+    if (!narrow) {
+      const cx = (b: { x: number; w: number }, i: number) => b.x + b.w / 2 + (i === 0 ? -notch / 4 : 0);
+      const mx = lerp(cx(from, Math.max(0, current - 1)), cx(to, current), gk);
+      const my = focus.y - 18 * u;
+      ctx.moveTo(mx - ms, my - ms * 0.9);
+      ctx.lineTo(mx + ms, my - ms * 0.9);
+      ctx.lineTo(mx, my + ms * 0.2);
+    } else {
+      const cy = (b: { y: number; h: number }, i: number) => b.y + (i === 0 ? (b.h - notch) / 2 : notch / 2 + (b.h - notch) / 2);
+      const my = lerp(cy(from, Math.max(0, current - 1)), cy(to, current), gk);
+      const mx = st.left - 4 * u;
+      ctx.moveTo(mx - ms * 1.1, my - ms);
+      ctx.lineTo(mx, my);
+      ctx.lineTo(mx - ms * 1.1, my + ms);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  // The large heading: the active step's name and what it means.
+  stepFocus(sc, P, T, focus);
   ctx.restore();
 }
 
