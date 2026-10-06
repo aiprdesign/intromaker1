@@ -3,7 +3,7 @@
  * "free" is only offered when the copy really offers it, and site buttons are cleaned.
  * Run: npm run check:copy
  */
-import { isClaimWord, mentionsOffer, offerKey, offerSafe, offersIn, safeCopy } from "../src/engine/claims";
+import { isClaimWord, isUnsafe, mentionsOffer, offerKey, offerSafe, offersIn, safeCopy } from "../src/engine/claims";
 import { cleanCta, contextCta, lowerFirst, offersFree, safePlan } from "../src/engine/planner";
 import { speakable } from "../src/engine/voice";
 import { applyTemplate, trailerBeats } from "../src/engine/templates";
@@ -171,6 +171,18 @@ for (const [from, to] of [
   ["Built for everyone", "Built for you"],
   ["Always on time", "On time"],
 ]) check(safeCopy(from) === to, `"${from}" → "${safeCopy(from)}"`);
+
+console.log("No badges or awards on screen");
+for (const [from, to] of [
+  ["Editor's Choice wireless earbuds", "Wireless earbuds"],
+  ["A staff pick for weekend trips", "For weekend trips"],
+  ["Best-selling travel mug", "Travel mug"],
+  ["Extra strong grip", "Strong grip"],
+  ["Premium quality leather", "Quality leather"],
+  ["Editors' pick", ""],
+]) check(safeCopy(from) === to, `"${from}" → "${safeCopy(from)}"`);
+check(["Editor's Choice", "Bestseller", "Extra", "Top pick", "Award-winning", "Premium"].every(isClaimWord) && !["Extras", "Editor", "Choice of colours"].some(isClaimWord), "badge words are caught on their own, plain words aren't");
+check(isUnsafe("Winner of the 2024 Design Award") && !isUnsafe("Plan your awards night"), "award wins are left out");
 
 console.log("No bare claim words on slides");
 {

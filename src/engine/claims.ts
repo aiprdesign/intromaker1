@@ -32,6 +32,12 @@ function plural(w: string) {
 }
 
 const RULES: Rule[] = [
+  // Badges and awards nobody can vouch for: "Editor's Choice", "Staff pick", "Bestseller",
+  // "Award winner"; and boosts with nothing behind them ("Extra strong", "Premium quality").
+  [/\b(?:an?\s+|our\s+|the\s+)?(?:editor|staff|critic|customer|fan|reader|user|shopper|people|crowd)(?:s'|'s|s)?\s*[- ]?(?:choice|pick|favou?rite)s?\b\s*/gi, ""],
+  [/\b(?:an?\s+|our\s+|the\s+)?(?:best[- ]?sell(?:ers?|ing)|top[- ](?:picks?|choices?|sellers?|selling)|official selection|critically acclaimed|acclaimed|highly rated|must[- ]haves?|awards?[- ](?:winners?|nominees?|nominated))\b\s*/gi, ""],
+  [/\b(?:premium|top|highest|superior|exceptional|outstanding|superb)[- ]quality\b/gi, "quality"],
+  [/\bextra[- ](?=(?:\*)?(?:strong|strength|secure|safe|fast|durable|tough|powerful|reliable|protective|protection|long[- ]lasting|gentle|effective|smooth|soft|comfortable|clean|bright|sharp|light|quiet|sturdy)\b)/gi, ""],
   // Social proof with a number or a boast: "Trusted by 12,000+ teams", "Loved by thousands".
   [/\b(?:trusted|loved|used|chosen|relied on|backed)\s+by\s+(?:over\s+|more than\s+)?(?:\*?\d[\d,.]*\s*[kmb]?\+?\*?|thousands|millions|hundreds|the best|leading|top|the world'?s)[^.!?|—–]*/gi, "Built for *teams*"],
   [/\bjoin\s+(?:over\s+|more than\s+)?\*?\d[\d,.]*\s*[kmb]?\+?\*?\s+[^.!?|—–]*/gi, "Join us"],
@@ -187,6 +193,8 @@ const UNSAFE: RegExp[] = [
   /\b(?:compliant|compliance[- ]ready|certified|accredited|unhackable|hack[- ]proof)\b|\b(?:bank|military|enterprise)[- ]grade\b/i,
   // Green claims.
   /\b(?:eco[- ]friendly|environmentally[- ]friendly|carbon[- ](?:neutral|negative|free)|net[- ]zero|climate[- ](?:positive|neutral)|sustainabl\w*|biodegradable|compostable|recyclable|non[- ]toxic|all[- ]natural|chemical[- ]free|plastic[- ]free)\b/i,
+  // Awards won ("Winner of the 2024 Design Award").
+  /\b(?:winner|winners|won|nominee|nominated)\s+(?:of|for)?\s*(?:the\s+|an?\s+)?[\w\s'-]{0,30}\bawards?\b/i,
   // Endorsements and origin.
   /\b(?:as seen (?:on|in)|recommended by|endorsed by|approved by|official (?:partner|sponsor)|made in (?:the\s+)?(?:usa|u\.s\.a?\.?|america|uk|germany))\b/i,
   // Promised business outcomes.
@@ -206,7 +214,12 @@ export function isUnsafe(text: string) {
  */
 const CLAIM_WORD =
   /^(?:(?:super|ultra|fully|very|truly|rock|lightning|blazing(?:ly)?|bank|military|enterprise)[- ]?)?(?:secure|safe|safer|fast|faster|speedy|quick|quicker|instant|reliable|trusted|tested|proven|approved|certified|verified|validated|compliant|encrypted|protected|private|accurate|powerful|seamless|effortless|flawless|perfect|best|guaranteed|bulletproof|unbreakable|solid|grade)$/i;
-export const isClaimWord = (text: string) => CLAIM_WORD.test(text.replace(/[*_.!,]/g, "").trim());
+/** A badge on its own ("Editor's Choice", "Bestseller", "Extra", "Premium"): an award or rank claim. */
+const BADGE = /^(?:(?:editor|staff|critic|customer|fan|reader|user|shopper|people|crowd)(?:s'|'s|s)?\s*[- ]?(?:choice|pick|favou?rite)|top[- ](?:pick|choice|seller|rated)|best[- ]?sell(?:er|ing)|award[- ]winn(?:er|ing)|acclaimed|must[- ]have|extra|premium|popular|trending|hot)$/i;
+export const isClaimWord = (text: string) => {
+  const t = text.replace(/[*_.!,]/g, "").replace(/\s+/g, " ").trim();
+  return CLAIM_WORD.test(t) || BADGE.test(t);
+};
 
 export function hasClaim(text: string | undefined) {
   if (!text) return false;

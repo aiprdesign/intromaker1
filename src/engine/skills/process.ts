@@ -113,7 +113,7 @@ export function stepFocus(
   sc: SkillContext,
   P: { title: string; detail: string }[],
   T: number[],
-  box: { x: number; y: number; w: number; size: number; align: CanvasTextAlign },
+  box: { x: number; y: number; w: number; size: number; align: CanvasTextAlign; underline?: boolean },
 ) {
   const { ctx, t, u, palette } = sc;
   const current = T.reduce((c, ti, i) => (t >= ti ? i : c), -1);
@@ -149,16 +149,18 @@ export function stepFocus(
       ctx.restore();
       x += widths[wi] + space;
     });
-    // An accent underline grows under the name.
-    const lk = ease.outCubic(clamp((kIn - 0.25) / 0.6));
-    const ux = box.align === "center" ? box.x - (total * lk) / 2 : box.x;
-    const g = ctx.createLinearGradient(ux, 0, ux + total, 0);
-    g.addColorStop(0, palette.primary);
-    g.addColorStop(1, palette.secondary);
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.roundRect(ux, base + size * 0.2, Math.max(1, total * lk), Math.max(3, size * 0.06), size * 0.03);
-    ctx.fill();
+    // An accent underline grows under the name (unless the slide asks for none).
+    if (box.underline !== false) {
+      const lk = ease.outCubic(clamp((kIn - 0.25) / 0.6));
+      const ux = box.align === "center" ? box.x - (total * lk) / 2 : box.x;
+      const g = ctx.createLinearGradient(ux, 0, ux + total, 0);
+      g.addColorStop(0, palette.primary);
+      g.addColorStop(1, palette.secondary);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.roundRect(ux, base + size * 0.2, Math.max(1, total * lk), Math.max(3, size * 0.06), size * 0.03);
+      ctx.fill();
+    }
     if (p.detail) {
       const dk = ease.outCubic(clamp((kIn - 0.35) / 0.6));
       ctx.globalAlpha *= dk;

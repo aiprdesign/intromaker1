@@ -40,7 +40,7 @@ function servicePos(T: number[], t: number, lead = 0.5) {
 }
 
 /** The large name of the current service with its label, at `box` (see stepFocus). */
-function tellService(sc: SkillContext, P: { title: string; detail: string }[], T: number[], box: { x: number; y: number; w: number; size: number; align: CanvasTextAlign }) {
+function tellService(sc: SkillContext, P: { title: string; detail: string }[], T: number[], box: { x: number; y: number; w: number; size: number; align: CanvasTextAlign; underline?: boolean }) {
   const cur = currentOf(T, sc.t, 0.05);
   if (cur < 0) return;
   smallLabel(sc, `SERVICE ${num(cur)}`, box.x, box.y - 8 * sc.u, box.align, clamp((sc.t - T[cur]) / 0.3));
@@ -690,9 +690,10 @@ function serviceSpotlight(sc: SkillContext) {
   const tile = Math.min(gapW * 0.6, room * (narrow ? 0.13 : 0.18), 150 * u * S);
   const nameSize = Math.min(22 * u * S, gapW * 0.12);
   const xs = P.map((_, i) => st.left + gapW * (i + 0.5));
-  // The spotlight swings from service to service with a little overshoot, like a hand-pulled light.
+  // The spotlight swings from service to service with a little overshoot, like a hand-pulled light,
+  // setting off as the name changes so the lit card and the name below always match.
   let pos = 0;
-  for (let i = 1; i < n; i++) pos += clamp(spring(t - (T[i] - 0.55), 9, 6), 0, 1.06);
+  for (let i = 1; i < n; i++) pos += clamp(spring(t - (T[i] - 0.12), 9, 6), 0, 1.06);
   const enter = ease.outCubic(range(t, 0.2, T[0]));
   const tx = lerp(xs[0] - gapW * 0.8, lerp(xs[Math.floor(clamp(pos, 0, n - 1))], xs[Math.min(n - 1, Math.floor(clamp(pos, 0, n - 1)) + 1)], clamp(pos, 0, n - 1) - Math.floor(clamp(pos, 0, n - 1))), enter);
   const srcX = w / 2;
@@ -788,14 +789,14 @@ function serviceSpotlight(sc: SkillContext) {
   if (cur >= 0) {
     const big = (narrow ? 60 : 76) * u * S;
     const caps = P.map((p) => ({ ...p, title: p.title.toUpperCase() }));
-    tellService(sc, caps, T, { x: w / 2, y: shelfY + 30 * u + nameSize * 2.2 + 44 * u * S, w: st.width * (narrow ? 1 : 0.86), size: big, align: "center" });
+    tellService(sc, caps, T, { x: w / 2, y: shelfY + 30 * u + nameSize * 2.2 + 44 * u * S, w: st.width * (narrow ? 1 : 0.86), size: big, align: "center", underline: false });
   }
   ctx.restore();
 }
 
 const spotlightSfx = (scene: Scene): SfxCue[] => {
   const T = serviceTimes(scene, itemsOf(scene).length);
-  return [at(0.2, "whoosh"), ...T.map((ti, i) => at(ti - (i ? 0.4 : 0), "swoosh"))];
+  return [at(0.2, "whoosh"), ...T.map((ti, i) => at(ti - (i ? 0.1 : 0), "swoosh"))];
 };
 
 /* ───────────────────────── Registry ───────────────────────── */
