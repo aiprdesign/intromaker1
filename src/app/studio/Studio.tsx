@@ -2035,6 +2035,10 @@ export default function Studio() {
                 Remake ↻
               </button>
             )}
+            {/* Phones: the export is in the thumb bar too (the player's own button is further up). */}
+            <button className="btn btn-ghost btn-lg phone-only" onClick={() => window.dispatchEvent(new Event("studio:export"))} disabled={loading || importing}>
+              Export
+            </button>
           </div>
           {takes.length > 1 && (
             <div className="version-row">
@@ -2069,7 +2073,7 @@ export default function Studio() {
             </a>
           </p>
           {note && (
-            <div className="director-note" role="status">
+            <div className="director-note wide-only" role="status">
               <p>{note}</p>
               <button type="button" className="director-note-close" onClick={() => setNote(null)} aria-label="Dismiss this note">
                 ×
@@ -2082,6 +2086,14 @@ export default function Studio() {
         </aside>
 
         <section className="main">
+          {note && (
+            <div className="director-note phone-note" role="status">
+              <p>{note}</p>
+              <button type="button" className="director-note-close" onClick={() => setNote(null)} aria-label="Dismiss this note">
+                ×
+              </button>
+            </div>
+          )}
           <div className={`stage-wrap${loading || importing ? " building" : ""}`}>
             {(importing || (loading && !takesLoading)) && <BuildProgress importing={importing} stage={importStage} site={importing ? siteUrl : undefined} onStop={stopDirecting} />}
             {!importing && !loading && importError && (

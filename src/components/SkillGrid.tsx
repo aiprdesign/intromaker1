@@ -18,7 +18,7 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(
 /** The first skill of each picker group carries the group's anchor (/skills#fast-type). */
 const ANCHORS = new Map(SKILL_GROUPS.map((g) => [g.skills[0]?.id, slug(g.name)]));
 
-export default function SkillGrid({ limit, pickers = false, group, ids }: { limit?: number; pickers?: boolean; group?: string; ids?: string[] }) {
+export default function SkillGrid({ limit, pickers = false, group, ids, swipe = false }: { limit?: number; pickers?: boolean; group?: string; ids?: string[]; /** Phones: a sideways-swiping row instead of a grid. */ swipe?: boolean }) {
   const [palette, setPalette] = useState<PaletteId | "mix">("mix");
   const inGroup = group ? (SKILL_GROUPS.find((g) => g.name === group)?.skills ?? []) : SKILLS;
   // An explicit pick (in its own order) narrows the group.
@@ -41,7 +41,7 @@ export default function SkillGrid({ limit, pickers = false, group, ids }: { limi
           ))}
         </div>
       )}
-      <div className="skill-grid">
+      <div className={`skill-grid${swipe ? " swipe" : ""}`}>
         {skills.map((s, i) => {
           const pal = palette === "mix" ? DEFAULT_PALETTES[i % DEFAULT_PALETTES.length] : palette;
           const scene = { skill: s.id, text: s.sample.text, subtext: s.sample.subtext, items: s.sample.items, duration: 4.6, transition: "cut" as const };

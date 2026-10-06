@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@fontsource/anton/400.css";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/700.css";
@@ -20,6 +20,14 @@ import "@fontsource/jost/600.css";
 import "@fontsource/jost/700.css";
 import "./globals.css";
 import { SITE_URL_ENV } from "@/lib/site";
+
+/** Phones first: the page fills the screen edge to edge (fixed bars keep clear of the notch and home bar), and pinch-zoom stays on. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#06050c",
+};
 
 export const metadata: Metadata = {
   // Absolute links (canonical, Open Graph) need the public address: INTROMAKER_SITE_URL.

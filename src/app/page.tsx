@@ -58,7 +58,7 @@ export default function Home() {
           <h2>167 motion skills, rendered live.</h2>
           <p>The cards below are real-time output of the engine: the same frames you export.</p>
         </div>
-        <SkillGrid limit={9} />
+        <SkillGrid limit={9} swipe />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
             See the 167 skills →
@@ -72,7 +72,7 @@ export default function Home() {
           <h2>Speed animations, on the beat.</h2>
           <p>Twenty-six kinetic text slides that switch words on the half-beat (whips, crash zooms, jump cuts, stamps, gauges, dominoes, rallies, stomps) and then land your line. The cards below play live.</p>
         </div>
-        <SkillGrid group="Fast type" ids={["crash-zoom", "jump-cut", "speed-gauge", "rapid-fire", "letter-rush", "stack-stomp"]} />
+        <SkillGrid swipe group="Fast type" ids={["crash-zoom", "jump-cut", "speed-gauge", "rapid-fire", "letter-rush", "stack-stomp"]} />
         <div className="center">
           <Link href="/skills#fast-type" className="btn btn-ghost btn-lg">
             See the 26 fast type slides →

@@ -371,6 +371,17 @@ export default function Player({
     }
   };
 
+  // The studio's thumb bar on phones asks for the same export as the Export button here.
+  const exportRef = useRef(onExport);
+  exportRef.current = onExport;
+  useEffect(() => {
+    const go = () => {
+      if (exporting === null) void exportRef.current();
+    };
+    window.addEventListener("studio:export", go);
+    return () => window.removeEventListener("studio:export", go);
+  }, [exporting]);
+
   const palette = PALETTES[plan.palette];
   let acc = 0;
 

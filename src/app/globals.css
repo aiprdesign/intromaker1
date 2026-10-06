@@ -1957,7 +1957,7 @@ details.claim-note summary {
     display: none;
   }
   /* The preview already fills a phone's width: the size switch has nothing to change. */
-  .view-size button[role="radio"] {
+  .view-size:not(.aspect-pick) button[role="radio"] {
     display: none;
   }
   .nav-links {
@@ -4884,4 +4884,198 @@ code.secret {
 
 .url-hint {
   color: #ffb4a8;
+}
+
+/* ───────── Mobile first ─────────
+   Phones get the studio in the order you use it (the video, then the settings, then the slides),
+   the main actions in a bar at the bottom within thumb reach, 16px fields (so the page doesn't
+   zoom in when you tap one), finger-sized controls and text no smaller than 12px. */
+.phone-only,
+.director-note.phone-note {
+  display: none;
+}
+@media (max-width: 900px) {
+  /* The video first (with the director's note under it), then the settings, then the timeline, versions and slides. */
+  .studio-body {
+    display: flex;
+    flex-direction: column;
+  }
+  .studio-body > .main {
+    display: contents;
+  }
+  .studio-body > .main > * {
+    order: 4;
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+  .studio-body > .main > .stage-wrap {
+    order: 1;
+    margin: 12px 10px 4px;
+  }
+  .studio-body > .panel {
+    order: 3;
+    border-top: 1px solid var(--line);
+    margin-bottom: 18px;
+  }
+  /* The thumb bar: Generate, Remake and Export, fixed at the bottom, clear of the home bar. */
+  .phone-only {
+    display: inline-flex;
+  }
+  .panel-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    padding: 10px max(12px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+    background: rgba(8, 7, 16, 0.94);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line-2);
+  }
+  /* The three buttons share the bar's width (no wider than the phone). */
+  .panel-foot .gen-row > .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 15px;
+  }
+  .panel-foot .gen-row > .btn-primary,
+  .panel-foot .gen-row > .stop-btn {
+    flex-grow: 1.4;
+  }
+  .global-opts {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  /* (The AI line is in AI settings; the director's note stays, kept short with its own scroll.) */
+  .panel-foot > .hint {
+    display: none;
+  }
+  /* The director's note sits under the video on phones, not in the bar. */
+  .director-note.wide-only {
+    display: none;
+  }
+  .studio-body > .main > .director-note.phone-note {
+    display: flex;
+    order: 2;
+    margin-top: 6px;
+  }
+  .studio {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  /* Toasts sit above the thumb bar. */
+  .studio .toast {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+  /* 16px fields: smaller text makes phones zoom the page in on tap. */
+  .input,
+  .select,
+  .select.sm,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  /* Small print stays readable. */
+  .fld-cap,
+  .fld-cap em,
+  .field-label,
+  .hint,
+  .panel-foot .hint {
+    font-size: 12px;
+  }
+}
+
+/* Touch screens: controls a finger can hit (about 44px), whatever the screen size. */
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+  }
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .panel-tabs button,
+  .seg-control button,
+  .mode-tabs button,
+  .palette-row > *,
+  .view-size button {
+    min-height: 40px;
+  }
+  .timeline {
+    height: 36px;
+  }
+  .link-btn {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  summary {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .pw-toggle {
+    padding: 8px 12px;
+  }
+  .director-note-close {
+    width: 36px;
+    height: 36px;
+  }
+  /* Slide cards: move, copy and remove buttons; the strip's copy/remove; drag handles; pickers. */
+  .icon-btn.sm {
+    width: 40px;
+    height: 40px;
+  }
+  .slide-act {
+    width: 32px;
+    height: 32px;
+  }
+  .drag-handle {
+    min-width: 32px;
+    min-height: 40px;
+  }
+  .skill-field,
+  .select.sm,
+  .chip {
+    min-height: 40px;
+  }
+}
+
+/* Phones: skill cards on the home page swipe sideways in a row instead of a long cramped grid. */
+@media (max-width: 640px) {
+  .skill-grid.swipe {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    margin: 0 -16px;
+    padding: 4px 16px 12px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .skill-grid.swipe::-webkit-scrollbar {
+    display: none;
+  }
+  .skill-grid.swipe > * {
+    flex: 0 0 78%;
+    scroll-snap-align: start;
+  }
+}
+
+/* The smallest phones (320–360px): the header's logo, button and menu still fit on one line. */
+@media (max-width: 360px) {
+  .nav .logo {
+    font-size: 16px;
+    gap: 8px;
+  }
+  .nav .nav-cta {
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 13px;
+  }
+}
+/* Long links (licence pages list web addresses) break instead of widening the page. */
+.legal a,
+.legal code,
+.legal li {
+  overflow-wrap: anywhere;
 }
