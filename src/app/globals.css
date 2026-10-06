@@ -1074,10 +1074,209 @@ textarea {
 }
 .studio-body {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: auto 360px minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
+/* ── The intros sidebar: open (names) or folded to icons, sticky beside the settings. ── */
+.intro-rail {
+  position: sticky;
+  top: var(--bar-h, 65px);
+  height: calc(100vh - var(--bar-h, 65px));
+  width: 248px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 10px 12px;
+  border-right: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.01);
+  transition: width 0.18s ease;
+  min-height: 0;
+}
+.intro-rail.folded {
+  width: 64px;
+  align-items: center;
+}
+.rail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+.rail-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rail-toggle,
+.rail-new,
+.rail-item,
+.rail-all {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  font: inherit;
+}
+.rail-toggle {
+  width: 34px;
+  height: 34px;
+  justify-content: center;
+  color: var(--muted);
+}
+.rail-toggle:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+.rail-new {
+  width: 100%;
+  padding: 8px 10px;
+  border-color: var(--line);
+  font-weight: 600;
+  font-size: 14px;
+}
+.intro-rail.folded .rail-new {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  justify-content: center;
+}
+.rail-new:hover {
+  border-color: var(--cyan);
+}
+.rail-plus {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--cyan), #7c5cff);
+  color: #07040f;
+  font-weight: 800;
+  line-height: 1;
+}
+.rail-search {
+  width: 100%;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+.rail-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  scrollbar-width: thin;
+  align-content: start;
+  justify-items: center;
+}
+.intro-rail.open .rail-list {
+  justify-items: stretch;
+}
+.rail-item {
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+}
+.intro-rail.folded .rail-item {
+  width: 44px;
+  padding: 4px;
+  justify-content: center;
+}
+.rail-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.rail-item.current {
+  background: color-mix(in srgb, var(--cyan) 12%, transparent);
+  border-color: color-mix(in srgb, var(--cyan) 45%, transparent);
+}
+.rail-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.rail-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rail-text {
+  display: grid;
+  min-width: 0;
+}
+.rail-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-text small {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.rail-empty,
+.rail-note {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 8px;
+  margin: 0;
+  line-height: 1.45;
+}
+.rail-all {
+  padding: 8px 10px;
+  width: 100%;
+  font-size: 13.5px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding-top: 12px;
+}
+.intro-rail.folded .rail-all {
+  width: 42px;
+  justify-content: center;
+  padding: 12px 0 4px;
+}
+.rail-all:hover {
+  color: var(--text);
+}
+/* Folded: hovering an icon names it (fixed, so the scrolling list doesn't clip it). */
+.rail-tip {
+  position: fixed;
+  transform: translateY(-50%);
+  z-index: 80;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #15131f;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
 /* The settings panel fits the screen: tabs on top, its own scroll area, Generate pinned below. */
 .panel {
   border-right: 1px solid var(--line);
@@ -2005,6 +2204,10 @@ details.claim-note summary {
 @media (max-width: 900px) {
   .studio-body {
     grid-template-columns: 1fr;
+  }
+  /* No room on phones and small tablets: the sidebar is hidden. */
+  .intro-rail {
+    display: none;
   }
   .panel {
     border-right: 0;

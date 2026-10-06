@@ -12,6 +12,8 @@ import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/com
 import type { PlanLimits } from "@/lib/plans";
 import { pauseThumbs, sceneThumb, thumbsReady, restyleScene } from "@/lib/thumbs";
 import { redesignPlan } from "@/engine/redesign";
+import IntroSidebar, { type SidebarIntro } from "@/components/IntroSidebar";
+import { listLocalIntros, loadLocalIntro, newIntroId, saveLocalIntro, type LocalIntro } from "@/lib/localIntros";
 import SlideTimeline from "@/components/SlideTimeline";
 import Icon from "@/components/Icon";
 import { useReorder } from "@/components/useReorder";
@@ -53,6 +55,14 @@ import { PALETTE_IDS, POINTER_STYLES, SHAPE_SETS, TEXT_FX, TRANSITIONS, type Poi
 
 type Engine = "ai" | "builtin" | "manual" | "sample";
 const FILM_KEY = "intromaker.film";
+
+/** An intro's name for the sidebar: its brand, its title, else the start of its prompt. */
+function introTitle(plan: VideoPlan, prompt: string) {
+  const t = (plan.brand?.name || plan.title || "").replace(/\*/g, "").trim();
+  if (t && t !== "Your product") return t;
+  const p = prompt.trim().split(/[,.\n]/)[0].trim();
+  return p ? (p.length > 40 ? `${p.slice(0, 38)}…` : p) : "Untitled intro";
+}
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string; angle?: Angle };
 
 const PRODUCT_VOICE_OFF = "intromaker.product-voice-off";
@@ -77,6 +87,12 @@ export default function Studio() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const savedIdRef = useRef(savedId);
   savedIdRef.current = savedId;
+  // This browser's copy of the intro on screen (listed in the sidebar), from its first Generate.
+  const [localId, setLocalId] = useState<string | null>(null);
+  const localIdRef = useRef(localId);
+  localIdRef.current = localId;
+  const [localIntros, setLocalIntros] = useState<LocalIntro[]>([]);
+  useEffect(() => setLocalIntros(listLocalIntros()), []);
   /** Edit history for the film on screen (slides, text, look): undo / redo, Ctrl+Z / Ctrl+Shift+Z. */
   const past = useRef<VideoPlan[]>([]);
   const future = useRef<VideoPlan[]>([]);
@@ -747,12 +763,16 @@ export default function Studio() {
     setLoading(true);
     setNote(null);
     // The film on screen and its versions, so making a new one can be undone.
-    const before = { plan: planRef.current, takes, current, engine, engineLabel, prompt: promptRef.current };
+    const before = { plan: planRef.current, takes, current, engine, engineLabel, prompt: promptRef.current, localId: localIdRef.current, savedId: savedIdRef.current };
     try {
       const take = await direct({ ...opts, signal });
       if (!stillRunning(run)) return;
       show(take, 0);
       setSavedId(null);
+      // A new intro: its own entry in the sidebar.
+      const id = newIntroId();
+      localIdRef.current = id;
+      setLocalId(id);
       promptRef.current = (opts.prompt ?? prompt).trim();
       setTakes([{ ...take, label: "Original" }]);
       if (before.plan !== HERO_PLAN && booted.current && !bootingRef.current)
@@ -761,6 +781,9 @@ export default function Studio() {
           key: Date.now(),
           undo: () => {
             setPlan(before.plan);
+            setLocalId(before.localId);
+            localIdRef.current = before.localId;
+            setSavedId(before.savedId);
             setPrompt(before.prompt);
             setTakes(before.takes);
             setCurrent(before.current);
@@ -1029,6 +1052,93 @@ export default function Studio() {
     });
   };
 
+  // ── The sidebar: intros saved to the account and the ones made in this browser, newest first.
+  const [accountFilms, setAccountFilms] = useState<{ id: string; title: string; updatedAt: number; thumb?: string }[]>([]);
+  const loadAccountFilms = useCallback(() => {
+    fetch("/api/account/films")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && Array.isArray(d.films) && setAccountFilms(d.films))
+      .catch(() => {});
+  }, []);
+  const sidebarIntros = useMemo<SidebarIntro[]>(() => {
+    const saved = new Set(accountFilms.map((f) => f.id));
+    const out: SidebarIntro[] = accountFilms.map((f) => ({ key: `a:${f.id}`, title: f.title || "Untitled intro", updatedAt: f.updatedAt, color: "#7c5cff", thumb: f.thumb }));
+    for (const l of localIntros) if (!(l.savedId && saved.has(l.savedId))) out.push({ key: `l:${l.id}`, title: l.title, updatedAt: l.updatedAt, color: l.color });
+    return out.sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [accountFilms, localIntros]);
+  const currentIntro = savedId && accountFilms.some((f) => f.id === savedId) ? `a:${savedId}` : localId ? `l:${localId}` : null;
+  const busy = loading || importing || remaking || takesLoading;
+  /** Open an intro from the sidebar (an account copy, or this browser's). */
+  const openIntro = (x: SidebarIntro) => {
+    if (busy || x.key === currentIntro) return;
+    const id = x.key.slice(2);
+    setSelected(null);
+    setNote(null);
+    setSite(null);
+    if (x.key.startsWith("a:")) {
+      fetch(`/api/account/films/${encodeURIComponent(id)}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((f: { id: string; plan: VideoPlan }) => {
+          const p = sanitizePlan(f.plan);
+          setPlan(p);
+          setAspect(p.aspect);
+          if (p.template) setTemplate(p.template);
+          setTakes([]);
+          setCurrent(0);
+          setSavedId(f.id);
+          const local = localIntros.find((l) => l.savedId === f.id);
+          localIdRef.current = local?.id ?? null;
+          setLocalId(local?.id ?? null);
+          setEngine("manual");
+          setVersion((v) => v + 1);
+        })
+        .catch(() => setToast({ text: "That intro couldn't be opened.", key: Date.now() }));
+      return;
+    }
+    const saved = loadLocalIntro<{ plan: VideoPlan; prompt?: string; savedId?: string | null }>(id);
+    if (!saved?.plan?.scenes?.length) {
+      setToast({ text: "That intro is no longer in this browser.", key: Date.now() });
+      return;
+    }
+    const p = sanitizePlan(saved.plan);
+    setPlan(p);
+    setAspect(p.aspect);
+    if (p.template) setTemplate(p.template);
+    setPrompt(saved.prompt ?? "");
+    promptRef.current = saved.prompt ?? "";
+    setSavedId(saved.savedId ?? null);
+    setTakes([]);
+    setCurrent(0);
+    localIdRef.current = id;
+    setLocalId(id);
+    setEngine("manual");
+    setVersion((v) => v + 1);
+  };
+  /** + New intro: an empty studio, the description box ready. */
+  const newIntro = () => {
+    if (busy) return;
+    setSite(null);
+    setBrandColors(undefined);
+    setImportError(null);
+    setPrompt("");
+    promptRef.current = "";
+    setPlan(HERO_PLAN);
+    setTakes([]);
+    setCurrent(0);
+    setSavedId(null);
+    localIdRef.current = null;
+    setLocalId(null);
+    setSelected(null);
+    setNote(null);
+    setVersion((v) => v + 1);
+    try {
+      localStorage.removeItem(FILM_KEY);
+    } catch {
+      /* ignore */
+    }
+    requestAnimationFrame(() => document.getElementById("studio-prompt")?.focus());
+  };
+
   const clearSite = () => {
     setSite(null);
     setBrandColors(undefined);
@@ -1041,7 +1151,15 @@ export default function Studio() {
   useEffect(() => {
     if (!saving.current || plan === HERO_PLAN) return;
     const timer = window.setTimeout(() => {
-      const film = { v: 1, plan, prompt, current, savedId: savedIdRef.current, takes: takes.map(({ plan: tp, engine: te, engineLabel: tl, label }) => ({ plan: tp, engine: te, engineLabel: tl, label })) };
+      const film = { v: 1, plan, prompt, current, savedId: savedIdRef.current, localId: localIdRef.current, takes: takes.map(({ plan: tp, engine: te, engineLabel: tl, label }) => ({ plan: tp, engine: te, engineLabel: tl, label })) };
+      // The sidebar's copy of this intro.
+      if (localIdRef.current)
+        setLocalIntros(
+          saveLocalIntro(
+            { id: localIdRef.current, title: introTitle(plan, prompt), updatedAt: Date.now(), color: plan.brand?.colors?.primary ?? "#7c5cff", aspect: plan.aspect, savedId: savedIdRef.current ?? undefined },
+            { ...film, takes: [], current: 0 },
+          ),
+        );
       try {
         localStorage.setItem(FILM_KEY, JSON.stringify(film));
       } catch {
@@ -1105,6 +1223,9 @@ export default function Studio() {
           setPrompt(saved.prompt ?? "");
           promptRef.current = saved.prompt ?? "";
           if (typeof saved.savedId === "string") setSavedId(saved.savedId);
+          const lid = typeof saved.localId === "string" ? saved.localId : newIntroId();
+          localIdRef.current = lid;
+          setLocalId(lid);
           const savedTakes = Array.isArray(saved.takes) ? (saved.takes as Take[]).map((t) => ({ ...t, plan: sanitizePlan(t.plan) })) : [];
           setTakes(savedTakes);
           setCurrent(Math.min(Math.max(0, saved.current ?? 0), Math.max(0, savedTakes.length - 1)));
@@ -1555,9 +1676,12 @@ export default function Studio() {
   useEffect(() => {
     fetch("/api/account")
       .then((r) => r.json())
-      .then((a) => setAccount({ user: a.user, limits: a.limits }))
+      .then((a) => {
+        setAccount({ user: a.user, limits: a.limits });
+        if (a.user) loadAccountFilms();
+      })
       .catch(() => setAccount(null));
-  }, []);
+  }, [loadAccountFilms]);
   const [saveState, setSavingState] = useState<"" | "saving" | "saved">("");
   const saveFilm = async () => {
     if (!account?.user) {
@@ -1586,6 +1710,7 @@ export default function Studio() {
         return;
       }
       setSavedId(data.id);
+      loadAccountFilms();
       setSavingState("saved");
       setTimeout(() => setSavingState(""), 2000);
     } catch {
@@ -1653,6 +1778,14 @@ export default function Studio() {
 
       {aiOpen && <AiSettings value={ai} onChange={setAi} onClose={() => setAiOpen(false)} serverClaude={!!aiAvailable} localViaServer={localViaServer} />}
       <div className="studio-body">
+        <IntroSidebar
+          intros={sidebarIntros}
+          current={currentIntro}
+          onOpen={openIntro}
+          onNew={newIntro}
+          allHref="/account"
+          note={account?.user ? undefined : "Kept in this browser. Sign in to save them to your account."}
+        />
         <aside className="panel">
           <nav className="panel-tabs" role="tablist" aria-label="Settings">
             {(
