@@ -14,7 +14,8 @@
  * - service-bento:     a bento grid where the current service's tile grows into the big tile while
  *                      the others shrink and rearrange round it.
  * - service-spotlight: a dark stage with the services on plinths; a spotlight swings to each in
- *                      turn, and the lit one rises and glows under its name.
+ *                      turn, the lit one rises and glows, and its name is told large in capitals
+ *                      under the stage.
  *
  * Every frame is a pure function of time, so preview, seek and export match.
  */
@@ -682,10 +683,12 @@ function serviceSpotlight(sc: SkillContext) {
   veil.addColorStop(1, rgba("#000000", palette.light ? 0.14 : 0.45));
   ctx.fillStyle = veil;
   ctx.fillRect(0, st.top - 20 * u, w, h);
-  const shelfY = st.top + room * (narrow ? 0.62 : 0.72);
+  // The stage sits in the upper part, so the lit service's name can be told large under it.
+  const shelfY = st.top + room * (narrow ? 0.44 : 0.5);
   const cols = n;
   const gapW = st.width / cols;
-  const tile = Math.min(gapW * 0.6, room * (narrow ? 0.14 : 0.2), 150 * u * S);
+  const tile = Math.min(gapW * 0.6, room * (narrow ? 0.13 : 0.18), 150 * u * S);
+  const nameSize = Math.min(22 * u * S, gapW * 0.12);
   const xs = P.map((_, i) => st.left + gapW * (i + 0.5));
   // The spotlight swings from service to service with a little overshoot, like a hand-pulled light.
   let pos = 0;
@@ -775,16 +778,17 @@ function serviceSpotlight(sc: SkillContext) {
     ctx.save();
     ctx.globalAlpha *= clamp(k) * (0.45 + 0.55 * lit);
     ctx.fillStyle = palette.text;
-    ctx.font = subFont(Math.min(22 * u * S, gapW * 0.12), 700);
+    ctx.font = subFont(nameSize, 700);
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     fillTextFit(ctx, p.title, x, shelfY + 30 * u, gapW * 0.92, { maxLines: 2, lineHeight: 1.1, minScale: 0.6 });
     ctx.restore();
   });
-  // The lit service's name, large, in the light above.
+  // The lit service's name, large and in capitals, under the stage.
   if (cur >= 0) {
-    const big = (narrow ? 58 : 68) * u * S;
-    tellService(sc, P, T, { x: narrow ? w / 2 : clamp(tx, st.left + st.width * 0.25, st.left + st.width * 0.75), y: st.top + room * (narrow ? 0.12 : 0.08), w: st.width * (narrow ? 1 : 0.5), size: big, align: "center" });
+    const big = (narrow ? 60 : 76) * u * S;
+    const caps = P.map((p) => ({ ...p, title: p.title.toUpperCase() }));
+    tellService(sc, caps, T, { x: w / 2, y: shelfY + 30 * u + nameSize * 2.2 + 44 * u * S, w: st.width * (narrow ? 1 : 0.86), size: big, align: "center" });
   }
   ctx.restore();
 }
@@ -850,7 +854,7 @@ export const creativeServiceSkills: Skill[] = [
   {
     id: "service-spotlight",
     name: "Service Spotlight",
-    tagline: "A dark stage with the services on plinths; a spotlight swings to each in turn, and the lit one rises and glows under its name.",
+    tagline: "A dark stage with the services on plinths; a spotlight swings to each in turn, the lit one rises and glows, and its name is told large in capitals under the stage.",
     bestFor: "A theatrical reveal of services: 2–5 ('Service — short description'). Agencies, studios, events, premium brands.",
     sample: { text: "In the *spotlight*", items: SERVICES.slice(0, 4) },
     itemsHint: "2–5 services: 'Service — short description'",
