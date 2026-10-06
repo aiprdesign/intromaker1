@@ -32,10 +32,10 @@ const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 type Pt = { x: number; y: number };
 
 /** Which step is current at time t (the last one whose turn has come), or -1 before the first. */
-const currentOf = (T: number[], t: number, lead = 0) => T.reduce((c, ti, i) => (t >= ti - lead ? i : c), -1);
+export const currentOf = (T: number[], t: number, lead = 0) => T.reduce((c, ti, i) => (t >= ti - lead ? i : c), -1);
 
 /** A small spaced label ("STEP 02") above the large name. */
-function smallLabel(sc: SkillContext, text: string, x: number, y: number, align: CanvasTextAlign, alpha = 1) {
+export function smallLabel(sc: SkillContext, text: string, x: number, y: number, align: CanvasTextAlign, alpha = 1) {
   const { ctx, u, palette } = sc;
   ctx.save();
   ctx.globalAlpha *= alpha;
@@ -49,7 +49,7 @@ function smallLabel(sc: SkillContext, text: string, x: number, y: number, align:
 }
 
 /** Services take turns in equal slots after a short build. */
-function serviceTimes(scene: Scene, n: number, start = 0.6) {
+export function serviceTimes(scene: Scene, n: number, start = 0.6) {
   const slot = clamp((scene.duration - start - 0.9) / Math.max(1, n), 0.8, 2);
   return Array.from({ length: n }, (_, i) => start + i * slot);
 }

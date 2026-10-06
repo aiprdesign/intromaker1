@@ -1613,11 +1613,15 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     });
   } else if (featureKind === "services") {
     // A big icon for the current service beside the list ("Service — what it is" where the site
-    // says); remakes stage the services as an orbit, a carousel or a honeycomb.
+    // says); remakes stage the services ten ways (orbit, cube, carousel, bloom, honeycomb, card fan,
+    // bento, split-flap board, spotlight).
     const offer = (withBenefit.length >= 2 ? withBenefit : featureItems).slice(0, 5);
-    const serviceSkill = (["services", "service-orbit", "service-carousel", "service-hex"] as const)[Math.floor(variant / 2) % 4];
+    const kinds = ["services", "service-orbit", "service-cube", "service-carousel", "service-bloom", "service-hex", "service-fan", "service-bento", "service-board", "service-spotlight"] as const;
+    const serviceSkill = kinds[Math.floor(variant / 2) % kinds.length];
+    // (An orbit, a flower and a bento want three services or more; a spotlight's stage fits five.)
+    const fits = !((serviceSkill === "service-orbit" || serviceSkill === "service-bloom" || serviceSkill === "service-bento") && offer.length < 3) && !(serviceSkill === "service-spotlight" && offer.length > 5);
     add(valuePriority, {
-      role: "features", skill: offer.length < 3 && serviceSkill === "service-orbit" ? "services" : serviceSkill,
+      role: "features", skill: fits ? serviceSkill : "services",
       text: serviceBiz ? "What we *do*" : `Inside *${site.name}*`,
       items: offer,
       eyebrow: serviceBiz ? "Services" : "Features",
