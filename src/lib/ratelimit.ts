@@ -43,6 +43,8 @@ export const RULES = {
   adminLogin: { limit: 6, windowMs: 15 * MIN },
   /** Film events the studio reports (exports). */
   filmEvent: { limit: 60, windowMs: 10 * MIN },
+  /** Site PIN attempts (Admin → Site PIN): a short PIN can't be guessed by trying them all. */
+  unlock: { limit: 8, windowMs: 15 * MIN },
   /** Account sign-in attempts. */
   accountLogin: { limit: 10, windowMs: 15 * MIN },
   /** New accounts from one address. */

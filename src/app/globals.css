@@ -5079,3 +5079,79 @@ code.secret {
 .legal li {
   overflow-wrap: anywhere;
 }
+
+/* ───────── Site PIN page ───────── */
+.unlock {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+.unlock-card {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 28px 24px;
+  border-radius: 20px;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  box-shadow: 0 40px 100px -40px rgba(124, 77, 255, 0.55);
+}
+.unlock-card h1 {
+  font-size: 26px;
+  margin-top: 8px;
+}
+.unlock-card > p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.unlock-form {
+  display: grid;
+  gap: 12px;
+}
+.unlock-pin {
+  font-size: 22px;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+/* Admin → Site PIN */
+.access-tab .admin-card {
+  display: grid;
+  gap: 14px;
+  max-width: 620px;
+}
+.access-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.access-head h2 {
+  font-size: 20px;
+}
+.access-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.input.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.access-tab .env-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 201, 60, 0.35);
+  background: rgba(255, 201, 60, 0.08);
+  color: #f6e7bd;
+  font-size: 13px;
+  line-height: 1.5;
+}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/Nav";
+import AccessTab from "./AccessTab";
 import AiTab from "./AiTab";
 import BillingTab from "./BillingTab";
 import FilmsTab, { type AccountRef } from "./FilmsTab";
@@ -17,6 +18,7 @@ const TABS = [
   { id: "plans", label: "Plans" },
   { id: "billing", label: "Billing" },
   { id: "ai", label: "AI" },
+  { id: "access", label: "Site PIN" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 const isTab = (v: string): v is Tab => TABS.some((t) => t.id === v);
@@ -276,6 +278,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           />
         )}
         {tab === "ai" && <AiTab />}
+        {tab === "access" && <AccessTab />}
       </div>
     </main>
   );

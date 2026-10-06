@@ -19,6 +19,8 @@ export interface EnvVar {
 
 export const ENV_VARS: EnvVar[] = [
   { name: "ADMIN_PASSWORD", group: "Admin and payments", purpose: "Turns on this admin area and the video log; the password to sign in here.", example: "a long, unique password", secret: true, needed: true },
+  { name: "INTROMAKER_SITE_PIN", group: "Admin and payments", purpose: "Makes the whole site private: visitors enter this PIN before they see it (Admin stays open). Remove it to open the site again; it wins over Admin → Site PIN.", example: "2020", secret: true },
+  { name: "INTROMAKER_SITE_PIN_ALLOW", group: "Admin and payments", purpose: "IP addresses that skip the site PIN (comma-separated), on top of the ones listed in Admin → Site PIN.", example: "203.0.113.7, 198.51.100.4", secret: false },
   {
     name: "STRIPE_WEBHOOK_SECRET",
     group: "Admin and payments",
