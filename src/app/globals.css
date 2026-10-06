@@ -1155,6 +1155,56 @@ textarea {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+/* Remake: a small menu above the button (design or story). */
+.remake-wrap {
+  position: relative;
+  display: flex;
+}
+.remake-wrap > .btn {
+  flex: 1;
+}
+.remake-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.remake-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 41;
+  display: grid;
+  gap: 4px;
+  width: min(290px, calc(100vw - 32px));
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-2);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+.remake-menu button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.remake-menu button:hover,
+.remake-menu button:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--line);
+}
+.remake-menu strong {
+  font-size: 14px;
+}
+.remake-menu span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
 .field-stack {
   display: grid;
   gap: 2px;
@@ -5003,6 +5053,24 @@ code.secret {
   .panel-foot .gen-row > .btn-primary,
   .panel-foot .gen-row > .stop-btn {
     flex-grow: 1.4;
+  }
+  .panel-foot .gen-row > .remake-wrap {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .panel-foot .remake-wrap > .btn {
+    min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 15px;
+  }
+  /* The remake menu spans the screen just above the thumb bar. */
+  .remake-menu {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    width: auto;
   }
   .global-opts {
     flex-wrap: wrap;

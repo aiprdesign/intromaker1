@@ -11,6 +11,7 @@ import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
 import type { PlanLimits } from "@/lib/plans";
 import { pauseThumbs, sceneThumb, thumbsReady, restyleScene } from "@/lib/thumbs";
+import { redesignPlan } from "@/engine/redesign";
 import SlideTimeline from "@/components/SlideTimeline";
 import Icon from "@/components/Icon";
 import { useReorder } from "@/components/useReorder";
@@ -52,7 +53,7 @@ import { PALETTE_IDS, POINTER_STYLES, SHAPE_SETS, TEXT_FX, TRANSITIONS, type Poi
 
 type Engine = "ai" | "builtin" | "manual" | "sample";
 const FILM_KEY = "intromaker.film";
-type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string };
+type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string; angle?: Angle };
 
 const PRODUCT_VOICE_OFF = "intromaker.product-voice-off";
 
@@ -786,19 +787,80 @@ export default function Studio() {
    * Original returns to the first.
    */
   const [remaking, setRemaking] = useState(false);
+  const [remakeMenu, setRemakeMenu] = useState(false);
+  /** Adds a version after the ones there are, and shows it. */
+  const addTake = (take: Take) => {
+    const base = takes.length ? takes : [{ plan, engine, engineLabel, label: "Original", angle: storyRef.current !== "auto" ? storyRef.current : undefined }];
+    const next = [...base, take];
+    setTakes(next);
+    show(take, next.length - 1);
+  };
+
+  /**
+   * Remake design: the same story (slides, words, pictures, timing and your edits) with each slide
+   * in another design of its family. Instant, made in the browser.
+   */
+  const remakeDesign = () => {
+    setRemakeMenu(false);
+    const n = takes.filter((t) => t.label.startsWith("Design")).length + 1;
+    const { plan: next, changed } = redesignPlan(planRef.current, n, restyleScene);
+    if (!changed) {
+      setToast({ text: "These slides have no other designs that fit their content.", key: Date.now() });
+      return;
+    }
+    addTake({ plan: next, engine: "manual", engineLabel: "", label: `Design ${n}`, angle: takes[current]?.angle });
+    setToast({ text: `New designs for ${changed} slide${changed === 1 ? "" : "s"}, same story.`, key: Date.now() });
+  };
+
+  /**
+   * The story angles a new telling can take, in turn after the one on screen, keeping only those the
+   * material supports (problem-led needs problems to open on, proof-first needs real proof) and
+   * that actually tell it differently. Judged with the built-in director, which runs in the browser.
+   */
+  const nextStory = (): Angle | undefined => {
+    const source = promptRef.current.trim() || prompt.trim();
+    const local = (angle: Angle) => {
+      const common = { aspect: plan.aspect, length, palette: "auto" as const, seed: plan.seed, style: styleRef.current, template: templateRef.current, safe: true, angle };
+      try {
+        return site ? planFromSite(site, { ...common, colors: plan.brand?.colors, direction: source }) : source ? planFromPrompt({ prompt: source, ...common }) : null;
+      } catch {
+        return null;
+      }
+    };
+    const shape = (p: VideoPlan) => p.scenes.map((s) => s.role ?? "").join(">");
+    const now = shape(planRef.current);
+    const order: Angle[] = site?.kind === "product" ? ["product", "proof", "story"] : ["problem", "bab", "product", "proof", "story"];
+    const last = takes[current]?.angle ?? (storyRef.current !== "auto" ? storyRef.current : "story");
+    const from = Math.max(0, order.indexOf(last));
+    for (let k = 1; k <= order.length; k++) {
+      const angle = order[(from + k) % order.length];
+      const p = local(angle);
+      if (!p) continue;
+      const roles = new Set(p.scenes.map((s) => s.role));
+      if ((angle === "problem" || angle === "bab") && !roles.has("pain")) continue;
+      if (angle === "proof" && !["quote", "logos", "metric", "cards"].some((r) => roles.has(r))) continue;
+      if (shape(p) === now) continue;
+      return angle;
+    }
+    return undefined;
+  };
+
+  /** Remake story: a new telling of the same material (another story angle, where it makes sense). */
   const remake = async () => {
+    setRemakeMenu(false);
     const { run, signal } = startRun();
     setRemaking(true);
     setNote(null);
     try {
-      const n = takes.filter((t) => t.label.startsWith("Remake")).length + 1;
-      const take = await direct({ seed: Math.floor(Math.random() * 1e9), variant: n, signal });
+      const n = takes.filter((t) => t.label.startsWith("Story") || t.label.startsWith("Remake")).length + 1;
+      // Trailers have no story angles: a remake draws other slides for the same beats.
+      const angle = plan.style === "trailer" ? undefined : nextStory();
+      const take = await direct({ seed: Math.floor(Math.random() * 1e9), variant: n, angle, signal });
       if (!stillRunning(run)) return;
-      const base = takes.length ? takes : [{ plan, engine, engineLabel, label: "Original" }];
-      const next = [...base, { ...take, label: `Remake ${n}` }];
-      setTakes(next);
-      show(take, next.length - 1);
+      const name = ANGLES.find((a) => a.id === angle)?.name;
+      addTake({ ...take, label: name ? `Story ${n} · ${name}` : `Remake ${n}`, angle });
       if (take.note) setNote(take.note);
+      else if (plan.style !== "trailer" && !angle) setNote("This material supports one story, so the remake tells it with other slides. Add problems, steps or proof (or import the website) for other ways to tell it.");
     } catch (e) {
       if (!stopped(e)) throw e;
     } finally {
@@ -2055,9 +2117,33 @@ export default function Studio() {
                 <span className="spinner sm" /> Remaking… <span className="stop-label">■ Stop</span>
               </button>
             ) : (
-              <button className="btn btn-ghost btn-lg" onClick={remake} disabled={loading || importing || takesLoading} title="A new version with different slides for its sections. Undo or Original brings back earlier versions.">
-                Remake ↻
-              </button>
+              <div className="remake-wrap">
+                <button
+                  className="btn btn-ghost btn-lg"
+                  onClick={() => setRemakeMenu((o) => !o)}
+                  disabled={loading || importing || takesLoading}
+                  aria-haspopup="menu"
+                  aria-expanded={remakeMenu}
+                  title="A new version: new designs for the same story, or a new story. Undo or Original brings back earlier versions."
+                >
+                  Remake ↻
+                </button>
+                {remakeMenu && (
+                  <>
+                    <div className="remake-scrim" onClick={() => setRemakeMenu(false)} aria-hidden />
+                    <div className="remake-menu" role="menu" onKeyDown={(e) => e.key === "Escape" && setRemakeMenu(false)}>
+                      <button role="menuitem" autoFocus onClick={remakeDesign}>
+                        <strong>Remake design</strong>
+                        <span>Same story and words, new slide designs</span>
+                      </button>
+                      <button role="menuitem" onClick={() => void remake()}>
+                        <strong>Remake story</strong>
+                        <span>{plan.style === "trailer" ? "Other slides for the same beats" : "A new way to tell it, where the material allows"}</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
             {/* Phones: the export is in the thumb bar too (the player's own button is further up). */}
             <button className="btn btn-ghost btn-lg phone-only" onClick={() => window.dispatchEvent(new Event("studio:export"))} disabled={loading || importing}>
