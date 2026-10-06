@@ -845,6 +845,31 @@ export default function Studio() {
     return undefined;
   };
 
+  /** The Story picker: retells the video on screen in the story chosen (Auto: the director's pick). */
+  const applyStory = async (choice: "auto" | Angle) => {
+    setStory(choice);
+    storyRef.current = choice;
+    // Before there's a video of your own (or while one is being made) it applies to the next Generate.
+    // (Retold from what the video on screen was made from, not from an edit typed since.)
+    const source = promptRef.current.trim();
+    if (!(site || source) || loading || importing || remaking || takesLoading) return;
+    const { run, signal } = startRun();
+    setRemaking(true);
+    setNote(null);
+    try {
+      const angle = choice === "auto" ? undefined : choice;
+      const take = await direct({ seed: plan.seed, angle, signal, ...(site ? {} : { prompt: source }) });
+      if (!stillRunning(run)) return;
+      const name = angle ? ANGLES.find((a) => a.id === angle)?.name : "Auto";
+      addTake({ ...take, label: `Story · ${name}`, angle });
+      if (take.note) setNote(take.note);
+    } catch (e) {
+      if (!stopped(e)) throw e;
+    } finally {
+      if (stillRunning(run)) setRemaking(false);
+    }
+  };
+
   /** Remake story: a new telling of the same material (another story angle, where it makes sense). */
   const remake = async () => {
     setRemakeMenu(false);
@@ -1888,7 +1913,7 @@ export default function Studio() {
                 id="story-pick"
                 className="select"
                 value={story}
-                onChange={(e) => setStory(e.target.value as "auto" | Angle)}
+                onChange={(e) => void applyStory(e.target.value as "auto" | Angle)}
                 title="How the video tells it. Problem → solution opens on the problems (the site's own, or ones written from its services or features), then shows how each is solved."
               >
                 <option value="auto">Auto (director&apos;s pick)</option>

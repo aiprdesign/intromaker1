@@ -596,7 +596,7 @@ export function isSaasPrompt(prompt: string) {
   // Any recognisable product category (an AI assistant, a CRM, a payments tool…) is a SaaS film too.
   // (Plurals count: "deploy your apps" is a product. Saying "SaaS" or "product launch" outright
   // wins over trailer words, so "an epic SaaS launch" is an epic SaaS film, not a movie trailer.)
-  const product = /\b(saas|apps?|platforms?|software|startups?|products?|dashboards?|b2b|apis?|crm|tools?|workspaces?|launch video|explainer|demo|systems?|teams|assistants?|automations?|analytics)\b/.test(l) ||
+  const product = /\b(saas|apps?|platforms?|software|startups?|products?|dashboards?|b2b|apis?|crm|tools?|workspaces?|launch video|explainer|demo|systems?|teams|assistants?|automations?|analytics|management|tracking|trackers?|planners?|scheduling|bookkeeping|invoicing|roadmaps?|sprints?|kanban|workflows?)\b/.test(l) ||
     Math.max(...CONCEPTS.map((c) => (l.match(c.keywords) ?? []).length)) >= 2;
   const outright = /\b(saas|product launch|launch video|explainer|b2b)\b/.test(l);
   if (FILM_CUE.test(l) && !outright) return false;
@@ -866,7 +866,8 @@ function noteShort(plan: VideoPlan, target: number, fromSite: boolean): VideoPla
 }
 
 function planFromPromptRaw(req: PlanRequest): VideoPlan {
-  if (req.style === "saas" || (req.style !== "trailer" && isSaasPrompt(req.prompt))) return planFromPromptSaas(req);
+  // (A story angle asked for is a product story: problem → solution, before → after… aren't trailer cuts.)
+  if (req.style === "saas" || (req.style !== "trailer" && (isSaasPrompt(req.prompt) || !!req.angle))) return planFromPromptSaas(req);
   const prompt = req.prompt.trim() || "Epic intro";
   const lower = prompt.toLowerCase();
   // (A remake is another draw: its number moves the seed, so a trailer remake picks other slides.)
@@ -1225,7 +1226,7 @@ export const ANGLES: { id: Angle; name: string; brief: string }[] = [
   { id: "proof", name: "Proof-first", brief: "Lead with social proof (customers, real numbers, a real quote), then show why." },
 ];
 /** Proof-first with no proof: open on the positioning line, then the product doing its job. */
-const VALUE_ORDER = ["hook", "reveal", "demo", "features", "bento", "meet", "tour", "how", "cards", "integrations", "cta"];
+const VALUE_ORDER = ["hook", "features", "bento", "reveal", "demo", "meet", "tour", "how", "cards", "integrations", "cta"];
 const ANGLE_ORDER: Record<Angle, string[]> = {
   story: ["pain", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
   problem: ["pain", "agitate", "hook", "reveal", "meet", "how", "tour", "features", "bento", "quote", "logos", "cards", "integrations", "cta"],
@@ -1549,9 +1550,6 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Problem → solution: the site's own pains, else the problems its services or features take on,
   // written from them ("Stuck on SEO"), so the film opens on the problem whatever the site says.
   const problemLed = angle === "problem" || angle === "bab";
-  const featurePains = problemLed && sitePains.length < 2 ? problemsFrom(shortFeatures) : [];
-  const serviceWord = SERVICE_BIZ.test([site.tagline, site.description, ...site.headlines.slice(0, 8)].join(" \n ")) ? "services" : "features";
-  const pains = featurePains.length >= 2 ? featurePains.map((p) => p.pain) : sitePains;
   // What kind of product this is decides the arc, chapter labels, CTA voice and icons.
   // (From the site as captured: screening a claim out mustn't change what kind of product it is.)
   const whole = ORIGINAL.get(site) ?? site;
@@ -1559,6 +1557,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     `${whole.name} ${whole.tagline} ${whole.description}`,
     [...whole.headlines, ...whole.features, ...(whole.steps ?? []), ...(whole.pains ?? [])].join(" "),
   );
+  // (Written from its own features first; where those are whole phrases, from what a product of
+  // its kind typically does, which the director's note asks to check.)
+  const ownProblems = problemLed && sitePains.length < 2 ? problemsFrom(shortFeatures) : [];
+  const featurePains = !problemLed || sitePains.length >= 2 ? [] : ownProblems.length >= 2 ? ownProblems : problemsFrom([...shortFeatures, ...(concept.starter ?? [])]);
+  const serviceWord = SERVICE_BIZ.test([site.tagline, site.description, ...site.headlines.slice(0, 8)].join(" \n ")) ? "services" : "features";
+  const pains = featurePains.length >= 2 ? featurePains.map((p) => p.pain) : sitePains;
   const teamStat = site.stats.find((st) => /\d/.test(st) && /team|customer|compan|user|business|developer/i.test(st));
   // Product imagery available to the gallery skills: the site's images and captured UI components.
   const visuals = brand.images.length + (shots.parts ?? []).filter((p) => p.kind !== "button" && p.w * p.h > 120 * 90).length;
@@ -2217,7 +2221,9 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   if (angle === "product") {
     const r = scenes.findIndex((sc) => sc.role === "reveal");
     const first = scenes.findIndex((sc) => sc.role === "meet" || sc.role === "tour");
-    if (r > 0 && first > r) scenes.splice(r, 0, scenes.splice(first, 1)[0]);
+    // (Without a screen to show, the product moment opens cold instead.)
+    const cold = first >= 0 ? first : scenes.findIndex((sc) => sc.role === "demo");
+    if (r > 0 && cold > r) scenes.splice(r, 0, { ...scenes.splice(cold, 1)[0], why: "Product-first: the product at work before the logo (a cold open)" });
   }
   // Transitions follow the new order: the opener cuts in.
   if (scenes[0]) scenes[0] = { ...scenes[0], transition: "cut" };
@@ -2252,6 +2258,11 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
   const total = styled.scenes.reduce((a, sc) => a + sc.duration, 0);
+  if (valueFirst && req.angle === "proof")
+    styled.notes = [
+      ...(styled.notes ?? []),
+      "Proof-first needs real proof to lead with (a testimonial, customer logos or a real number), and this has none, so it leads with the benefits instead.",
+    ];
   if (problemLed && !painHook)
     styled.notes = [
       ...(styled.notes ?? []),
