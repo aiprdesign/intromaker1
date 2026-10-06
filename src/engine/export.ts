@@ -201,7 +201,8 @@ export function exportFormat(aspect: VideoPlan["aspect"], long = 1920) {
   const px = (n: number) => Math.round(n * k);
   const tag = long === 1920 ? "" : ` (${sizeLabel(long)})`;
   if (aspect === "9:16") return { name: `9:16 · ${px(1080)}×${px(1920)}${tag}`, long: px(1920), fps: 30 };
-  if (aspect === "1:1") return { name: `1:1 · ${px(1080)}×${px(1080)}${tag}`, long: px(1080), fps: 30 };
+  // aspectSize gives a square 9/16 of the long side: 1920 → 1080×1080.
+  if (aspect === "1:1") return { name: `1:1 · ${px(1080)}×${px(1080)}${tag}`, long: px(1920), fps: 30 };
   return { name: `16:9 · ${px(1920)}×${px(1080)}${tag}`, long: px(1920), fps: 60 };
 }
 
