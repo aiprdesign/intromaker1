@@ -977,7 +977,7 @@ export const TEMPLATES: Template[] = [
 export const TEMPLATE_MAP = Object.fromEntries(TEMPLATES.map((t) => [t.id, t])) as Record<string, Template>;
 export const DEFAULT_TEMPLATE = "midnight";
 
-const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
+export const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "blur-reveal": "hook",
   "pain-strike": "pain",
   "logo-reveal": "reveal",

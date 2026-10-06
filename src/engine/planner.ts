@@ -199,6 +199,44 @@ const FAMILIES = [
   ["deploy", "release", "ship", "build", "preview", "rollback"],
 ];
 /**
+ * Designs that take the same content, per story beat. A remake rotates each beat through its
+ * designs (offset per beat, so beats don't move in step), so consecutive remakes show the same
+ * material in other slides. The first take keeps the director's best fit.
+ */
+const REMIX: Record<string, readonly SkillId[]> = {
+  hook: ["blur-reveal", "type-cascade", "split-wipe", "type-echo", "style-shuffle"],
+  revealNoLogo: ["logo-reveal", "particle-assemble", "logo-pop", "logo-type", "logo-draw", "logo-wipe", "logo-shapes", "logo-dots", "logo-morph", "logo-slices"],
+  features: ["icon-features", "showreel", "card-stack", "contact-sheet"],
+  bento: ["bento", "card-system", "spec-sheet", "widget-set"],
+  how: ["steps", "process-chevrons", "step-stairs", "step-cards", "step-portals", "light-trail"],
+};
+
+function remix(plan: VideoPlan, variant: number): VideoPlan {
+  if (!variant) return plan;
+  const used = new Set(plan.scenes.map((s) => s.skill));
+  const scenes = plan.scenes.map((s) => {
+    const key = s.role === "reveal" && !plan.brand?.logo ? "revealNoLogo" : s.role ?? "";
+    const pool = REMIX[key];
+    if (!pool?.includes(s.skill)) return s;
+    // (The list layouts want three items or more; a product's services keep their own designs.)
+    const n = s.items?.length ?? 0;
+    if ((key === "features" || key === "bento" || key === "how") && n < (key === "how" ? 2 : 3)) return s;
+    const offset = [...key].reduce((a, c) => a + c.charCodeAt(0), 0) % pool.length;
+    for (let k = 0; k < pool.length; k++) {
+      const next = pool[(variant + offset + k) % pool.length];
+      if (next !== s.skill && used.has(next)) continue;
+      used.add(next);
+      if (next === s.skill) return s;
+      // A list shown one item at a time needs a little longer than a grid.
+      const duration = key === "features" && next !== "icon-features" ? Math.min(8, Math.max(s.duration, 1.8 + n * 1.1)) : s.duration;
+      return { ...s, skill: next, duration, why: [s.why, "Remake: another design for the same content"].filter(Boolean).join("; ") };
+    }
+    return s;
+  });
+  return { ...plan, scenes };
+}
+
+/**
  * Who the product is for, from its own words ("bookkeeping for freelancers" → "freelancers"): the
  * audience call-out an opener carries ("For freelancers"). Plural groups only, not "for you".
  */
@@ -831,7 +869,8 @@ function planFromPromptRaw(req: PlanRequest): VideoPlan {
   if (req.style === "saas" || (req.style !== "trailer" && isSaasPrompt(req.prompt))) return planFromPromptSaas(req);
   const prompt = req.prompt.trim() || "Epic intro";
   const lower = prompt.toLowerCase();
-  const seed = (req.seed ?? hashString(prompt)) >>> 0;
+  // (A remake is another draw: its number moves the seed, so a trailer remake picks other slides.)
+  const seed = ((req.seed ?? hashString(prompt)) + Math.max(0, Math.floor(req.variant ?? 0)) * 7919) >>> 0;
   const r = rng(seed);
   const pick = <T,>(arr: T[]) => arr[Math.floor(r() * arr.length)];
 
@@ -2229,7 +2268,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
           : "List a few features in your prompt (e.g. “with X, Y and Z”) or import the website for the full cut."),
     ];
   }
-  return styled;
+  return remix(styled, variant);
 }
 
 
