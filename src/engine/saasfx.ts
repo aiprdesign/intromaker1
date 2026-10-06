@@ -763,16 +763,17 @@ function classicPath(ctx: CanvasRenderingContext2D) {
 }
 
 /**
- * The modern pointer: a rounded arrowhead with a notch at its back (no stem), the shape design
- * tools and launch videos use, wide and stable. Tip at the origin, about 18 × 19 pointer units; `r` rounds every
+ * The modern pointer: a rounded arrowhead with a deep notch at its back (no stem), the shape
+ * design tools and launch videos use: wide, and never a plain triangle. Tip at the origin, about
+ * 19 × 20 pointer units; `r` rounds every
  * corner (the tip a little less).
  */
 function modernPath(ctx: CanvasRenderingContext2D, r = 1) {
   const P: [number, number, number][] = [
-    [0, 0, 1.3 * r],
-    [1.6, 19, 2.4 * r],
-    [7.8, 13.6, 1.6 * r],
-    [18.4, 11.8, 2.4 * r],
+    [0, 0, 1.2 * r],
+    [2.2, 19.8, 2.2 * r],
+    [6.9, 11.9, 1.1 * r],
+    [18.6, 12.4, 2.2 * r],
   ];
   ctx.beginPath();
   // Start halfway along the last edge so every corner can be rounded with arcTo.
