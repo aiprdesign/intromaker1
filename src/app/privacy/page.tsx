@@ -64,8 +64,8 @@ export default async function Privacy() {
         <p>
           The server opens the public page you enter in a headless browser, reads its text and takes screenshots of it, its UI components and its logo.{" "}
           {CAPTURE_STORAGE === "browser"
-            ? "The screenshots aren't written to the server's disk: it holds them in memory only while your video is being made (up to 30 minutes), and your browser keeps its own copy."
-            : "The screenshots are stored on the server so the studio, share links and saved intros can show them, and are deleted automatically after 7 days. Your browser also keeps its own copy."}{" "}
+            ? "The screenshots aren't written to the server's disk: it holds them in memory only while your video is being made (up to 30 minutes), and your browser keeps its own copy for up to 48 hours: download your video before then."
+            : "The screenshots are stored on the server so the studio, share links and saved intros can show them, and are deleted automatically within 48 hours: download your video before then. After that, intros show without them; images used straight from the website keep showing, as they load from the site itself."}{" "}
           The site&apos;s own images and videos are passed through to your browser and not stored. Only public addresses can be imported: private and internal
           networks are refused. Please import only sites you have the right to use.
         </p>
@@ -77,7 +77,7 @@ export default async function Privacy() {
           JPEGs in your browser first (so camera details such as location are dropped), then{" "}
           {CAPTURE_STORAGE === "browser"
             ? "held in the server's memory only while your video is being made (up to 30 minutes)."
-            : "stored on the server like website screenshots and deleted automatically after 7 days."}{" "}
+            : "stored on the server like website screenshots and deleted automatically within 48 hours."}{" "}
           Please use only listings and photos you have the right to use, such as your own.
         </p>
 
@@ -99,7 +99,7 @@ export default async function Privacy() {
           {CAPTURE_STORAGE === "browser" ? (
             <li>Screenshots of imported sites, in memory only, for up to 30 minutes; not on disk.</li>
           ) : (
-            <li>Screenshots of imported sites, for 7 days.</li>
+            <li>Screenshots of imported sites and photos you add, for up to 48 hours.</li>
           )}
           <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits and to block signing in from an address after 3 wrong passwords (for an hour). It isn&apos;t written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>

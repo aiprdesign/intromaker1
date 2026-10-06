@@ -99,6 +99,8 @@ function loadImage(src: string) {
 const SHOT_DB = "intromaker-captures";
 const SHOT_STORE = "shots";
 const SHOT_KEEP = 400;
+/** Like the server's copy, this browser's copy of a capture goes 48 hours after it was first saved. */
+const SHOT_MAX_AGE_MS = 48 * 3_600_000;
 
 /** The capture id in a /api/shot URL, or null. */
 function shotKey(src: string) {
@@ -139,16 +141,18 @@ function idb<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBReq
 
 let stored = 0;
 async function cachedShot(src: string, key: string): Promise<Blob | null> {
-  const hit = await idb<{ blob: Blob; at: number } | undefined>("readonly", (st) => st.get(key));
-  if (hit?.blob) {
-    void idb("readwrite", (st) => st.put({ blob: hit.blob, at: Date.now() }, key));
+  const hit = await idb<{ blob: Blob; at: number; saved?: number } | undefined>("readonly", (st) => st.get(key));
+  const saved = hit?.saved ?? hit?.at ?? 0;
+  if (hit?.blob && Date.now() - saved <= SHOT_MAX_AGE_MS) {
+    void idb("readwrite", (st) => st.put({ blob: hit.blob, at: Date.now(), saved }, key));
     return hit.blob;
   }
+  if (hit) await idb("readwrite", (st) => st.delete(key));
   try {
     const res = await fetch(src);
     if (!res.ok) return null;
     const blob = await res.blob();
-    await idb("readwrite", (st) => st.put({ blob, at: Date.now() }, key));
+    await idb("readwrite", (st) => st.put({ blob, at: Date.now(), saved: Date.now() }, key));
     if (++stored % 25 === 0) void pruneShots();
     return blob;
   } catch {

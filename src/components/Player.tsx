@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Soundtrack } from "@/engine/audio";
 import { canEncodeSize, canExport, exportFormat, exportThumbnail, exportVideo, sizeLabel } from "@/engine/export";
 import { ensureFonts } from "@/engine/fonts";
@@ -123,6 +123,8 @@ export default function Player({
   const chooseSize = (big: boolean) => setBigSize(big);
   const exportLong = bigSize && bigOk && maxLong > 1920 ? maxLong : Math.min(1920, maxLong);
   const preset = exportFormat(plan.aspect, exportLong);
+  // Screenshots and added photos (/api/shot) leave the server within 48 hours: say so by Export.
+  const usesCaptures = useMemo(() => JSON.stringify(plan).includes("/api/shot"), [plan]);
   const fileBase = (p: VideoPlan) => `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "intro"}-${p.aspect.replace(":", "x")}`;
   const download = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -565,6 +567,13 @@ export default function Player({
           Export video
         </button>
       </div>
+      {usesCaptures && (
+        <p className="hint export-note">
+          <strong>Download your video when it&apos;s ready.</strong> Website screenshots and photos you add are deleted from our server within 48 hours; after
+          that, intros show without them, saved ones and share links included. Images used straight from the website keep showing, as they load from the site
+          itself.
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
     </div>
   );

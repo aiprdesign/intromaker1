@@ -1300,6 +1300,9 @@ textarea {
   line-height: 1.5;
   margin: 6px 0 0;
 }
+.export-note {
+  margin: 10px 0 0;
+}
 .hint.warn {
   color: #ffc93c;
 }

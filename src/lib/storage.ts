@@ -8,8 +8,10 @@ import { join } from "node:path";
  *
  * Hosted: set INTROMAKER_DATA_DIR to a persistent disk (the Docker image uses /data, mounted as
  * a volume) so captures survive restarts and redeploys. Locally it falls back to the system temp
- * folder. Captures are kept for INTROMAKER_SHOT_TTL_DAYS (default 7) and the folder is held under
- * INTROMAKER_SHOT_MAX_MB (default 1024), oldest first, so a public demo can't fill its disk.
+ * folder. Captures are deleted within INTROMAKER_SHOT_TTL_HOURS (default and most 48, as the studio
+ * tells visitors) and the folder is held under INTROMAKER_SHOT_MAX_MB (default 1024), oldest
+ * first, so a public demo can't fill its disk. A timer started with the server (instrumentation.ts)
+ * sweeps every 15 minutes, so files go on time even when nobody imports anything.
  * (Share links that point at an expired capture still play, without that screenshot.)
  */
 export const SHOT_DIR = process.env.INTROMAKER_DATA_DIR ? join(process.env.INTROMAKER_DATA_DIR, "shots") : join(tmpdir(), "intromaker-shots");
@@ -29,9 +31,11 @@ export function dataIsPersistent() {
   }
 }
 
-const TTL_MS = Math.max(1, Number(process.env.INTROMAKER_SHOT_TTL_DAYS ?? 7) || 7) * 86_400_000;
+/** Hours a capture may stay on the server: 48, or fewer when INTROMAKER_SHOT_TTL_HOURS says so. */
+export const SHOT_TTL_HOURS = Math.min(48, Math.max(1, Number(process.env.INTROMAKER_SHOT_TTL_HOURS ?? 48) || 48));
+const TTL_MS = SHOT_TTL_HOURS * 3_600_000;
 const MAX_BYTES = Math.max(50, Number(process.env.INTROMAKER_SHOT_MAX_MB ?? 1024) || 1024) * 1_048_576;
-const SWEEP_EVERY_MS = 60 * 60_000;
+const SWEEP_EVERY_MS = 15 * 60_000;
 
 let lastSweep = 0;
 let sweeping: Promise<unknown> | null = null;
@@ -80,13 +84,43 @@ export async function readShot(name: string): Promise<Buffer | null> {
     const hit = memory.get(name);
     return hit && Date.now() - hit.at <= MEM_TTL_MS ? hit.data : null;
   }
+  // Past its time, a capture is gone even if the next sweep hasn't reached it yet.
+  const s = await stat(join(SHOT_DIR, name)).catch(() => null);
+  if (!s?.isFile() || Date.now() - s.mtimeMs > TTL_MS) return null;
   return readFile(join(SHOT_DIR, name)).catch(() => null);
 }
 
-function maybeSweep(now = Date.now()) {
+let cleaner: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the clean-up timer (once per server): sweep now, then every 15 minutes. On disk, a sweep
+ * deletes captures that would pass their time before the next one, so none outlives it; in memory
+ * ("browser" storage), expired captures are dropped.
+ */
+export function startCleaner() {
+  if (cleaner) return;
+  const tick = () => {
+    if (CAPTURE_STORAGE === "browser") {
+      const now = Date.now();
+      for (const [k, v] of memory) {
+        if (now - v.at <= MEM_TTL_MS) break;
+        memory.delete(k);
+        memoryBytes -= v.data.length;
+      }
+      return;
+    }
+    lastSweep = 0;
+    maybeSweep(Date.now(), TTL_MS - SWEEP_EVERY_MS);
+  };
+  tick();
+  cleaner = setInterval(tick, SWEEP_EVERY_MS);
+  cleaner.unref?.();
+}
+
+function maybeSweep(now = Date.now(), ttlMs = TTL_MS - SWEEP_EVERY_MS) {
   if (sweeping || now - lastSweep < SWEEP_EVERY_MS) return;
   lastSweep = now;
-  sweeping = sweep(now)
+  sweeping = sweep(now, ttlMs)
     .catch((e) => console.warn("[storage] sweep failed:", (e as Error).message))
     .finally(() => {
       sweeping = null;
