@@ -518,7 +518,7 @@ function dropZone(sc: SkillContext) {
     ctx.font = subFont(17 * u * S * 0.9, 600);
     fillTextFit(ctx, file, -fw / 2 + fh * 0.95, 0, fw - fh * 1.1, { maxLines: 1, minScale: 0.6 });
     ctx.restore();
-    if (shrink > 0.5) drawCursor(sc, p.x + fw * 0.32, p.y + fh * 0.2, t > T.drop - 0.15 ? 1 : 0.6, S);
+    if (shrink > 0.5) drawCursor(sc, p.x + fw * 0.32, p.y + fh * 0.2, t > T.drop - 0.15 ? 1 : 0.6, S, p.lean);
   }
   // The results pop out under the zone, each with a tick.
   const ry = zy + zh + 36 * u;

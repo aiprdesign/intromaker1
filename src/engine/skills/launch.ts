@@ -387,7 +387,7 @@ function toggleList(sc: SkillContext) {
     const press = Math.max(...labels.map((_, i) => clamp(1 - Math.abs(t - onAt(i)) / 0.07)));
     ctx.save();
     ctx.globalAlpha *= clamp((t - 0.6) / 0.2) * (1 - away);
-    drawCursor(sc, cur.x + away * 60 * u, cur.y + away * 90 * u, press, S);
+    drawCursor(sc, cur.x + away * 60 * u, cur.y + away * 90 * u, press, S, cur.lean);
     ctx.restore();
   }
   ctx.restore();
@@ -862,7 +862,7 @@ function calendarDrop(sc: SkillContext) {
     const p = t < T.stretch ? cursorPath(ex0 + 90 * u, ey0 + 120 * u, ex0, ey0, range(t, T.stretch - 0.5, T.stretch - 0.05)) : { x: ex0, y: ey0 + ease.outBack(clamp((t - T.stretch) / 0.35)) * rowH };
     ctx.save();
     ctx.globalAlpha *= clamp((t - T.stretch + 0.5) / 0.2) * (1 - range(t, T.end, T.end + 0.4));
-    drawCursor(sc, p.x, p.y, clamp(1 - Math.abs(t - T.stretch) / 0.1), S);
+    drawCursor(sc, p.x, p.y, clamp(1 - Math.abs(t - T.stretch) / 0.1), S, "lean" in p ? p.lean : 0);
     ctx.restore();
   }
   ctx.restore();

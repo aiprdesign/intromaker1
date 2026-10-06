@@ -13,6 +13,7 @@ import {
   blurInLayout,
   borderBeam,
   clickRipple,
+  cursorLean,
   drawCursor,
   drawIcon,
   eyebrow,
@@ -477,16 +478,19 @@ function uiTour(sc: SkillContext) {
   const b = toScreen(hot[1]);
   const start = { x: w * 0.92, y: h * 1.05 };
   let cur = start;
-  const toA = ease.inOutCubic(range(t, T.zoomA + 0.1, T.clickA - 0.05));
-  cur = { x: lerp(start.x, a.x, toA), y: lerp(start.y, a.y, toA) };
-  const toB = ease.inOutCubic(range(t, T.zoomB + 0.1, T.clickB - 0.05));
-  cur = { x: lerp(cur.x, b.x, toB), y: lerp(cur.y, b.y, toB) };
-  const away = ease.inCubic(range(t, T.out, T.out + 0.6));
-  cur = { x: lerp(cur.x, w * 1.05, away), y: lerp(cur.y, h * 1.1, away) };
+  const at = (tt: number) => {
+    const toA = ease.inOutCubic(range(tt, T.zoomA + 0.1, T.clickA - 0.05));
+    let c = { x: lerp(start.x, a.x, toA), y: lerp(start.y, a.y, toA) };
+    const toB = ease.inOutCubic(range(tt, T.zoomB + 0.1, T.clickB - 0.05));
+    c = { x: lerp(c.x, b.x, toB), y: lerp(c.y, b.y, toB) };
+    const away = ease.inCubic(range(tt, T.out, T.out + 0.6));
+    return { x: lerp(c.x, w * 1.05, away), y: lerp(c.y, h * 1.1, away) };
+  };
+  cur = at(t);
   const press = Math.max(1 - Math.abs(t - T.clickA) / 0.12, 1 - Math.abs(t - T.clickB) / 0.12, 0);
   clickRipple(sc, a.x, a.y, range(t, T.clickA, T.clickA + 0.6));
   clickRipple(sc, b.x, b.y, range(t, T.clickB, T.clickB + 0.6));
-  if (t > T.zoomA) drawCursor(sc, cur.x, cur.y, press);
+  if (t > T.zoomA) drawCursor(sc, cur.x, cur.y, press, 1, cursorLean(at, t, w));
 
   // Pinned headline on a shade band.
   // Deepens while zoomed so the headline stays legible over bright screenshots.
@@ -1643,7 +1647,12 @@ export function ctaCursor(sc: SkillContext, tx: number, ty: number, T: ReturnTyp
   const k = ease.inOutCubic(range(t, T.button + 0.1, T.hover + 0.2));
   const away = ease.inCubic(range(t, T.click + 0.6, T.click + 1.3));
   if (t > T.button) {
-    drawCursor(sc, lerp(lerp(start.x, tx, k), w * 1.1, away), lerp(lerp(start.y, ty, k), h * 1.1, away), press);
+    const xAt = (tt: number) => {
+      const kk = ease.inOutCubic(range(tt, T.button + 0.1, T.hover + 0.2));
+      const aw = ease.inCubic(range(tt, T.click + 0.6, T.click + 1.3));
+      return { x: lerp(lerp(start.x, tx, kk), w * 1.1, aw), y: 0 };
+    };
+    drawCursor(sc, lerp(lerp(start.x, tx, k), w * 1.1, away), lerp(lerp(start.y, ty, k), h * 1.1, away), press, 1, cursorLean(xAt, t, w));
   }
 }
 

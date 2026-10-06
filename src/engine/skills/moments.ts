@@ -991,7 +991,7 @@ function kanban(sc: SkillContext) {
     return { x: s.x + colW * 0.34, y: s.y + cardH * 0.55 };
   };
   const [m1, m2] = moves;
-  let cur: { x: number; y: number } | null = cursorAt;
+  let cur: { x: number; y: number; lean?: number } | null = cursorAt;
   let press = 0;
   if (!cur) {
     if (t < m1.t0) cur = cursorPath(wx + ww * 0.7, wy + wh + 100 * u, grab(0, 0).x, grab(0, 0).y, range(t, 0.55, m1.t0 - 0.05));
@@ -1007,7 +1007,7 @@ function kanban(sc: SkillContext) {
   if (t > 0.5) {
     ctx.save();
     ctx.globalAlpha *= clamp((t - 0.5) / 0.2);
-    drawCursor(sc, cur.x, cur.y, press, S);
+    drawCursor(sc, cur.x, cur.y, press, S, cur.lean ?? 0);
     ctx.restore();
   }
   ctx.restore();
@@ -1178,7 +1178,7 @@ function beforeAfter(sc: SkillContext) {
     const away = ease.inOutCubic(range(t, T.release, T.release + 0.6));
     ctx.save();
     ctx.globalAlpha *= clamp((t - 0.45) / 0.2) * (1 - away);
-    drawCursor(sc, p.x + away * 60 * u, p.y + away * 90 * u, press, S);
+    drawCursor(sc, p.x + away * 60 * u, p.y + away * 90 * u, press, S, "lean" in p ? p.lean : 0);
     ctx.restore();
   }
   ctx.restore();

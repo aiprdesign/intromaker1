@@ -749,15 +749,8 @@ export function borderBeam(sc: SkillContext, x: number, y: number, cw: number, c
 }
 
 /** macOS-style arrow cursor with a soft shadow; `press` 0..1 squashes it on click. */
-export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, scale = 1) {
-  const { ctx, u } = sc;
-  const s = 1.9 * u * scale * (1 - press * 0.12);
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s, s);
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 3;
+/** The pointer's outline, tip at the origin, in pointer units (about 16 × 26). */
+function pointerPath(ctx: CanvasRenderingContext2D) {
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(0, 22);
@@ -767,13 +760,85 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
   ctx.lineTo(9, 15.8);
   ctx.lineTo(16, 15.8);
   ctx.closePath();
-  ctx.fillStyle = "#ffffff";
+}
+
+/**
+ * The mouse pointer, large and three-dimensional like a modern launch video's: a glossy white
+ * body extruded with a soft grey side, a fine dark rim, a specular edge and a soft shadow on the
+ * page. A click presses it into the screen (it sinks and its depth and shadow tighten). `lean`
+ * (-1..1, from the pointer's horizontal speed: see cursorPath) tilts it slightly into its motion.
+ */
+export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, scale = 1, lean = 0) {
+  const { ctx, u } = sc;
+  const p = clamp(press);
+  const s = 2.6 * u * scale * (1 - p * 0.08);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(clamp(lean, -1, 1) * 0.16);
+  ctx.scale(s, s);
+  ctx.lineJoin = "round";
+  // Shadow on the page: further away and softer while the pointer floats, tight when pressed.
+  const lift = 1 - p * 0.65;
+  ctx.save();
+  ctx.translate(2.2 * lift + 0.6, 3.4 * lift + 0.8);
+  ctx.shadowColor = `rgba(0,0,0,${0.32 + 0.12 * p})`;
+  ctx.shadowBlur = (10 * lift + 4) * s * 0.55;
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  pointerPath(ctx);
   ctx.fill();
-  ctx.shadowColor = "transparent";
-  ctx.lineWidth = 1.6;
-  ctx.strokeStyle = "#111";
+  ctx.restore();
+  // Extrusion: the body's side, swept back and down as one solid (darker towards the back).
+  const depth = 2.4 * (1 - p * 0.55);
+  const steps = 12;
+  for (let i = steps; i >= 1; i--) {
+    const k = i / steps;
+    ctx.save();
+    ctx.translate(depth * 0.55 * k, depth * k);
+    ctx.fillStyle = mixHex("#7c8599", "#bcc3d0", 1 - k);
+    pointerPath(ctx);
+    ctx.fill();
+    if (i === steps) {
+      // Only the far edge gets a soft dark line, so the side reads against light pages.
+      ctx.strokeStyle = "rgba(20,24,36,0.28)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // The face: white with a soft cool falloff, a fine dark rim and a highlight on the long edge.
+  const face = ctx.createLinearGradient(0, 0, 12, 26);
+  face.addColorStop(0, "#ffffff");
+  face.addColorStop(0.55, "#f4f6fb");
+  face.addColorStop(1, "#dfe4ee");
+  pointerPath(ctx);
+  ctx.fillStyle = face;
+  ctx.fill();
+  ctx.save();
+  pointerPath(ctx);
+  ctx.clip();
+  const spec = ctx.createRadialGradient(2.5, 5, 0, 2.5, 5, 11);
+  spec.addColorStop(0, "rgba(255,255,255,0.95)");
+  spec.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = spec;
+  ctx.fillRect(-2, -2, 20, 30);
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(1.1, 2.4);
+  ctx.lineTo(1.1, 18.5);
   ctx.stroke();
   ctx.restore();
+  pointerPath(ctx);
+  ctx.strokeStyle = "rgba(17,20,30,0.92)";
+  ctx.lineWidth = 1.15;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** How far a pointer moving along `at(t)` leans into its motion (-1..1), from its horizontal speed. */
+export function cursorLean(at: (t: number) => { x: number }, t: number, w: number) {
+  const vx = (at(t + 0.02).x - at(t - 0.02).x) / 0.04;
+  return clamp(vx / (w * 1.1), -1, 1);
 }
 
 /** Expanding ring where a click lands. k: 0..1 over the ripple's life. */

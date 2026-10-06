@@ -169,13 +169,19 @@ export function windowChrome(sc: SkillContext, x: number, y: number, ww: number,
 
 /** Cursor that glides along a curved path (asymmetric ease: fast out, soft landing). */
 export function cursorPath(x0: number, y0: number, x1: number, y1: number, k: number) {
-  const e = ease.outQuart(clamp(k));
+  // Smootherstep: the pointer eases out of rest and settles into the target with no jolt (zero
+  // speed and acceleration at both ends), along a gentle arc like a hand's.
+  const kk = clamp(k);
+  const e = kk * kk * kk * (kk * (kk * 6 - 15) + 10);
   const cx = lerp(x0, x1, 0.15) + (y1 - y0) * 0.18;
   const cy = lerp(y0, y1, 0.85);
   const a = (1 - e) * (1 - e);
   const b = 2 * (1 - e) * e;
   const c = e * e;
-  return { x: a * x0 + b * cx + c * x1, y: a * y0 + b * cy + c * y1 };
+  // Lean into the motion: horizontal share of the chord times the speed (1 at the peak).
+  const dist = Math.hypot(x1 - x0, y1 - y0) || 1;
+  const speed = (30 * kk * kk * (kk - 1) * (kk - 1)) / 1.875;
+  return { x: a * x0 + b * cx + c * x1, y: a * y0 + b * cy + c * y1, lean: ((x1 - x0) / dist) * speed };
 }
 
 /* ───────────────────────── Command palette (⌘K) ───────────────────────── */
@@ -769,7 +775,7 @@ function clickFlow(sc: SkillContext) {
     clickRipple(sc, bcx + bw * 0.12, bcy + bh * 0.15, range(t, T.click, T.click + 0.5));
     ctx.save();
     ctx.globalAlpha *= clamp((t - T.arrive + 0.35) / 0.2) * (1 - away);
-    drawCursor(sc, p.x + away * 60 * u, p.y + away * 90 * u, press, S);
+    drawCursor(sc, p.x + away * 60 * u, p.y + away * 90 * u, press, S, p.lean);
     ctx.restore();
   }
   ctx.restore();
