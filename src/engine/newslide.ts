@@ -4,7 +4,7 @@ import { roleOf } from "./templates";
 import type { Scene, SkillId, VideoPlan } from "./types";
 
 /** Lists that are about the product's features (others, like a kanban board's cards, aren't). */
-const FEATURE_LIST = /feature|benefit|callout|caption|close-up/i;
+const FEATURE_LIST = /feature|benefit|callout|caption|close-up|service/i;
 
 const norm = (x: string) => x.replace(/\*/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
@@ -125,7 +125,7 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
   const promise = role === "promise" ? scenes.find((s) => s.skill === "word-swap") : undefined;
   if (promise && skill !== "word-swap") return { text: swapAsLine(promise.text), eyebrow: promise.eyebrow, items: k.itemsHint !== undefined ? itemsLike(skill, features) ?? k.sample.items : undefined, role };
   const headline =
-    role === "cta" ? `Get started with *${name}*` : role === "reveal" ? name : role === "hook" ? `Introducing *${name}*` : role === "features" || role === "bento" || role === "cards" ? `Inside *${name}*` : role === "promise" ? `This is *${name}*` : role === "gallery" ? `A closer look at *${name}*` : `See *${name}* in action`;
+    role === "cta" ? `Get started with *${name}*` : role === "reveal" ? name : role === "hook" ? `Introducing *${name}*` : role === "features" || role === "bento" || role === "cards" ? `Inside *${name}*` : role === "promise" ? `This is *${name}*` : role === "gallery" ? `A closer look at *${name}*` : role === "how" ? `How *${name}* works` : `See *${name}* in action`;
   return {
     text: name ? headline : k.sample.text,
     subtext: k.sample.subtext,

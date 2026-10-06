@@ -120,6 +120,21 @@ const AUDIENCES: { re: RegExp; card: string }[] = [
 ];
 
 /** The audiences a site names itself (at least two, else none), in the order it names them. */
+/** A business that sells services (an agency, studio, consultancy or freelancer), from its own words. */
+export const SERVICE_BIZ =
+  /\b(?:our services|services we offer|what we do|full[- ]service|(?:creative|digital|design|marketing|web|branding|development|seo|video|content|growth) (?:agency|studio)|agency|consult(?:ing|ancy|ants?)|freelanc\w*|we help (?:brands|businesses|companies|startups|teams))\b/i;
+
+/**
+ * The how-it-works layout for a remake: the numbered line (the default), business-process arrows,
+ * a staircase, and a cycle when there are three steps or more. Service businesses lead with the
+ * process arrows.
+ */
+export function howLayout(variant: number, n: number, serviceBiz = false) {
+  const order = serviceBiz ? (["process-chevrons", "steps", "step-stairs", "process-cycle"] as const) : (["steps", "process-chevrons", "step-stairs", "process-cycle"] as const);
+  const pick = order[Math.floor(variant / 2) % order.length];
+  return pick === "process-cycle" && n < 3 ? "process-chevrons" : pick;
+}
+
 export function audiencesOf(text: string): string[] {
   const found = AUDIENCES.map((a) => ({ card: a.card, at: text.search(a.re) })).filter((a) => a.at >= 0);
   return found.length >= 2 ? found.sort((a, b) => a.at - b.at).slice(0, 4).map((a) => a.card) : [];
@@ -1461,7 +1476,9 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       // AI and creative tools show their steps as a node workflow (ComfyUI-style).
       // (Or any product whose steps read as a pipeline: connect, trigger, transform, publish.)
       // Every third remake with short steps rides them on a big 3D arrow.
-      role: "how", skill: variant % 3 === 2 && site.steps.slice(0, 4).every((x) => x.split(/\s+/).length <= 3) ? "arrow-rise" : site.steps.length >= 3 && alt !== (concept.id === "ai" || concept.id === "creative" || /\b(workflows?|pipelines?|automat\w*|nodes?|connect\w*|triggers?|integrat\w*)\b/i.test(site.steps.join(" "))) ? "node-graph" : "steps",
+      // Otherwise remakes rotate through the process layouts: the numbered line, business-process
+      // arrows, a staircase and (3+ steps) a cycle; service businesses lead with the process arrows.
+      role: "how", skill: variant % 3 === 2 && site.steps.slice(0, 4).every((x) => x.split(/\s+/).length <= 3) ? "arrow-rise" : site.steps.length >= 3 && alt !== (concept.id === "ai" || concept.id === "creative" || /\b(workflows?|pipelines?|automat\w*|nodes?|connect\w*|triggers?|integrat\w*)\b/i.test(site.steps.join(" "))) ? "node-graph" : howLayout(variant, site.steps.length, SERVICE_BIZ.test([site.tagline, site.description, ...site.headlines.slice(0, 8)].join(" \n "))),
       text: `Get started in *${site.steps.length} steps*`,
       items: site.steps.slice(0, 4),
       eyebrow: "How it works",
@@ -1511,14 +1528,17 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Long films with real feature descriptions and product UI to show give each feature its own
   // slide; otherwise a bento for a rich set, or the classic icon row.
   const withBenefit = featureItems.filter((it) => (it.split(/\s+[—–]\s+/)[1] ?? "").split(/\s+/).length >= 4);
-  // Remakes rotate through the other feature layouts the material allows.
+  // Remakes rotate through the other feature layouts the material allows. A service business
+  // (an agency, studio or consultancy) shows its offer as a services list first.
+  const serviceBiz = SERVICE_BIZ.test([whole.tagline, whole.description, ...whole.headlines.slice(0, 8)].join(" \n "));
   const featureKinds = [
+    ...(serviceBiz && featureItems.length >= 2 ? ["services"] : []),
     ...(target >= 30 && withBenefit.length >= 3 && visuals >= 2 ? ["slides"] : []),
     ...(featureItems.length >= 5 ? ["bento"] : []),
     ...(featureItems.length >= 2 ? ["icons"] : []),
     ...(featureItems.length === 3 || featureItems.length === 4 ? ["bento"] : []),
     // Editorial system layouts: a showreel of the features, or the card system.
-    ...(featureItems.length >= 3 ? ["reel", "system", "stack", "sheet", "contact", "widgets"] : []),
+    ...(featureItems.length >= 3 ? ["reel", "system", "stack", "sheet", "contact", "widgets", ...(serviceBiz ? [] : ["services"])] : []),
   ];
   const featureKind = featureKinds.length ? featureKinds[variant % featureKinds.length] : null;
   const featureSlides = featureKind === "slides";
@@ -1579,6 +1599,18 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       items: rows,
       eyebrow: "Overview",
       duration: Math.max(5, beats(12)),
+      transition: "dolly",
+    });
+  } else if (featureKind === "services") {
+    // A big icon for the current service beside the list ("Service — what it is" where the site says).
+    const offer = (withBenefit.length >= 2 ? withBenefit : featureItems).slice(0, 5);
+    add(valuePriority, {
+      role: "features", skill: "services",
+      text: serviceBiz ? "What we *do*" : `Inside *${site.name}*`,
+      items: offer,
+      eyebrow: serviceBiz ? "Services" : "Features",
+      why: serviceBiz ? "The site offers services (an agency, studio or consultancy)" : undefined,
+      duration: Math.max(5, beats(offer.length * 2.4 + 4)),
       transition: "dolly",
     });
   } else if (featureKind === "icons") {
@@ -1923,7 +1955,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Chapter labels in the category's own voice.
   for (const sc of scenes) {
     const eb = concept.eyebrows[sc.role as keyof typeof concept.eyebrows];
-    if (eb && sc.role !== "reveal" && sc.role !== "cta") sc.eyebrow = eb;
+    if (eb && sc.role !== "reveal" && sc.role !== "cta" && !(sc.skill === "services" && sc.eyebrow === "Services")) sc.eyebrow = eb;
   }
   // "Free" is an offer, and an offer must be real: only when the site itself offers something free.
   const freeOffer = offersFree([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features].join(" "));

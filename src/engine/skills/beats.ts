@@ -29,21 +29,21 @@ import { fitTimes } from "./moments";
 import { topHeadline } from "./saas";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
-const split = (item: string) => {
+export const split = (item: string) => {
   const [a, b] = item.split(/\s+[—–]\s+/);
   return { title: (a ?? "").trim(), detail: (b ?? "").trim() };
 };
-const exitOf = (sc: SkillContext) => ease.inCubic(exitT(sc, 0.4));
-const hair = (p: Palette, a = 0.1) => (p.light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`);
+export const exitOf = (sc: SkillContext) => ease.inCubic(exitT(sc, 0.4));
+export const hair = (p: Palette, a = 0.1) => (p.light ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`);
 
 /** The scene's items, else a stock set (at least `min`). */
-function itemsOr(scene: Scene, fallback: string[], max = 5, min = 2) {
+export function itemsOr(scene: Scene, fallback: string[], max = 5, min = 2) {
   const items = (scene.items ?? []).map((x) => x.trim()).filter(Boolean).slice(0, max);
   return items.length >= min ? items : fallback.slice(0, max);
 }
 
 /** The stage under the headline: scale, frame and the box content may use. */
-function stage(sc: SkillContext) {
+export function stage(sc: SkillContext) {
   const { w, h, u } = sc;
   const portrait = h > w;
   const square = !portrait && w / h < 1.25;
