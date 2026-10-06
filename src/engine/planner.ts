@@ -1690,7 +1690,16 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   } else if (demo.skill === "chat-thread") {
     demoScene = { role: "demo", skill: "chat-thread", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else if (demo.skill === "click-flow") {
-    demoScene = { role: "demo", skill: "click-flow", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
+    // The tasks that tick off are the product's own (its features the film hasn't shown yet, else
+    // its features, else its how-it-works steps), so the moment is about this product, not a stock
+    // checklist for its category (three or more where it has them, else two); the category's tasks
+    // and button only when the site has fewer.
+    const brief = (xs: string[]) => [...new Set(xs.map((x) => x.split(/\s+[—–]\s+/)[0].trim()).filter((x) => x && x.split(/\s+/).length <= 6))];
+    const own = [brief(spareFeatures), brief(shortFeatures), brief(site.steps ?? [])].find((xs) => xs.length >= 3) ?? [brief(shortFeatures), brief(site.steps ?? [])].find((xs) => xs.length >= 2);
+    const named = site.name && site.name !== "Your product";
+    demoScene = own
+      ? { role: "demo", skill: "click-flow", text: named ? `${site.name}, *in action*` : "Your work, *in motion*", subtext: "Run", items: own.slice(0, 4), eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" }
+      : { role: "demo", skill: "click-flow", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
   } else if (demo.skill === "toggle-list" || demo.skill === "changelog") {
     // Settings and "what's new" read best as the product's own features, when the film has spare ones.
     const own = spareFeatures.filter((f) => f.split(/\s+/).length <= 5);

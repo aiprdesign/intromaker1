@@ -86,6 +86,10 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
   // A product moment of another kind (a board, a chat, an inbox…) has its own words: they aren't
   // borrowed from the film's other moment. Lists of features take the film's own.
   const moment = role === "demo" ? momentCopy(skill) : undefined;
+  // A one-click flow ticks off the product's own features, not a stock checklist.
+  const own = features.map((x) => x.split(/\s+[—–]\s+/)[0]).filter((x) => x.split(/\s+/).length <= 6);
+  if (skill === "click-flow" && own.length >= 2)
+    return { text: name ? `${name}, *in action*` : "Your work, *in motion*", eyebrow: moment?.eyebrow ?? "In action", subtext: "Run", items: own.slice(0, 4), role };
   if (moment)
     return {
       // ("Nimbus: your week, *planned*")

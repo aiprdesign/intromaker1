@@ -139,7 +139,7 @@ Prodintro.com is a portfolio project: a SaaS-style web app that turns a text pro
 - **Signature interaction moments**, as the best launch videos stage them, chosen to suit the product:
   - a ⌘K command palette (keycaps, live filtering, a result card);
   - an AI prompt that streams its answer, in the product's own words;
-  - a one-click flow (micro-zoom, then a task cascade);
+  - a one-click flow (micro-zoom, then a task cascade; the tasks are the product's own features or steps from its site or prompt, with stock tasks for its category only when it has fewer than two);
   - an iOS-style notification stack;
   - a growth chart for one real metric;
   - code to deploy: code types into an editor, `git push` runs and the pipeline ticks green (developer tools);
