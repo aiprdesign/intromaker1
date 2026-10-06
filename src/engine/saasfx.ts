@@ -766,14 +766,14 @@ function classicPath(ctx: CanvasRenderingContext2D) {
  * The modern pointer: a rounded arrowhead with a deep notch at its back (no stem), the shape
  * design tools and launch videos use: wide, and never a plain triangle. Tip at the origin, about
  * 19 × 20 pointer units; `r` rounds every
- * corner (the tip a little less).
+ * corner just enough to keep it crisp (a sharp tip, no soft heart-like curves).
  */
 function modernPath(ctx: CanvasRenderingContext2D, r = 1) {
   const P: [number, number, number][] = [
-    [0, 0, 1.2 * r],
-    [2.2, 19.8, 2.2 * r],
-    [6.9, 11.9, 1.1 * r],
-    [18.6, 12.4, 2.2 * r],
+    [0, 0, 0.3 * r],
+    [2.2, 19.8, 0.9 * r],
+    [6.9, 11.9, 0.55 * r],
+    [18.6, 12.4, 0.9 * r],
   ];
   ctx.beginPath();
   // Start halfway along the last edge so every corner can be rounded with arcTo.
@@ -812,14 +812,14 @@ function pointerLook(style: Exclude<PointerStyle, "auto" | "classic">, p: Palett
   };
   switch (style) {
     case "graphite":
-      return { face: (c) => lin(c, "#4a505e", "#1d2028", "#0b0c11"), side: ["#020203", "#23262f"], rim: "rgba(255,255,255,0.96)", rimW: 1.7, depth: 2.2, round: 1, spec: 0.45, shadow: 0.42 };
+      return { face: (c) => lin(c, "#646b7c", "#262a34", "#07080b"), side: ["#030304", "#2c303b"], rim: "rgba(255,255,255,0.96)", rimW: 1.6, depth: 2.8, round: 1, spec: 0.45, shadow: 0.42 };
     case "brand":
       return {
-        face: (c) => lin(c, mixHex(p.primary, "#ffffff", 0.18), p.primary, mixHex(p.primary, p.secondary, 0.7)),
-        side: [mixHex(p.primary, "#000000", 0.55), mixHex(p.primary, "#000000", 0.3)],
+        face: (c) => lin(c, mixHex(p.primary, "#ffffff", 0.38), p.primary, mixHex(p.secondary, "#000000", 0.12)),
+        side: [mixHex(p.primary, "#000000", 0.6), mixHex(p.secondary, "#000000", 0.25)],
         rim: "rgba(255,255,255,0.95)",
-        rimW: 1.6,
-        depth: 2.2,
+        rimW: 1.5,
+        depth: 2.8,
         round: 1,
         spec: 0.55,
         glow: rgba(p.primary, 0.55),
@@ -856,7 +856,7 @@ function pointerLook(style: Exclude<PointerStyle, "auto" | "classic">, p: Palett
         shadow: 0.36,
       };
     default:
-      return { face: (c) => lin(c, "#ffffff", "#f3f5fa", "#dde2ec"), side: ["#7c8599", "#bcc3d0"], rim: "rgba(17,20,30,0.9)", rimW: 1.15, depth: 2.2, round: 1, spec: 0.95, shadow: 0.34 };
+      return { face: (c) => lin(c, "#ffffff", "#eef1f7", "#c6cddb"), side: ["#5f687c", "#b4bccb"], rim: "rgba(17,20,30,0.9)", rimW: 1.1, depth: 2.8, round: 1, spec: 0.95, shadow: 0.34 };
   }
 }
 
@@ -908,7 +908,16 @@ export function drawCursor(sc: SkillContext, x: number, y: number, press = 0, sc
     const k = i / steps;
     ctx.save();
     ctx.translate(depth * 0.55 * k, depth * k);
-    ctx.fillStyle = L.side[0].startsWith("#") ? mixHex(L.side[0], L.side[1], 1 - k) : k > 0.5 ? L.side[0] : L.side[1];
+    if (L.side[0].startsWith("#")) {
+      // A gradient along the side: lit near the tip, falling into shade towards the wings, and
+      // darker the further back the layer.
+      const base = mixHex(L.side[0], L.side[1], 1 - k);
+      const sg = ctx.createLinearGradient(0, 0, 16, 20);
+      sg.addColorStop(0, mixHex(base, "#ffffff", 0.28));
+      sg.addColorStop(0.55, base);
+      sg.addColorStop(1, mixHex(base, "#000000", 0.3));
+      ctx.fillStyle = sg;
+    } else ctx.fillStyle = k > 0.5 ? L.side[0] : L.side[1];
     path(ctx);
     ctx.fill();
     if (i === steps && L.rimW) {
