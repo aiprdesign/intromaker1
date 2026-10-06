@@ -1542,6 +1542,49 @@ textarea {
   padding-left: 2px;
   opacity: 0.85;
 }
+/* A paused slide's editable points (tour highlight areas, zoom lens stops), on the preview itself. */
+.points-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  touch-action: none;
+}
+.points-overlay .pt-area {
+  pointer-events: all;
+  fill: rgba(124, 92, 255, 0.14);
+  stroke: #fff;
+  cursor: grab;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
+.points-overlay .pt-area[data-on] {
+  stroke: #7c5cff;
+  cursor: grabbing;
+}
+.points-overlay .pt-handle {
+  pointer-events: all;
+  fill: #fff;
+  stroke: #7c5cff;
+  cursor: nwse-resize;
+}
+.points-toggle {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.points-toggle:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
 .stage-play.mini:hover {
   opacity: 1;
 }

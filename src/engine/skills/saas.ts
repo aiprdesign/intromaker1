@@ -384,10 +384,17 @@ export function tourAreas(scene: Scene, brand: Brand | undefined, w: number, h: 
   const u = Math.min(w, h) / 1080;
   const g = tourGeometry(w, h, u, seed, scene, media, src);
   if (!g.img) return null;
-  const { ox, oy, cs, iw, ih } = g.img;
+  return { image: media, key: tourSrcKey(src), ...editAreas(g, scene) };
+}
+
+/**
+ * The highlight areas as the studio edits them, as fractions of the screenshot, and the part of
+ * it the frame shows. (An automatic area that takes in most of the screenshot starts as a box at
+ * its stop instead, so the boxes can be told apart and moved.)
+ */
+function editAreas(g: ReturnType<typeof tourGeometry>, scene: Scene) {
+  const { ox, oy, cs, iw, ih } = g.img!;
   const toImg = (b: Box): [number, number, number, number] => [(b.x - ox) / (iw * cs), (b.y - oy) / (ih * cs), b.w / (iw * cs), b.h / (ih * cs)];
-  // (An automatic area that takes in most of the screenshot starts as a box at its stop instead,
-  // so the boxes can be told apart and moved.)
   const areas = g.hot.map((p, i) => {
     const a = toImg(g.comps[i] ?? { x: p.x - g.ww * 0.12, y: p.y - (g.wh - g.bar) * 0.09, w: g.ww * 0.24, h: (g.wh - g.bar) * 0.18 });
     if (scene.tour?.areas?.length || a[2] * a[3] < 0.35) return a;
@@ -395,7 +402,7 @@ export function tourAreas(scene: Scene, brand: Brand | undefined, w: number, h: 
     return [clamp(px - 0.16, 0, 0.68), clamp(py - 0.14, 0, 0.72), 0.32, 0.28] as [number, number, number, number];
   });
   const visible = toImg({ x: g.fx0, y: g.fy0 + g.bar, w: g.ww, h: g.wh - g.bar });
-  return { image: media, key: tourSrcKey(src), areas, visible };
+  return { areas, visible };
 }
 
 function uiTour(sc: SkillContext) {
@@ -403,14 +410,17 @@ function uiTour(sc: SkillContext) {
   saasBackground(sc, { beams: 3 });
   const T = tourTiming(d);
   const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
-  const { portrait, bar, ww, wh, fcx, fcy, fx0, fy0, zoomFor, hot, comps } = tourGeometry(w, h, u, seed, scene, media, mediaSrc(scene, brand));
+  const geo = tourGeometry(w, h, u, seed, scene, media, mediaSrc(scene, brand));
+  const { portrait, bar, ww, wh, fcx, fcy, fx0, fy0, zoomFor, hot, comps } = geo;
   const Z = 1.85;
+  // Editing its areas on the paused preview: the whole window, unzoomed, with nothing over it.
+  const editing = !!sc.edit;
 
   // Camera keyframes.
   const center = { x: fcx, y: fcy };
-  const kA = ease.inOutCubic(range(t, T.zoomA, T.zoomA + 0.85));
-  const kB = ease.inOutCubic(range(t, T.zoomB, T.zoomB + 0.85));
-  const kOut = ease.inOutCubic(range(t, T.out, T.out + 0.75));
+  const kA = editing ? 0 : ease.inOutCubic(range(t, T.zoomA, T.zoomA + 0.85));
+  const kB = editing ? 0 : ease.inOutCubic(range(t, T.zoomB, T.zoomB + 0.85));
+  const kOut = editing ? 0 : ease.inOutCubic(range(t, T.out, T.out + 0.75));
   // Each stop frames a whole component (never cutting through it): zoomed until the component
   // fills about three quarters of the window, gentler when no clear component was found.
   // The camera stays inside the window where the zoom lets it, so a component near the window's
@@ -431,10 +441,10 @@ function uiTour(sc: SkillContext) {
   const z = lerp(lerp(lerp(1, stops[0].z, kA), stops[1].z, kB), 1, kOut);
   const toScreen = (p: { x: number; y: number }) => ({ x: (p.x - focus.x) * z + fcx, y: (p.y - focus.y) * z + fcy });
 
-  const intro = clamp(spring(t - 0.1, 10, 7));
-  const ex = ease.inCubic(exitT(sc, 0.4));
+  const intro = editing ? 1 : clamp(spring(t - 0.1, 10, 7));
+  const ex = editing ? 0 : ease.inCubic(exitT(sc, 0.4));
   ctx.save();
-  ctx.globalAlpha = clamp(t / 0.3) * (1 - ex);
+  ctx.globalAlpha = editing ? 1 : clamp(t / 0.3) * (1 - ex);
   ctx.translate(fcx, fcy + (1 - intro) * h * 0.12);
   ctx.scale(z * lerp(0.88, 1, intro), z * lerp(0.88, 1, intro));
   ctx.translate(-focus.x, -focus.y);
@@ -464,7 +474,7 @@ function uiTour(sc: SkillContext) {
   if (media) drawCover(ctx, media, fx0, fy0 + bar, ww, wh - bar, 1, 0.5, 0.2);
   else mockUi(sc, fx0, fy0 + bar, ww, wh - bar);
   // Focal isolation: once a component is clicked, the rest of the screen dims around it.
-  hot.forEach((_, i) => {
+  if (!editing) hot.forEach((_, i) => {
     const c = comps[i];
     const click = i === 0 ? T.clickA : T.clickB;
     const until = i === 0 ? T.zoomB + 0.2 : T.out;
@@ -480,7 +490,7 @@ function uiTour(sc: SkillContext) {
   });
   ctx.restore();
   // Highlight rings: hugging the real component when found, else a soft box round the click.
-  hot.forEach((p, i) => {
+  if (!editing) hot.forEach((p, i) => {
     const click = i === 0 ? T.clickA : T.clickB;
     const k = clamp(spring(t - click, 12, 8)) * (1 - kOut * 0.6);
     if (t < click) return;
@@ -505,6 +515,16 @@ function uiTour(sc: SkillContext) {
   });
   ctx.restore();
 
+  if (editing) {
+    // The headline stays (the boxes are placed against the frame as it plays); then the areas.
+    topHeadline(sc);
+    const { areas } = geo.img ? editAreas(geo, scene) : { areas: [] };
+    if (geo.img) {
+      const { ox, oy, cs, iw, ih } = geo.img;
+      sc.edit!({ kind: "tour", areas, key: tourSrcKey(mediaSrc(scene, brand)), map: { ox, oy, sx: iw * cs, sy: ih * cs }, clip: { x: fx0, y: fy0 + bar, w: ww, h: wh - bar } });
+    }
+    return;
+  }
   // Callouts + cursor in screen space.
   const labels = [scene.items?.[0] ?? scene.subtext, scene.items?.[1]];
   hot.forEach((p, i) => {

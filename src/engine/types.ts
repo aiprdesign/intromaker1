@@ -521,7 +521,22 @@ export interface SkillContext {
   watermark?: string;
   /** The mouse pointer's look (unset: auto). */
   pointer?: PointerStyle;
+  /**
+   * Set when the studio edits this slide's points on the paused preview: the slide draws its
+   * overview (no zoom, lens or callouts) and reports where its editable points sit.
+   */
+  edit?: (layout: EditLayout) => void;
 }
+
+/**
+ * A slide's editable points on the frame, for the studio's on-preview handles. `map` turns a
+ * fraction of the picture into frame pixels: x = ox + fx * sx, y = oy + fy * sy.
+ */
+export type EditLayout =
+  /** UI Zoom Tour: the highlight areas ([x, y, w, h] fractions of the screenshot) and the screenshot's key. */
+  | { kind: "tour"; areas: [number, number, number, number][]; map: { ox: number; oy: number; sx: number; sy: number }; key?: string; clip: { x: number; y: number; w: number; h: number } }
+  /** Detail Zoom: the lens stops (fractions of the product cut-out) and the magnified spot's radius in frame pixels. */
+  | { kind: "lens"; points: [number, number][]; r: number; map: { ox: number; oy: number; sx: number; sy: number } };
 
 export interface MusicPulse {
   /** Seconds since the last kick the score played (Infinity when the drums are out). */

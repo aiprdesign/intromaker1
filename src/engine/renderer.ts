@@ -15,7 +15,7 @@ import { LOGO_3D_IDS } from "./skills/logo3d";
 import { saasBackground } from "./saasfx";
 import { setCrispText } from "./fx";
 import { liquidWipe, loadTransitions, renderTransition, transitionsReady } from "./gl";
-import type { Aspect, MusicPulse, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
+import type { Aspect, EditLayout, MusicPulse, Palette, Scene, SkillContext, Transition, VideoPlan } from "./types";
 
 export const TRANSITION_LEN = 0.45;
 
@@ -65,6 +65,8 @@ export interface RenderOptions {
   grade?: boolean;
   grain?: boolean;
   watermark?: string;
+  /** Editing on the paused preview: slides with editable points draw their overview flat and report them. */
+  edit?: (index: number, layout: EditLayout) => void;
 }
 
 type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
@@ -155,6 +157,7 @@ function drawScene(
     shapeSet: plan.shapeSet,
     watermark: plan.shapeSet === "text" ? watermarkText(plan) : undefined,
     pointer: plan.pointer,
+    edit: opts.edit ? (l) => opts.edit!(index, l) : undefined,
   };
   resetCtx(target);
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
@@ -174,7 +177,8 @@ function drawScene(
   const last = !scenes || index >= scenes.length - 1;
   const exitLen = Math.min(0.42, beat * 0.85);
   const exit = saas && d === scene.duration && !last && scene.role !== "cta" && !/^(cta|qr-end)$/.test(scene.skill) ? ease.inCubic(clamp((t - (d - exitLen)) / exitLen)) * 0.8 : 0;
-  if (turn > 0 || slab) {
+  // (While its points are edited the slide is drawn flat, so the handles sit on what they move.)
+  if (!opts.edit && (turn > 0 || slab)) {
     // 3D stages: the shot is drawn flat, then shown turned on a panel (turntable) or as a thick
     // floating slab, over the style's own background.
     saasBackground(sc);
@@ -192,7 +196,7 @@ function drawScene(
     resetCtx(target);
     return sc;
   }
-  if (depth > 0) {
+  if (!opts.edit && depth > 0) {
     // 3D stage: flat shader background, content projected onto a tilted, orbiting plane.
     saasBackground(sc);
     const layer = scratch("depth-content", w, h);

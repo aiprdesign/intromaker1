@@ -7,11 +7,15 @@ import { ensureFonts } from "@/engine/fonts";
 import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
 import { PALETTES } from "@/engine/palettes";
-import { aspectSize, renderFrame, totalDuration } from "@/engine/renderer";
+import { aspectSize, renderFrame, sceneAt as sceneAtTime, totalDuration } from "@/engine/renderer";
 import { previewsQuiet } from "./previewScheduler";
 import { SKILL_MAP } from "@/engine/skills";
-import type { Aspect, VideoPlan } from "@/engine/types";
+import type { Aspect, EditLayout, Scene, VideoPlan } from "@/engine/types";
+import PointsOverlay from "./PointsOverlay";
 import { WATERMARK, type PlanLimits } from "@/lib/plans";
+
+/** Slides whose points can be moved on the paused preview (and what the points are called). */
+const POINT_SLIDES: Record<string, string> = { "ui-tour": "highlight areas", "product-zoom": "zoom points" };
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
 
@@ -42,6 +46,7 @@ export default function Player({
   beforeExport,
   limits,
   onAspect,
+  onEditScene,
 }: {
   plan: VideoPlan;
   autoPlay?: boolean;
@@ -62,9 +67,13 @@ export default function Player({
   limits?: PlanLimits;
   /** Shows the frame picker (9:16, 16:9, 1:1) in the toolbar; called with the chosen format. */
   onAspect?: (aspect: Aspect) => void;
+  /** Lets the paused preview edit a slide's points in place (UI Zoom Tour's areas, Detail Zoom's lens stops). */
+  onEditScene?: (index: number, patch: Partial<Scene>) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playing, setPlaying] = useState(autoPlay);
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
   const [time, setTime] = useState(0);
   const [muted, setMuted] = useState(false);
   // Preview size: small, medium (default), large, or the full width; remembered. Full screen too.
@@ -115,6 +124,21 @@ export default function Player({
   const duration = totalDuration(plan);
   const { w, h } = aspectSize(plan.aspect, 1280);
 
+  // Paused on a slide with editable points (a tour's highlight areas, a zoom's lens stops), the
+  // preview shows the slide's overview with the points on it, to drag in place; "Hide" shows the
+  // paused frame as it plays.
+  const [showPoints, setShowPoints] = useState(true);
+  const pointsOn = useRef(true);
+  pointsOn.current = showPoints && !!onEditScene;
+  const [layout, setLayout] = useState<{ index: number; l: EditLayout } | null>(null);
+  const layoutKey = useRef("");
+  const keepLayout = (next: { index: number; l: EditLayout } | null) => {
+    const key = next ? JSON.stringify(next) : "";
+    if (key === layoutKey.current) return;
+    layoutKey.current = key;
+    setLayout(next);
+  };
+
   // Previews draw sharp frames: motion blur is part of the final render (the export) only.
   const pending = useRef<{ raf: number; t: number }>({ raf: 0, t: 0 });
   const paint = useCallback(
@@ -122,6 +146,16 @@ export default function Player({
       const c = canvasRef.current;
       if (!c) return;
       const ctx = c.getContext("2d")!;
+      const at = sceneAtTime(plan, t);
+      if (!playingRef.current && pointsOn.current && at && POINT_SLIDES[at.scene.skill]) {
+        // The slide mid-way (clear of transitions), flat and still, reporting its points.
+        let got: EditLayout | null = null;
+        renderFrame(ctx, plan, at.start + at.scene.duration * 0.5, c.width, c.height, { camera: false, edit: (i, l) => i === at.index && (got = l) });
+        if (grid) drawGridOverlay(ctx, c.width, c.height);
+        keepLayout(got ? { index: at.index, l: got } : null);
+        return;
+      }
+      keepLayout(null);
       // Grid view shows the layout itself: the lens (push-in, drift, beat punches) holds still.
       renderFrame(ctx, plan, t, c.width, c.height, grid ? { camera: false } : {});
       if (grid) drawGridOverlay(ctx, c.width, c.height);
@@ -248,9 +282,8 @@ export default function Player({
   }, [playing, plan, draw, duration]);
 
   useEffect(() => soundRef.current?.setMuted(muted), [muted]);
+  useEffect(() => draw(timeRef.current), [showPoints, draw]);
   // While paused, repaint when a website image/video frame becomes available.
-  const playingRef = useRef(playing);
-  playingRef.current = playing;
   useEffect(() => onMediaReady(() => !playingRef.current && draw(timeRef.current)), [draw]);
   useEffect(() => () => void soundRef.current?.close(), []);
 
@@ -350,6 +383,14 @@ export default function Player({
         onDoubleClick={fullScreen}
       >
         <canvas ref={canvasRef} width={w} height={h} onClick={toggle} />
+        {!playing && exporting === null && layout && layout.index === sceneAt && onEditScene && (
+          <PointsOverlay w={w} h={h} layout={layout.l} scene={plan.scenes[layout.index]} onCommit={(patch) => onEditScene(layout.index, patch)} />
+        )}
+        {!playing && exporting === null && onEditScene && POINT_SLIDES[plan.scenes[sceneAt]?.skill] && (
+          <button type="button" className="points-toggle" onClick={() => setShowPoints((v) => !v)} aria-pressed={showPoints}>
+            {showPoints ? `Hide ${POINT_SLIDES[plan.scenes[sceneAt].skill]}` : `Edit ${POINT_SLIDES[plan.scenes[sceneAt].skill]}`}
+          </button>
+        )}
         {/* Paused mid-film (editing a slide), the play button moves to the corner so the frame stays visible. */}
         {!playing && exporting === null && (
           <button className={`stage-play${time > 0.05 ? " mini" : ""}`} onClick={toggle} aria-label="Play">

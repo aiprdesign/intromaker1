@@ -2071,6 +2071,7 @@ export default function Studio() {
               resetKey={version}
               seek={seek}
               onScene={setActiveScene}
+              onEditScene={updateScene}
               limits={account?.limits}
               onAspect={(a) => {
                 setAspect(a);

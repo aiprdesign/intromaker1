@@ -1465,15 +1465,25 @@ function productZoom(sc: SkillContext) {
   saasBackground(sc, { beams: 0, grid: false });
   const portrait = h >= w * 0.95;
   topHeadline(sc);
-  const ex = ease.inCubic(exitT(sc, 0.4));
-  const k = clamp(spring(t - 0.1, 7, 6), 0, 1.06);
+  // Editing its lens stops on the paused preview: the product settled, without the lens.
+  const editing = !!sc.edit;
+  const ex = editing ? 0 : ease.inCubic(exitT(sc, 0.4));
+  const k = editing ? 1 : clamp(spring(t - 0.1, 7, 6), 0, 1.06);
   const box = portrait ? { cx: w / 2, cy: h * 0.55, w: w * 0.78, h: h * 0.46 } : { cx: w / 2, cy: h * 0.58, w: w * 0.44, h: h * 0.6 };
-  const rect = drawProduct(sc, box.cx, box.cy, box.w, box.h, k, clamp(t / 0.25) * (1 - ex));
+  const rect = drawProduct(sc, box.cx, box.cy, box.w, box.h, k, editing ? 1 : clamp(t / 0.25) * (1 - ex));
   if (!rect) return;
   const pi = productImage(sc);
   const pts = lensStops(scene, rect.src, pi?.key ?? "product");
   const labels = calloutItems(scene);
   const T = zoomTiming(d, pts.length);
+  // Lens size and zoom strength as set in the studio (× the defaults).
+  const R = Math.min(w, h) * (portrait ? 0.17 : 0.14) * clamp(scene.zoom?.size ?? 1, 0.6, 1.6);
+  const zoom = clamp(scene.zoom?.power ?? 2.7, 1.5, 4.5);
+  if (editing) {
+    // The spot a stop magnifies is R / zoom across, on the product as it sits in the frame.
+    sc.edit!({ kind: "lens", points: pts.map(([x, y]) => [x, y] as [number, number]), r: R / zoom, map: { ox: rect.x, oy: rect.y, sx: rect.w, sy: rect.h } });
+    return;
+  }
   if (t < T.first - T.move) return;
   // Which stop, and how far between the previous and this one.
   const idx = clamp(Math.floor((t - T.first) / T.each), 0, pts.length - 1);
@@ -1483,13 +1493,10 @@ function productZoom(sc: SkillContext) {
   const to = pts[idx];
   const fx = from[0] + (to[0] - from[0]) * mv;
   const fy = from[1] + (to[1] - from[1]) * mv;
-  // Lens size and zoom strength as set in the studio (× the defaults).
-  const R = Math.min(w, h) * (portrait ? 0.17 : 0.14) * clamp(scene.zoom?.size ?? 1, 0.6, 1.6);
   // The lens sits over the spot it magnifies, kept inside the frame and below the headline (it
   // still shows exactly that spot, wherever it has to sit).
   const lx = clamp(rect.x + fx * rect.w, w * 0.05 + R, w * 0.95 - R);
   const ly = clamp(rect.y + fy * rect.h, h * (portrait ? 0.2 : 0.17) + R, h * 0.93 - R);
-  const zoom = clamp(scene.zoom?.power ?? 2.7, 1.5, 4.5);
   const appear = idx === 0 ? mv : 1;
   ctx.save();
   ctx.globalAlpha = appear * (1 - ex);
