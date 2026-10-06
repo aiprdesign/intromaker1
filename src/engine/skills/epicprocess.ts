@@ -11,8 +11,8 @@
  * - step-cards:       big numbered cards flip over one by one to reveal each step, a glint
  *                     sweeping across as they land; the current card stands forward.
  * Services
- * - service-orbit:    services orbit a glowing core like planets; the current one swings to the
- *                     front, grows, and is named large beside the orbit.
+ * - service-orbit:    services orbit a glowing core like planets; the current one swings round to
+ *                     3 o'clock, grows, and is named large beside the orbit.
  * - service-carousel: a cover-flow of service cards under spotlights glides to each service in
  *                     turn, the current card large and facing the camera.
  * - service-hex:      a honeycomb of service tiles; the current one rises in 3D under a beam of
@@ -568,14 +568,14 @@ function serviceOrbit(sc: SkillContext) {
   const icons = iconsFor(P.map((p) => p.title), sc);
   const room = st.bottom - st.top;
   const current = currentOf(T, t, 0.05);
-  const ocx = narrow ? w / 2 : st.left + st.width * 0.3;
+  const ocx = narrow ? w / 2 - st.width * 0.06 : st.left + st.width * 0.27;
   const ocy = narrow ? st.top + room * 0.32 : st.top + room * 0.52;
-  const Rx = narrow ? Math.min(st.width * 0.46, room * 0.34) : Math.min(st.width * 0.3, room * 0.78);
+  const Rx = narrow ? Math.min(st.width * 0.34, room * 0.3) : Math.min(st.width * 0.26, room * 0.72);
   const Ry = Rx * (narrow ? 0.62 : 0.42);
   const Rc = Math.min(Ry * 0.72, Rx * 0.3);
   const D = TAU / n;
-  // The orbit turns so that each service in turn reaches the front.
-  let phi = Math.PI / 2;
+  // The orbit turns so that each service in turn reaches 3 o'clock, facing its name.
+  let phi = 0;
   for (let i = 1; i < n; i++) phi -= D * ease.inOutCubic(range(t, T[i] - 0.5, T[i]));
   const enter = clamp(spring(t - 0.1, 9, 7), 0, 1.04);
   ctx.save();
@@ -608,9 +608,11 @@ function serviceOrbit(sc: SkillContext) {
     const k = clamp(spring(t - 0.3 - i * 0.08, 12, 7), 0, 1.06);
     if (k <= 0) return;
     const grow = active ? ease.outCubic(range(t, T[i] - 0.2, T[i] + 0.3)) : 0;
-    const pr = (24 + 16 * (z + 1)) * u * S * (1 + grow * 0.55) * k;
+    // At 3 o'clock the current one is half way round the depth, so it is brought fully forward.
+    const zz = lerp(z, 1, grow);
+    const pr = (24 + 16 * (zz + 1)) * u * S * (1 + grow * 0.55) * k;
     ctx.save();
-    ctx.globalAlpha *= 0.45 + 0.55 * (z + 1) / 2;
+    ctx.globalAlpha *= 0.45 + 0.55 * (zz + 1) / 2;
     if (active) {
       ctx.shadowColor = rgba(palette.primary, 0.8);
       ctx.shadowBlur = 30 * u;
@@ -683,7 +685,7 @@ function serviceOrbit(sc: SkillContext) {
     const big = (narrow ? 60 : 70) * u * S;
     const box = narrow
       ? { x: w / 2, y: ocy + Ry + 150 * u * S, w: st.width, size: big, align: "center" as CanvasTextAlign }
-      : { x: ocx + Rx + 70 * u, y: ocy - big * 0.9, w: st.left + st.width - (ocx + Rx + 70 * u), size: big, align: "left" as CanvasTextAlign };
+      : { x: ocx + Rx + 120 * u * S, y: ocy - big * 0.9, w: st.left + st.width - (ocx + Rx + 120 * u * S), size: big, align: "left" as CanvasTextAlign };
     smallLabel(sc, `SERVICE ${num(current)}`, box.x, box.y - 8 * u, box.align, clamp((t - T[current]) / 0.3));
     stepFocus(sc, P, T, box);
   }
@@ -992,7 +994,7 @@ export const epicProcessSkills: Skill[] = [
   {
     id: "service-orbit",
     name: "Service Orbit",
-    tagline: "Services orbit a glowing core like planets; the current one swings to the front, grows and is named large beside the orbit.",
+    tagline: "Services orbit a glowing core like planets; the current one swings round to 3 o'clock, grows and is named large beside the orbit.",
     bestFor: "What a company offers, staged big: 3–6 services ('Service — short description'). Agencies, studios, platforms with several products.",
     sample: { text: "What we *offer*", items: SERVICES },
     itemsHint: "3–6 services: 'Service — short description'",
