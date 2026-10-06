@@ -12,7 +12,7 @@
  *                     sweeping across as they land; the current card stands forward.
  * Services
  * - service-orbit:    services orbit a glowing core like planets; the current one swings round to
- *                     3 o'clock, grows, and is named large beside the orbit.
+ *                     3 o'clock (the front in vertical frames), grows, and is named large beside it.
  * - service-carousel: a cover-flow of service cards under spotlights glides to each service in
  *                     turn, the current card large and facing the camera.
  * - service-hex:      a honeycomb of service tiles; the current one rises in 3D under a beam of
@@ -568,14 +568,15 @@ function serviceOrbit(sc: SkillContext) {
   const icons = iconsFor(P.map((p) => p.title), sc);
   const room = st.bottom - st.top;
   const current = currentOf(T, t, 0.05);
-  const ocx = narrow ? w / 2 - st.width * 0.06 : st.left + st.width * 0.27;
+  const ocx = narrow ? w / 2 : st.left + st.width * 0.27;
   const ocy = narrow ? st.top + room * 0.32 : st.top + room * 0.52;
-  const Rx = narrow ? Math.min(st.width * 0.34, room * 0.3) : Math.min(st.width * 0.26, room * 0.72);
+  const Rx = narrow ? Math.min(st.width * 0.46, room * 0.34) : Math.min(st.width * 0.26, room * 0.72);
   const Ry = Rx * (narrow ? 0.62 : 0.42);
   const Rc = Math.min(Ry * 0.72, Rx * 0.3);
   const D = TAU / n;
-  // The orbit turns so that each service in turn reaches 3 o'clock, facing its name.
-  let phi = 0;
+  // The orbit turns so that each service in turn reaches 3 o'clock, facing its name beside the
+  // orbit (6 o'clock, the front, in vertical frames, where the name sits underneath).
+  let phi = narrow ? Math.PI / 2 : 0;
   for (let i = 1; i < n; i++) phi -= D * ease.inOutCubic(range(t, T[i] - 0.5, T[i]));
   const enter = clamp(spring(t - 0.1, 9, 7), 0, 1.04);
   ctx.save();
@@ -994,7 +995,7 @@ export const epicProcessSkills: Skill[] = [
   {
     id: "service-orbit",
     name: "Service Orbit",
-    tagline: "Services orbit a glowing core like planets; the current one swings round to 3 o'clock, grows and is named large beside the orbit.",
+    tagline: "Services orbit a glowing core like planets; the current one swings round to 3 o'clock (the front in vertical frames), grows and is named large beside the orbit.",
     bestFor: "What a company offers, staged big: 3–6 services ('Service — short description'). Agencies, studios, platforms with several products.",
     sample: { text: "What we *offer*", items: SERVICES },
     itemsHint: "3–6 services: 'Service — short description'",
