@@ -13,6 +13,7 @@ import { speedMoreSkills } from "./speed2";
 import { launchSkills } from "./launch";
 import { beatSkills } from "./beats";
 import { processSkills } from "./process";
+import { epicProcessSkills } from "./epicprocess";
 import { logo3dSkills } from "./logo3d";
 import { logoCleanSkills } from "./logoclean";
 import { interactionSkills } from "./interactions";
@@ -46,6 +47,7 @@ export const SKILLS: Skill[] = [
   ...slideSkills,
   beatSkills[4],
   ...processSkills,
+  ...epicProcessSkills,
   ...productSkills,
   beatSkills[3],
   ...typeFxSkills,
@@ -88,7 +90,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Fast type", skills: [...fastTypeSkills, ...speedSkills, ...speedMoreSkills] },
   { name: "Product moments", skills: [...interactionSkills, ...momentSkills, ...launchSkills, ...beatSkills.slice(0, 3)] },
   { name: "Slides", skills: [...slideSkills, beatSkills[4]] },
-  { name: "Process & services", skills: processSkills },
+  { name: "Process & services", skills: [...processSkills, ...epicProcessSkills] },
   { name: "Media & gallery", skills: [...productSkills, beatSkills[3], ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Epic screens", skills: [...epicSkills, ...iconicSkills] },

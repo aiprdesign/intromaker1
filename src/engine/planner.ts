@@ -127,13 +127,21 @@ export const SERVICE_BIZ =
 
 /**
  * The how-it-works layout for a remake: the numbered line (the default), business-process arrows,
- * a staircase, and a cycle when there are three steps or more. Service businesses lead with the
- * process arrows.
+ * a light trail, a staircase, portals, a cycle (three steps or more) and flip cards (four or
+ * fewer). Service businesses lead with the process arrows.
  */
 export function howLayout(variant: number, n: number, serviceBiz = false) {
-  const order = serviceBiz ? (["process-chevrons", "steps", "step-stairs", "process-cycle"] as const) : (["steps", "process-chevrons", "step-stairs", "process-cycle"] as const);
-  const pick = order[Math.floor(variant / 2) % order.length];
-  return pick === "process-cycle" && n < 3 ? "process-chevrons" : pick;
+  const order = serviceBiz
+    ? (["process-chevrons", "steps", "step-portals", "step-stairs", "light-trail", "process-cycle", "step-cards"] as const)
+    : (["steps", "process-chevrons", "light-trail", "step-stairs", "step-portals", "process-cycle", "step-cards"] as const);
+  // Every third even take rides the 3D arrow (see the caller), so the order counts the takes
+  // left over: each layout comes up within the first few remakes.
+  const slot = Math.floor(variant / 2);
+  const pick = order[(slot - Math.floor((slot + 2) / 3)) % order.length];
+  // (A cycle needs three steps; flip cards suit four or fewer.)
+  if (pick === "process-cycle" && n < 3) return "process-chevrons";
+  if (pick === "step-cards" && n > 4) return "step-portals";
+  return pick;
 }
 
 export function audiencesOf(text: string): string[] {
@@ -1541,7 +1549,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     // Editorial system layouts: a showreel of the features, or the card system.
     ...(featureItems.length >= 3 ? ["reel", "system", "stack", "sheet", "contact", "widgets", ...(serviceBiz ? [] : ["services"])] : []),
   ];
-  const featureKind = featureKinds.length ? featureKinds[variant % featureKinds.length] : null;
+  // (Service businesses show their services on every other take.)
+  const featureKind = serviceBiz && featureItems.length >= 2 && variant % 2 === 0 ? "services" : featureKinds.length ? featureKinds[variant % featureKinds.length] : null;
   const featureSlides = featureKind === "slides";
   if (featureSlides) {
     add(valuePriority, {
@@ -1603,10 +1612,12 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       transition: "dolly",
     });
   } else if (featureKind === "services") {
-    // A big icon for the current service beside the list ("Service — what it is" where the site says).
+    // A big icon for the current service beside the list ("Service — what it is" where the site
+    // says); remakes stage the services as an orbit, a carousel or a honeycomb.
     const offer = (withBenefit.length >= 2 ? withBenefit : featureItems).slice(0, 5);
+    const serviceSkill = (["services", "service-orbit", "service-carousel", "service-hex"] as const)[Math.floor(variant / 2) % 4];
     add(valuePriority, {
-      role: "features", skill: "services",
+      role: "features", skill: offer.length < 3 && serviceSkill === "service-orbit" ? "services" : serviceSkill,
       text: serviceBiz ? "What we *do*" : `Inside *${site.name}*`,
       items: offer,
       eyebrow: serviceBiz ? "Services" : "Features",
@@ -1956,7 +1967,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   // Chapter labels in the category's own voice.
   for (const sc of scenes) {
     const eb = concept.eyebrows[sc.role as keyof typeof concept.eyebrows];
-    if (eb && sc.role !== "reveal" && sc.role !== "cta" && !(sc.skill === "services" && sc.eyebrow === "Services")) sc.eyebrow = eb;
+    if (eb && sc.role !== "reveal" && sc.role !== "cta" && !((sc.skill === "services" || sc.skill.startsWith("service-")) && sc.eyebrow === "Services")) sc.eyebrow = eb;
   }
   // "Free" is an offer, and an offer must be real: only when the site itself offers something free.
   const freeOffer = offersFree([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features].join(" "));

@@ -26,21 +26,21 @@ import { iconTile } from "./interactions";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 /** Ink on the brand gradient. */
-const onFill = (p: Palette) => (p.light ? "#ffffff" : p.bg0);
+export const onFill = (p: Palette) => (p.light ? "#ffffff" : p.bg0);
 /** The brand gradient's colour for step i of n. */
-const stepColor = (p: Palette, i: number, n: number) => mixHex(p.primary, p.secondary, n > 1 ? i / (n - 1) : 0);
-const num = (i: number) => String(i + 1).padStart(2, "0");
+export const stepColor = (p: Palette, i: number, n: number) => mixHex(p.primary, p.secondary, n > 1 ? i / (n - 1) : 0);
+export const num = (i: number) => String(i + 1).padStart(2, "0");
 
 /** The stage under the headline, with a side margin in vertical and square frames (whose
  * title-safe area runs close to the edges). */
-function frame(sc: SkillContext) {
+export function frame(sc: SkillContext) {
   const st = stage(sc);
   const inset = st.narrow ? sc.w * 0.045 : 0;
   return { ...st, left: st.left + inset, width: st.width - inset * 2 };
 }
 
 /** When each of n steps lights up: one slot each, after a short build. */
-function stepTimes(scene: Scene, n: number, start = 0.7) {
+export function stepTimes(scene: Scene, n: number, start = 0.7) {
   const slot = clamp((scene.duration - start - 1.2) / Math.max(1, n), 0.55, 1.5);
   return Array.from({ length: n }, (_, i) => start + i * slot);
 }
@@ -81,7 +81,7 @@ function stepText(
 
 /* ───────────────────────── Process Arrows ───────────────────────── */
 
-const FLOW = ["Discover — We learn your goals", "Plan — A roadmap that fits", "Build — Design and development", "Launch — Go live and grow"];
+export const FLOW = ["Discover — We learn your goals", "Plan — A roadmap that fits", "Build — Design and development", "Launch — Go live and grow"];
 
 /** A chevron pointing right (or down); the first one in the row has a flat back. */
 function chevronPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, notch: number, first: boolean, down: boolean) {
@@ -109,7 +109,7 @@ function chevronPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
  * active tab (the old name slides away, the new one's words rise in one after another), so the
  * viewer always knows which step is being talked about.
  */
-function stepFocus(
+export function stepFocus(
   sc: SkillContext,
   P: { title: string; detail: string }[],
   T: number[],
@@ -712,7 +712,7 @@ const stairsSfx = (scene: Scene): SfxCue[] => {
 
 /* ───────────────────────── Services ───────────────────────── */
 
-const SERVICES = ["Brand strategy — Positioning, naming and voice", "Web design — Clear, modern sites", "Development — Apps built to grow with you", "Marketing — Campaigns from idea to launch"];
+export const SERVICES = ["Brand strategy — Positioning, naming and voice", "Web design — Clear, modern sites", "Development — Apps built to grow with you", "Marketing — Campaigns from idea to launch"];
 
 function servicesTiming(scene: Scene, n: number) {
   const start = 0.55;
