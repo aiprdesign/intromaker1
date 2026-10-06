@@ -74,6 +74,12 @@ export function canonicalListing(raw: string): string {
   return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, "") || "/"}`;
 }
 
+/** The marketplace a host belongs to, whatever page (its home page, a search…), or null. */
+export function marketplaceHost(host: string): Market | null {
+  const m = MARKETS.find((x) => x.host.test(host));
+  return m ? { id: m.id, name: m.name } : null;
+}
+
 /** Which marketplace a listing URL is on (null for other sites). */
 export function marketOf(raw: string): Market | null {
   let u: URL;

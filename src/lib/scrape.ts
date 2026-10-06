@@ -3,6 +3,7 @@ import type { SiteData } from "@/engine/types";
 import { createHash } from "node:crypto";
 import { captureSite, cleanSvg, save } from "./capture";
 import { canonicalListing, marketOf, readListing, scrapeListing } from "./listing";
+import { marketplaceHost } from "./markets";
 import { safeFetch, UrlError } from "./netguard";
 
 const MAX_HTML = 3_000_000;
@@ -196,6 +197,13 @@ export function httpProblem(status: number, url: URL): UrlError {
       notHome ? `That page doesn't exist on ${host} (error ${status}). Check the address, or import the home page.` : `${host} answers "page not found" (error ${status}). Check the address.`,
       "notfound",
       notHome ? home : undefined,
+    );
+  // A marketplace's home page isn't a product: one listing is (and reads through its API when set up).
+  const market = marketplaceHost(host);
+  if ((status === 401 || status === 403 || status === 451) && market && !marketOf(url.href))
+    return new UrlError(
+      `${host} is ${market.name}'s home page, which doesn't let automated visitors in (error ${status}). Paste one product's listing link instead${market.id === "ebay" ? " (ebay.com/itm/…)" : market.id === "amazon" ? " (amazon.com/dp/…)" : ""}, or add your product photos with "Add product photos" and describe it in the prompt.`,
+      "blocked",
     );
   if (status === 401 || status === 403 || status === 451)
     return new UrlError(`${host} doesn't let automated visitors in (error ${status}), so it can't be imported. Describe your product in the prompt instead.`, "blocked");
