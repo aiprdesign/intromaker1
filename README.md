@@ -140,7 +140,8 @@ Prodintro.com is a portfolio project: a SaaS-style web app that turns a text pro
   - a ⌘K command palette (keycaps, live filtering, a result card);
   - an AI prompt that streams its answer, in the product's own words;
   - a one-click flow (micro-zoom, then a task cascade; the tasks are the product's own features or steps from its site or prompt, with stock tasks for its category only when it has fewer than two);
-  - an iOS-style notification stack;
+  - every product moment (notifications, the command palette, a board's cards, a chat, an inbox, a calendar, a table, comments, keyboard shortcuts, a phone's callouts, a file drop, settings and what's new) is filled from the video's own features and how-it-works steps, the ones not shown elsewhere first, both by the director and when the slide is added in the studio; a category's stock copy is used only when the product names too few features (a sales or hiring pipeline keeps its stages, since features aren't deals or candidates). The globe's live events and the support slide's help articles use the product's features the same way;
+  - an iOS-style notification stack (each notification one of the product's own features with the site's line about it);
   - a growth chart for one real metric;
   - code to deploy: code types into an editor, `git push` runs and the pipeline ticks green (developer tools);
   - a kanban board where a cursor drags a card and the rest of the work flows into Done (projects, hiring and sales pipelines);

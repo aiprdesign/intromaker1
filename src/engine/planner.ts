@@ -1,6 +1,7 @@
 import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
+import { ownMoment } from "./momentitems";
 import { hasSpecificIcon } from "./icons";
 import { writeVoiceover } from "./script";
 import { isClaimWord, isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
@@ -1664,14 +1665,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const fitting = moments.filter((m, i) => m.score >= moments[0].score * 0.6 || (variant > 0 && i === 1 && m.score > 0));
   // Offset from the feature-layout rotation, so consecutive remakes never repeat the original's pair.
   const fit = fitting[(variant + Math.floor(variant / 2)) % fitting.length];
-  const demo = fit.spec;
-  const demoWhy = fit.because.length ? `Best fit: the site talks about ${fit.because.slice(0, 3).join(", ")}` : `Typical of ${concept.name.toLowerCase()} launch videos`;
+  // The moment is filled from the product's own features and steps (ones the film hasn't shown
+  // first); the category's stock copy only when it names too few (see momentitems.ts).
+  const spareSet = new Set(spareFeatures.map(norm));
+  const ownFeatures = [...bentoItems.filter((it) => spareSet.has(norm(it.split(/\s+[—–]\s+/)[0]))), ...bentoItems.filter((it) => !spareSet.has(norm(it.split(/\s+[—–]\s+/)[0])))];
+  const own = fit.spec.skill === "ai-prompt" ? null : ownMoment(fit.spec.skill, { name: site.name, features: ownFeatures, steps: site.steps ?? [] }, fit.spec);
+  const demo = own ? { ...fit.spec, title: own.title ?? fit.spec.title, action: own.action ?? fit.spec.action, items: own.items } : fit.spec;
+  const demoWhy =
+    (fit.because.length ? `Best fit: the site talks about ${fit.because.slice(0, 3).join(", ")}` : `Typical of ${concept.name.toLowerCase()} launch videos`) +
+    (own ? "; filled from its own features" : "");
   let demoScene: Scene | null = null;
   if (demo.skill === "command-k") {
-    // The command that runs is a real feature; the rest are the palette's everyday commands.
-    // (A feature already shown elsewhere in the film isn't repeated: the palette's own commands run instead.)
+    // With too few features of its own, the command that runs is a real feature and the rest are
+    // the palette's everyday commands.
     const lead = spareFeatures[0];
-    demoScene = { role: "demo", skill: "command-k", text: demo.title, items: lead ? [lead, ...demo.items].slice(0, 4) : demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
+    demoScene = { role: "demo", skill: "command-k", text: demo.title, items: own ? demo.items : lead ? [lead, ...demo.items].slice(0, 4) : demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
   } else if (demo.skill === "ai-prompt") {
     // Ask the product what it does; it answers in its own words (the site's copy, first person).
     const said = aiSelfIntro(shortenCopy(site.description.split(/(?<=[.!?])\s/)[0] ?? "", 24) || descClause || tagline, site.name);
@@ -1689,39 +1697,14 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     };
   } else if (demo.skill === "code-deploy") {
     demoScene = { role: "demo", skill: "code-deploy", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(12), transition: "whip" };
-  } else if (demo.skill === "kanban") {
-    demoScene = { role: "demo", skill: "kanban", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(12), transition: "whip" };
-  } else if (demo.skill === "live-cursors") {
-    // The shared board holds the product's own features when the film hasn't shown them yet.
-    const cards = spareFeatures.length >= 3 ? spareFeatures.slice(0, 4) : demo.items;
-    demoScene = { role: "demo", skill: "live-cursors", text: demo.title, subtext: demo.action, items: cards, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
+  } else if (demo.skill === "kanban" || demo.skill === "live-cursors" || demo.skill === "click-flow" || demo.skill === "phone-tour" || demo.skill === "drop-zone") {
+    demoScene = { role: "demo", skill: demo.skill, text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(demo.skill === "kanban" ? 12 : demo.skill === "phone-tour" ? 11 : 10), transition: "whip" };
   } else if (demo.skill === "chat-thread") {
     demoScene = { role: "demo", skill: "chat-thread", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
-  } else if (demo.skill === "click-flow") {
-    // The tasks that tick off are the product's own (its features the film hasn't shown yet, else
-    // its features, else its how-it-works steps), so the moment is about this product, not a stock
-    // checklist for its category (three or more where it has them, else two); the category's tasks
-    // and button only when the site has fewer.
-    const brief = (xs: string[]) => [...new Set(xs.map((x) => x.split(/\s+[—–]\s+/)[0].trim()).filter((x) => x && x.split(/\s+/).length <= 6))];
-    const own = [brief(spareFeatures), brief(shortFeatures), brief(site.steps ?? [])].find((xs) => xs.length >= 3) ?? [brief(shortFeatures), brief(site.steps ?? [])].find((xs) => xs.length >= 2);
-    const named = site.name && site.name !== "Your product";
-    demoScene = own
-      ? { role: "demo", skill: "click-flow", text: named ? `${site.name}, *in action*` : "Your work, *in motion*", subtext: "Run", items: own.slice(0, 4), eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" }
-      : { role: "demo", skill: "click-flow", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
-  } else if (demo.skill === "toggle-list" || demo.skill === "changelog") {
-    // Settings and "what's new" read best as the product's own features, when the film has spare ones.
-    const own = spareFeatures.filter((f) => f.split(/\s+/).length <= 5);
-    demoScene = { role: "demo", skill: demo.skill, text: demo.title, items: own.length >= 3 ? own.slice(0, demo.skill === "changelog" ? 5 : 4) : demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else if (demo.skill === "comment-pins") {
     // Comments land on the product's own screen.
     demoScene = { role: "demo", skill: "comment-pins", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip", media: tourMedia ?? undefined };
-  } else if (demo.skill === "phone-tour") {
-    // The phone's callouts are the product's own short features, when the film has spare ones.
-    const own = spareFeatures.filter((f) => f.split(/\s+/).length <= 4);
-    demoScene = { role: "demo", skill: "phone-tour", text: demo.title, subtext: demo.action, items: own.length >= 3 ? own.slice(0, 3) : demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
-  } else if (demo.skill === "drop-zone") {
-    demoScene = { role: "demo", skill: "drop-zone", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(10), transition: "whip" };
-  } else if (demo.skill === "keycaps" || demo.skill === "calendar-drop" || demo.skill === "inbox-sweep" || demo.skill === "table-fill") {
+  } else if (demo.skill === "toggle-list" || demo.skill === "changelog" || demo.skill === "keycaps" || demo.skill === "calendar-drop" || demo.skill === "inbox-sweep" || demo.skill === "table-fill") {
     demoScene = { role: "demo", skill: demo.skill, text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else {
     demoScene = { role: "demo", skill: "notify-stack", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(demo.items.length * 1.2 + 5), transition: "whip" };
@@ -1757,6 +1740,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const globalLine = [site.tagline, site.description, ...site.headlines, ...site.features].find((x) => GLOBAL.test(x ?? ""));
   if (target >= 20 && globalLine) {
     const own = sentenceCopy(globalLine, 8);
+    const reachEvents = [...new Set(shortFeatures.filter((f) => f.split(/\s+/).length <= 3))].slice(0, 4);
     const n = own.split(/\s+/).length;
     // A flat map when the site talks about places (countries, regions, currencies, languages);
     // the turning globe when it talks about a global network or reach.
@@ -1764,7 +1748,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     add(target >= 30 ? 4 : 6, {
       role: "reach", skill: flatMap ? "world-map" : "globe",
       text: own && !/\d/.test(own) && n >= 3 && n <= 8 ? own : REACH[concept.id]?.title ?? REACH.general.title,
-      items: (REACH[concept.id] ?? REACH.general).items,
+      // The live events are the product's own short features; the category's generic ones otherwise.
+      items: reachEvents.length >= 3 ? reachEvents : (REACH[concept.id] ?? REACH.general).items,
       eyebrow: "Global",
       why: flatMap ? "The site talks about countries, regions or currencies" : "The site talks about global use",
       duration: beats(11),
@@ -1800,12 +1785,15 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // 5f. Support: when the site talks about help, docs or onboarding (and the demo isn't already a
   // support chat).
+  const helpTopics = [...new Set(shortFeatures.filter((f) => f.split(/\s+/).length <= 4))];
+  const lowerFirst = (x: string) => (/^[A-Z][a-z]/.test(x) ? x[0].toLowerCase() + x.slice(1) : x);
   if (target >= 20 && SUPPORT.test([whole.tagline, whole.description, ...whole.headlines, ...whole.features].join(" ")) && demo.skill !== "chat-thread") {
     add(target >= 30 ? 5 : 7, {
       role: "support", skill: "support",
       text: "Support, *built in*",
-      subtext: "How do I invite my team?",
-      items: [`Getting started with ${site.name}`, "Invite your team", "Connect your tools", "Manage your account"],
+      // The help articles and the question are about the product's own features where it names them.
+      subtext: helpTopics.length >= 2 ? `How do I use ${lowerFirst(helpTopics[0])}?` : "How do I invite my team?",
+      items: helpTopics.length >= 2 ? [`Getting started with ${site.name}`, ...helpTopics.slice(0, 3).map((f) => `Using ${lowerFirst(f)}`)] : [`Getting started with ${site.name}`, "Invite your team", "Connect your tools", "Manage your account"],
       eyebrow: "Support",
       why: "The site talks about support, docs or onboarding",
       duration: beats(12),

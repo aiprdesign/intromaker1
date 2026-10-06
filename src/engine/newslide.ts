@@ -1,4 +1,5 @@
 import { momentCopy } from "./concepts";
+import { ownMoment } from "./momentitems";
 import { SKILL_MAP } from "./skills";
 import { roleOf } from "./templates";
 import type { Scene, SkillId, VideoPlan } from "./types";
@@ -25,6 +26,12 @@ function filmFeatures(plan: VideoPlan) {
     }
   }
   return out;
+}
+
+/** The film's how-it-works steps (from a steps slide), for moments that can use them. */
+function filmSteps(plan: VideoPlan) {
+  const hint = (s: Scene) => SKILL_MAP[s.skill]?.itemsHint ?? "";
+  return plan.scenes.filter((s) => s.skill === "steps" || (/\bsteps?\b/i.test(hint(s)) && !/pipeline/i.test(hint(s)))).flatMap((s) => s.items ?? []);
 }
 
 /** The film's features shaped like the slide's sample: "Title — detail" pairs, or plain titles. */
@@ -86,10 +93,17 @@ export function slideContent(skill: SkillId, plan: VideoPlan, direct: (variant: 
   // A product moment of another kind (a board, a chat, an inbox…) has its own words: they aren't
   // borrowed from the film's other moment. Lists of features take the film's own.
   const moment = role === "demo" ? momentCopy(skill) : undefined;
-  // A one-click flow ticks off the product's own features, not a stock checklist.
-  const own = features.map((x) => x.split(/\s+[—–]\s+/)[0]).filter((x) => x.split(/\s+/).length <= 6);
-  if (skill === "click-flow" && own.length >= 2)
-    return { text: name ? `${name}, *in action*` : "Your work, *in motion*", eyebrow: moment?.eyebrow ?? "In action", subtext: "Run", items: own.slice(0, 4), role };
+  // A product moment shows the film's own features (notifications, commands, a board's cards…),
+  // not the moment's stock copy, whenever the film has enough of them.
+  const own = moment ? ownMoment(skill, { name, features, steps: filmSteps(plan) }, moment) : null;
+  if (moment && own)
+    return {
+      text: own.title ?? (name ? `${name}: ${moment.title.charAt(0).toLowerCase()}${moment.title.slice(1)}` : moment.title),
+      eyebrow: moment.eyebrow,
+      subtext: k.sample.subtext !== undefined ? own.action ?? moment.action : undefined,
+      items: own.items,
+      role,
+    };
   if (moment)
     return {
       // ("Nimbus: your week, *planned*")
