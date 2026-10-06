@@ -105,18 +105,12 @@ export default function Player({
   // Designer's grid overlay: preview only, never part of an export.
   const [grid, setGrid] = useState(false);
   // Export what's being watched: the format on screen, at 1080p or the larger size the plan
-  // allows (4K by default), chosen beside the Export button and remembered.
+  // allows (4K by default), chosen beside the Export button. 1080p on every visit: 4K is picked
+  // each time it's wanted.
   const maxLong = limits?.maxLong ?? 1920;
   const sizes = maxLong > 1920 ? [1920, maxLong] : [];
   const [bigSize, setBigSize] = useState(false);
   const [bigOk, setBigOk] = useState(true);
-  useEffect(() => {
-    try {
-      setBigSize(localStorage.getItem("intromaker.export-size") === "large");
-    } catch {
-      /* ignore */
-    }
-  }, []);
   useEffect(() => {
     if (maxLong <= 1920) return;
     let live = true;
@@ -126,14 +120,7 @@ export default function Player({
       live = false;
     };
   }, [maxLong]);
-  const chooseSize = (big: boolean) => {
-    setBigSize(big);
-    try {
-      localStorage.setItem("intromaker.export-size", big ? "large" : "1080p");
-    } catch {
-      /* ignore */
-    }
-  };
+  const chooseSize = (big: boolean) => setBigSize(big);
   const exportLong = bigSize && bigOk && maxLong > 1920 ? maxLong : Math.min(1920, maxLong);
   const preset = exportFormat(plan.aspect, exportLong);
   const fileBase = (p: VideoPlan) => `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "intro"}-${p.aspect.replace(":", "x")}`;
