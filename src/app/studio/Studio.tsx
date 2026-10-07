@@ -483,8 +483,11 @@ export default function Studio() {
     // Product videos look best in the bright studio (or, as a trailer, in a trailer style); software
     // films get their category's style.
     const trailerCut = styleRef.current === "trailer";
-    const id =
-      p.style === "saas"
+    // Asked for characters (a cartoon, a mascot, a video for kids): the cartoon style tells it.
+    const cartoon = p.style === "saas" && !p.product && /\b(cartoons?|animated characters?|characters?|mascots?|kids?|children|preschool)\b/i.test(promptRef.current);
+    const id = cartoon
+      ? "cartoon"
+      : p.style === "saas"
         ? p.product
           ? trailerCut
             ? TEMPLATE_MAP[p.template ?? ""]?.trailer
@@ -830,6 +833,8 @@ export default function Studio() {
     try {
       const take = await direct({ ...opts, signal });
       if (!stillRunning(run)) return;
+      // (Known before the take is shown, so its style suggestion reads this description.)
+      promptRef.current = (opts.prompt ?? prompt).trim();
       show(take, 0);
       setSavedId(null);
       // A new intro: its own entry in the sidebar.

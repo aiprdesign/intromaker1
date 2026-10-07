@@ -248,6 +248,24 @@ export const TEMPLATES: Template[] = [
     sample: sample("Plans with friends, *sorted*."),
   },
   {
+    id: "cartoon",
+    name: "Cartoon Pals",
+    category: "Bold & Playful",
+    description: "Friendly flat cartoon characters tell the story: a mascot says hello, a presenter explains, a team cheers you on.",
+    vibe: "Warm, human and playful. Simple, friendly copy a child could read aloud; characters do the talking; bouncy motion.",
+    palette: "pastel",
+    font: "manrope",
+    bpm: 118,
+    music: "saas",
+    flavor: "pop",
+    look: { grid: false, beams: 0, aurora: 1.1, text: "pop", grain: 0.3 },
+    transitions: ["push", "swipe", "zoom", "dissolve"],
+    pace: 1,
+    roles: { hook: "char-hello", features: "char-presenter", cards: "char-team", bento: "char-presenter", solve: "char-aha", demo: "char-desk", cta: "char-cheer" },
+    revealNoLogo: "char-hello",
+    sample: sample("Learning, *made friendly*."),
+  },
+  {
     id: "keynote",
     name: "Cinematic Keynote",
     category: "Premium",
@@ -1088,6 +1106,12 @@ export const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "service-fan": "features",
   "service-board": "features",
   "service-bento": "features",
+  "char-hello": "hook",
+  "char-presenter": "features",
+  "char-team": "cards",
+  "char-aha": "solve",
+  "char-desk": "demo",
+  "char-cheer": "cta",
   "service-spotlight": "features",
   "spotlight": "tour",
   "device-trio": "tour",
@@ -1184,7 +1208,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

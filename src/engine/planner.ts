@@ -347,7 +347,8 @@ const FILLER = new Set(
   (
     "make create generate build give me i want need please video intro outro trailer teaser promo launch launching " +
     "motion graphics graphic animation animated epic modern cinematic style called named " +
-    "some very really super cool awesome amazing using use like vibe vibes feel feeling seconds second sec"
+    "some very really super cool awesome amazing using use like vibe vibes feel feeling seconds second sec " +
+    "cartoon cartoons character characters"
   ).split(" "),
 );
 /** Glue words kept inside a phrase but trimmed from its edges. */
@@ -618,8 +619,8 @@ function naturalCase(phrase: string, source: string) {
  * Edge functions]; verb clauses ("writes your emails and summarises your meetings") become
  * features too.
  */
-/** "An intro for …" / "Launch video about …": the request, not the product. */
-const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer)\s+)?(?:video|film|teaser|trailer|intro|promo)\s+(?:for|about|of)\s+/i;
+/** "An intro for …" / "Launch video about …" / "A cartoon video with characters for …": the request, not the product. */
+const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer|cartoon|animated|fun)\s+)*(?:video|film|teaser|trailer|intro|promo)(?:\s+with\s+(?:cartoon\s+|animated\s+)?(?:characters?|a\s+mascot|mascots))?\s+(?:for|about|of)\s+/i;
 
 export function parseSaasPrompt(prompt: string) {
   const brand = extractBrand(prompt);
