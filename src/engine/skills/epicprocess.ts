@@ -6,7 +6,8 @@ import { lightSweep } from "../fx";
  *
  * Steps
  * - step-portals:     the camera flies through glowing rings, one per step, with light streaks as
- *                     it moves; the step it arrives at is named large inside its ring.
+ *                     it moves; the step it arrives at is named large inside its ring, the rings
+ *                     ahead staying faint behind it until the camera moves on.
  * - light-trail:      a comet races along a sweeping path and ignites each step with a burst; the
  *                     step it reaches is named large beside its orb.
  * - step-cards:       big numbered cards flip over one by one to reveal each step, a glint
@@ -87,10 +88,17 @@ function stepPortals(sc: SkillContext) {
   const room = st.bottom - st.top;
   const cx = w / 2;
   const cy = st.top + room * (narrow ? 0.46 : 0.5);
-  const Rt = narrow ? Math.min(st.width * 0.47, room * 0.3) : Math.min(room * 0.45, st.width * 0.3);
+  // The ring, its ticks and the progress dots under it fit the frame (the dots never touch the ring).
+  const dotGap = 34 * u;
+  const Rt = Math.min(narrow ? st.width * 0.47 : st.width * 0.3, (room * (narrow ? 0.92 : 1) - 2 * dotGap) / 2.24);
   const c = portalCamera(T, t);
   const speed = Math.abs(portalCamera(T, t + 0.02) - portalCamera(T, t - 0.02)) / 0.04;
   const current = currentOf(T, t, 0.05);
+  // How fully the current step is on show: while it is, the rings ahead stay faint and unlabelled
+  // behind it (they'd otherwise sit right through its name); they come back as the camera moves on.
+  const nextT = current >= 0 && current + 1 < n ? T[current + 1] : Infinity;
+  const leave = current >= 0 && Number.isFinite(nextT) ? ease.inCubic(range(t, nextT - 0.38, nextT - 0.2)) : 0;
+  const shown = current >= 0 ? ease.outCubic(range(t, T[current] - 0.15, T[current] + 0.2)) * (1 - leave) : 0;
   ctx.save();
   ctx.globalAlpha = 1 - ex;
   // Light streaks while the camera moves: thin lines rushing out from the centre.
@@ -127,8 +135,9 @@ function stepPortals(sc: SkillContext) {
     const lit = t >= T[i] - 0.1;
     const x = cx + ox;
     const y = cy + oy;
+    const ahead = d > 0.35;
     ctx.save();
-    ctx.globalAlpha *= a * (lit ? 1 : 0.55);
+    ctx.globalAlpha *= a * (lit ? 1 : 0.55) * (ahead ? 1 - 0.9 * shown : 1);
     const g = ctx.createLinearGradient(x - R, y - R, x + R, y + R);
     g.addColorStop(0, palette.primary);
     g.addColorStop(1, palette.secondary);
@@ -155,7 +164,7 @@ function stepPortals(sc: SkillContext) {
     ctx.lineWidth = Math.max(1, 2 * u * s);
     ticks(ctx, x, y, R * 1.06, R * 0.05, 48, t * 0.15 * (i % 2 ? 1 : -1));
     // The step's number and icon on the ring's rim, for rings ahead.
-    if (d > 0.35) {
+    if (ahead && shown < 0.12) {
       ctx.fillStyle = palette.text;
       ctx.font = subFont(Math.max(12 * u, 30 * u * S * s), 750);
       ctx.textAlign = "center";
@@ -167,27 +176,30 @@ function stepPortals(sc: SkillContext) {
   }
   // Inside the ring the camera has reached: its number, faint and huge, then the step's name.
   if (current >= 0) {
-    const next = current + 1 < n ? T[current + 1] : Infinity;
-    const leave = ease.inCubic(range(t, next - 0.38, next - 0.2));
     ctx.save();
     ctx.globalAlpha *= 1 - leave;
     ctx.translate(cx, cy);
     ctx.scale(1 + leave * 0.4, 1 + leave * 0.4);
     ctx.translate(-cx, -cy);
-    const big = Math.min(84 * u * S, Rt * 0.26);
-    ctx.font = displayFont(saasFont(sc), Rt * 0.95);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.strokeStyle = rgba(palette.text, 0.1);
-    ctx.lineWidth = 2 * u;
-    ctx.strokeText(num(current), cx, cy);
-    smallLabel(sc, `STEP ${num(current)}`, cx, cy - big * 0.75, "center", clamp((t - T[current]) / 0.3));
-    drawIcon(ctx, icons[current], cx, cy - big * 1.55, big * 0.62, palette.primary, ease.outCubic(range(t, T[current], T[current] + 0.6)));
-    stepFocus(sc, P, T, { x: cx, y: cy - big * 0.55, w: Rt * 1.55, size: big, align: "center" });
+    // A soft disc behind the words, so nothing in the tunnel shows through them.
+    const disc = ctx.createRadialGradient(cx, cy, 0, cx, cy, Rt * 0.86);
+    disc.addColorStop(0, rgba(palette.bg0, 0.82 * shown));
+    disc.addColorStop(0.7, rgba(palette.bg0, 0.55 * shown));
+    disc.addColorStop(1, rgba(palette.bg0, 0));
+    ctx.fillStyle = disc;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Rt * 0.86, 0, TAU);
+    ctx.fill();
+    // Icon, STEP 0n, the step's name and its detail, centred in the ring as one block.
+    const big = Math.min(104 * u * S, Rt * 0.3);
+    const top = cy - big * 0.95;
+    drawIcon(ctx, icons[current], cx, top - big * 0.95, big * 0.6, palette.primary, ease.outCubic(range(t, T[current], T[current] + 0.6)));
+    smallLabel(sc, `STEP ${num(current)}`, cx, top - big * 0.2, "center", clamp((t - T[current]) / 0.3));
+    stepFocus(sc, P, T, { x: cx, y: top, w: Rt * 1.5, size: big, align: "center" });
     ctx.restore();
   }
   // Progress: a dot per step under the tunnel.
-  const dy = Math.min(st.bottom - 14 * u, cy + Rt + 44 * u);
+  const dy = cy + Rt * 1.12 + dotGap;
   for (let i = 0; i < n; i++) {
     const on = i <= current;
     const dx = cx + (i - (n - 1) / 2) * 26 * u;
