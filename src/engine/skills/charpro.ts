@@ -26,7 +26,7 @@ import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
-import { blinkAt, bubble, bubbleText, pointTimes, pop, useToon } from "./characters";
+import { blinkAt, fitBubble, pointTimes, pop, speech, useToon } from "./characters";
 import { iconTile } from "./interactions";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
@@ -1074,14 +1074,10 @@ function proDuo(sc: SkillContext) {
     const r = rigs[cur % 2];
     const k = pop(t, T[cur], T[cur + 1] !== undefined ? T[cur + 1] - 0.15 : Infinity);
     const size = 32 * u * S;
-    ctx.font = subFont(size, 700);
-    const bw = Math.min(st.width * (narrow ? 0.9 : 0.52), Math.max(240 * u, ctx.measureText(P[cur]).width * 0.62 + 70 * u));
-    const bh = size * 3.2;
-    const bx = clamp(r.head.x - bw / 2, st.left, st.left + st.width - bw);
-    const by = Math.max(st.top, r.top - bh - 36 * u);
-    const box = { x: bx, y: by, w: bw, h: bh };
-    bubble(sc, box, { x: r.head.x, y: r.top - 8 * u }, k);
-    bubbleText(sc, P[cur], box, size, k, false);
+    const tip = { x: r.head.x, y: r.top - 8 * u };
+    const area = { x: st.left, y: st.top, w: st.width, h: Math.max(size * 2, tip.y - 30 * u - st.top) };
+    const box = fitBubble(sc, P[cur], tip, size, { area, maxW: st.width * (narrow ? 0.9 : 0.5), display: false });
+    speech(sc, P[cur], box, tip, size, k, false);
   }
   ctx.restore();
 }

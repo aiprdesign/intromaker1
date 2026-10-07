@@ -159,6 +159,7 @@ const sample = (text: string, skill: SkillId = "blur-reveal", extra: Partial<Sce
 /** The character slides for each part of the story (the cartoon styles). */
 /** The advanced characters for each part of the story. */
 const PRO_ROLES: Template["roles"] = { hook: "pro-walk", features: "pro-explainer", bento: "pro-explainer", how: "pro-explainer", cards: "pro-duo", quote: "pro-duo", solve: "pro-thinker", promise: "pro-unveil", cta: "pro-highfive" };
+const ABS_ROLES: Template["roles"] = { hook: "abs-hello", features: "abs-features", bento: "abs-features", how: "abs-parade", cards: "abs-crowd", quote: "abs-chat", solve: "abs-chat", promise: "abs-parade", cta: "abs-cheer" };
 const ROLES: Template["roles"] = { hook: "char-hello", features: "char-presenter", cards: "char-team", bento: "char-presenter", solve: "char-aha", demo: "char-desk", cta: "char-cheer" };
 
 export const TEMPLATES: Template[] = [
@@ -395,6 +396,42 @@ export const TEMPLATES: Template[] = [
     roles: PRO_ROLES,
     revealNoLogo: "pro-unveil",
     sample: sample("A better day *starts here*."),
+  },
+  {
+    id: "abstract",
+    name: "Abstract People",
+    category: "Cartoon",
+    description: "A modern, minimal character library: geometric people in bold colours, generated fresh for each video (remake for a new cast).",
+    vibe: "Modern, inclusive and upbeat. Short, friendly copy; a crowd of simple shapes with personality does the talking.",
+    palette: "swiss",
+    font: "jost",
+    bpm: 120,
+    music: "saas",
+    flavor: "pop",
+    look: { grid: false, beams: 0, aurora: 0.5, text: "pop", grain: 0.15, toon: "flat" },
+    transitions: ["push", "swipe", "zoom", "dissolve"],
+    pace: 1,
+    roles: ABS_ROLES,
+    revealNoLogo: "abs-hello",
+    sample: sample("Made for *your team*."),
+  },
+  {
+    id: "memphis",
+    name: "Memphis Crowd",
+    category: "Cartoon",
+    description: "Abstract characters on a warm, dotted stage: a playful Memphis-style crowd that parades, holds up signs and cheers.",
+    vibe: "Bold, retro-modern and fun. Punchy copy; geometric people, confident colour and bouncy motion.",
+    palette: "cream",
+    font: "manrope",
+    bpm: 124,
+    music: "saas",
+    flavor: "pop",
+    look: { grid: false, beams: 0, aurora: 0.3, backdrop: "dots", text: "pop", grain: 0.3, toon: "flat" },
+    transitions: ["push", "swipe", "zoom"],
+    pace: 1.05,
+    roles: ABS_ROLES,
+    revealNoLogo: "abs-hello",
+    sample: sample("Join the *crowd*."),
   },
   {
     id: "keynote",
@@ -1249,6 +1286,12 @@ export const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "pro-thinker": "solve",
   "pro-unveil": "promise",
   "pro-highfive": "cta",
+  "abs-hello": "hook",
+  "abs-crowd": "cards",
+  "abs-features": "features",
+  "abs-parade": "promise",
+  "abs-chat": "quote",
+  "abs-cheer": "cta",
   "service-spotlight": "features",
   "spotlight": "tour",
   "device-trio": "tour",
@@ -1345,7 +1388,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";

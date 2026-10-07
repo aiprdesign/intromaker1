@@ -19,7 +19,7 @@
  */
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
-import { displayFont, fillTextFit, subFont } from "../text";
+import { displayFont, fillTextFit, fitTextLines, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
 import { iconTile } from "./interactions";
@@ -415,73 +415,252 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
 
 /* ───────────────────────── Shared props ───────────────────────── */
 
-/** A speech bubble (rounded box with a tail pointing at `tip`), drawn grown from the tail by `k`. */
-export function bubble(sc: SkillContext, box: { x: number; y: number; w: number; h: number }, tip: { x: number; y: number }, k: number) {
-  const { ctx, u, palette } = sc;
-  if (k <= 0.001) return;
-  const fill = palette.light ? "#ffffff" : "#f7f8fc";
+type Box = { x: number; y: number; w: number; h: number };
+type Pt = { x: number; y: number };
+type Side = "top" | "right" | "bottom" | "left";
+
+const BUBBLE_LH = 1.12;
+/** The padding inside a bubble for type of this size. */
+const bubblePad = (size: number, u: number) => ({ x: Math.max(24 * u, size * 0.62), y: Math.max(16 * u, size * 0.46) });
+const bubbleFont = (sc: SkillContext, size: number, display: boolean) => (display ? displayFont(saasFont(sc), size) : subFont(size, 700));
+const bubbleFill = (sc: SkillContext) => (sc.palette.light ? "#ffffff" : "#f7f8fc");
+
+/** Which side of `box` a tail towards `tip` leaves from. */
+function tipSide(box: Box, tip: Pt): Side {
+  if (tip.y >= box.y + box.h) return "bottom";
+  if (tip.y <= box.y) return "top";
+  return tip.x < box.x + box.w / 2 ? "left" : "right";
+}
+
+/**
+ * A speech bubble's box, hugging its text: no wider than `maxW` and inside `area`, kept on the
+ * side of `area` nearest the speaker (`tip`) so the tail stays short.
+ */
+export function fitBubble(sc: SkillContext, text: string, tip: Pt, size: number, o: { area: Box; maxW?: number; display?: boolean; maxLines?: number }): Box {
+  const { ctx, u } = sc;
+  const { area } = o;
+  const pad = bubblePad(size, u);
+  const maxW = Math.min(area.w, o.maxW ?? area.w);
   ctx.save();
-  ctx.translate(tip.x, tip.y);
-  ctx.scale(k, k);
-  ctx.translate(-tip.x, -tip.y);
-  const outlined = TOON === "comic" || TOON === "doodle";
-  if (TOON === "comic") {
-    // Comic: a hard offset shadow instead of a soft one.
-    ctx.fillStyle = INK;
-    ctx.beginPath();
-    ctx.roundRect(box.x + 8 * u, box.y + 8 * u, box.w, box.h, Math.min(20 * u, box.h / 2));
-    ctx.fill();
-  } else if (!outlined) {
-    ctx.shadowColor = "rgba(0,0,0,0.22)";
-    ctx.shadowBlur = (TOON === "soft" ? 40 : 24) * u;
-    ctx.shadowOffsetY = (TOON === "soft" ? 14 : 8) * u;
+  ctx.font = bubbleFont(sc, size, o.display ?? true);
+  const fit = fitTextLines(ctx, text, maxW - pad.x * 2, { maxLines: o.maxLines ?? 3, minScale: 0.5 });
+  ctx.restore();
+  const bw = clamp(fit.width + pad.x * 2, Math.min(maxW, Math.max(size * 3.2, 150 * u)), maxW);
+  const bh = Math.min(area.h, (fit.lines.length - 1) * fit.size * BUBBLE_LH + fit.size * 1.05 + pad.y * 2);
+  const side = tipSide(area, tip);
+  if (side === "top" || side === "bottom") {
+    return { x: clamp(tip.x - bw / 2, area.x, area.x + area.w - bw), y: side === "bottom" ? area.y + area.h - bh : area.y, w: bw, h: bh };
   }
-  ctx.fillStyle = fill;
+  return { x: side === "left" ? area.x : area.x + area.w - bw, y: clamp(tip.y - bh * 0.6, area.y, area.y + area.h - bh), w: bw, h: bh };
+}
+
+/** The outline of a bubble: its rounded box and a curved tail, as one shape (so it fills and inks cleanly). */
+function bubbleGeom(box: Box, tip: Pt, u: number) {
+  const { x, y, w, h } = box;
+  const R = Math.min((TOON === "comic" ? 18 : TOON === "soft" ? 34 : 26) * u, h * 0.45, w * 0.25);
+  const side = tipSide(box, tip);
+  const n = side === "top" ? { x: 0, y: -1 } : side === "bottom" ? { x: 0, y: 1 } : side === "left" ? { x: -1, y: 0 } : { x: 1, y: 0 };
+  // The direction the outline runs along this side (clockwise).
+  const tg = side === "top" ? { x: 1, y: 0 } : side === "bottom" ? { x: -1, y: 0 } : side === "left" ? { x: 0, y: -1 } : { x: 0, y: 1 };
+  const vertical = side === "top" || side === "bottom";
+  const tw = clamp(Math.min(w, h) * 0.17, 13 * u, 26 * u);
+  const along = vertical ? clamp(tip.x, x + R + tw, x + w - R - tw) : clamp(tip.y, y + R + tw, y + h - R - tw);
+  const base = side === "top" ? { x: along, y } : side === "bottom" ? { x: along, y: y + h } : side === "left" ? { x, y: along } : { x: x + w, y: along };
+  const dx = tip.x - base.x;
+  const dy = tip.y - base.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  // Point at the speaker, but always leave the box outwards (never flat along its edge)…
+  let dirX = dx / dist;
+  let dirY = dy / dist;
+  const out = dirX * n.x + dirY * n.y;
+  if (out < 0.5) {
+    dirX += n.x * (0.5 - out) * 2;
+    dirY += n.y * (0.5 - out) * 2;
+    const m = Math.hypot(dirX, dirY) || 1;
+    dirX /= m;
+    dirY /= m;
+  }
+  // …and keep it short: a long sliver reads as a mistake, not a tail.
+  const L = clamp(dist, 16 * u, Math.max(64 * u, Math.min(w, h) * 0.7));
+  const end = { x: base.x + dirX * L, y: base.y + dirY * L };
+  const a = { x: base.x - tg.x * tw, y: base.y - tg.y * tw };
+  const b = { x: base.x + tg.x * tw, y: base.y + tg.y * tw };
+  return { box, R, side, n, a, b, end, L };
+}
+
+function traceBubble(ctx: CanvasRenderingContext2D, g: ReturnType<typeof bubbleGeom>) {
+  const { x, y, w, h } = g.box;
+  const { R, side, n, a, b, end, L } = g;
+  const tail = () => {
+    ctx.lineTo(a.x, a.y);
+    ctx.quadraticCurveTo(a.x + n.x * L * 0.5, a.y + n.y * L * 0.5, end.x, end.y);
+    ctx.quadraticCurveTo(b.x + n.x * L * 0.28, b.y + n.y * L * 0.28, b.x, b.y);
+  };
   ctx.beginPath();
-  ctx.roundRect(box.x, box.y, box.w, box.h, Math.min((TOON === "comic" ? 20 : 28) * u, box.h / 2));
-  ctx.fill();
-  ink(ctx, 4 * u);
-  // Tail: from the box's nearest edge towards the tip.
-  const cx = clamp(tip.x, box.x + box.h * 0.4, box.x + box.w - box.h * 0.4);
-  const below = tip.y > box.y + box.h;
-  const ey = below ? box.y + box.h - 2 * u : box.y + 2 * u;
-  const tw = Math.min(26 * u, box.w * 0.12);
-  ctx.beginPath();
-  ctx.moveTo(cx - tw, ey);
-  ctx.quadraticCurveTo(lerp(cx, tip.x, 0.5), lerp(ey, tip.y, 0.4), tip.x, tip.y);
-  ctx.quadraticCurveTo(lerp(cx, tip.x, 0.3), lerp(ey, tip.y, 0.6), cx + tw, ey);
-  if (outlined) {
-    // The tail's two sides in ink (not its base, which joins the box).
+  ctx.moveTo(x + R, y);
+  if (side === "top") tail();
+  ctx.lineTo(x + w - R, y);
+  ctx.arcTo(x + w, y, x + w, y + R, R);
+  if (side === "right") tail();
+  ctx.lineTo(x + w, y + h - R);
+  ctx.arcTo(x + w, y + h, x + w - R, y + h, R);
+  if (side === "bottom") tail();
+  ctx.lineTo(x + R, y + h);
+  ctx.arcTo(x, y + h, x, y + h - R, R);
+  if (side === "left") tail();
+  ctx.lineTo(x, y + R);
+  ctx.arcTo(x, y, x + R, y, R);
+  ctx.closePath();
+}
+
+/** Fill (and ink, per style) the current bubble or cloud path: offset ink in comic, a soft shadow otherwise. */
+function fillBalloon(sc: SkillContext, trace: () => void) {
+  const { ctx, u } = sc;
+  ctx.save();
+  if (TOON === "comic") {
     ctx.save();
-    ctx.shadowColor = "transparent";
+    ctx.translate(7 * u, 7 * u);
+    trace();
+    ctx.fillStyle = INK;
     ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(cx - tw, ey);
-    ctx.quadraticCurveTo(lerp(cx, tip.x, 0.5), lerp(ey, tip.y, 0.4), tip.x, tip.y);
-    ctx.quadraticCurveTo(lerp(cx, tip.x, 0.3), lerp(ey, tip.y, 0.6), cx + tw, ey);
-    ink(ctx, 4 * u);
-    // Cover the box's outline where the tail meets it.
-    ctx.fillStyle = fill;
-    ctx.fillRect(cx - tw + 3 * u, below ? ey - 6 * u : ey, tw * 2 - 6 * u, 6 * u);
     ctx.restore();
-  } else {
-    ctx.closePath();
-    ctx.fill();
+  } else if (TOON !== "doodle") {
+    ctx.shadowColor = sc.palette.light ? "rgba(40,30,80,0.18)" : "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = (TOON === "soft" ? 44 : 28) * u;
+    ctx.shadowOffsetY = (TOON === "soft" ? 16 : 10) * u;
+  }
+  trace();
+  ctx.fillStyle = bubbleFill(sc);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  if (TOON === "comic" || TOON === "doodle") ink(ctx, 4.5 * u);
+  else {
+    // A hairline edge, so a white bubble still reads on a pale stage.
+    ctx.lineWidth = 1.5 * u;
+    ctx.strokeStyle = "rgba(30,20,60,0.08)";
+    ctx.stroke();
   }
   ctx.restore();
 }
 
-/** Text inside a bubble: dark on white, fitted to its box. */
-export function bubbleText(sc: SkillContext, text: string, box: { x: number; y: number; w: number; h: number }, size: number, k: number, display = true) {
+/** Grow from `p` by `k` (the pop-in), around the current transform. */
+function growFrom(ctx: CanvasRenderingContext2D, p: Pt, k: number) {
+  ctx.translate(p.x, p.y);
+  ctx.scale(k, k);
+  ctx.translate(-p.x, -p.y);
+}
+
+/** A speech bubble (rounded box with a tail pointing at `tip`), drawn grown from the tail by `k`. */
+export function bubble(sc: SkillContext, box: Box, tip: Pt, k: number) {
+  if (k <= 0.001) return;
+  const { ctx, u } = sc;
+  const g = bubbleGeom(box, tip, u);
+  ctx.save();
+  growFrom(ctx, g.end, k);
+  fillBalloon(sc, () => traceBubble(ctx, g));
+  ctx.restore();
+}
+
+/** Text inside a bubble: dark on white, set in the same lines `fitBubble` measured. */
+export function bubbleText(sc: SkillContext, text: string, box: Box, size: number, k: number, display = true, maxLines = 3) {
   const { ctx, u } = sc;
   if (k <= 0.01) return;
+  const pad = bubblePad(size, u);
   ctx.save();
-  ctx.globalAlpha *= clamp(k * 1.4 - 0.3);
+  ctx.globalAlpha *= clamp(k * 1.6 - 0.4);
   ctx.fillStyle = "#151826";
-  ctx.font = display ? displayFont(saasFont(sc), size) : subFont(size, 700);
+  ctx.font = bubbleFont(sc, size, display);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  fillTextFit(ctx, text, box.x + box.w / 2, box.y + box.h / 2, box.w - 40 * u, { maxLines: 3, lineHeight: 1.12, minScale: 0.5 });
+  fillTextFit(ctx, text, box.x + box.w / 2, box.y + box.h / 2, box.w - pad.x * 2 + 1, { maxLines, lineHeight: BUBBLE_LH, minScale: 0.5 });
+  ctx.restore();
+}
+
+/** A speech bubble with its text, the two growing together from the tail. */
+export function speech(sc: SkillContext, text: string, box: Box, tip: Pt, size: number, k: number, display = true) {
+  if (k <= 0.001) return;
+  const { ctx, u } = sc;
+  const g = bubbleGeom(box, tip, u);
+  ctx.save();
+  growFrom(ctx, g.end, k);
+  fillBalloon(sc, () => traceBubble(ctx, g));
+  bubbleText(sc, text, box, size, 1, display);
+  ctx.restore();
+}
+
+/**
+ * A thought cloud around `text`, centred on `c` (no wider than `maxW`), with three shrinking dots
+ * trailing down to `head`. Puffs are spaced evenly round an ellipse sized to the text.
+ */
+export function thoughtCloud(sc: SkillContext, text: string, c: Pt, maxW: number, size: number, head: Pt, k: number, display = false) {
+  if (k <= 0.001) return;
+  const { ctx, u } = sc;
+  const pad = bubblePad(size, u);
+  ctx.save();
+  ctx.font = bubbleFont(sc, size, display);
+  const fit = fitTextLines(ctx, text, maxW * 0.74 - pad.x * 2, { maxLines: 3, minScale: 0.55 });
+  ctx.restore();
+  const tw = Math.max(fit.width, size * 3);
+  const th = (fit.lines.length - 1) * fit.size * BUBBLE_LH + fit.size * 1.05;
+  const rx = tw / 2 + pad.x * 1.35;
+  const ry = th / 2 + pad.y * 1.7;
+  const pr = clamp(ry * 0.5, 16 * u, 70 * u);
+  const per = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+  const nP = clamp(Math.round(per / (pr * 1.25)), 8, 18);
+  const puffs: { x: number; y: number; r: number }[] = [];
+  for (let i = 0; i < nP; i++) {
+    const a = (i / nP) * TAU + 0.2;
+    puffs.push({ x: c.x + Math.cos(a) * rx, y: c.y + Math.sin(a) * ry, r: pr * (1 + 0.14 * Math.sin(i * 2.7)) });
+  }
+  // The dots: from the cloud's edge towards the head, getting smaller.
+  const hx = head.x - c.x;
+  const hy = head.y - c.y;
+  const e = 1 / Math.hypot(hx / rx, hy / ry);
+  const p0 = { x: c.x + hx * e, y: c.y + hy * e };
+  const hd = Math.hypot(head.x - p0.x, head.y - p0.y) || 1;
+  const ux = (head.x - p0.x) / hd;
+  const uy = (head.y - p0.y) / hd;
+  const dots = [0.5, 0.36, 0.25].map((s, i) => {
+    const f = pr * 0.9 + (hd - pr * 0.9) * [0.18, 0.55, 0.88][i];
+    return { x: p0.x + ux * f, y: p0.y + uy * f, r: Math.max(pr * s, (10 - i * 2.5) * u) };
+  });
+  const trace = () => {
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, rx, ry, 0, 0, TAU);
+    for (const p of [...puffs, ...dots]) {
+      ctx.moveTo(p.x + p.r, p.y);
+      ctx.arc(p.x, p.y, p.r, 0, TAU);
+    }
+  };
+  ctx.save();
+  growFrom(ctx, c, k);
+  if (TOON === "comic" || TOON === "doodle") {
+    // Ink the union's outer edge: a wide stroke under the fill leaves just the outside half showing.
+    ctx.save();
+    if (TOON === "comic") {
+      ctx.save();
+      ctx.translate(7 * u, 7 * u);
+      trace();
+      ctx.fillStyle = INK;
+      ctx.fill();
+      ctx.restore();
+    }
+    trace();
+    ctx.lineWidth = (TOON === "comic" ? 9 : 4.5) * u;
+    ctx.strokeStyle = TOON === "comic" ? INK : rgba(SEPIA, 0.85);
+    ctx.stroke();
+    ctx.fillStyle = bubbleFill(sc);
+    ctx.fill();
+    ctx.restore();
+  } else fillBalloon(sc, trace);
+  ctx.save();
+  ctx.globalAlpha *= clamp(k * 1.6 - 0.4);
+  ctx.fillStyle = "#151826";
+  ctx.font = fit.font;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  fillTextFit(ctx, fit.lines.join(" "), c.x, c.y, tw + 1, { maxLines: 3, lineHeight: BUBBLE_LH, minScale: 0.55 });
+  ctx.restore();
   ctx.restore();
 }
 
@@ -521,21 +700,24 @@ function charHello(sc: SkillContext) {
   });
   // The headline in a speech bubble, beside the head (above it in vertical frames).
   const text = plain(scene.text) || "Hello!";
-  const bw = portrait ? w * 0.84 : w * 0.46;
-  const bh = portrait ? h * 0.2 : h * 0.34;
-  const box = portrait ? { x: (w - bw) / 2, y: h * 0.12, w: bw, h: bh } : { x: w * 0.47, y: h * 0.16, w: bw, h: bh };
-  const tip = portrait ? { x: cx + ch.head.r * 0.2, y: ch.top - ch.head.r * 0.35 } : { x: cx + ch.head.r * 1.25, y: ch.head.y - ch.head.r * 0.2 };
+  const bw = portrait ? w * 0.84 : w * 0.44;
+  const size = (portrait ? 64 : 72) * u;
+  // Beside the mouth (on the side away from the waving hand), or above the head when vertical.
+  const area = portrait ? { x: (w - bw) / 2, y: h * 0.1, w: bw, h: Math.max(h * 0.12, ch.top - h * 0.1 - 40 * u) } : { x: w * 0.47, y: h * 0.12, w: bw, h: h * 0.5 };
+  const tip = portrait ? { x: cx + ch.head.r * 0.2, y: ch.top - 10 * u } : { x: cx + ch.head.r * 1.12, y: ch.head.y + ch.head.r * 0.3 };
+  const box = fitBubble(sc, text, tip, size, { area });
   const k = pop(t, 0.75);
-  bubble(sc, box, tip, k);
-  bubbleText(sc, text, box, (portrait ? 64 : 72) * u, k);
+  speech(sc, text, box, tip, size, k);
   if (scene.subtext) {
     const a = range(t, 1.2, 1.6);
     ctx.globalAlpha = (1 - ex) * a;
     ctx.fillStyle = rgba(palette.text, 0.8);
     ctx.font = subFont((portrait ? 30 : 32) * u, 500);
     ctx.textAlign = portrait ? "center" : "left";
-    ctx.textBaseline = "top";
-    fillTextFit(ctx, plain(scene.subtext), portrait ? w / 2 : box.x + 8 * u, box.y + box.h + 28 * u + (1 - a) * 10 * u, bw - 16 * u, { maxLines: 2, lineHeight: 1.25 });
+    // Under the bubble; above it in vertical frames, where the head is just below.
+    ctx.textBaseline = portrait ? "bottom" : "top";
+    const sy = portrait ? box.y - 24 * u : box.y + box.h + 28 * u;
+    fillTextFit(ctx, plain(scene.subtext), portrait ? w / 2 : box.x + 8 * u, sy + (1 - a) * 10 * u, bw - 16 * u, { maxLines: 2, lineHeight: 1.25 });
   }
   ctx.restore();
 }
@@ -693,14 +875,10 @@ function charTeam(sc: SkillContext) {
     const hd = heads[cur];
     const k = pop(t, T[cur], T[cur + 1] !== undefined ? T[cur + 1] - 0.2 : Infinity);
     const size = 34 * u * S;
-    ctx.font = displayFont(saasFont(sc), size);
-    const bw = Math.min(st.width * (narrow ? 0.9 : 0.5), Math.max(220 * u, ctx.measureText(P[cur]).width + 64 * u));
-    const bh = size * 2.4;
-    const bx = clamp(hd.x - bw / 2, st.left, st.left + st.width - bw);
-    const by = Math.max(st.top, hd.top - bh - 44 * u);
-    const box = { x: bx, y: by, w: bw, h: bh };
-    bubble(sc, box, { x: hd.x + hd.r * 0.3, y: hd.top - 6 * u }, k);
-    bubbleText(sc, P[cur], box, size, k);
+    const tip = { x: hd.x + hd.r * 0.3, y: hd.top - 6 * u };
+    const area = { x: st.left, y: st.top, w: st.width, h: Math.max(size * 2, tip.y - 30 * u - st.top) };
+    const box = fitBubble(sc, P[cur], tip, size, { area, maxW: st.width * (narrow ? 0.9 : 0.46) });
+    speech(sc, P[cur], box, tip, size, k);
   }
   ctx.restore();
 }
@@ -742,38 +920,10 @@ function charAha(sc: SkillContext) {
   // The thought cloud with the problem, before the idea.
   const cloudK = pop(t, 0.5, tAha - 0.05);
   if (cloudK > 0) {
-    const cw = portrait ? w * 0.78 : w * 0.4;
-    const chh = portrait ? h * 0.15 : h * 0.24;
-    const ccx = portrait ? w / 2 : cx + w * 0.3;
-    const ccy = portrait ? ch.top - chh * 0.9 : ch.head.y - h * 0.18;
-    ctx.save();
-    ctx.translate(ccx, ccy);
-    ctx.scale(cloudK, cloudK);
-    ctx.translate(-ccx, -ccy);
-    ctx.fillStyle = palette.light ? "#ffffff" : "#f2f4fa";
-    ctx.shadowColor = "rgba(0,0,0,0.2)";
-    ctx.shadowBlur = 20 * u;
-    const puffs = 9;
-    ctx.beginPath();
-    ctx.roundRect(ccx - cw / 2, ccy - chh / 2, cw, chh, chh / 2);
-    for (let k = 0; k < puffs; k++) {
-      const a = (k / puffs) * TAU;
-      const r = chh * (0.32 + 0.06 * Math.sin(k * 2.1));
-      ctx.moveTo(ccx + Math.cos(a) * cw * 0.45 + r, ccy + Math.sin(a) * chh * 0.48);
-      ctx.arc(ccx + Math.cos(a) * cw * 0.45, ccy + Math.sin(a) * chh * 0.48, r, 0, TAU);
-    }
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // Thought dots down to the head.
-    for (let k = 0; k < 3; k++) {
-      const f = (k + 1) / 4;
-      ctx.beginPath();
-      ctx.arc(lerp(ccx - (portrait ? 0 : cw * 0.3), ch.head.x + ch.head.r * 0.6, f), lerp(ccy + chh * 0.6, ch.top, f), chh * (0.1 - k * 0.025), 0, TAU);
-      ctx.fill();
-    }
-    ctx.shadowBlur = 0;
-    bubbleText(sc, problem, { x: ccx - cw / 2, y: ccy - chh / 2, w: cw, h: chh }, (portrait ? 34 : 36) * u, 1, false);
-    ctx.restore();
+    const cw = portrait ? w * 0.8 : w * 0.46;
+    const size = (portrait ? 36 : 38) * u;
+    const c = portrait ? { x: w / 2, y: Math.max(h * 0.16, ch.top - h * 0.17) } : { x: cx + w * 0.33, y: ch.head.y - h * 0.2 };
+    thoughtCloud(sc, problem, c, cw, size, { x: ch.head.x + ch.head.r * (portrait ? 0 : 0.7), y: ch.top - ch.head.r * 0.15 }, cloudK);
     // Question marks bob around the head.
     for (let k = 0; k < 2; k++) {
       ctx.save();
@@ -781,7 +931,8 @@ function charAha(sc: SkillContext) {
       ctx.fillStyle = palette.primary;
       ctx.font = displayFont(saasFont(sc), ch.head.r * 0.8);
       ctx.textAlign = "center";
-      ctx.fillText("?", ch.head.x + (k ? 1 : -1) * ch.head.r * 1.5, ch.head.y - ch.head.r * (0.6 + 0.15 * Math.sin(t * 4 + k * 2)));
+      // On the side away from the cloud's dots.
+      ctx.fillText("?", ch.head.x - ch.head.r * (k ? 1.05 : 1.6), ch.head.y - ch.head.r * ((k ? 1.45 : 0.55) + 0.15 * Math.sin(t * 4 + k * 2)));
       ctx.restore();
     }
   }

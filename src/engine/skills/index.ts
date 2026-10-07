@@ -2,6 +2,7 @@ import type { Skill, SkillId } from "../types";
 import { cardSkills } from "./cards";
 import { characterSkills } from "./characters";
 import { charProSkills } from "./charpro";
+import { abstractSkills } from "./abstract";
 import { componentSkills } from "./components";
 import { endingSkills } from "./endings";
 import { editorialSkills } from "./editorial";
@@ -54,6 +55,7 @@ export const SKILLS: Skill[] = [
   ...creativeServiceSkills,
   ...characterSkills,
   ...charProSkills,
+  ...abstractSkills,
   ...productSkills,
   beatSkills[3],
   ...typeFxSkills,
@@ -99,6 +101,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Process & services", skills: [...processSkills, ...epicProcessSkills, ...creativeServiceSkills] },
   { name: "Characters", skills: characterSkills },
   { name: "Advanced characters", skills: charProSkills },
+  { name: "Abstract characters", skills: abstractSkills },
   { name: "Media & gallery", skills: [...productSkills, beatSkills[3], ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Epic screens", skills: [...epicSkills, ...iconicSkills] },

@@ -83,6 +83,8 @@ type MadeFrom = {
 /** Which cartoon style suits a description: comic, storybook, clay, outdoors, night, else Cartoon Pals. */
 function cartoonStyleFor(prompt: string) {
   const p = prompt.toLowerCase();
+  if (/\b(abstract|minimal|minimalist|geometric|shapes?)\b/.test(p)) return /\b(memphis|retro|crowd|parade)\b/.test(p) ? "memphis" : "abstract";
+  if (/\b(memphis)\b/.test(p)) return "memphis";
   if (/\b(explainer|explains?|walkthrough|presenters?|hosts?|realistic|advanced characters?)\b/.test(p)) return "explainer";
   if (/\b(journey|adventure|together|community|friends)\b/.test(p) && /\b(outdoors?|parks?|nature|hills?|river)\b/.test(p)) return "storycast";
   if (/\b(comics?|superheroe?s?|funny|comedy|jokes?)\b/.test(p)) return "comic";
@@ -496,7 +498,7 @@ export default function Studio() {
     // films get their category's style.
     const trailerCut = styleRef.current === "trailer";
     // Asked for characters (a cartoon, a mascot, a video for kids): the cartoon style tells it.
-    const cartoon = p.style === "saas" && !p.product && /\b(cartoons?|animated characters?|characters?|mascots?|kids?|children|preschool|animated explainer)\b/i.test(promptRef.current);
+    const cartoon = p.style === "saas" && !p.product && /\b(cartoons?|animated characters?|characters?|mascots?|kids?|children|preschool|animated explainer|abstract people|abstract characters?)\b/i.test(promptRef.current);
     const id = cartoon
       ? cartoonStyleFor(promptRef.current)
       : p.style === "saas"

@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   ...(SITE_URL_ENV ? { metadataBase: new URL(SITE_URL_ENV) } : {}),
   title: "Prodintro.com · Launch videos for SaaS, products and websites",
   description:
-    "Paste your website URL or type a prompt and get a SaaS intro video: an AI director, 179 motion skills, 3D logo intros, a produced soundtrack, voice-over and 1080p or 4K export for your landing page, Reels, TikTok and Shorts.",
+    "Paste your website URL or type a prompt and get a SaaS intro video: an AI director, 185 motion skills, 3D logo intros, a produced soundtrack, voice-over and 1080p or 4K export for your landing page, Reels, TikTok and Shorts.",
   keywords: ["SaaS video maker", "SaaS intro video", "product intro video", "URL to video", "website to video", "product demo video", "launch video", "3D logo intro", "motion graphics", "AI video generator"],
   openGraph: { siteName: "Prodintro.com", type: "website" },
 };
