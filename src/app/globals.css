@@ -5662,3 +5662,247 @@ code.secret {
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* ───────── Studio pixel pass ─────────
+ * One spacing scale (4px grid) and one height per control tier, so rows line up exactly:
+ * 36px for standard controls (header and player buttons, selects, segmented groups, icon buttons),
+ * 28px for small ones. Sections in the settings panel sit 20px apart, a label 8px above its control. */
+.studio {
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --ctl: 36px;
+  --ctl-sm: 28px;
+}
+
+/* Header: every action the same height, centred on one line. */
+.studio .studio-bar {
+  min-height: 64px;
+  padding: var(--sp-3) var(--sp-5);
+}
+.studio .studio-bar .btn {
+  height: var(--ctl);
+  padding: 0 var(--sp-4);
+}
+.studio .engine-badge {
+  height: var(--ctl-sm);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--sp-3);
+}
+
+/* Settings panel: an even rhythm. */
+.studio .panel-tabs {
+  padding: var(--sp-2) var(--sp-5) 0;
+}
+.studio .panel-tabs button {
+  height: 40px;
+  padding: 0 var(--sp-1);
+}
+.studio .panel-scroll {
+  padding: var(--sp-5) var(--sp-5) var(--sp-6);
+  gap: var(--sp-2);
+}
+.studio .panel-scroll .field-label {
+  margin-top: var(--sp-3);
+  line-height: 16px;
+}
+.studio .panel-scroll .field-label.first,
+.studio .panel-scroll > .field-label:first-child {
+  margin-top: 0;
+}
+.studio .panel-scroll > .hint,
+.studio .panel-scroll .photo-drop,
+.studio .panel-scroll .claim-note {
+  margin-top: 0;
+}
+.studio .panel-scroll .photo-drop {
+  padding: var(--sp-3);
+  gap: var(--sp-2) var(--sp-3);
+}
+.studio .panel-scroll .field-stack {
+  gap: var(--sp-5);
+  margin-top: var(--sp-3);
+}
+.studio .panel-scroll .field-stack .field-label {
+  margin-top: 0;
+  margin-bottom: var(--sp-2);
+  display: block;
+}
+.studio .panel-scroll .claim-note {
+  margin-top: var(--sp-3);
+}
+.studio .panel-scroll .prompt-meter {
+  margin-top: 0;
+}
+.studio .url-row .input,
+.studio .url-row .btn {
+  height: var(--ctl);
+}
+.studio .url-row .btn {
+  padding: 0 var(--sp-4);
+}
+.studio .panel-scroll .input,
+.studio .panel-scroll .select {
+  min-height: var(--ctl);
+}
+.studio .panel-scroll .seg-control {
+  padding: 3px;
+  gap: 2px;
+  min-height: var(--ctl);
+}
+.studio .panel-scroll .seg-control button {
+  min-height: calc(var(--ctl) - 8px);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+@media (min-width: 901px) {
+  .studio .panel-foot {
+    padding: var(--sp-3) var(--sp-5);
+  }
+}
+/* A fold's current value ("Style default") at the same size as the other label values. */
+.studio .fold summary .tpl-desc,
+.studio .field-label .tpl-desc {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-left: var(--sp-2);
+}
+
+/* Player rows: one height for every control. */
+.studio .player .controls {
+  gap: var(--sp-2);
+  row-gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.studio .player .icon-btn {
+  width: var(--ctl);
+  height: var(--ctl);
+}
+.studio .player .btn {
+  height: var(--ctl);
+  padding: 0 var(--sp-4);
+}
+.studio .player .select.sm {
+  height: var(--ctl);
+  padding: 0 var(--sp-2);
+}
+.studio .player .timeline {
+  height: var(--ctl);
+}
+.studio .player .view-size {
+  height: var(--ctl);
+  align-items: stretch;
+}
+.studio .player .view-size button {
+  padding: 0 10px;
+}
+
+/* The workspace beside the panel: 20px gutters (on the grid). */
+.studio .main {
+  padding: var(--sp-5);
+}
+
+/* Under the player: the edit bar's links at the hint's size, section headings on one scale. */
+.studio .edit-bar {
+  margin-top: var(--sp-5);
+}
+.studio .edit-bar-actions .link-btn {
+  font-size: 13px;
+  line-height: 20px;
+  text-decoration: none;
+}
+.studio .edit-bar-actions .link-btn:not(:disabled):hover {
+  text-decoration: underline;
+}
+.studio .slide-timeline {
+  margin-top: var(--sp-3);
+}
+.studio .takes {
+  margin-top: var(--sp-6);
+}
+.studio .takes-head h2,
+.studio .storyboard-head h2 {
+  font-size: 18px;
+  line-height: 24px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  font-weight: 700;
+}
+.studio .storyboard-head {
+  margin: var(--sp-6) 0 var(--sp-3);
+}
+
+/* Left rail (open): 12px gutters, its title on the panel tabs' line. */
+.studio .intro-rail.open {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+}
+.studio .intro-rail .rail-head {
+  min-height: 40px;
+}
+
+/* Phones and small tablets. */
+@media (max-width: 900px) {
+  /* Header: the logo on its own line, then the four actions as an even 2 × 2 grid. */
+  .studio .studio-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .studio .studio-bar > :first-child {
+    grid-column: 1 / -1;
+  }
+  .studio .studio-bar .studio-title,
+  .studio .studio-bar .engine-badge {
+    display: none;
+  }
+  .studio .studio-bar .btn {
+    width: 100%;
+    min-width: 0;
+  }
+  /* One 16px gutter down the whole page: header, video, settings, timeline and thumb bar. */
+  .studio .studio-body > .main > * {
+    margin-left: var(--sp-4);
+    margin-right: var(--sp-4);
+  }
+  .studio .studio-body > .main > .stage-wrap {
+    margin: var(--sp-3) var(--sp-4) var(--sp-1);
+  }
+  .studio .panel-tabs,
+  .studio .panel-scroll {
+    padding-left: var(--sp-4);
+    padding-right: var(--sp-4);
+  }
+  .studio .panel-foot {
+    padding-left: max(var(--sp-4), env(safe-area-inset-left));
+    padding-right: max(var(--sp-4), env(safe-area-inset-right));
+  }
+  /* Player: Export takes the whole last row. */
+  .studio .player .controls .btn-primary {
+    flex: 1 1 100%;
+  }
+  /* Thumb bar: the three buttons fill it evenly, labels never touching their edges. */
+  .studio .panel-foot .gen-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: var(--sp-2);
+  }
+  .studio .panel-foot .gen-row > * {
+    min-width: 0;
+  }
+  .studio .panel-foot .gen-row > .btn,
+  .studio .panel-foot .remake-wrap > .btn {
+    height: 48px;
+    padding-left: var(--sp-3);
+    padding-right: var(--sp-3);
+    font-size: 14px;
+  }
+  .studio .panel-foot .remake-wrap > .btn {
+    width: 100%;
+  }
+}
