@@ -74,6 +74,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   bpm?: number;
   brand?: VideoPlan["brand"];
   product?: boolean;
+  cast?: VideoPlan["cast"];
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
@@ -164,6 +165,7 @@ function drawScene(
     shapeSet: plan.shapeSet,
     watermark: plan.shapeSet === "text" ? watermarkText(plan) : undefined,
     pointer: plan.pointer,
+    cast: plan.cast,
     edit: opts.edit ? (l) => opts.edit!(index, l) : undefined,
   };
   resetCtx(target);

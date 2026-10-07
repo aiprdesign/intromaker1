@@ -459,6 +459,42 @@ export interface VideoPlan {
   flavor?: "tech" | "soft" | "pop" | "minimal" | "neon";
   /** Voice-over settings (the lines live on the scenes; audio in the clip store). */
   voiceover?: VoiceSettings;
+  /** Custom abstract characters (the character designer's cast), cast first in the abstract slides. */
+  cast?: CastMember[];
+}
+
+/**
+ * A custom abstract character (see skills/abstract.ts), designed in the character designer. The
+ * abstract slides cast these first, in order, then fill the rest with generated people.
+ */
+/** Abstract characters' drawing styles (see cast.ts ART_STYLES). */
+export type ArtStyle = "flat" | "soft" | "outline" | "line" | "paper";
+
+export interface CastMember {
+  name?: string;
+  /** The drawing style (unset: flat). */
+  art?: ArtStyle;
+  body: "pill" | "arch" | "bell" | "triangle" | "round" | "block";
+  /** Body width and height, as fractions of the character's height unit. */
+  bodyW: number;
+  bodyH: number;
+  bodyColor: string;
+  pattern: "none" | "stripes" | "dots" | "half";
+  patternColor: string;
+  head: "circle" | "oval" | "squircle";
+  headR: number;
+  neck: number;
+  skin: string;
+  hair: "none" | "cap" | "bun" | "spikes" | "wave" | "bob" | "afro" | "beanie";
+  hairColor: string;
+  legLen: number;
+  legColor: string;
+  shoe: string;
+  armColor: string;
+  eyes: "dots" | "lines" | "ovals";
+  glasses: boolean;
+  cheeks: boolean;
+  nose: boolean;
 }
 
 export interface Palette {
@@ -493,6 +529,8 @@ export interface Look {
   backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow";
   /** How cartoon characters are drawn (character slides): flat, comic ink with cel shading, soft clay, or hand-drawn doodle. */
   toon?: "flat" | "comic" | "soft" | "doodle";
+  /** How generated abstract characters are drawn (unset: from toon). Your own characters keep theirs. */
+  art?: ArtStyle;
   /** UI card treatment: frosted glass (default), frosted-light, flat, or neo-brutalist. */
   card?: "glass" | "frost" | "flat" | "brutal" | "clay";
   /** Headline size multiplier (kinetic-type styles go big). */
@@ -553,6 +591,8 @@ export interface SkillContext {
   watermark?: string;
   /** The mouse pointer's look (unset: auto). */
   pointer?: PointerStyle;
+  /** Custom abstract characters, cast first (see VideoPlan.cast). */
+  cast?: CastMember[];
   /**
    * Set when the studio edits this slide's points on the paused preview: the slide draws its
    * overview (no zoom, lens or callouts) and reports where its editable points sit.

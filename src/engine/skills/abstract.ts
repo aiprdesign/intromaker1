@@ -18,48 +18,23 @@
  * - abs-chat:     two characters talk: the lines as an alternating conversation.
  * - abs-cheer:    a crowd jumps and cheers around the call-to-action button.
  */
+import { BODIES, HAIR_STYLES, HAIRS, MODERN, PLAYFUL_SKINS, SKINS } from "../cast";
 import { clamp, ease, hashString, lerp, mixHex, rgba, rng, TAU } from "../math";
 import { saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
-import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
+import type { ArtStyle, CastMember, Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
 import { blinkAt, fitBubble, pointTimes, pop, speech, useToon } from "./characters";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
+const INK = "#17131f";
 const plain = (s: string) => s.replace(/\*/g, "").trim();
 
 /* ───────────────────────── The generator ───────────────────────── */
 
-type Body = "pill" | "arch" | "bell" | "triangle" | "round" | "block";
-type Hair = "none" | "cap" | "bun" | "spikes" | "wave" | "bob" | "afro" | "beanie";
-
-export interface AbsSpec {
-  body: Body;
-  bodyW: number;
-  bodyH: number;
-  bodyColor: string;
-  pattern: "none" | "stripes" | "dots" | "half";
-  patternColor: string;
-  head: "circle" | "oval" | "squircle";
-  headR: number;
-  neck: number;
-  skin: string;
-  hair: Hair;
-  hairColor: string;
-  legLen: number;
-  legColor: string;
-  shoe: string;
-  armColor: string;
-  eyes: "dots" | "lines" | "ovals";
-  glasses: boolean;
-  cheeks: boolean;
-  nose: boolean;
-}
-
-const MODERN = ["#ff6b6b", "#ffd166", "#06d6a0", "#118ab2", "#8338ec", "#ff8fab", "#3a86ff", "#fb5607", "#2ec4b6", "#ffbe0b"];
-const SKINS = ["#f6d5bf", "#eab896", "#d39a72", "#b5784f", "#8a5636", "#5e3a24"];
-const PLAYFUL_SKINS = ["#9aa8ff", "#ffb08f", "#86d9bb", "#c9a7ff"];
-const HAIRS = ["#1d1520", "#3b2417", "#6b3a1e", "#c88a3a", "#e8e1d8", "#ff6b6b", "#3a86ff"];
+/** A character's design (the same shape the character designer edits). */
+export type AbsSpec = CastMember;
+type Hair = AbsSpec["hair"];
 
 /** A new character from a seed, dressed partly in the video's own colours. */
 export function makeCharacter(seed: number, p: Palette): AbsSpec {
@@ -72,7 +47,7 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
   const skin = r() < 0.18 ? pick(PLAYFUL_SKINS) : pick(SKINS);
   const tall = r();
   return {
-    body: pick(["pill", "arch", "bell", "triangle", "round", "block"] as const),
+    body: pick(BODIES),
     bodyW: 0.24 + r() * 0.16,
     bodyH: 0.3 + r() * 0.14,
     bodyColor,
@@ -82,7 +57,7 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
     headR: 0.085 + r() * 0.05,
     neck: r() * 0.035,
     skin,
-    hair: pick(["none", "cap", "bun", "spikes", "wave", "bob", "afro", "beanie"] as const),
+    hair: pick(HAIR_STYLES),
     hairColor: pick(HAIRS),
     legLen: 0.22 + tall * 0.18,
     legColor: r() < 0.5 ? (p.light ? "#2b2f45" : "#d9dcef") : pick(colors),
@@ -93,6 +68,23 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
     cheeks: r() < 0.55,
     nose: r() < 0.4,
   };
+}
+
+/** The character in a slide's `slot`: the video's own cast first (from the character designer), then generated people. */
+function person(sc: SkillContext, slot: number, seed: number): AbsSpec {
+  const own = sc.cast?.[slot];
+  if (own) return own;
+  // Generated people match the cast's lead, else the style's own look.
+  const art = sc.cast?.[0]?.art ?? sc.look?.art ?? TOON_ART[sc.look?.toon ?? "flat"];
+  const c = makeCharacter(seed, sc.palette);
+  return art === "flat" ? c : { ...c, art };
+}
+const TOON_ART: Record<NonNullable<NonNullable<SkillContext["look"]>["toon"]>, ArtStyle> = { flat: "flat", comic: "outline", soft: "soft", doodle: "line" };
+
+/** A slot order for a row of `n`: from the middle outwards, so a custom cast stands front and centre. */
+function middleOut(i: number, n: number) {
+  const mid = (n - 1) / 2;
+  return [...Array(n).keys()].sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b).indexOf(i);
 }
 
 export interface AbsPose {
@@ -148,6 +140,57 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
   ctx.translate(-x, -groundY);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+  // The drawing style: how shapes are filled and limbs stroked (see ART_STYLES).
+  const art = c.art ?? "flat";
+  const inked = art === "outline" || art === "line";
+  const inkW = Math.max(1.2, H * (art === "line" ? 0.0075 : 0.011));
+  const m = ctx.getTransform();
+  const px = Math.hypot(m.a, m.b);
+  const paperOn = () => {
+    if (art !== "paper") return;
+    ctx.shadowColor = "rgba(40,24,70,0.26)";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = H * 0.007 * px;
+    ctx.shadowOffsetY = H * 0.011 * px;
+  };
+  const paperOff = () => {
+    if (art === "paper") ctx.shadowColor = "transparent";
+  };
+  const tint = (col: string) => (art === "line" ? mixHex(col, "#ffffff", 0.8) : col);
+  const inkStroke = () => {
+    if (!inked) return;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = inkW;
+    ctx.stroke();
+  };
+  /** Fill the current path in this style (y0..y1: the shape's extent, for soft shading). */
+  const fillShape = (col: string, y0: number, y1: number, ink = true) => {
+    if (art === "soft") {
+      const g = ctx.createLinearGradient(0, y0, 0, y1);
+      g.addColorStop(0, mixHex(col, "#ffffff", 0.3));
+      g.addColorStop(1, mixHex(col, "#000000", 0.16));
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = tint(col);
+    paperOn();
+    ctx.fill();
+    paperOff();
+    if (ink) inkStroke();
+  };
+  /** Stroke a limb (traced by `trace`) in this style: ink-edged, a plain ink line, or a coloured noodle. */
+  const strokeLimb = (col: string, width: number, trace: () => void) => {
+    if (art === "outline") {
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = width + inkW * 2;
+      trace();
+      ctx.stroke();
+    }
+    paperOn();
+    ctx.strokeStyle = art === "line" ? INK : col;
+    ctx.lineWidth = art === "line" ? inkW * 1.15 : width;
+    trace();
+    ctx.stroke();
+    paperOff();
+  };
   // Legs: thin noodles with big shoes; a walk swings them.
   const lw = Math.max(2, H * 0.024);
   for (const s of [-1, 1]) {
@@ -157,16 +200,14 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
     const raise = pose.walk !== undefined ? Math.max(0, Math.cos(ph)) * legLen * 0.18 : 0;
     const fx = hx + swing;
     const fy = groundY - raise - lift * 0;
-    ctx.strokeStyle = c.legColor;
-    ctx.lineWidth = lw;
-    ctx.beginPath();
-    ctx.moveTo(hx, hipY - H * 0.01);
-    ctx.quadraticCurveTo(hx + swing * 0.3 + s * H * 0.01, lerp(hipY, fy, 0.55) - raise * 0.3, fx, fy - lift - H * 0.012);
-    ctx.stroke();
-    ctx.fillStyle = c.shoe;
+    strokeLimb(c.legColor, lw, () => {
+      ctx.beginPath();
+      ctx.moveTo(hx, hipY - H * 0.01);
+      ctx.quadraticCurveTo(hx + swing * 0.3 + s * H * 0.01, lerp(hipY, fy, 0.55) - raise * 0.3, fx, fy - lift - H * 0.012);
+    });
     ctx.beginPath();
     ctx.ellipse(fx + H * 0.022, fy - lift - H * 0.008, H * 0.045, H * 0.02, 0, 0, TAU);
-    ctx.fill();
+    fillShape(c.shoe, fy - lift - H * 0.03, fy - lift + H * 0.012);
   }
   // Body shape.
   const bodyPath = () => {
@@ -235,31 +276,28 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
     // The noodle bows sideways (perpendicular to the arm).
     const mx = (sx + ex) / 2 + s * Math.cos(a) * armLen * 0.28 * curl;
     const my = (sy + ey) / 2 - Math.sin(a) * armLen * 0.28 * curl;
-    ctx.strokeStyle = c.armColor;
-    ctx.lineWidth = Math.max(2, H * 0.022);
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.quadraticCurveTo(mx, my, ex, ey);
-    ctx.stroke();
-    ctx.fillStyle = c.skin;
+    strokeLimb(c.armColor, Math.max(2, H * 0.022), () => {
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.quadraticCurveTo(mx, my, ex, ey);
+    });
     ctx.beginPath();
     ctx.arc(ex, ey, H * 0.024, 0, TAU);
-    ctx.fill();
+    fillShape(c.skin, ey - H * 0.024, ey + H * 0.024);
     return { x: ex, y: ey };
   };
   const handL = drawArm(-1);
   const handR = drawArm(1);
   out.handL = pose.flip ? { x: 2 * x - handR.x, y: handR.y } : handL;
   out.handR = pose.flip ? { x: 2 * x - handL.x, y: handL.y } : handR;
-  ctx.fillStyle = c.bodyColor;
   bodyPath();
-  ctx.fill();
+  fillShape(c.bodyColor, top, hipY, false);
   // Pattern.
   if (c.pattern !== "none") {
     ctx.save();
     bodyPath();
     ctx.clip();
-    ctx.fillStyle = c.patternColor;
+    ctx.fillStyle = tint(c.patternColor);
     if (c.pattern === "stripes") {
       const step = bh / 5;
       for (let k = 1; k < 5; k += 2) ctx.fillRect(x - bw, top + k * step, bw * 2, step * 0.55);
@@ -275,42 +313,52 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
     }
     ctx.restore();
   }
-  // A soft shadow down one side, for a little depth.
-  ctx.save();
-  bodyPath();
-  ctx.clip();
-  ctx.fillStyle = "rgba(36,18,63,0.1)";
-  ctx.fillRect(x + bw * 0.18, top - H, bw, H * 2);
-  ctx.restore();
+  // A soft shadow down one side, for a little depth (soft shading and line art have their own).
+  if (art !== "soft" && art !== "line") {
+    ctx.save();
+    bodyPath();
+    ctx.clip();
+    ctx.fillStyle = "rgba(36,18,63,0.1)";
+    ctx.fillRect(x + bw * 0.18, top - H, bw, H * 2);
+    ctx.restore();
+  }
+  if (inked) {
+    bodyPath();
+    inkStroke();
+  }
   // Neck.
   if (c.neck > 0.008) {
-    ctx.strokeStyle = c.skin;
-    ctx.lineWidth = Math.max(2, H * 0.03);
-    ctx.beginPath();
-    ctx.moveTo(x, top + H * 0.01);
-    ctx.lineTo(x, headY + hr * 0.6);
-    ctx.stroke();
+    strokeLimb(c.skin, Math.max(2, H * 0.03), () => {
+      ctx.beginPath();
+      ctx.moveTo(x, top + H * 0.01);
+      ctx.lineTo(x, headY + hr * 0.6);
+    });
   }
   // Hair behind the head.
-  ctx.fillStyle = c.hairColor;
   if (c.hair === "bob") {
     ctx.beginPath();
     ctx.roundRect(x - hr * 1.12, headY - hr * 0.6, hr * 2.24, hr * 1.65, [hr, hr, hr * 0.3, hr * 0.3]);
-    ctx.fill();
+    fillShape(c.hairColor, headY - hr * 0.6, headY + hr * 1.05);
   } else if (c.hair === "afro") {
     ctx.beginPath();
     ctx.arc(x, headY - hr * 0.25, hr * 1.45, 0, TAU);
-    ctx.fill();
+    fillShape(c.hairColor, headY - hr * 1.7, headY + hr * 1.2);
   }
   // Head.
-  ctx.fillStyle = c.skin;
   ctx.beginPath();
   if (c.head === "oval") ctx.ellipse(x, headY, hr * 0.86, hr * 1.06, 0, 0, TAU);
   else if (c.head === "squircle") ctx.roundRect(x - hr, headY - hr, hr * 2, hr * 2, hr * 0.7);
   else ctx.arc(x, headY, hr, 0, TAU);
-  ctx.fill();
+  fillShape(c.skin, headY - hr, headY + hr);
+  if (art === "soft") {
+    // A soft sheen on the forehead.
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(x - hr * 0.35, headY - hr * 0.45, hr * 0.32, hr * 0.18, -0.5, 0, TAU);
+    ctx.fill();
+  }
   // Hair on top.
-  ctx.fillStyle = c.hairColor;
+  const hairFill = () => fillShape(c.hairColor, headY - hr * 1.6, headY);
   switch (c.hair) {
     case "cap":
     case "bob":
@@ -318,13 +366,13 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
       ctx.arc(x, headY, hr * 1.04, Math.PI * 1.05, Math.PI * 1.95);
       ctx.quadraticCurveTo(x + hr * 0.3, headY - hr * 0.3, x - hr * 0.98, headY - hr * 0.3);
       ctx.closePath();
-      ctx.fill();
+      hairFill();
       break;
     case "bun":
       ctx.beginPath();
       ctx.arc(x, headY - hr * 1.2, hr * 0.42, 0, TAU);
       ctx.arc(x, headY, hr * 1.03, Math.PI * 1.08, Math.PI * 1.92);
-      ctx.fill();
+      hairFill();
       break;
     case "spikes":
       ctx.beginPath();
@@ -336,7 +384,7 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
       }
       ctx.lineTo(x + hr, headY - hr * 0.2);
       ctx.arc(x, headY, hr * 1.02, Math.PI * 2 - 0.2, Math.PI + 0.2, true);
-      ctx.fill();
+      hairFill();
       break;
     case "wave":
       ctx.beginPath();
@@ -344,18 +392,19 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
       ctx.bezierCurveTo(x - hr * 1.3, headY - hr * 1.6, x + hr * 0.6, headY - hr * 1.7, x + hr * 1.15, headY - hr * 0.5);
       ctx.quadraticCurveTo(x + hr * 0.4, headY - hr * 0.7, x - hr * 0.2, headY - hr * 0.45);
       ctx.quadraticCurveTo(x - hr * 0.7, headY - hr * 0.3, x - hr * 1.05, headY);
-      ctx.fill();
+      hairFill();
       break;
     case "beanie":
-      ctx.fillStyle = c.patternColor;
       ctx.beginPath();
       ctx.arc(x, headY - hr * 0.25, hr * 1.05, Math.PI, 0);
       ctx.closePath();
-      ctx.fill();
-      ctx.fillRect(x - hr * 1.12, headY - hr * 0.32, hr * 2.24, hr * 0.3);
+      fillShape(c.patternColor, headY - hr * 1.3, headY - hr * 0.25);
+      ctx.beginPath();
+      ctx.rect(x - hr * 1.12, headY - hr * 0.32, hr * 2.24, hr * 0.3);
+      fillShape(c.patternColor, headY - hr * 0.32, headY - hr * 0.02);
       ctx.beginPath();
       ctx.arc(x, headY - hr * 1.35, hr * 0.22, 0, TAU);
-      ctx.fill();
+      fillShape(c.patternColor, headY - hr * 1.57, headY - hr * 1.13);
       break;
     case "afro":
       break;
@@ -453,13 +502,13 @@ function bounceIn(t: number, t0: number) {
 }
 
 /** A friendly idle: a little bob and an arm sway, different per character. */
-function idle(t: number, i: number) {
+export function idle(t: number, i: number) {
   const ph = t * 2.2 + i * 1.7;
   return { lift: Math.max(0, Math.sin(ph)) * 0.012, armL: 0.25 + Math.sin(ph + 1) * 0.08, armR: 0.25 + Math.sin(ph + 2) * 0.08, squash: Math.sin(ph * 2) * 0.012 };
 }
 
 /** A wave with the right arm, up and rocking. */
-const waveArm = (t: number, k: number) => lerp(0.25, 2.5 + Math.sin(t * 9) * 0.3, k);
+export const waveArm = (t: number, k: number) => lerp(0.25, 2.5 + Math.sin(t * 9) * 0.3, k);
 
 /* ───────────────────────── Slides ───────────────────────── */
 
@@ -472,7 +521,7 @@ function absHello(sc: SkillContext) {
   const H = portrait ? h * 0.42 : h * 0.62;
   const ground = portrait ? h * 0.92 : h * 0.92;
   const cx = portrait ? w / 2 : w * 0.28;
-  const c = makeCharacter(seed, palette);
+  const c = person(sc, 0, seed);
   const b = bounceIn(t, 0.1);
   const wk = ease.inOutCubic(clamp((t - 0.6) / 0.3)) * (1 - ease.inOutCubic(clamp((t - 2.6) / 0.3)));
   const id = idle(t, 0);
@@ -530,7 +579,11 @@ function absCrowd(sc: SkillContext) {
     return { i, x, H, ground };
   });
   for (const p of people) {
-    const c = makeCharacter(seed * 31 + p.i * 7 + 1, palette);
+    // The front row is cast first (from the middle), then the back.
+    const row = p.i < back ? 0 : 1;
+    const k = row ? p.i - back : p.i;
+    const slot = row ? middleOut(k, n - back) : n - back + middleOut(k, back);
+    const c = person(sc, slot, seed * 31 + p.i * 7 + 1);
     const b = bounceIn(t, 0.25 + ((p.i * 0.37) % 1) * 0.6);
     if (b.k <= 0) continue;
     const id = idle(t, p.i);
@@ -616,7 +669,7 @@ function absFeatures(sc: SkillContext) {
   P.forEach((label, i) => {
     const b = bounceIn(t, T[i] - 0.25);
     if (b.k <= 0) return;
-    const c = makeCharacter(seed * 17 + i * 13 + 5, palette);
+    const c = person(sc, i, seed * 17 + i * 13 + 5);
     const x = st.left + slotW * (i + 0.5);
     const lit = i === cur;
     const hop = lit ? Math.max(0, Math.sin(clamp((t - T[i]) / 0.4) * Math.PI)) * 0.05 : 0;
@@ -659,7 +712,7 @@ function absParade(sc: SkillContext) {
   for (let i = 0; i < n; i++) {
     // A line walking left to right, wrapping round so the parade never ends.
     const x = ((((i * gap + t * speed) % (w + H)) + (w + H)) % (w + H)) - H * 0.5;
-    const c = makeCharacter(seed * 23 + i * 11 + 3, palette);
+    const c = person(sc, i, seed * 23 + i * 11 + 3);
     const ph = (x / (H * 0.32)) * Math.PI;
     const sign = i < P.length ? P[i] : null;
     const rig = drawAbstract(ctx, x, st.bottom, H, c, {
@@ -700,7 +753,7 @@ function absChat(sc: SkillContext) {
     const b = bounceIn(t, 0.1 + i * 0.15);
     const speaking = cur >= 0 && cur % 2 === i;
     const id = idle(t, i * 3);
-    return drawAbstract(ctx, xs[i], st.bottom + (1 - Math.min(1, b.k)) * H * 0.5, H, makeCharacter(seed * 41 + i * 19 + 9, palette), {
+    return drawAbstract(ctx, xs[i], st.bottom + (1 - Math.min(1, b.k)) * H * 0.5, H, person(sc, i, seed * 41 + i * 19 + 9), {
       armL: speaking && i === 1 ? 1.2 + Math.sin(t * 4) * 0.25 : id.armL,
       armR: speaking && i === 0 ? 1.2 + Math.sin(t * 4) * 0.25 : id.armR,
       lift: id.lift + (speaking ? Math.max(0, Math.sin(t * 6)) * 0.01 : 0),
@@ -741,7 +794,7 @@ function absCheer(sc: SkillContext) {
     const ph = t * 4.2 + i * 1.3;
     const jump = Math.max(0, Math.sin(ph)) * 0.08 * clamp(t - 0.9);
     const land = Math.sin(ph) < 0 ? -Math.sin(ph) * 0.06 * clamp(t - 0.9) : 0;
-    const c = makeCharacter(seed * 13 + i * 29 + 7, palette);
+    const c = person(sc, middleOut(i, n), seed * 13 + i * 29 + 7);
     ctx.save();
     ctx.globalAlpha *= clamp(b.k * 2);
     drawAbstract(ctx, x, h * 0.97 + (1 - Math.min(1, b.k)) * H * 0.5, H * (0.85 + ((i * 7) % 5) * 0.05), c, {

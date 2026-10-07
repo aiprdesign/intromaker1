@@ -1,4 +1,5 @@
 import { assetUrl } from "./assets";
+import { ART_STYLES, sanitizeCast } from "./cast";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { ownMoment } from "./momentitems";
@@ -620,7 +621,7 @@ function naturalCase(phrase: string, source: string) {
  * features too.
  */
 /** "An intro for …" / "Launch video about …" / "A cartoon video with characters for …": the request, not the product. */
-const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer|cartoon|animated|fun)\s+)*(?:video|film|teaser|trailer|intro|promo)(?:\s+with\s+(?:cartoon\s+|animated\s+)?(?:characters?|a\s+mascot|mascots))?\s+(?:for|about|of)\s+/i;
+const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer|cartoon|animated|fun)\s+)*(?:video|film|teaser|trailer|intro|promo)(?:\s+with\s+(?:cartoon\s+|animated\s+|abstract\s+)?(?:characters?|a\s+mascot|mascots))?\s+(?:for|about|of)\s+/i;
 
 export function parseSaasPrompt(prompt: string) {
   const brand = extractBrand(prompt);
@@ -2735,6 +2736,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     pointer: (POINTER_STYLES as readonly string[]).includes(raw.pointer as string) && raw.pointer !== "auto" ? (raw.pointer as VideoPlan["pointer"]) : undefined,
     shapes: raw.shapes === false ? false : undefined,
     contrast: raw.contrast === false ? false : undefined,
+    cast: sanitizeCast(raw.cast),
     shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) && raw.shapeSet !== "geometric" ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,
     textFx: (TEXT_FX as readonly string[]).includes(raw.textFx as string) ? (raw.textFx as VideoPlan["textFx"]) : undefined,
@@ -2754,6 +2756,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
             backdrop: ["grid", "dots", "blobs", "scanlines", "plain", "horizon", "stars", "eclipse", "studio", "ribbon", "beam", "bloom", "warp", "planet", "wormhole", "rain", "plexus", "meadow"].includes(raw.look.backdrop as string) ? raw.look.backdrop : undefined,
             card: ["glass", "frost", "flat", "brutal", "clay"].includes(raw.look.card as string) ? raw.look.card : undefined,
             toon: ["flat", "comic", "soft", "doodle"].includes(raw.look.toon as string) ? raw.look.toon : undefined,
+            art: (ART_STYLES as readonly string[]).includes(raw.look.art as string) ? raw.look.art : undefined,
             shader: ["mesh", "grain", "warp", "smoke", "neuro", "rays", "panels", "metaballs", "swirl", "voronoi", "dither", "waves"].includes(raw.look.shader as string) ? raw.look.shader : undefined,
             shaderStrength: raw.look.shaderStrength !== undefined ? Math.min(1, Math.max(0, Number(raw.look.shaderStrength) || 0)) : undefined,
             shaderSpeed: raw.look.shaderSpeed !== undefined ? Math.min(3, Math.max(0, Number(raw.look.shaderSpeed) || 0)) : undefined,

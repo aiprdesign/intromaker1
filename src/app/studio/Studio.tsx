@@ -6,6 +6,8 @@ import AiSettings, { aiForRequest, aiLabel, DEFAULT_AI, loadAiSettings, type AiS
 import { Logo } from "@/components/Nav";
 import SkillPicker from "@/components/SkillPicker";
 import PointerPicker, { POINTER_NAMES } from "@/components/PointerPicker";
+import { CastThumb, CharacterDesignerModal, loadCast, saveCast } from "@/components/CharacterDesigner";
+import { brandPalette } from "@/engine/renderer";
 import ShapesPicker from "@/components/ShapesPicker";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
@@ -52,7 +54,7 @@ import ZoomLensEditor from "@/components/ZoomLensEditor";
 import TourAreaEditor from "@/components/TourAreaEditor";
 import { needsPicture } from "@/engine/placeholders";
 import { slideContent } from "@/engine/newslide";
-import { PALETTE_IDS, POINTER_STYLES, SHAPE_SETS, TEXT_FX, TRANSITIONS, type PointerStyle, type ShapeSet, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
+import { PALETTE_IDS, POINTER_STYLES, SHAPE_SETS, TEXT_FX, TRANSITIONS, type PointerStyle, type ShapeSet, type Transition, type FontId, type TextFx, type Aspect, type Brand, type PaletteId, type Media, type Scene, type CastMember, type SiteData, type SkillId, type VideoPlan, type VoiceSettings } from "@/engine/types";
 
 type Engine = "ai" | "builtin" | "manual" | "sample";
 const FILM_KEY = "intromaker.film";
@@ -364,6 +366,35 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.pointer ?? "auto") !== pointer) setPlan((p) => ({ ...p, pointer: pointer === "auto" ? undefined : pointer }));
   }, [plan, pointer]);
+  // Your own abstract characters (the character designer's cast): kept in the browser and cast
+  // first in the abstract character slides, unless switched to a random cast.
+  const [cast, setCast] = useState<CastMember[]>([]);
+  const [castOn, setCastOn] = useState(true);
+  const [castOpen, setCastOpen] = useState(false);
+  useEffect(() => {
+    setCast(loadCast());
+    try {
+      if (localStorage.getItem("intromaker.cast.use") === "off") setCastOn(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseCast = (c: CastMember[]) => {
+    setCast(c);
+    saveCast(c);
+  };
+  const chooseCastOn = (on: boolean) => {
+    setCastOn(on);
+    try {
+      localStorage.setItem("intromaker.cast.use", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    const want = castOn && cast.length ? cast : undefined;
+    if (JSON.stringify(plan.cast ?? null) !== JSON.stringify(want ?? null)) setPlan((p) => ({ ...p, cast: want }));
+  }, [plan, cast, castOn]);
   // What floats behind SaaS slides: a set of animated shapes (geometric by default), watermark
   // text, or nothing. Remembered, and saved with the video.
   const [shapes, setShapes] = useState<ShapeSet | "off">("geometric");
@@ -1966,6 +1997,7 @@ export default function Studio() {
         </a>
       </header>
 
+      {castOpen && <CharacterDesignerModal cast={cast} onChange={chooseCast} palette={brandPalette(plan.palette, plan.brand, plan.scheme)} onClose={() => setCastOpen(false)} />}
       {aiOpen && <AiSettings value={ai} onChange={setAi} onClose={() => setAiOpen(false)} serverClaude={!!aiAvailable} localViaServer={localViaServer} />}
       <div className="studio-body">
         <IntroSidebar
@@ -2401,6 +2433,34 @@ export default function Studio() {
             <PointerPicker plan={plan} value={pointer} onChange={choosePointer} />
             <p className="hint">{pointer === "auto" ? "A 3D pointer that suits the colours: white on dark styles, graphite on light ones." : `The ${POINTER_NAMES[pointer].toLowerCase()} pointer in product demos, tours and buttons.`}</p>
           </details>
+          {style !== "trailer" && (
+            <details className="fold">
+              <summary>
+                <span className="field-label inline">Characters</span> <span className="tpl-desc">{castOn && cast.length ? `${cast.length} of yours` : "Random cast"}</span>
+              </summary>
+              {cast.length > 0 && (
+                <div className="seg-control">
+                  <button className={castOn ? "active" : ""} onClick={() => chooseCastOn(true)}>
+                    My characters
+                  </button>
+                  <button className={!castOn ? "active" : ""} onClick={() => chooseCastOn(false)}>
+                    Random
+                  </button>
+                </div>
+              )}
+              <div className="cast-row">
+                {cast.map((c, k) => (
+                  <button key={k} type="button" className="cd-member" onClick={() => setCastOpen(true)} title={c.name || `Character ${k + 1}`}>
+                    <CastThumb c={c} />
+                  </button>
+                ))}
+                <button type="button" className="btn btn-ghost" onClick={() => setCastOpen(true)}>
+                  {cast.length ? "Edit characters" : "Design characters"}
+                </button>
+              </div>
+              <p className="hint">{cast.length ? (castOn ? "The abstract character slides (Abstract People and Memphis Crowd styles) cast yours first, then fill crowds with generated people." : "The abstract character slides make up a new cast for each video.") : "Design simple abstract characters to star in the abstract character slides (Abstract People and Memphis Crowd styles), or download them as PNGs."}</p>
+            </details>
+          )}
           {(style !== "trailer" || plan.product) && (
             <>
               <details className="fold">

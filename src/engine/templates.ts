@@ -426,7 +426,7 @@ export const TEMPLATES: Template[] = [
     bpm: 124,
     music: "saas",
     flavor: "pop",
-    look: { grid: false, beams: 0, aurora: 0.3, backdrop: "dots", text: "pop", grain: 0.3, toon: "flat" },
+    look: { grid: false, beams: 0, aurora: 0.3, backdrop: "dots", text: "pop", grain: 0.3, toon: "flat", art: "paper" },
     transitions: ["push", "swipe", "zoom"],
     pace: 1.05,
     roles: ABS_ROLES,
