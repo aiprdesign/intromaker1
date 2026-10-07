@@ -36,6 +36,106 @@ export function sentence(sc: SkillContext, opts: Parameters<typeof headline>[1] 
  * The signature "dark grid" stage: aurora glow at the top, a spotlight cone,
  * a faded grid with dots, and bright beams that travel along the grid lines.
  */
+/**
+ * Meadow: a sunny outdoor stage for cartoon videos. A soft sky with a sun and slowly drifting
+ * clouds, rolling green hills in two layers with a winding blue river, and round trees that sway
+ * a little, all low in the frame so the headline sits on open sky. Drawn on the film's own clock
+ * so it carries on across cuts.
+ */
+function meadowStage(sc: SkillContext) {
+  const { ctx, w, h, u, seed } = sc;
+  const T = sc.globalT ?? sc.t;
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, "#9fd8ff");
+  sky.addColorStop(0.55, "#dff3ff");
+  sky.addColorStop(1, "#f4fbff");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+  // Sun (top right) with a soft halo.
+  const sx = w * 0.84;
+  const sy = h * 0.16;
+  const halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, Math.min(w, h) * 0.3);
+  halo.addColorStop(0, "rgba(255,236,150,0.75)");
+  halo.addColorStop(1, "rgba(255,236,150,0)");
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#ffe27a";
+  ctx.beginPath();
+  ctx.arc(sx, sy, Math.min(w, h) * 0.055, 0, Math.PI * 2);
+  ctx.fill();
+  // Clouds drifting left to right.
+  const r = rng(seed + 311);
+  for (let i = 0; i < 4; i++) {
+    const cw = (180 + r() * 160) * u;
+    const cy = h * (0.08 + r() * 0.22);
+    const cx = ((r() * (w + cw * 2) + T * (8 + r() * 10) * u) % (w + cw * 2)) - cw;
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, cw * 0.5, cw * 0.16, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx - cw * 0.18, cy - cw * 0.1, cw * 0.2, cw * 0.17, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + cw * 0.12, cy - cw * 0.14, cw * 0.24, cw * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Hills: a far layer and a near one, with a river winding between them.
+  const hill = (base: number, amp: number, freq: number, phase: number, color: string) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let x = 0; x <= w + 8; x += 8 * u) ctx.lineTo(x, base + Math.sin(x / w * Math.PI * freq + phase) * amp);
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fill();
+  };
+  hill(h * 0.66, h * 0.04, 2.2, 0.6, "#a6dd8f");
+  hill(h * 0.8, h * 0.035, 1.6, 2.4, "#7ccf6a");
+  // River: a ribbon from the far hills, widening as it winds down to the bottom of the frame.
+  const top = h * 0.665;
+  const rw = (y: number) => (10 + Math.pow((y - top) / (h - top), 1.3) * 230) * u;
+  const rx = (y: number) => w * 0.62 + Math.sin(((y - top) / (h - top)) * 4.2 + 0.4) * w * 0.07;
+  const bank = (dir: number) => {
+    for (let y = top; y <= h + 6 * u; y += 6 * u) ctx.lineTo(rx(y) + (dir * rw(y)) / 2, y);
+  };
+  ctx.beginPath();
+  bank(-1);
+  for (let y = h + 6 * u; y >= top; y -= 6 * u) ctx.lineTo(rx(y) + rw(y) / 2, y);
+  ctx.closePath();
+  const water = ctx.createLinearGradient(0, top, 0, h);
+  water.addColorStop(0, "#9ad8f5");
+  water.addColorStop(1, "#4fb2e6");
+  ctx.fillStyle = water;
+  ctx.fill();
+  // Sandy edges, then glints sliding downstream.
+  ctx.strokeStyle = "rgba(240,226,170,0.7)";
+  ctx.lineWidth = 3 * u;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  for (let k = 0; k < 9; k++) {
+    const f = (k / 9 + T * 0.04) % 1;
+    const y = top + Math.pow(f, 0.8) * (h - top);
+    const gw = rw(y) * 0.28;
+    ctx.fillRect(rx(y) - gw / 2 + Math.sin(k * 2.3) * rw(y) * 0.2, y, gw, Math.max(1.5, 2.5 * u * (0.5 + f)));
+  }
+  // Round trees that sway a little.
+  const tr = rng(seed + 912);
+  const trees = w > h ? 7 : 4;
+  for (let i = 0; i < trees; i++) {
+    const tx = ((i + 0.3 + tr() * 0.4) / trees) * w;
+    if (Math.abs(tx - w * 0.62) < w * 0.12) continue;
+    const far = i % 2 === 0;
+    const ty = far ? h * (0.66 + 0.02 * tr()) : h * (0.8 + 0.02 * tr());
+    const s = (far ? 46 : 70) * u * (0.8 + tr() * 0.4);
+    const sway = Math.sin(T * 1.2 + i) * s * 0.04;
+    ctx.fillStyle = "#8a5a3b";
+    ctx.fillRect(tx - s * 0.08, ty - s * 0.9, s * 0.16, s * 0.9);
+    ctx.fillStyle = far ? "#58b35a" : "#3f9d4c";
+    ctx.beginPath();
+    ctx.arc(tx + sway, ty - s * 1.15, s * 0.55, 0, Math.PI * 2);
+    ctx.arc(tx - s * 0.32 + sway, ty - s * 0.9, s * 0.4, 0, Math.PI * 2);
+    ctx.arc(tx + s * 0.34 + sway, ty - s * 0.88, s * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?: number; aurora?: number } = {}) {
   if (sc.noStage) return;
   const { ctx, w, h, t, u, palette, seed } = sc;
@@ -219,6 +319,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   else if (backdrop === "wormhole") wormholeStage(sc, glowOp);
   else if (backdrop === "rain") rainStage(sc, glowOp);
   else if (backdrop === "plexus") plexusStage(sc, glowOp);
+  else if (backdrop === "meadow") meadowStage(sc);
 
   if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
     // Over a shader stage the grid lives on its own layer, masked to fade at the edges;

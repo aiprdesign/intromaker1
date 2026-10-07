@@ -478,7 +478,9 @@ export interface Look {
   /** Vignette strength multiplier. */
   vignette?: number;
   /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, plain, synthwave horizon, stars, the clean-epic stages (eclipse rim, studio sweep, silk ribbons, light beam, colour bloom), or the sci-fi stages (light-speed warp, ringed planet, wormhole, data rain, quantum mesh). */
-  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus";
+  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow";
+  /** How cartoon characters are drawn (character slides): flat, comic ink with cel shading, soft clay, or hand-drawn doodle. */
+  toon?: "flat" | "comic" | "soft" | "doodle";
   /** UI card treatment: frosted glass (default), frosted-light, flat, or neo-brutalist. */
   card?: "glass" | "frost" | "flat" | "brutal" | "clay";
   /** Headline size multiplier (kinetic-type styles go big). */

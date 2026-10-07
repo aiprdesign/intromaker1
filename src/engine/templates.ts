@@ -33,8 +33,8 @@ export type Role =
   | "support"
   | "cta";
 
-export type TemplateCategory = "Clean & Epic" | "Product Trailers" | "Modern" | "Clean & Light" | "Sci-Fi" | "3D" | "Bold & Playful" | "Premium";
-export const TEMPLATE_CATEGORIES: TemplateCategory[] = ["Clean & Epic", "Product Trailers", "Modern", "Sci-Fi", "3D", "Clean & Light", "Bold & Playful", "Premium"];
+export type TemplateCategory = "Clean & Epic" | "Product Trailers" | "Modern" | "Clean & Light" | "Sci-Fi" | "3D" | "Bold & Playful" | "Cartoon" | "Premium";
+export const TEMPLATE_CATEGORIES: TemplateCategory[] = ["Clean & Epic", "Product Trailers", "Modern", "Sci-Fi", "3D", "Clean & Light", "Bold & Playful", "Cartoon", "Premium"];
 
 export interface Template {
   id: string;
@@ -156,6 +156,9 @@ const sample = (text: string, skill: SkillId = "blur-reveal", extra: Partial<Sce
   ...extra,
 });
 
+/** The character slides for each part of the story (the cartoon styles). */
+const ROLES: Template["roles"] = { hook: "char-hello", features: "char-presenter", cards: "char-team", bento: "char-presenter", solve: "char-aha", demo: "char-desk", cta: "char-cheer" };
+
 export const TEMPLATES: Template[] = [
   {
     id: "midnight",
@@ -250,7 +253,7 @@ export const TEMPLATES: Template[] = [
   {
     id: "cartoon",
     name: "Cartoon Pals",
-    category: "Bold & Playful",
+    category: "Cartoon",
     description: "Friendly flat cartoon characters tell the story: a mascot says hello, a presenter explains, a team cheers you on.",
     vibe: "Warm, human and playful. Simple, friendly copy a child could read aloud; characters do the talking; bouncy motion.",
     palette: "pastel",
@@ -258,12 +261,102 @@ export const TEMPLATES: Template[] = [
     bpm: 118,
     music: "saas",
     flavor: "pop",
-    look: { grid: false, beams: 0, aurora: 1.1, text: "pop", grain: 0.3 },
+    look: { grid: false, beams: 0, aurora: 1.1, text: "pop", grain: 0.3, toon: "flat" },
     transitions: ["push", "swipe", "zoom", "dissolve"],
     pace: 1,
-    roles: { hook: "char-hello", features: "char-presenter", cards: "char-team", bento: "char-presenter", solve: "char-aha", demo: "char-desk", cta: "char-cheer" },
+    roles: ROLES,
     revealNoLogo: "char-hello",
     sample: sample("Learning, *made friendly*."),
+  },
+  {
+    id: "comic",
+    name: "Comic Pop",
+    category: "Cartoon",
+    description: "A comic book: bold ink outlines and cel shading, halftone dots, punchy panels and hard-shadow speech bubbles.",
+    vibe: "Loud, funny and bold like a comic strip. Short, punchy lines with exclamation energy; snappy whips and zooms.",
+    palette: "brutal",
+    font: "anton",
+    bpm: 126,
+    music: "saas",
+    flavor: "pop",
+    look: { grid: false, beams: 0, aurora: 0.4, backdrop: "dots", card: "brutal", text: "pop", grain: 0.4, toon: "comic" },
+    transitions: ["whip", "zoom", "swipe", "flash"],
+    pace: 0.9,
+    roles: ROLES,
+    revealNoLogo: "char-hello",
+    sample: sample("Your new *sidekick*!"),
+  },
+  {
+    id: "storybook",
+    name: "Storybook",
+    category: "Cartoon",
+    description: "A picture book: hand-drawn ink characters that gently boil like animation frames, on warm paper with a classic serif.",
+    vibe: "Gentle, cosy and wonder-filled, like a bedtime story. Calm, kind copy; soft dissolves and slow page-turn pacing.",
+    palette: "cream",
+    font: "playfair",
+    bpm: 96,
+    music: "saas",
+    flavor: "soft",
+    look: { grid: false, beams: 0, aurora: 0.5, backdrop: "plain", card: "flat", text: "blur", grain: 1.2, vignette: 0.8, toon: "doodle" },
+    transitions: ["dissolve", "morph", "push"],
+    pace: 1.15,
+    roles: ROLES,
+    revealNoLogo: "char-hello",
+    sample: sample("Once upon a *better way*."),
+  },
+  {
+    id: "claybuddies",
+    name: "Clay Buddies",
+    category: "Cartoon",
+    description: "Soft clay characters with rounded 3D shading and gentle glossy highlights, on puffy clay cards and pastel colour.",
+    vibe: "Squishy, cuddly and calm. Friendly, reassuring copy; soft, springy motion.",
+    palette: "clay",
+    font: "jost",
+    bpm: 110,
+    music: "saas",
+    flavor: "soft",
+    look: { grid: false, beams: 0, aurora: 0.9, card: "clay", text: "pop", grain: 0.2, shader: "mesh", shaderStrength: 0.45, toon: "soft" },
+    transitions: ["push", "dolly", "dissolve"],
+    pace: 1.05,
+    roles: ROLES,
+    revealNoLogo: "char-hello",
+    sample: sample("Help that feels *soft*."),
+  },
+  {
+    id: "sunnypark",
+    name: "Sunny Park",
+    category: "Cartoon",
+    description: "Characters outdoors on a sunny day: blue sky and drifting clouds, green hills, a winding river and swaying trees.",
+    vibe: "Fresh, outdoorsy and cheerful. Upbeat, simple copy; breezy pushes and swipes.",
+    palette: "daybreak",
+    font: "manrope",
+    bpm: 116,
+    music: "saas",
+    flavor: "pop",
+    look: { grid: false, beams: 0, aurora: 0, backdrop: "meadow", card: "flat", text: "pop", grain: 0.2, vignette: 0.4, toon: "flat" },
+    transitions: ["push", "swipe", "dissolve", "zoom"],
+    pace: 1,
+    roles: ROLES,
+    revealNoLogo: "char-hello",
+    sample: sample("A brighter day, *outside*."),
+  },
+  {
+    id: "nightowls",
+    name: "Night Owls",
+    category: "Cartoon",
+    description: "Characters under a twinkling night sky: deep blue, soft starlight and glowing cards, for late-night and dreamy stories.",
+    vibe: "Dreamy, quiet and magical. Short, soothing lines; slow dolly moves and dissolves.",
+    palette: "midnight",
+    font: "manrope",
+    bpm: 100,
+    music: "saas",
+    flavor: "minimal",
+    look: { grid: false, beams: 0, aurora: 0.8, backdrop: "stars", card: "glass", text: "glow", grain: 0.6, vignette: 1.1, toon: "flat" },
+    transitions: ["dolly", "dissolve", "push"],
+    pace: 1.1,
+    roles: ROLES,
+    revealNoLogo: "char-hello",
+    sample: sample("Sweet dreams, *sorted*."),
   },
   {
     id: "keynote",

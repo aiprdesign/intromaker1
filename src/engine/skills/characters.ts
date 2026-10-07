@@ -29,6 +29,41 @@ const plain = (s: string) => s.replace(/\*/g, "").trim();
 
 /* ───────────────────────── The character ───────────────────────── */
 
+export type Toon = "flat" | "comic" | "soft" | "doodle";
+/** How characters, bubbles and boards are drawn this frame (from the style's look; set per render). */
+let TOON: Toon = "flat";
+/** Hand-drawn "boil": the doodle ink shifts a little 8 times a second, like redrawn frames. */
+let BOIL = 0;
+const INK = "#1a1624";
+/** Storybook ink: a warm brown, drawn as a sketchy double line. */
+const SEPIA = "#4a3426";
+function useToon(sc: SkillContext) {
+  TOON = sc.look?.toon ?? "flat";
+  BOIL = Math.floor((sc.globalT ?? sc.t) * 8);
+}
+/** Ink outline for the current path (comic and doodle), after its fill. */
+function ink(ctx: CanvasRenderingContext2D, width: number) {
+  if (TOON !== "comic" && TOON !== "doodle") return;
+  ctx.save();
+  ctx.lineJoin = "round";
+  if (TOON === "doodle") {
+    // Two light pen passes that don't quite line up, shifting each "drawing" (boil).
+    ctx.strokeStyle = SEPIA;
+    ctx.lineWidth = width * 0.45;
+    ctx.globalAlpha *= 0.85;
+    ctx.translate(Math.sin(BOIL * 7.13) * width * 0.4, Math.cos(BOIL * 5.31) * width * 0.4);
+    ctx.stroke();
+    ctx.translate(Math.cos(BOIL * 3.7) * width * 0.6, Math.sin(BOIL * 4.1) * width * 0.6);
+    ctx.globalAlpha *= 0.6;
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export interface CharLook {
   skin: string;
   hair: string;
@@ -79,11 +114,15 @@ export function castLook(p: Palette, i: number): CharLook {
   // a team looks varied but still belongs to the video.
   const friends = ["#ff8a5c", "#2ec4b6", "#ffbe0b", "#9b5de5", "#ef476f"];
   const tops = [p.primary, ...friends.map((c) => mixHex(c, p.primary, 0.15))];
+  // Storybook colours are softened towards the paper, like watercolour; on a dark stage the
+  // trousers and shoes are lighter so they don't vanish into the night.
+  const soft = (col: string) => (TOON === "doodle" ? mixHex(col, "#f3e6cf", 0.22) : col);
   return {
     ...c,
-    top: tops[i % tops.length],
-    bottom: p.light ? "#3a3f57" : "#262a3d",
-    shoe: p.light ? "#1f2233" : "#12141f",
+    skin: soft(c.skin),
+    top: soft(tops[i % tops.length]),
+    bottom: soft(p.light ? "#3a3f57" : "#56608c"),
+    shoe: p.light ? "#1f2233" : "#363d60",
   };
 }
 
@@ -106,12 +145,58 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
   const shY = hipY - torsoH;
   const headY = shY - headR * 0.82;
   const out = { head: { x, y: headY, r: headR }, handL: { x, y: 0 }, handR: { x, y: 0 }, top: headY - headR };
+  const ow = H * 0.014;
+  const outlined = TOON === "comic" || TOON === "doodle";
+  /** A limb: an ink stroke under the coloured one (comic, doodle), a soft highlight on top (clay). */
+  const limb = (pts: [number, number][], width: number, color: string) => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (const q of pts.slice(1)) ctx.lineTo(q[0], q[1]);
+    if (outlined) {
+      ctx.save();
+      if (TOON === "doodle") {
+        // A sketchy pen line either side of the limb.
+        ctx.translate(Math.sin(BOIL * 3.7) * ow * 0.3, Math.cos(BOIL * 4.9) * ow * 0.3);
+        ctx.strokeStyle = SEPIA;
+        ctx.globalAlpha *= 0.85;
+        ctx.lineWidth = width + ow * 0.9;
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = width + ow * 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+    if (TOON === "soft") {
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.lineWidth = width * 0.32;
+      ctx.stroke();
+    }
+  };
+  /** Cel shade (comic): the right-hand part of the current path darkened with a hard edge. */
+  const cel = (x0: number, alpha = 0.16) => {
+    if (TOON !== "comic") return;
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = `rgba(20,10,40,${alpha})`;
+    ctx.fillRect(x0, -1e4, 2e4, 2e4);
+    ctx.restore();
+  };
   ctx.save();
   // Ground shadow (not tilted with the body).
-  ctx.fillStyle = "rgba(0,0,0,0.16)";
+  ctx.fillStyle = TOON === "comic" ? "rgba(20,10,40,0.28)" : "rgba(0,0,0,0.16)";
+  if (TOON === "soft") {
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = H * 0.04;
+  }
   ctx.beginPath();
   ctx.ellipse(x, footY + H * 0.01, H * 0.17, H * 0.028, 0, 0, TAU);
   if (pose.legs !== false) ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.translate(x, footY);
   ctx.rotate(pose.lean ?? 0);
   ctx.translate(-x, -footY);
@@ -124,26 +209,31 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
       const hx = x + s * torsoW * 0.22;
       const fx = hx + s * Math.sin(a) * legLen;
       const fy = hipY + Math.cos(a) * legLen;
-      ctx.strokeStyle = look.bottom;
-      ctx.lineWidth = H * 0.085;
-      ctx.beginPath();
-      ctx.moveTo(hx, hipY);
-      ctx.lineTo(fx, fy - H * 0.02);
-      ctx.stroke();
+      limb([[hx, hipY], [fx, fy - H * 0.02]], H * 0.085, look.bottom);
       ctx.fillStyle = look.shoe;
       ctx.beginPath();
       ctx.ellipse(fx + s * H * 0.018, fy - H * 0.012, H * 0.058, H * 0.03, 0, 0, TAU);
       ctx.fill();
+      ink(ctx, ow);
     }
   }
   // Torso: a rounded body in the top's colour, lit from the upper left.
-  const tg = ctx.createLinearGradient(x - torsoW / 2, shY, x + torsoW / 2, hipY);
-  tg.addColorStop(0, mixHex(look.top, "#ffffff", 0.16));
-  tg.addColorStop(1, mixHex(look.top, "#000000", 0.12));
+  let tg: CanvasGradient;
+  if (TOON === "soft") {
+    tg = ctx.createRadialGradient(x - torsoW * 0.2, shY + torsoH * 0.2, torsoW * 0.05, x, shY + torsoH * 0.5, torsoW * 0.9);
+    tg.addColorStop(0, mixHex(look.top, "#ffffff", 0.35));
+    tg.addColorStop(1, mixHex(look.top, "#000000", 0.18));
+  } else {
+    tg = ctx.createLinearGradient(x - torsoW / 2, shY, x + torsoW / 2, hipY);
+    tg.addColorStop(0, mixHex(look.top, "#ffffff", TOON === "flat" ? 0.16 : 0));
+    tg.addColorStop(1, mixHex(look.top, "#000000", TOON === "flat" ? 0.12 : 0));
+  }
   ctx.fillStyle = tg;
   ctx.beginPath();
   ctx.roundRect(x - torsoW / 2, shY - H * 0.01, torsoW, torsoH + H * 0.03, [torsoW * 0.42, torsoW * 0.42, torsoW * 0.2, torsoW * 0.2]);
   ctx.fill();
+  cel(x + torsoW * 0.18);
+  ink(ctx, ow);
   // Neck.
   ctx.fillStyle = mixHex(look.skin, "#000000", 0.08);
   ctx.beginPath();
@@ -162,17 +252,12 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
     const a2 = a + bend;
     const hx = ex + s * Math.sin(a2) * fo;
     const hy = ey + Math.cos(a2) * fo;
-    ctx.strokeStyle = mixHex(look.top, "#000000", 0.06);
-    ctx.lineWidth = H * 0.068;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(ex, ey);
-    ctx.lineTo(hx, hy);
-    ctx.stroke();
+    limb([[sx, sy], [ex, ey], [hx, hy]], H * 0.068, mixHex(look.top, "#000000", 0.06));
     ctx.fillStyle = look.skin;
     ctx.beginPath();
     ctx.arc(hx, hy, H * 0.038, 0, TAU);
     ctx.fill();
+    ink(ctx, ow * 0.8);
     if (s < 0) out.handL = { x: hx, y: hy };
     else out.handR = { x: hx, y: hy };
   }
@@ -184,20 +269,30 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
     ctx.beginPath();
     ctx.roundRect(x - headR * 1.05, headY - headR * 0.3, headR * 2.1, headR * 1.75, [headR * 0.5, headR * 0.5, headR * 0.35, headR * 0.35]);
     ctx.fill();
+    ink(ctx, ow);
   }
   ctx.fillStyle = look.skin;
   for (const s of [-1, 1]) {
     ctx.beginPath();
     ctx.arc(x + s * headR * 0.98, headY + headR * 0.08, headR * 0.2, 0, TAU);
     ctx.fill();
+    ink(ctx, ow * 0.8);
   }
   const hg = ctx.createRadialGradient(x - headR * 0.35, headY - headR * 0.4, headR * 0.1, x, headY, headR * 1.05);
-  hg.addColorStop(0, mixHex(look.skin, "#ffffff", 0.12));
-  hg.addColorStop(1, look.skin);
+  hg.addColorStop(0, mixHex(look.skin, "#ffffff", TOON === "soft" ? 0.28 : TOON === "flat" ? 0.12 : 0));
+  hg.addColorStop(1, TOON === "soft" ? mixHex(look.skin, "#000000", 0.12) : look.skin);
   ctx.fillStyle = hg;
   ctx.beginPath();
   ctx.arc(x, headY, headR, 0, TAU);
   ctx.fill();
+  cel(x + headR * 0.42, 0.12);
+  ink(ctx, ow);
+  if (TOON === "soft") {
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(x - headR * 0.4, headY - headR * 0.45, headR * 0.28, headR * 0.16, -0.5, 0, TAU);
+    ctx.fill();
+  }
   // Hair on top.
   ctx.fillStyle = look.hair;
   ctx.beginPath();
@@ -206,10 +301,12 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
   ctx.quadraticCurveTo(x - headR * 0.7, headY - headR * 0.4, x - headR * 1.03, headY - headR * 0.02);
   ctx.closePath();
   ctx.fill();
+  ink(ctx, ow);
   if (look.hairStyle === 2) {
     ctx.beginPath();
     ctx.arc(x + headR * 0.1, headY - headR * 1.12, headR * 0.38, 0, TAU);
     ctx.fill();
+    ink(ctx, ow);
   } else if (look.hairStyle === 3) {
     for (let k = 0; k < 7; k++) {
       const a = Math.PI * (1.05 + (k / 6) * 0.9);
@@ -299,13 +396,23 @@ function bubble(sc: SkillContext, box: { x: number; y: number; w: number; h: num
   ctx.translate(tip.x, tip.y);
   ctx.scale(k, k);
   ctx.translate(-tip.x, -tip.y);
-  ctx.shadowColor = "rgba(0,0,0,0.22)";
-  ctx.shadowBlur = 24 * u;
-  ctx.shadowOffsetY = 8 * u;
+  const outlined = TOON === "comic" || TOON === "doodle";
+  if (TOON === "comic") {
+    // Comic: a hard offset shadow instead of a soft one.
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.roundRect(box.x + 8 * u, box.y + 8 * u, box.w, box.h, Math.min(20 * u, box.h / 2));
+    ctx.fill();
+  } else if (!outlined) {
+    ctx.shadowColor = "rgba(0,0,0,0.22)";
+    ctx.shadowBlur = (TOON === "soft" ? 40 : 24) * u;
+    ctx.shadowOffsetY = (TOON === "soft" ? 14 : 8) * u;
+  }
   ctx.fillStyle = fill;
   ctx.beginPath();
-  ctx.roundRect(box.x, box.y, box.w, box.h, Math.min(28 * u, box.h / 2));
+  ctx.roundRect(box.x, box.y, box.w, box.h, Math.min((TOON === "comic" ? 20 : 28) * u, box.h / 2));
   ctx.fill();
+  ink(ctx, 4 * u);
   // Tail: from the box's nearest edge towards the tip.
   const cx = clamp(tip.x, box.x + box.h * 0.4, box.x + box.w - box.h * 0.4);
   const below = tip.y > box.y + box.h;
@@ -315,8 +422,24 @@ function bubble(sc: SkillContext, box: { x: number; y: number; w: number; h: num
   ctx.moveTo(cx - tw, ey);
   ctx.quadraticCurveTo(lerp(cx, tip.x, 0.5), lerp(ey, tip.y, 0.4), tip.x, tip.y);
   ctx.quadraticCurveTo(lerp(cx, tip.x, 0.3), lerp(ey, tip.y, 0.6), cx + tw, ey);
-  ctx.closePath();
-  ctx.fill();
+  if (outlined) {
+    // The tail's two sides in ink (not its base, which joins the box).
+    ctx.save();
+    ctx.shadowColor = "transparent";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - tw, ey);
+    ctx.quadraticCurveTo(lerp(cx, tip.x, 0.5), lerp(ey, tip.y, 0.4), tip.x, tip.y);
+    ctx.quadraticCurveTo(lerp(cx, tip.x, 0.3), lerp(ey, tip.y, 0.6), cx + tw, ey);
+    ink(ctx, 4 * u);
+    // Cover the box's outline where the tail meets it.
+    ctx.fillStyle = fill;
+    ctx.fillRect(cx - tw + 3 * u, below ? ey - 6 * u : ey, tw * 2 - 6 * u, 6 * u);
+    ctx.restore();
+  } else {
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -344,6 +467,7 @@ const wave = (t: number, k: number) => ({ arm: lerp(0.2, 2.55, k), fore: k * (0.
 
 function charHello(sc: SkillContext) {
   const { ctx, w, h, t, u, palette, scene } = sc;
+  useToon(sc);
   saasBackground(sc, { beams: 0, aurora: 0.5 });
   const ex = exitOf(sc);
   const portrait = h > w;
@@ -399,6 +523,7 @@ function pointTimes(scene: Scene, n: number, start = 0.8) {
 
 function charPresenter(sc: SkillContext) {
   const { ctx, w, t, u, palette, scene } = sc;
+  useToon(sc);
   saasBackground(sc, { beams: 0, aurora: 0.35 });
   const st = stage(sc);
   const { S, narrow, ex } = st;
@@ -429,7 +554,8 @@ function charPresenter(sc: SkillContext) {
   ctx.beginPath();
   ctx.roundRect(board.x, board.y, board.w, board.h, 24 * u);
   ctx.fill();
-  ctx.stroke();
+  if (TOON === "comic" || TOON === "doodle") ink(ctx, 4 * u);
+  else ctx.stroke();
   const pad = 28 * u * S;
   const rowH = (board.h - pad * 2) / n;
   const rows = P.map((p, i) => {
@@ -495,6 +621,7 @@ const TEAM = ["Friendly support", "Simple setup", "Works on any device", "Made f
 
 function charTeam(sc: SkillContext) {
   const { ctx, w, t, u, palette, scene } = sc;
+  useToon(sc);
   saasBackground(sc, { beams: 0, aurora: 0.35 });
   const st = stage(sc);
   const { S, narrow, ex } = st;
@@ -554,6 +681,7 @@ function charTeam(sc: SkillContext) {
 
 function charAha(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene } = sc;
+  useToon(sc);
   saasBackground(sc, { beams: 0, aurora: 0.4 });
   const ex = exitOf(sc);
   const portrait = h > w;
@@ -607,6 +735,7 @@ function charAha(sc: SkillContext) {
       ctx.arc(ccx + Math.cos(a) * cw * 0.45, ccy + Math.sin(a) * chh * 0.48, r, 0, TAU);
     }
     ctx.fill();
+    ctx.shadowBlur = 0;
     // Thought dots down to the head.
     for (let k = 0; k < 3; k++) {
       const f = (k + 1) / 4;
@@ -690,6 +819,7 @@ const UPDATES = ["Project created", "Teammates invited", "First task done", "Rep
 
 function charDesk(sc: SkillContext) {
   const { ctx, w, t, u, palette, scene, brand } = sc;
+  useToon(sc);
   saasBackground(sc, { beams: 0, aurora: 0.35 });
   const st = stage(sc);
   const { S, narrow, ex } = st;
@@ -724,6 +854,7 @@ function charDesk(sc: SkillContext) {
   ctx.beginPath();
   ctx.roundRect(cx - dw / 2, deskY, dw, H * 0.05, 8 * u);
   ctx.fill();
+  ink(ctx, 4 * u);
   ctx.fillStyle = mixHex(palette.bg1, palette.light ? "#000000" : "#ffffff", 0.06);
   ctx.beginPath();
   ctx.roundRect(cx - dw * 0.46, deskY + H * 0.05, dw * 0.92, H * 0.24, [0, 0, 10 * u, 10 * u]);
@@ -738,6 +869,7 @@ function charDesk(sc: SkillContext) {
   ctx.beginPath();
   ctx.roundRect(cx - lw / 2, deskY - lh, lw, lh, 10 * u);
   ctx.fill();
+  ink(ctx, 4 * u);
   ctx.fillStyle = palette.primary;
   ctx.font = displayFont(saasFont(sc), lh * 0.42);
   ctx.textAlign = "center";
@@ -764,6 +896,7 @@ function charDesk(sc: SkillContext) {
     ctx.roundRect(gx, y, cardW, cardH, 16 * u);
     ctx.fill();
     ctx.shadowBlur = 0;
+    ink(ctx, 3 * u);
     const ts = cardH * 0.56;
     iconTile(sc, icons[i], gx + 18 * u + ts / 2, y + cardH / 2, ts);
     ctx.fillStyle = palette.text;
@@ -792,6 +925,7 @@ function charDesk(sc: SkillContext) {
 
 function charCheer(sc: SkillContext) {
   const { ctx, w, h, t, u, palette, scene, seed } = sc;
+  useToon(sc);
   saasBackground(sc, { beams: 0, aurora: 0.5 });
   const portrait = h > w;
   const label = plain(scene.text) || "Get started";
@@ -840,6 +974,7 @@ function charCheer(sc: SkillContext) {
   ctx.roundRect(bx, by, bw, bh, bh / 2);
   ctx.fill();
   ctx.shadowBlur = 0;
+  ink(ctx, 5 * u);
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";

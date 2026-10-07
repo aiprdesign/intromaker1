@@ -80,6 +80,16 @@ type MadeFrom = {
   logoColors?: Brand["colors"];
   brandMode?: "site" | "logo" | "off";
 };
+/** Which cartoon style suits a description: comic, storybook, clay, outdoors, night, else Cartoon Pals. */
+function cartoonStyleFor(prompt: string) {
+  const p = prompt.toLowerCase();
+  if (/\b(comics?|superheroe?s?|funny|comedy|jokes?)\b/.test(p)) return "comic";
+  if (/\b(story|stories|storybook|bedtime|fairy ?tales?|picture books?)\b/.test(p)) return "storybook";
+  if (/\b(clay|plush|cuddly|squishy|toys?)\b/.test(p)) return "claybuddies";
+  if (/\b(night|sleep|sleeping|dreams?|stars?|moon)\b/.test(p)) return "nightowls";
+  if (/\b(outdoors?|outside|parks?|gardens?|gardening|farms?|nature|picnics?|camping|hiking|walks?)\b/.test(p)) return "sunnypark";
+  return "cartoon";
+}
 /** The part of MadeFrom kept on the account (the fields, not the imported site's data). */
 const accountInputs = (m: MadeFrom | null) => (m ? { url: m.url, prompt: m.prompt, photos: m.photos, length: m.length, story: m.story } : undefined);
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string; angle?: Angle };
@@ -486,7 +496,7 @@ export default function Studio() {
     // Asked for characters (a cartoon, a mascot, a video for kids): the cartoon style tells it.
     const cartoon = p.style === "saas" && !p.product && /\b(cartoons?|animated characters?|characters?|mascots?|kids?|children|preschool)\b/i.test(promptRef.current);
     const id = cartoon
-      ? "cartoon"
+      ? cartoonStyleFor(promptRef.current)
       : p.style === "saas"
         ? p.product
           ? trailerCut
