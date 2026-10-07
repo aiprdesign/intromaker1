@@ -608,38 +608,42 @@ function serviceOrbit(sc: SkillContext) {
     const a = phi + i * D;
     return { i, x: ocx + Math.cos(a) * Rx * enter, y: ocy + Math.sin(a) * Ry * enter, z: Math.sin(a) };
   });
+  // How "on" a planet is, 0..1: it grows and lights up as its turn comes, then eases back to a
+  // small grey planet while the orbit turns the next one round (never a jump in size or colour).
+  const onness = (i: number) => {
+    const inK = ease.outCubic(range(t, T[i] - 0.2, T[i] + 0.3));
+    const out = i + 1 < n ? ease.inOutCubic(range(t, T[i + 1] - 0.5, T[i + 1] + 0.1)) : 0;
+    return inK * (1 - out);
+  };
   const drawPlanet = (pl: (typeof planets)[number]) => {
     const { i, x, y, z } = pl;
-    const active = i === current;
     const k = clamp(spring(t - 0.3 - i * 0.08, 12, 7), 0, 1.06);
     if (k <= 0) return;
-    const grow = active ? ease.outCubic(range(t, T[i] - 0.2, T[i] + 0.3)) : 0;
+    const grow = onness(i);
     // At 3 o'clock the current one is half way round the depth, so it is brought fully forward.
     const zz = lerp(z, 1, grow);
     const pr = (24 + 16 * (zz + 1)) * u * S * (1 + grow * 0.55) * k;
     ctx.save();
     ctx.globalAlpha *= 0.45 + 0.55 * (zz + 1) / 2;
-    if (active) {
-      ctx.shadowColor = rgba(palette.primary, 0.8);
-      ctx.shadowBlur = 30 * u;
+    if (grow > 0.01) {
+      ctx.shadowColor = rgba(palette.primary, 0.8 * grow);
+      ctx.shadowBlur = 30 * u * grow;
     }
+    // The fill blends from the resting planet's to the lit one's.
+    const rest0 = palette.light ? "#ffffff" : mixHex(palette.bg1, palette.text, 0.12);
+    const rest1 = palette.light ? mixHex("#ffffff", palette.primary, 0.12) : mixHex(palette.bg0, palette.text, 0.04);
     const pg = ctx.createLinearGradient(x - pr, y - pr, x + pr, y + pr);
-    if (active) {
-      pg.addColorStop(0, mixHex(palette.primary, "#ffffff", 0.25));
-      pg.addColorStop(1, palette.secondary);
-    } else {
-      pg.addColorStop(0, palette.light ? "#ffffff" : mixHex(palette.bg1, palette.text, 0.12));
-      pg.addColorStop(1, palette.light ? mixHex("#ffffff", palette.primary, 0.12) : mixHex(palette.bg0, palette.text, 0.04));
-    }
+    pg.addColorStop(0, mixHex(rest0, mixHex(palette.primary, "#ffffff", 0.25), grow));
+    pg.addColorStop(1, mixHex(rest1, palette.secondary, grow));
     ctx.fillStyle = pg;
     ctx.beginPath();
     ctx.arc(x, y, pr, 0, TAU);
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = active ? "rgba(255,255,255,0.7)" : hair(palette, 0.2);
+    ctx.strokeStyle = grow > 0.5 ? `rgba(255,255,255,${0.7 * (grow - 0.5) * 2})` : hair(palette, 0.2 * (1 - grow * 2));
     ctx.lineWidth = 1.5 * u;
     ctx.stroke();
-    drawIcon(ctx, icons[i], x, y, pr * 0.95, active ? onFill(palette) : rgba(palette.text, 0.7));
+    drawIcon(ctx, icons[i], x, y, pr * 0.95, rgba(mixHex(palette.text, onFill(palette), grow), 0.7 + 0.3 * grow));
     ctx.restore();
   };
   // Back half of the orbit and the planets behind the core, the core, then the front.
