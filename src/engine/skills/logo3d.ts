@@ -22,7 +22,7 @@
  * shafts, thin lines and small sparks, and the frame's brightness never pulses.
  */
 import { brandGlyph, saasBackground, saasFont, spring } from "../saasfx";
-import { background, drawLayout, dust, exitT, headline, lightSweep, shake, subline } from "../fx";
+import { background, drawLayout, dust, exitT, headline, lensFlare, lightSweep, shake, subline } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { getImage, isWideLogo, logoAt } from "../media";
 import { revealHit } from "../arrange";
@@ -746,50 +746,8 @@ function flare(sc: SkillContext, S: Shot, start = S.hit) {
   const drift = range(t, start, start + 1.8);
   const sx = S.P.cx + S.P.mw * (0.42 - drift * 0.22);
   const sy = S.P.cy - S.P.mh * 0.48;
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  const src = ctx.createRadialGradient(sx, sy, 0, sx, sy, 60 * u);
-  src.addColorStop(0, rgba("#ffffff", 0.7 * k));
-  src.addColorStop(0.3, rgba(palette.primary, 0.25 * k));
-  src.addColorStop(1, rgba(palette.primary, 0));
-  ctx.fillStyle = src;
-  ctx.fillRect(sx - 60 * u, sy - 60 * u, 120 * u, 120 * u);
-  for (const [ang, len] of [
-    [0.35, 90],
-    [0.35 + Math.PI / 2, 60],
-  ] as const) {
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(ang + drift * 0.3);
-    const g = ctx.createLinearGradient(-len * u, 0, len * u, 0);
-    g.addColorStop(0, rgba("#ffffff", 0));
-    g.addColorStop(0.5, rgba("#ffffff", 0.55 * k));
-    g.addColorStop(1, rgba("#ffffff", 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(-len * u, -0.8 * u, len * 2 * u, 1.6 * u);
-    ctx.restore();
-  }
-  const ghosts = [
-    [0.55, 18, palette.secondary, 0.18],
-    [0.85, 34, palette.accent, 0.1],
-    [1.2, 10, "#ffffff", 0.22],
-    [1.5, 56, palette.primary, 0.08],
-    [1.95, 24, palette.secondary, 0.12],
-  ] as const;
-  for (const [f, rad, col, a] of ghosts) {
-    const x = sx + (w / 2 - sx) * f;
-    const y = sy + (h / 2 - sy) * f;
-    const rr = rad * u;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rr);
-    g.addColorStop(0, rgba(col, a * 0.35 * k));
-    g.addColorStop(0.75, rgba(col, a * k));
-    g.addColorStop(1, rgba(col, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, rr, 0, TAU);
-    ctx.fill();
-  }
-  ctx.restore();
+  // A real flare: hot core and bloom, a turning starburst, a streak, halo and iris ghosts.
+  lensFlare(ctx, sx, sy, { k, size: 15 * u, color: palette.primary, accent: palette.secondary, frame: { w, h }, rays: 8, rotate: 0.35 + drift * 0.3, streak: w * 0.2 });
 }
 
 /**

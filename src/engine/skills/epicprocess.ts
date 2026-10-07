@@ -1,3 +1,4 @@
+import { lightSweep } from "../fx";
 /**
  * Epic steps and services slides: the same "how it works" and "what we offer" beats as the
  * process set (process.ts), staged bigger. Each names the current step or service large, so the
@@ -518,15 +519,7 @@ function stepCards(sc: SkillContext) {
       ctx.fillRect(x, y, cw, 8 * u);
       // A glint sweeps across as the card lands.
       const gk = range(t, T[i] + 0.05, T[i] + 0.6);
-      if (gk > 0 && gk < 1) {
-        const gx = x - cw * 0.5 + gk * cw * 2;
-        const gl = ctx.createLinearGradient(gx - cw * 0.25, 0, gx + cw * 0.25, 0);
-        gl.addColorStop(0, "rgba(255,255,255,0)");
-        gl.addColorStop(0.5, `rgba(255,255,255,${palette.light ? 0.5 : 0.18})`);
-        gl.addColorStop(1, "rgba(255,255,255,0)");
-        ctx.fillStyle = gl;
-        ctx.fillRect(x, y, cw, chh);
-      }
+      if (gk > 0 && gk < 1) lightSweep(ctx, x, y, cw, chh, gk, { alpha: palette.light ? 0.55 : 0.4, width: 0.2, slant: 0.45 });
       ctx.restore();
       const tile = Math.min(cw * 0.34, chh * 0.26);
       const ty = y + chh * 0.3;

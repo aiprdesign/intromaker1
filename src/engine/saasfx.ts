@@ -4,7 +4,7 @@
  * glass cards with animated border beams, a macOS cursor with click ripples, and icon glyphs.
  */
 import { geoShapes } from "./shapes";
-import { headline } from "./fx";
+import { anamorphicStreak, headline, lensFlare, lightSweep } from "./fx";
 import { clamp, mixHex, range, rgba, rng, TAU } from "./math";
 import { CONCEPT_MAP, ROLE_ICONS, type ConceptRole } from "./concepts";
 import { liquidText } from "./gl";
@@ -541,12 +541,8 @@ function beamStage(sc: SkillContext, glowOp: GlobalCompositeOperation) {
     ctx.fillRect(-spread * 1.2, -spread * 1.2, spread * 2.4, spread * 2.4);
     ctx.restore();
   }
-  // Source flare.
-  const fl = ctx.createRadialGradient(sx, 0, 0, sx, 0, h * 0.16);
-  fl.addColorStop(0, rgba(beam, 0.5 * I));
-  fl.addColorStop(1, rgba(beam, 0));
-  ctx.fillStyle = fl;
-  ctx.fillRect(sx - h * 0.2, 0, h * 0.4, h * 0.2);
+  // Source flare: the lamp itself, a hot point with a soft bloom and a faint streak.
+  lensFlare(ctx, sx, h * 0.004, { k: 0.55 * I, size: h * 0.022, color: beam, streak: w * 0.18, op: light ? "screen" : "lighter" })
   // Dust motes, visible only inside the beam.
   const r = rng(seed + 913);
   for (let i = 0; i < 60; i++) {
@@ -1372,10 +1368,14 @@ export function blurInLayout(
         lit(Math.max(x0, bx), x1, accent ? fill : mixHex(palette.text, palette.bg1, 0.42));
         lit(x0, Math.min(x1, bx), fill);
         if (sweep > 0 && sweep < 1) {
+          // The light's edge: a soft tail, a white-hot crest, then a thin brand-coloured fringe.
           const band = ctx.createLinearGradient(bx - size * 0.7, 0, bx + size * 0.25, 0);
           band.addColorStop(0, "rgba(255,255,255,0)");
+          band.addColorStop(0.35, "rgba(255,255,255,0.12)");
+          band.addColorStop(0.58, "rgba(255,255,255,0.55)");
           band.addColorStop(0.72, palette.light ? "rgba(255,255,255,0.95)" : "#ffffff");
-          band.addColorStop(0.86, palette.primary);
+          band.addColorStop(0.8, mixHex("#ffffff", palette.primary, 0.5));
+          band.addColorStop(0.88, palette.primary);
           band.addColorStop(1, rgba(palette.primary, 0));
           lit(bx - size * 0.7, bx + size * 0.25, band);
         }
@@ -1471,28 +1471,10 @@ export function lensStreak(sc: SkillContext, cx: number, cy: number, k: number) 
   const { ctx, w, u, palette } = sc;
   const life = Math.pow(1 - k, 2) * Math.min(1, k * 12);
   const half = w * (0.25 + 0.55 * Math.pow(k, 0.4));
-  ctx.save();
-  ctx.globalCompositeOperation = palette.light ? "source-over" : "lighter";
-  const g = ctx.createLinearGradient(cx - half, 0, cx + half, 0);
-  g.addColorStop(0, rgba(palette.primary, 0));
-  g.addColorStop(0.42, rgba(palette.primary, 0.35 * life));
-  g.addColorStop(0.5, `rgba(255,255,255,${(palette.light ? 0.5 : 0.8) * life})`);
-  g.addColorStop(0.58, rgba(palette.secondary, 0.35 * life));
-  g.addColorStop(1, rgba(palette.secondary, 0));
-  ctx.fillStyle = g;
-  const th = 2.2 * u;
-  ctx.fillRect(cx - half, cy - th / 2, half * 2, th);
-  // Soft bloom around the core.
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(1, 0.06);
-  const b = ctx.createRadialGradient(0, 0, 0, 0, 0, half * 0.7);
-  b.addColorStop(0, rgba(palette.primary, 0.3 * life));
-  b.addColorStop(1, rgba(palette.primary, 0));
-  ctx.fillStyle = b;
-  ctx.fillRect(-half, -half, half * 2, half * 2);
-  ctx.restore();
-  ctx.restore();
+  // A tapered streak (white-hot thread, tinted body, faint haze) with a small hot point at its heart.
+  const op: GlobalCompositeOperation = palette.light ? "source-over" : "lighter";
+  anamorphicStreak(ctx, cx, cy, half, 2.2 * u, life * (palette.light ? 0.55 : 1), palette.primary, op);
+  lensFlare(ctx, cx, cy, { k: life * (palette.light ? 0.35 : 0.8), size: 10 * u, color: palette.secondary, op });
 }
 
 /** Glyphs the decode effect cycles through before a character locks in. */

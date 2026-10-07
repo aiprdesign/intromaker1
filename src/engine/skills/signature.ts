@@ -1,4 +1,4 @@
-import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, subline } from "../fx";
+import { background, bevel, drawLayout, dust, exitT, extrude, flash, glow, headline, headlineGradient, noGlow, lightSweep, subline } from "../fx";
 import { clamp, ease, lerp, mix, mixHex, range, rgba, rng, TAU } from "../math";
 import { scratch } from "../scratch";
 import { displayFont, drawTracked, layoutChars } from "../text";
@@ -216,21 +216,11 @@ function glassShatter(sc: SkillContext) {
   // Once locked, a specular sweep across the glass.
   const locked = range(t, assembleEnd, assembleEnd + 0.9);
   if (locked > 0 && locked < 1 && t < breakAt) {
-    const sx = lerp(x0 - 200 * u, x0 + bw + 200 * u, ease.inOutCubic(locked));
     ctx.save();
     ctx.beginPath();
     ctx.rect(x0, top, bw, bh);
     ctx.clip();
-    ctx.globalCompositeOperation = "lighter";
-    const g = ctx.createLinearGradient(sx - 120 * u, 0, sx + 120 * u, 0);
-    g.addColorStop(0, "rgba(255,255,255,0)");
-    g.addColorStop(0.5, "rgba(255,255,255,0.35)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = g;
-    ctx.translate(sx, 0);
-    ctx.transform(1, 0, -0.4, 1, 0, 0);
-    ctx.translate(-sx, 0);
-    ctx.fillRect(sx - 150 * u, top, 300 * u, bh);
+    lightSweep(ctx, x0, top, bw, bh, ease.inOutCubic(locked), { alpha: 0.6, width: 0.14, slant: 0.4 });
     ctx.restore();
   }
   const bottom = top + bh;

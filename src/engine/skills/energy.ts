@@ -81,10 +81,9 @@ function particleAssemble(sc: SkillContext) {
     noGlow(ctx);
     // Shimmer sweep.
     const sx = lerp(-w * 0.2, w * 1.2, range(t, settle, settle + 1.1));
+    // A bell-shaped band: soft shoulders and a narrow white-hot crest, not a flat ramp.
     const g = ctx.createLinearGradient(sx - 120 * u, 0, sx + 120 * u, 0);
-    g.addColorStop(0, "rgba(255,255,255,0)");
-    g.addColorStop(0.5, "rgba(255,255,255,0.9)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
+    for (const [at, a] of [[0, 0], [0.25, 0.08], [0.4, 0.35], [0.47, 0.8], [0.5, 0.95], [0.53, 0.8], [0.6, 0.35], [0.75, 0.08], [1, 0]] as const) g.addColorStop(at, `rgba(255,255,255,${a})`);
     ctx.restore();
     // Filling the glyphs with a moving highlight band keeps it on the letters.
     ctx.save();

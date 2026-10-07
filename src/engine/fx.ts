@@ -255,10 +255,16 @@ export function bevel(sc: SkillContext, layout: HeadlineLayout, alpha = 0.55) {
 }
 
 /**
- * A diagonal band of light that sweeps once across a box. It starts fully off one side and ends
- * fully off the other, and draws nothing before or after, so it never parks on a corner. `p`
- * (0..1) is the sweep's progress; the band travels along a direction tilted `slant` radians below
- * horizontal, `width` is its half-width as a fraction of the box's longer side.
+ * A diagonal band of light that sweeps once across a box, like a reflection gliding over glass or
+ * polished metal. It starts fully off one side and ends fully off the other, and draws nothing
+ * before or after, so it never parks on a corner. `p` (0..1) is the sweep's progress; the band
+ * travels along a direction tilted `slant` radians below horizontal, `width` is its half-width as a
+ * fraction of the box's longer side.
+ *
+ * The light is shaped, not flat: a soft halo with a narrow hot core (a bell-shaped falloff, not a
+ * ramp), a faint cool and warm fringe on its edges, and a thin second reflection trailing behind
+ * it. It swells in and out over the sweep rather than holding one level, and it brightens what it
+ * passes over (screen) instead of fogging it grey.
  */
 export function lightSweep(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
@@ -281,17 +287,198 @@ export function lightSweep(
     [x, y + h],
     [x + w, y + h],
   ].map(([px, py]) => px * dx + py * dy);
-  const lo = Math.min(...along) - band;
+  const lo = Math.min(...along) - band * 1.6;
   const hi = Math.max(...along) + band;
   const c = lo + (hi - lo) * p;
-  const g = ctx.createLinearGradient((c - band) * dx, (c - band) * dy, (c + band) * dx, (c + band) * dy);
+  // It swells in, peaks mid-way and eases out.
+  const a = (opts.alpha ?? 0.6) * Math.pow(Math.sin(Math.PI * p), 0.5);
   const col = opts.color ?? "255,255,255";
-  g.addColorStop(0, `rgba(${col},0)`);
-  g.addColorStop(0.5, `rgba(${col},${opts.alpha ?? 0.6})`);
-  g.addColorStop(1, `rgba(${col},0)`);
+  const tinted = !opts.color;
+  const shaped = (center: number, half: number, peak: number) => {
+    const g = ctx.createLinearGradient((center - half) * dx, (center - half) * dy, (center + half) * dx, (center + half) * dy);
+    // A bell curve: soft shoulders, a bright narrow core.
+    const bell: [number, number][] = [
+      [0, 0],
+      [0.16, 0.04],
+      [0.3, 0.16],
+      [0.4, 0.42],
+      [0.46, 0.8],
+      [0.5, 1],
+      [0.54, 0.8],
+      [0.6, 0.42],
+      [0.7, 0.16],
+      [0.84, 0.04],
+      [1, 0],
+    ];
+    for (const [at, v] of bell) {
+      // The leading shoulder runs a touch cool, the trailing one a touch warm (a lens's fringe).
+      const rgb = !tinted || (at > 0.42 && at < 0.58) ? col : at < 0.5 ? "205,225,255" : "255,232,205";
+      g.addColorStop(at, `rgba(${rgb},${(peak * v).toFixed(4)})`);
+    }
+    return g;
+  };
   ctx.save();
-  if (opts.op) ctx.globalCompositeOperation = opts.op;
-  ctx.fillStyle = g;
+  ctx.globalCompositeOperation = opts.op ?? "screen";
+  // The main reflection.
+  ctx.fillStyle = shaped(c, band, a);
   ctx.fillRect(x, y, w, h);
+  // A thin second reflection trailing behind it.
+  ctx.fillStyle = shaped(c - band * 1.05, band * 0.22, a * 0.55);
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+/**
+ * An anamorphic streak: a long, thin horizontal line of light through (x, y) that tapers to nothing
+ * at both ends (soft stacked ellipses, never a hard-edged bar), white-hot at the centre and tinted
+ * out along its length, with a faint wide haze around it. `half` is its half-length, `k` 0..1 its
+ * strength.
+ */
+export function anamorphicStreak(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  half: number,
+  thick: number,
+  k: number,
+  color: string,
+  op: GlobalCompositeOperation = "lighter",
+) {
+  if (k <= 0.002 || half <= 0) return;
+  ctx.save();
+  ctx.globalCompositeOperation = op;
+  // Three layers: a wide faint haze, the tinted body, and the white-hot thread.
+  for (const [len, th, a, hot] of [
+    [1.15, thick * 12, 0.15, false],
+    [1, thick * 3.2, 0.55, false],
+    [0.7, thick * 0.8, 1, true],
+  ] as const) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, th / (half * len));
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, half * len);
+    g.addColorStop(0, hot ? `rgba(255,255,255,${(a * k).toFixed(4)})` : rgba(mixHex(color, "#ffffff", 0.35), a * k));
+    g.addColorStop(0.18, rgba(mixHex(color, "#ffffff", hot ? 0.6 : 0.15), a * k * 0.55));
+    g.addColorStop(0.5, rgba(color, a * k * 0.18));
+    g.addColorStop(1, rgba(color, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(-half * len, -half * len, half * len * 2, half * len * 2);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/**
+ * A lens flare at (x, y), built like a real one: a bloom with a white-hot core, a starburst of
+ * fine tapered rays (slowly turning), an optional anamorphic streak, a faint chromatic halo ring,
+ * and iris ghosts strung along the line from the source through the centre of the frame, each
+ * a soft disc (one an aperture hexagon) with a brighter rim. `k` 0..1 is its strength; `size` is
+ * the core's radius in pixels. Additive by default (dark stages); pass `op` otherwise.
+ */
+export function lensFlare(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  opts: {
+    k: number;
+    size: number;
+    color: string;
+    accent?: string;
+    /** The frame, for the ghosts (none without it). */
+    frame?: { w: number; h: number };
+    rays?: number;
+    rotate?: number;
+    /** Half-length of an anamorphic streak through the source (0: none). */
+    streak?: number;
+    op?: GlobalCompositeOperation;
+  },
+) {
+  const { k, size, color } = opts;
+  if (k <= 0.002 || size <= 0) return;
+  const accent = opts.accent ?? color;
+  ctx.save();
+  ctx.globalCompositeOperation = opts.op ?? "lighter";
+  // Bloom: a falloff that drops fast, then lingers (light, not a flat disc).
+  const R = size * 5;
+  const bloom = ctx.createRadialGradient(x, y, 0, x, y, R);
+  bloom.addColorStop(0, `rgba(255,255,255,${(0.95 * k).toFixed(4)})`);
+  bloom.addColorStop(0.05, `rgba(255,255,255,${(0.75 * k).toFixed(4)})`);
+  bloom.addColorStop(0.12, rgba(mixHex(color, "#ffffff", 0.5), 0.42 * k));
+  bloom.addColorStop(0.28, rgba(color, 0.16 * k));
+  bloom.addColorStop(0.55, rgba(color, 0.05 * k));
+  bloom.addColorStop(1, rgba(color, 0));
+  ctx.fillStyle = bloom;
+  ctx.fillRect(x - R, y - R, R * 2, R * 2);
+  // Starburst: fine rays of varied length, tapering to points.
+  const rays = opts.rays ?? 0;
+  if (rays > 0) {
+    const rot = opts.rotate ?? 0;
+    for (let i = 0; i < rays; i++) {
+      const ang = rot + (i / rays) * TAU;
+      const len = size * (i % 2 ? 4.2 : 7) * (0.85 + 0.3 * Math.abs(Math.sin(i * 2.399)));
+      const base = size * (i % 2 ? 0.1 : 0.16);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      const g = ctx.createLinearGradient(0, 0, len, 0);
+      g.addColorStop(0, `rgba(255,255,255,${(0.75 * k).toFixed(4)})`);
+      g.addColorStop(0.25, rgba(mixHex(color, "#ffffff", 0.55), 0.32 * k));
+      g.addColorStop(1, rgba(color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(0, -base);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(0, base);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  if (opts.streak) anamorphicStreak(ctx, x, y, opts.streak, size * 0.22, k * 0.9, color, ctx.globalCompositeOperation as GlobalCompositeOperation);
+  // A faint chromatic halo ring around the source.
+  const hr = size * 9;
+  const halo = ctx.createRadialGradient(x, y, hr * 0.86, x, y, hr);
+  halo.addColorStop(0, "rgba(120,160,255,0)");
+  halo.addColorStop(0.35, `rgba(120,170,255,${(0.05 * k).toFixed(4)})`);
+  halo.addColorStop(0.6, `rgba(180,255,190,${(0.045 * k).toFixed(4)})`);
+  halo.addColorStop(0.85, `rgba(255,170,120,${(0.05 * k).toFixed(4)})`);
+  halo.addColorStop(1, "rgba(255,150,110,0)");
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(x, y, hr, 0, TAU);
+  ctx.fill();
+  // Ghosts: reflections inside the lens, mirrored through the frame's centre.
+  if (opts.frame) {
+    const cx = opts.frame.w / 2;
+    const cy = opts.frame.h / 2;
+    const ghosts: [number, number, string, number, boolean][] = [
+      [0.42, 0.9, accent, 0.16, false],
+      [0.78, 0.45, "#ffffff", 0.2, false],
+      [1.18, 1.9, color, 0.07, true],
+      [1.45, 0.7, accent, 0.13, false],
+      [1.9, 2.6, mixHex(color, accent, 0.5), 0.05, false],
+    ];
+    for (const [f, rs, col, a, hex] of ghosts) {
+      const gx = x + (cx - x) * f * 2;
+      const gy = y + (cy - y) * f * 2;
+      const rr = size * rs * 1.6;
+      const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, rr);
+      g.addColorStop(0, rgba(col, a * 0.35 * k));
+      g.addColorStop(0.7, rgba(col, a * 0.55 * k));
+      g.addColorStop(0.9, rgba(mixHex(col, "#ffffff", 0.4), a * k));
+      g.addColorStop(1, rgba(col, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      if (hex) {
+        for (let i = 0; i < 6; i++) {
+          const an = (i / 6) * TAU + 0.3;
+          if (i) ctx.lineTo(gx + Math.cos(an) * rr, gy + Math.sin(an) * rr);
+          else ctx.moveTo(gx + Math.cos(an) * rr, gy + Math.sin(an) * rr);
+        }
+        ctx.closePath();
+      } else ctx.arc(gx, gy, rr, 0, TAU);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }

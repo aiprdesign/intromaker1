@@ -1,3 +1,4 @@
+import { lightSweep } from "../fx";
 /**
  * Creative services slides: "what we offer", staged six more ways. Each shows one service at a
  * time, large, so the viewer always knows which one is being told. Items read
@@ -159,13 +160,7 @@ function serviceCube(sc: SkillContext) {
     // A glint sweeps across the face as it turns.
     const turning = Math.abs(s - sr);
     if (turning > 0.02) {
-      const gx = (1 - (s - Math.floor(s))) * L * 1.6 - L * 0.3;
-      const gl = ctx.createLinearGradient(gx - L * 0.2, 0, gx + L * 0.2, 0);
-      gl.addColorStop(0, "rgba(255,255,255,0)");
-      gl.addColorStop(0.5, "rgba(255,255,255,0.22)");
-      gl.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.fillStyle = gl;
-      ctx.fillRect(0, 0, L, L);
+      lightSweep(ctx, 0, 0, L, L, s - Math.floor(s), { alpha: 0.45, width: 0.22, slant: 0.3 });
     }
     ctx.restore();
   }

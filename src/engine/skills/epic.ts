@@ -16,7 +16,7 @@
  * Brightness changes are slow or local (no full-frame strobes); light uses gradients, so the
  * looks hold with glow switched off.
  */
-import { background, bevel, drawLayout, dust, exitT, extrude, headline, headlineGradient, shake, subline } from "../fx";
+import { background, bevel, drawLayout, dust, exitT, extrude, headline, headlineGradient, anamorphicStreak, lensFlare, lightSweep, shake, subline } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { scratch } from "../scratch";
 import { displayFont, drawTracked, type HeadlineLayout } from "../text";
@@ -60,43 +60,11 @@ function anamorphicFlare(sc: SkillContext) {
   titleFill(sc, layout, palette.text, mixHex(palette.text, palette.secondary, 0.45));
   bevel(sc, layout, 0.6);
   ctx.restore();
-  // The streak: a long horizontal line of light with a soft vertical falloff.
-  ctx.save();
-  ctx.globalCompositeOperation = lightOp(sc);
-  ctx.globalAlpha = streakA;
-  const band = ctx.createLinearGradient(0, cy - 60 * u, 0, cy + 60 * u);
-  band.addColorStop(0, rgba(palette.secondary, 0));
-  band.addColorStop(0.5, rgba(palette.secondary, 0.35));
-  band.addColorStop(1, rgba(palette.secondary, 0));
-  ctx.fillStyle = band;
-  ctx.fillRect(0, cy - 60 * u, w, 120 * u);
-  const line = ctx.createLinearGradient(coreX - w * 0.6, 0, coreX + w * 0.6, 0);
-  line.addColorStop(0, rgba(palette.secondary, 0));
-  line.addColorStop(0.5, rgba("#ffffff", 0.95));
-  line.addColorStop(1, rgba(palette.secondary, 0));
-  ctx.fillStyle = line;
-  ctx.fillRect(0, cy - 2 * u, w, 4 * u);
-  // The core: a small hot bloom, and lens ghosts mirrored through the frame centre.
-  const core = ctx.createRadialGradient(coreX, cy, 0, coreX, cy, 70 * u);
-  core.addColorStop(0, rgba("#ffffff", 0.85));
-  core.addColorStop(0.3, rgba(palette.secondary, 0.4));
-  core.addColorStop(1, rgba(palette.secondary, 0));
-  ctx.fillStyle = core;
-  ctx.fillRect(coreX - 70 * u, cy - 70 * u, 140 * u, 140 * u);
-  for (const [k, r, a] of [
-    [0.6, 36, 0.16],
-    [1.1, 22, 0.22],
-    [1.6, 60, 0.1],
-  ] as const) {
-    const gx = w / 2 - (coreX - w / 2) * k;
-    const gy = cy - (cy - h / 2) * k;
-    ctx.strokeStyle = rgba(palette.secondary, a);
-    ctx.lineWidth = 2 * u;
-    ctx.beginPath();
-    ctx.arc(gx, gy, r * u, 0, TAU);
-    ctx.stroke();
-  }
-  ctx.restore();
+  // The streak: a long tapered line of light across the frame (white-hot thread, tinted body, a
+  // wide haze), and at its core a real flare: bloom, a fine starburst, halo and iris ghosts.
+  const op = lightOp(sc);
+  anamorphicStreak(ctx, coreX, cy, w * 0.75, 4 * u, streakA, palette.secondary, op);
+  lensFlare(ctx, coreX, cy, { k: streakA * 0.95, size: 20 * u, color: palette.secondary, accent: palette.primary, frame: { w, h }, rays: 6, rotate: sweep * 0.6, op });
   subline(sc, bottomOf(layout) + 52 * u, range(t, Math.min(1.6, d * 0.5), Math.min(2.2, d * 0.7)), { alpha: 1 - ex });
 }
 
@@ -357,20 +325,19 @@ function steelTitle(sc: SkillContext) {
   // A glint sweeps the letters once they have settled (clipped to the type on a scratch layer).
   const p = range(t, 1.3, 2.3);
   if (p > 0 && p < 1) {
+    // The letters as a mask (drawn whole, then applied once), and the light cut to them: a shaped
+    // reflection with a trailing sliver.
+    const mask = scratch("steel-glint-mask", w, h);
+    mask.ctx.font = ctx.font;
+    mask.ctx.textAlign = "center";
+    mask.ctx.textBaseline = "middle";
+    mask.ctx.fillStyle = "#fff";
+    layout.lines.forEach((line, i) => drawTracked(mask.ctx, line, w / 2, layout.ys[i], layout.tracking));
     const { canvas, ctx: m } = scratch("steel-glint", w, h);
-    m.font = ctx.font;
-    m.textAlign = "center";
-    m.textBaseline = "middle";
-    m.fillStyle = "#fff";
-    layout.lines.forEach((line, i) => drawTracked(m, line, w / 2, layout.ys[i], layout.tracking));
-    m.globalCompositeOperation = "source-in";
-    const x = lerp(-w * 0.2, w * 1.2, p);
-    const g = m.createLinearGradient(x - w * 0.08, 0, x + w * 0.08, 0);
-    g.addColorStop(0, "rgba(255,255,255,0)");
-    g.addColorStop(0.5, "rgba(255,255,255,0.75)");
-    g.addColorStop(1, "rgba(255,255,255,0)");
-    m.fillStyle = g;
-    m.fillRect(0, 0, w, h);
+    lightSweep(m, 0, 0, w, h, p, { alpha: 0.95, width: 0.08, slant: 0.25, op: "source-over" });
+    m.globalCompositeOperation = "destination-in";
+    m.drawImage(mask.canvas, 0, 0);
+    m.globalCompositeOperation = "source-over";
     ctx.save();
     ctx.globalAlpha = 1 - ex;
     ctx.drawImage(canvas, 0, 0);

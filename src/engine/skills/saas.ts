@@ -5,7 +5,7 @@
  * widgets, pain → solution strikes, integration orbits, real testimonials, logo marquees
  * and a CTA lock-up with a clicked button.
  */
-import { exitT } from "../fx";
+import { exitT, lightSweep } from "../fx";
 import { clamp, ease, hashString, lerp, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
 import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, pageBands, segmentShot, snapBands } from "../media";
@@ -1699,15 +1699,11 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
   ctx.fill();
   ctx.shadowBlur = 0;
   // Shimmer sweep across the button.
-  const sx = lerp(-bw, bw, ((t - T.button) * 0.5) % 1.4);
+  // (A glossy reflection glides across every few seconds, then rests off the button.)
+  const phase = (((t - T.button) * 0.5) % 1.4) / 1.1;
   ctx.save();
   ctx.clip();
-  const sh = ctx.createLinearGradient(sx - 60 * u, 0, sx + 60 * u, 0);
-  sh.addColorStop(0, "rgba(255,255,255,0)");
-  sh.addColorStop(0.5, "rgba(255,255,255,0.45)");
-  sh.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = sh;
-  ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+  lightSweep(ctx, -bw / 2, -bh / 2, bw, bh, phase, { alpha: 0.7, width: 0.16, slant: 0.5 });
   ctx.restore();
   ctx.fillStyle = "#07040f";
   ctx.textAlign = "center";
