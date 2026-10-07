@@ -444,23 +444,26 @@ function absCrowd(sc: SkillContext) {
  * A placard held up over the head: its bottom edge clears the head (and hair), and where the
  * hands can't reach that high they hold it on two short poles.
  */
-function placard(sc: SkillContext, rig: AbsRig, cx: number, sw: number, sh: number, label: string, size: number, lit: boolean) {
+function placard(sc: SkillContext, rig: AbsRig, cx0: number, sw0: number, sh: number, label: string, size: number, lit: boolean) {
   const { ctx, u, palette } = sc;
+  // The sign is centred on the hands and at least as wide as they are apart, so each pole rises
+  // straight from a hand (the hands stay on the poles, never beside them).
+  const spread = Math.abs(rig.handR.x - rig.handL.x);
+  const cx = (rig.handL.x + rig.handR.x) / 2 || cx0;
+  const sw = Math.max(sw0, spread + 36 * u);
   const handY = Math.min(rig.handL.y, rig.handR.y);
   const bottom = Math.min(handY + 6 * u, rig.top - 14 * u);
   const sy = bottom - sh;
-  if (handY > bottom + 4 * u) {
-    ctx.strokeStyle = mixHex(palette.text, palette.light ? "#ffffff" : "#000000", 0.35);
-    ctx.lineWidth = 5 * u;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    for (const hd of [rig.handL, rig.handR]) {
-      const px = clamp(hd.x, cx - sw / 2 + 14 * u, cx + sw / 2 - 14 * u);
-      ctx.moveTo(px, hd.y + 4 * u);
-      ctx.lineTo(px, bottom - 2 * u);
-    }
-    ctx.stroke();
+  ctx.strokeStyle = mixHex(palette.text, palette.light ? "#ffffff" : "#000000", 0.35);
+  ctx.lineWidth = 5 * u;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  for (const hd of [rig.handL, rig.handR]) {
+    if (hd.y <= bottom + 4 * u) continue;
+    ctx.moveTo(hd.x, hd.y + 2 * u);
+    ctx.lineTo(hd.x, bottom - 2 * u);
   }
+  ctx.stroke();
   ctx.fillStyle = lit ? palette.primary : palette.light ? "#ffffff" : mixHex(palette.bg1, "#ffffff", 0.1);
   ctx.shadowColor = "rgba(0,0,0,0.16)";
   ctx.shadowBlur = 16 * u;

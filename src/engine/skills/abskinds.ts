@@ -377,7 +377,7 @@ export function drawBlob(ctx: CanvasRenderingContext2D, x: number, groundY: numb
 /* ───────────────────────── Stick figure ───────────────────────── */
 
 export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: CastMember, pose: AbsPose): AbsRig {
-  // A true stick figure: one line colour, an empty round head, no face, hair, clothes or fills.
+  // A true stick figure: one line colour, a round head with a simple line face, no hair, clothes or fills.
   const P = painter(ctx, H, c.art ?? "flat");
   const lift = (pose.lift ?? 0) * H;
   const lw = Math.max(2, H * 0.02);
@@ -434,11 +434,56 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
   };
   const l = arm(-1);
   const r = arm(1);
-  // The head: an empty circle.
+  // The head: an empty circle with a line-drawn face (dot eyes that blink and look, a mouth that
+  // smiles, talks, frowns or gasps), all in the same line colour.
   line(() => {
     ctx.beginPath();
     ctx.arc(x, headY, hr, 0, TAU);
   });
+  const lk = (pose.look ?? 0) * hr * 0.18;
+  const blink = clamp(pose.blink ?? 0);
+  const ey = headY - hr * 0.08;
+  ctx.fillStyle = lc;
+  ctx.strokeStyle = lc;
+  ctx.lineCap = "round";
+  ctx.lineWidth = lw * 0.75;
+  for (const k of [-1, 1]) {
+    const ex = x + k * hr * 0.34 + lk;
+    if (blink > 0.6) {
+      ctx.beginPath();
+      ctx.moveTo(ex - hr * 0.1, ey);
+      ctx.lineTo(ex + hr * 0.1, ey);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, hr * 0.085, hr * 0.11 * (1 - blink), 0, 0, TAU);
+      ctx.fill();
+    }
+  }
+  const my = headY + hr * 0.38;
+  const mx = x + lk;
+  ctx.beginPath();
+  switch (pose.mouth ?? "smile") {
+    case "open":
+      ctx.moveTo(mx - hr * 0.28, my - hr * 0.04);
+      ctx.quadraticCurveTo(mx, my + hr * 0.4, mx + hr * 0.28, my - hr * 0.04);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case "o":
+      ctx.arc(mx, my + hr * 0.04, hr * 0.09, 0, TAU);
+      ctx.stroke();
+      break;
+    case "flat":
+      ctx.moveTo(mx - hr * 0.18, my + hr * 0.04);
+      ctx.lineTo(mx + hr * 0.18, my + hr * 0.04);
+      ctx.stroke();
+      break;
+    default:
+      ctx.moveTo(mx - hr * 0.26, my - hr * 0.02);
+      ctx.quadraticCurveTo(mx, my + hr * 0.26, mx + hr * 0.26, my - hr * 0.02);
+      ctx.stroke();
+  }
   ctx.restore();
   return { head: { x, y: headY, r: hr }, top: headY - hr - lw, ...hands(x, pose.flip, l, r) };
 }

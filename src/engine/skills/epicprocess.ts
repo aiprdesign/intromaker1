@@ -648,7 +648,10 @@ function serviceOrbit(sc: SkillContext) {
   };
   // Back half of the orbit and the planets behind the core, the core, then the front.
   orbit(false);
-  planets.filter((p) => p.z < 0).sort((a, b) => a.z - b.z).forEach(drawPlanet);
+  // (A planet still lit, even easing back to small, stays in front of the orbit line, so the line
+  // never cuts across it as it shrinks round to the back.)
+  const behind = (p: (typeof planets)[number]) => p.z < 0 && onness(p.i) < 0.01;
+  planets.filter(behind).sort((a, b) => a.z - b.z).forEach(drawPlanet);
   // The core: a glowing sphere with slow light rays, pulsing as each service arrives.
   const pulse = current >= 0 ? 1 - range(t, T[current], T[current] + 0.6) : 0;
   ctx.save();
@@ -689,7 +692,7 @@ function serviceOrbit(sc: SkillContext) {
     fillTextFit(ctx, name, ocx, ocy, Rc * 1.6, { maxLines: 1, minScale: 0.5 });
   } else drawIcon(ctx, "Layers", ocx, ocy, Rc * 0.9, onFill(palette));
   orbit(true);
-  planets.filter((p) => p.z >= 0).sort((a, b) => a.z - b.z).forEach(drawPlanet);
+  planets.filter((p) => !behind(p)).sort((a, b) => lerp(a.z, 1, onness(a.i)) - lerp(b.z, 1, onness(b.i))).forEach(drawPlanet);
   // The current service, large, beside the orbit (under it in vertical frames).
   if (current >= 0) {
     const big = (narrow ? 60 : 70) * u * S;

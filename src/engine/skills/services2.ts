@@ -193,7 +193,11 @@ function serviceBloom(sc: SkillContext) {
   const Lp = narrow ? Math.min(st.width * 0.36, room * 0.22) : Math.min(room * 0.44, st.width * 0.2);
   const fcx = narrow ? w / 2 : st.left + st.width * 0.28;
   const fcy = narrow ? st.top + room * 0.3 : st.top + room * 0.52;
-  const rot = -Math.PI / 2 + Math.sin(t * 0.6) * 0.03;
+  // The flower turns so each service's petal in turn points right, at its name beside the flower
+  // (down, at the name underneath, in vertical frames), as Service Orbit does.
+  const D = TAU / Math.max(1, n);
+  let rot = (narrow ? Math.PI / 2 : 0) + Math.sin(t * 0.6) * 0.03;
+  for (let i = 1; i < n; i++) rot -= D * ease.inOutCubic(range(t, T[i] - 0.5, T[i]));
   ctx.save();
   ctx.globalAlpha = 1 - ex;
   // Pollen: small dots drifting round the flower.
@@ -243,13 +247,13 @@ function serviceBloom(sc: SkillContext) {
     ctx.strokeStyle = rgba(active ? "#ffffff" : c0, active ? 0.4 : 0.35);
     ctx.lineWidth = 1 * u;
     ctx.beginPath();
-    ctx.moveTo(len * 0.12, 0);
-    ctx.lineTo(len * 0.5, 0);
+    ctx.moveTo(len * 0.7, 0);
+    ctx.lineTo(len * 0.9, 0);
     ctx.stroke();
     ctx.restore();
-    // The service's icon near the petal's tip, upright.
-    const ix = fcx + Math.cos(ang) * len * 0.7;
-    const iy = fcy + Math.sin(ang) * len * 0.7;
+    // The service's icon centred on the petal (at its widest point, half way along), upright.
+    const ix = fcx + Math.cos(ang) * len * 0.52;
+    const iy = fcy + Math.sin(ang) * len * 0.52;
     drawIcon(ctx, icons[i], ix, iy, Math.min(wid * 1.1, 56 * u * S) * (active ? 1.15 : 1), active ? onFill(palette) : rgba(palette.text, 0.75), ease.outCubic(range(t, 0.4 + i * 0.12, 1.1 + i * 0.12)));
   }
   // The heart of the flower: the brand.

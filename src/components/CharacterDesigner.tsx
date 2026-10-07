@@ -216,7 +216,7 @@ const KIND_HINT: Record<CharacterKind, string> = {
   abstract: "Minimal geometric people with bendy noodle limbs.",
   memphis: "The modern Corporate Memphis look: tiny heads, long bendy limbs, big hands and feet.",
   blob: "A cute one-shape mascot with big eyes and stubby legs, great for kids and friendly apps.",
-  stick: "A minimal stick figure: an empty round head and line limbs in one colour, great for explainers.",
+  stick: "A minimal stick figure: a round head with a simple line face and line limbs in one colour, great for explainers.",
   classic: "A traditional rubber-hose cartoon: white gloves, pie-cut eyes and big shoes.",
 };
 const BODY_LABELS: Partial<Record<CharacterKind, Record<string, string>>> = {
