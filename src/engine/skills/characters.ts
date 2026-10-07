@@ -37,7 +37,7 @@ let BOIL = 0;
 const INK = "#1a1624";
 /** Storybook ink: a warm brown, drawn as a sketchy double line. */
 const SEPIA = "#4a3426";
-function useToon(sc: SkillContext) {
+export function useToon(sc: SkillContext) {
   TOON = sc.look?.toon ?? "flat";
   BOIL = Math.floor((sc.globalT ?? sc.t) * 8);
 }
@@ -388,7 +388,7 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
 /* ───────────────────────── Shared props ───────────────────────── */
 
 /** A speech bubble (rounded box with a tail pointing at `tip`), drawn grown from the tail by `k`. */
-function bubble(sc: SkillContext, box: { x: number; y: number; w: number; h: number }, tip: { x: number; y: number }, k: number) {
+export function bubble(sc: SkillContext, box: { x: number; y: number; w: number; h: number }, tip: { x: number; y: number }, k: number) {
   const { ctx, u, palette } = sc;
   if (k <= 0.001) return;
   const fill = palette.light ? "#ffffff" : "#f7f8fc";
@@ -444,7 +444,7 @@ function bubble(sc: SkillContext, box: { x: number; y: number; w: number; h: num
 }
 
 /** Text inside a bubble: dark on white, fitted to its box. */
-function bubbleText(sc: SkillContext, text: string, box: { x: number; y: number; w: number; h: number }, size: number, k: number, display = true) {
+export function bubbleText(sc: SkillContext, text: string, box: { x: number; y: number; w: number; h: number }, size: number, k: number, display = true) {
   const { ctx, u } = sc;
   if (k <= 0.01) return;
   ctx.save();
@@ -458,7 +458,7 @@ function bubbleText(sc: SkillContext, text: string, box: { x: number; y: number;
 }
 
 /** Ease a speech bubble in (overshoot) and out. */
-const pop = (t: number, t0: number, t1 = Infinity) => (t < t0 ? 0 : ease.outBack(clamp((t - t0) / 0.35))) * (1 - ease.inCubic(clamp((t - t1) / 0.25)));
+export const pop = (t: number, t0: number, t1 = Infinity) => (t < t0 ? 0 : ease.outBack(clamp((t - t0) / 0.35))) * (1 - ease.inCubic(clamp((t - t1) / 0.25)));
 
 /** A soft wave: the arm up and the forearm rocking. */
 const wave = (t: number, k: number) => ({ arm: lerp(0.2, 2.55, k), fore: k * (0.35 + 0.35 * Math.sin(t * 10)) });
@@ -516,7 +516,7 @@ function charHello(sc: SkillContext) {
 
 const POINTS = ["Plan — Set goals in minutes", "Share — Keep everyone in the loop", "Track — See progress at a glance", "Celebrate — Ship and say thanks"];
 
-function pointTimes(scene: Scene, n: number, start = 0.8) {
+export function pointTimes(scene: Scene, n: number, start = 0.8) {
   const slot = clamp((scene.duration - start - 1) / Math.max(1, n), 0.6, 1.6);
   return Array.from({ length: n }, (_, i) => start + i * slot);
 }
