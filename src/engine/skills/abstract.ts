@@ -18,7 +18,7 @@
  * - abs-chat:     two characters talk: the lines as an alternating conversation.
  * - abs-cheer:    a crowd jumps and cheers around the call-to-action button.
  */
-import { BODIES, HAIR_STYLES, HAIRS, MODERN, PLAYFUL_SKINS, SKINS } from "../cast";
+import { BODIES, HAIR_STYLES, HAIRS, introColors, matchColors, NEUTRALS, PLAYFUL_SKINS, SKINS } from "../cast";
 import { clamp, ease, hashString, lerp, mixHex, rgba, rng, TAU } from "../math";
 import { saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
@@ -40,7 +40,8 @@ type Hair = AbsSpec["hair"];
 export function makeCharacter(seed: number, p: Palette): AbsSpec {
   const r = rng(hashString(`abs:${seed}`));
   const pick = <T,>(xs: readonly T[]) => xs[Math.floor(r() * xs.length) % xs.length];
-  const colors = [p.primary, p.secondary, ...MODERN];
+  // Dressed in the intro's own colours (and neutrals for trousers and shoes).
+  const colors = introColors(p);
   const bodyColor = pick(colors);
   let patternColor = pick(colors);
   if (patternColor === bodyColor) patternColor = mixHex(bodyColor, "#ffffff", 0.45);
@@ -58,10 +59,10 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
     neck: r() * 0.035,
     skin,
     hair: pick(HAIR_STYLES),
-    hairColor: pick(HAIRS),
+    hairColor: r() < 0.85 ? pick(HAIRS.slice(0, 5)) : pick(colors),
     legLen: 0.22 + tall * 0.18,
-    legColor: r() < 0.5 ? (p.light ? "#2b2f45" : "#d9dcef") : pick(colors),
-    shoe: r() < 0.6 ? "#1d1b26" : pick(colors),
+    legColor: r() < 0.55 ? (p.light ? NEUTRALS[1] : NEUTRALS[3]) : mixHex(pick(colors), "#000000", 0.2),
+    shoe: r() < 0.6 ? NEUTRALS[0] : pick(colors),
     armColor: r() < 0.5 ? skin : bodyColor,
     eyes: pick(["dots", "dots", "lines", "ovals"] as const),
     glasses: r() < 0.18,
@@ -73,7 +74,8 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
 /** The character in a slide's `slot`: the video's own cast first (from the character designer), then generated people. */
 function person(sc: SkillContext, slot: number, seed: number): AbsSpec {
   const own = sc.cast?.[slot];
-  if (own) return own;
+  // Your characters wear the intro's colours unless you gave them their own.
+  if (own) return matchColors(own, sc.palette, slot);
   // Generated people match the cast's lead, else the style's own look.
   const art = sc.cast?.[0]?.art ?? sc.look?.art ?? TOON_ART[sc.look?.toon ?? "flat"];
   const c = makeCharacter(seed, sc.palette);

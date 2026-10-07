@@ -2451,7 +2451,7 @@ export default function Studio() {
               <div className="cast-row">
                 {cast.map((c, k) => (
                   <button key={k} type="button" className="cd-member" onClick={() => setCastOpen(true)} title={c.name || `Character ${k + 1}`}>
-                    <CastThumb c={c} />
+                    <CastThumb c={c} palette={brandPalette(plan.palette, plan.brand, plan.scheme)} slot={k} />
                   </button>
                 ))}
                 <button type="button" className="btn btn-ghost" onClick={() => setCastOpen(true)}>

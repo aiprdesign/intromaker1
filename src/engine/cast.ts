@@ -1,4 +1,5 @@
-import type { CastMember } from "./types";
+import { hexToRgb, mixHex } from "./math";
+import type { CastMember, Palette } from "./types";
 
 /**
  * The character designer's options: what a custom abstract character (see skills/abstract.ts) can
@@ -72,6 +73,7 @@ export function sanitizeMember(raw: unknown): CastMember | null {
     glasses: r.glasses === true,
     cheeks: r.cheeks === true,
     nose: r.nose === true,
+    ...(r.ownColors === true ? { ownColors: true } : {}),
   };
 }
 
@@ -80,4 +82,99 @@ export function sanitizeCast(raw: unknown): CastMember[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const out = raw.slice(0, CAST_MAX).map(sanitizeMember).filter((m): m is CastMember => !!m);
   return out.length ? out : undefined;
+}
+
+/* ───────────── Matching the intro's colours ───────────── */
+
+const lum = (hex: string) => {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const ratio = (a: string, b: string) => {
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+const sat = (hex: string) => {
+  const [r, g, b] = hexToRgb(hex);
+  return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+};
+
+/** Rotate a colour's hue by `deg`. */
+function hue(hex: string, deg: number) {
+  const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (!d) return hex;
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (((h * 60 + deg) % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [rr, gg, bb] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return `#${[rr, gg, bb].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * Clothes colours that belong to an intro: its primary, secondary and accent, their tints and
+ * shades, neighbouring and complementary hues and a neutral for variety, each nudged until it
+ * stands out from the stage.
+ */
+export function introColors(p: Palette): string[] {
+  const base = [p.primary, p.secondary, p.accent].filter((c) => HEX.test(c ?? ""));
+  if (!base.length) return MODERN;
+  const raw = [
+    ...base,
+    ...base.map((c) => mixHex(c, "#ffffff", 0.35)),
+    ...base.map((c) => mixHex(c, "#000000", 0.22)),
+    // Neighbouring hues, and the complement for a pop of contrast (still the intro's harmony).
+    hue(base[0], 32),
+    hue(base[0], -32),
+    hue(base[0], 64),
+    hue(base[0], 180),
+    // A neutral that reads on the stage (dark on light, light on dark).
+    p.light ? "#2b2f45" : "#e6e4f0",
+  ];
+  const bg = HEX.test(p.bg0) ? p.bg0 : p.light ? "#ffffff" : "#0b0b12";
+  const away = lum(bg) > 0.4 ? "#000000" : "#ffffff";
+  const out: string[] = [];
+  for (let c of raw) {
+    for (let k = 0.12; k <= 0.6 && ratio(c, bg) < 1.6; k += 0.12) c = mixHex(c, away, k);
+    c = c.toLowerCase();
+    const rgb = hexToRgb(c);
+    if (!out.some((o) => hexToRgb(o).every((v, i) => Math.abs(v - rgb[i]) < 18))) out.push(c);
+  }
+  return out;
+}
+
+const NATURAL_HAIR = new Set(HAIRS.slice(0, 5));
+const isNeutral = (c: string) => NEUTRALS.includes(c) || sat(c) < 0.12;
+
+/**
+ * A character dressed in the intro's colours: top, pattern, sleeves, and coloured trousers, shoes
+ * or hair change; skin, natural hair and neutral trousers and shoes stay. `slot` spreads a cast
+ * across the colours. A character with its own colours (ownColors) is returned as it is.
+ */
+export function matchColors(c: CastMember, p: Palette, slot = 0): CastMember {
+  if (c.ownColors) return c;
+  const set = introColors(p);
+  const n = set.length;
+  const body = set[slot % n];
+  let pattern = set[(slot + 2) % n];
+  if (ratio(pattern, body) < 1.4) pattern = lum(body) > 0.35 ? mixHex(body, "#000000", 0.35) : mixHex(body, "#ffffff", 0.6);
+  const second = set[(slot + 1) % n];
+  return {
+    ...c,
+    bodyColor: body,
+    patternColor: pattern,
+    armColor: c.armColor === c.skin ? c.skin : body,
+    legColor: isNeutral(c.legColor) ? c.legColor : mixHex(second, "#000000", 0.2),
+    shoe: isNeutral(c.shoe) ? c.shoe : second,
+    hairColor: NATURAL_HAIR.has(c.hairColor) ? c.hairColor : second,
+  };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ART_STYLES, BODIES, CAST_MAX, EYES, HAIR_STYLES, HAIRS, HEADS, MODERN, NEUTRALS, PATTERNS, PLAYFUL_SKINS, RANGES, sanitizeCast, SKINS } from "@/engine/cast";
+import { ART_STYLES, BODIES, CAST_MAX, EYES, HAIR_STYLES, HAIRS, HEADS, introColors, matchColors, MODERN, NEUTRALS, PATTERNS, PLAYFUL_SKINS, RANGES, sanitizeCast, SKINS } from "@/engine/cast";
 import { PALETTES } from "@/engine/palettes";
 import { drawAbstract, idle, makeCharacter, waveArm, type AbsPose } from "@/engine/skills/abstract";
 import { blinkAt } from "@/engine/skills/characters";
@@ -26,8 +26,11 @@ export function saveCast(cast: CastMember[]) {
   }
 }
 
-/** A brand-new random character, dressed partly in `palette`'s colours. */
-export function newCharacter(palette: Palette = PALETTES.swiss): CastMember {
+/** Colours to design in when there's no video to match (the /characters page): bright and mixed. */
+const SHOWCASE: Palette = { ...PALETTES.pastel, primary: "#8338ec", secondary: "#ff6b6b", accent: "#06d6a0", bg0: "#f4f1fb", bg1: "#ffffff", light: true };
+
+/** A brand-new random character, dressed in `palette`'s colours. */
+export function newCharacter(palette: Palette = SHOWCASE): CastMember {
   return makeCharacter(Math.floor(Math.random() * 2 ** 31), palette);
 }
 
@@ -103,15 +106,15 @@ function Figure({ c, w, h, focus = "full" }: { c: CastMember; w: number; h: numb
 }
 
 /** A small still of a character, for lists of the cast. */
-export function CastThumb({ c }: { c: CastMember }) {
-  return <Figure c={c} w={32} h={38} />;
+export function CastThumb({ c, palette, slot = 0 }: { c: CastMember; palette?: Palette; slot?: number }) {
+  return <Figure c={palette ? matchColors(c, palette, slot) : c} w={32} h={38} />;
 }
 
 /**
  * The designer in a dialog (the studio's): Esc or the backdrop closes it; focus starts inside and
  * returns to where it was.
  */
-export function CharacterDesignerModal({ cast, onChange, palette, onClose }: { cast: CastMember[]; onChange: (cast: CastMember[]) => void; palette?: Palette; onClose: () => void }) {
+export function CharacterDesignerModal({ cast, onChange, palette, onClose }: { cast: CastMember[]; onChange: (cast: CastMember[]) => void; palette: Palette; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const back = document.activeElement as HTMLElement | null;
@@ -133,7 +136,7 @@ export function CharacterDesignerModal({ cast, onChange, palette, onClose }: { c
             ✕
           </button>
         </div>
-        <CharacterDesigner cast={cast} onChange={onChange} palette={palette} />
+        <CharacterDesigner cast={cast} onChange={onChange} palette={palette} match />
         <div className="modal-actions">
           <button className="btn btn-primary" onClick={onClose}>
             Done
@@ -258,11 +261,15 @@ function Range({ name, value, range, onChange }: { name: string; value: number; 
  * The character designer: build simple abstract characters (body, head, hair, face, colours and
  * proportions), shuffle for ideas, keep a cast of up to CAST_MAX, and download any one as a PNG.
  */
-export default function CharacterDesigner({ cast, onChange, palette = PALETTES.swiss }: { cast: CastMember[]; onChange: (cast: CastMember[]) => void; palette?: Palette }) {
+export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, match = false }: { cast: CastMember[]; onChange: (cast: CastMember[]) => void; palette?: Palette; match?: boolean }) {
   const [sel, setSel] = useState(0);
   const i = Math.min(sel, Math.max(0, cast.length - 1));
-  const m = cast[i];
-  const brand = [palette.primary, palette.secondary];
+  const raw = cast[i];
+  // What it looks like in this video: the intro's colours, unless it has its own (match is set
+  // when there's a video to match; on its own page a character shows the colours it was made in).
+  const shown = (c: CastMember, k: number) => (match ? matchColors(c, palette, k) : c);
+  const m = raw && shown(raw, i);
+  const brand = introColors(palette).slice(0, 3);
 
   // New characters come out in the style you're using.
   const styled = (c: CastMember, art = cast[sel]?.art ?? cast[0]?.art) => (art && art !== "flat" ? { ...c, art } : c);
@@ -271,7 +278,7 @@ export default function CharacterDesigner({ cast, onChange, palette = PALETTES.s
     onChange([...cast, styled(newCharacter(palette))]);
     setSel(cast.length);
   };
-  if (!m) {
+  if (!raw || !m) {
     return (
       <div className="cd-empty">
         <p>Design simple abstract characters for your videos: pick a body, head, hair and face, then the colours and proportions. Or shuffle for ideas.</p>
@@ -281,17 +288,24 @@ export default function CharacterDesigner({ cast, onChange, palette = PALETTES.s
       </div>
     );
   }
-  const update = (patch: Partial<CastMember>) => {
-    const next = { ...m, ...patch };
+  /** Change the character. `own`: a colour you picked, so it keeps your colours from now on. */
+  const update = (patch: Partial<CastMember>, own = false) => {
+    const base = own ? { ...m, ownColors: true } : raw;
+    const next = { ...base, ...patch };
     // Bare arms follow the skin; sleeves follow the top.
-    if (patch.skin && m.armColor === m.skin) next.armColor = patch.skin;
-    if (patch.bodyColor && m.armColor === m.bodyColor) next.armColor = patch.bodyColor;
+    if (patch.skin && base.armColor === base.skin) next.armColor = patch.skin;
+    if (patch.bodyColor && base.armColor === base.bodyColor) next.armColor = patch.bodyColor;
     onChange(cast.map((c, k) => (k === i ? next : c)));
   };
-  const shuffle = () => update({ ...styled(newCharacter(palette), m.art), art: m.art, name: m.name });
+  const shuffle = () => update({ ...styled(newCharacter(palette), raw.art), art: raw.art, name: raw.name, ownColors: raw.ownColors });
   const recolor = () => {
-    const r = newCharacter(palette);
-    update({ bodyColor: r.bodyColor, patternColor: r.patternColor, skin: r.skin, hairColor: r.hairColor, legColor: r.legColor, shoe: r.shoe, armColor: m.armColor === m.skin ? r.skin : r.bodyColor });
+    // A new mix of the intro's colours (yours from now on).
+    const set = introColors(palette);
+    const pick = () => set[Math.floor(Math.random() * set.length)];
+    const body = pick();
+    let pattern = pick();
+    if (pattern === body) pattern = "#ffffff";
+    update({ bodyColor: body, patternColor: pattern, armColor: m.armColor === m.skin ? m.skin : body, shoe: Math.random() < 0.5 ? NEUTRALS[0] : pick() }, true);
   };
   const remove = () => {
     onChange(cast.filter((_, k) => k !== i));
@@ -328,7 +342,7 @@ export default function CharacterDesigner({ cast, onChange, palette = PALETTES.s
         <div className="cd-cast" role="listbox" aria-label="Your characters">
           {cast.map((c, k) => (
             <button key={k} type="button" role="option" aria-selected={k === i} className={`cd-member${k === i ? " active" : ""}`} onClick={() => setSel(k)} title={c.name || `Character ${k + 1}`}>
-              <Figure c={c} w={44} h={52} />
+              <Figure c={shown(c, k)} w={44} h={52} />
               {k === 0 && <span className="cd-lead">Lead</span>}
             </button>
           ))}
@@ -366,15 +380,27 @@ export default function CharacterDesigner({ cast, onChange, palette = PALETTES.s
           </div>
         </section>
         <section>
+          <h3>Colours</h3>
+          <div className="seg-control">
+            <button type="button" className={!raw.ownColors ? "active" : ""} onClick={() => onChange(cast.map((c, k) => (k === i ? { ...c, ownColors: undefined } : c)))}>
+              Match the intro
+            </button>
+            <button type="button" className={raw.ownColors ? "active" : ""} onClick={() => update({}, true)}>
+              My colours
+            </button>
+          </div>
+          <p className="hint">{raw.ownColors ? "Keeps the colours you chose in any video." : match ? "Dressed in this video's colours, and they follow if you change them. Pick any colour below to choose your own." : "In a video, the clothes take that video's colours. Pick any colour below to keep your own."}</p>
+        </section>
+        <section>
           <h3>Body</h3>
           <Tiles name="Body shape" options={BODIES} value={m.body} make={(o) => ({ ...m, body: o })} onPick={(o) => update({ body: o })} />
           <Tiles name="Pattern" options={PATTERNS} value={m.pattern} make={(o) => ({ ...m, pattern: o })} onPick={(o) => update({ pattern: o })} />
           <span className="cd-label">Colour</span>
-          <Colors name="Body colour" colors={[...brand, ...MODERN]} value={m.bodyColor} onPick={(c) => update({ bodyColor: c })} />
+          <Colors name="Body colour" colors={[...brand, ...MODERN]} value={m.bodyColor} onPick={(c) => update({ bodyColor: c }, true)} />
           {m.pattern !== "none" && (
             <>
               <span className="cd-label">Pattern colour</span>
-              <Colors name="Pattern colour" colors={["#ffffff", ...brand, ...MODERN]} value={m.patternColor} onPick={(c) => update({ patternColor: c })} />
+              <Colors name="Pattern colour" colors={["#ffffff", ...brand, ...MODERN]} value={m.patternColor} onPick={(c) => update({ patternColor: c }, true)} />
             </>
           )}
           <div className="cd-ranges">
@@ -398,7 +424,7 @@ export default function CharacterDesigner({ cast, onChange, palette = PALETTES.s
           {m.hair !== "none" && (
             <>
               <span className="cd-label">Colour</span>
-              <Colors name="Hair colour" colors={[...HAIRS, ...MODERN.slice(0, 5)]} value={m.hairColor} onPick={(c) => update({ hairColor: c })} />
+              <Colors name="Hair colour" colors={[...HAIRS, ...MODERN.slice(0, 5)]} value={m.hairColor} onPick={(c) => update({ hairColor: c }, !HAIRS.slice(0, 5).includes(c))} />
             </>
           )}
         </section>
@@ -419,14 +445,14 @@ export default function CharacterDesigner({ cast, onChange, palette = PALETTES.s
             <button type="button" className={!sleeves ? "active" : ""} onClick={() => update({ armColor: m.skin })}>
               Bare arms
             </button>
-            <button type="button" className={sleeves ? "active" : ""} onClick={() => update({ armColor: m.bodyColor })}>
+            <button type="button" className={sleeves ? "active" : ""} onClick={() => update({ armColor: m.bodyColor }, true)}>
               Sleeves
             </button>
           </div>
           <span className="cd-label">Legs</span>
-          <Colors name="Leg colour" colors={[...NEUTRALS, ...MODERN.slice(0, 6)]} value={m.legColor} onPick={(c) => update({ legColor: c })} />
+          <Colors name="Leg colour" colors={[...NEUTRALS, ...MODERN.slice(0, 6)]} value={m.legColor} onPick={(c) => update({ legColor: c }, true)} />
           <span className="cd-label">Shoes</span>
-          <Colors name="Shoe colour" colors={[...NEUTRALS.slice(0, 3), ...brand, ...MODERN.slice(0, 5)]} value={m.shoe} onPick={(c) => update({ shoe: c })} />
+          <Colors name="Shoe colour" colors={[...NEUTRALS.slice(0, 3), ...brand, ...MODERN.slice(0, 5)]} value={m.shoe} onPick={(c) => update({ shoe: c }, true)} />
           <div className="cd-ranges">
             <Range name="Leg length" value={m.legLen} range={RANGES.legLen} onChange={(v) => update({ legLen: v })} />
           </div>

@@ -495,6 +495,8 @@ export interface CastMember {
   glasses: boolean;
   cheeks: boolean;
   nose: boolean;
+  /** Keep these colours; unset: dressed in each video's own colours (see cast.ts matchColors). */
+  ownColors?: boolean;
 }
 
 export interface Palette {
