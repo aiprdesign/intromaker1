@@ -179,11 +179,20 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
   };
   /** Cel shade (comic): the right-hand part of the current path darkened with a hard edge. */
   const cel = (x0: number, alpha = 0.16) => {
-    if (TOON !== "comic") return;
+    if (TOON !== "comic" && TOON !== "flat") return;
     ctx.save();
     ctx.clip();
-    ctx.fillStyle = `rgba(20,10,40,${alpha})`;
-    ctx.fillRect(x0, -1e4, 2e4, 2e4);
+    ctx.fillStyle = `rgba(36,18,63,${TOON === "flat" ? alpha * 0.85 : alpha})`;
+    if (TOON === "flat") {
+      // An illustrator's shadow shape: a soft curve down the side away from the light.
+      ctx.beginPath();
+      ctx.moveTo(x0, -1e4);
+      ctx.bezierCurveTo(x0 - (x0 - x) * 0.25, footY - H, x0 - (x0 - x) * 0.1, footY - H * 0.4, x0 + (x0 - x) * 0.2, 1e4);
+      ctx.lineTo(2e4, 1e4);
+      ctx.lineTo(2e4, -1e4);
+      ctx.closePath();
+      ctx.fill();
+    } else ctx.fillRect(x0, -1e4, 2e4, 2e4);
     ctx.restore();
   };
   ctx.save();
@@ -215,6 +224,13 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
       ctx.ellipse(fx + s * H * 0.018, fy - H * 0.012, H * 0.058, H * 0.03, 0, 0, TAU);
       ctx.fill();
       ink(ctx, ow);
+      if (TOON !== "doodle") {
+        // A white sneaker sole.
+        ctx.fillStyle = "rgba(244,242,247,0.95)";
+        ctx.beginPath();
+        ctx.roundRect(fx + s * H * 0.018 - H * 0.056, fy + H * 0.006, H * 0.112, H * 0.014, H * 0.007);
+        ctx.fill();
+      }
     }
   }
   // Torso: a rounded body in the top's colour, lit from the upper left.
@@ -238,6 +254,10 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
   ctx.fillStyle = mixHex(look.skin, "#000000", 0.08);
   ctx.beginPath();
   ctx.roundRect(x - headR * 0.24, shY - headR * 0.3, headR * 0.48, headR * 0.42, headR * 0.12);
+  ctx.fill();
+  ctx.fillStyle = "rgba(36,18,63,0.16)";
+  ctx.beginPath();
+  ctx.roundRect(x - headR * 0.24, shY - headR * 0.3, headR * 0.48, headR * 0.16, headR * 0.08);
   ctx.fill();
   // Arms (sleeve in the top's colour, then the hand).
   for (const s of [-1, 1]) {
@@ -285,7 +305,7 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
   ctx.beginPath();
   ctx.arc(x, headY, headR, 0, TAU);
   ctx.fill();
-  cel(x + headR * 0.42, 0.12);
+  cel(x + headR * 0.42, TOON === "flat" ? 0.08 : 0.12);
   ink(ctx, ow);
   if (TOON === "soft") {
     ctx.fillStyle = "rgba(255,255,255,0.3)";
@@ -314,6 +334,14 @@ export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: n
       ctx.arc(x + Math.cos(a) * headR * 0.98, headY + Math.sin(a) * headR * 0.98, headR * 0.3, 0, TAU);
       ctx.fill();
     }
+  }
+  // A highlight streak on the hair (not in the ink styles, which stay graphic).
+  if (TOON === "flat" || TOON === "soft") {
+    ctx.strokeStyle = rgba(mixHex(look.hair, "#ffffff", 0.45), 0.5);
+    ctx.lineWidth = headR * 0.1;
+    ctx.beginPath();
+    ctx.arc(x - headR * 0.05, headY, headR * 0.86, Math.PI * 1.2, Math.PI * 1.42);
+    ctx.stroke();
   }
   // Face.
   const lk = (pose.look ?? 0) * headR * 0.12;

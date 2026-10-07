@@ -104,6 +104,10 @@ export interface ProPose {
   brows?: number;
   /** Hair swing (radians) for the ponytail. */
   sway?: number;
+  /** Reach a hand to a point (inverse kinematics; "chin" for a hand on the chin), blended in by reachK. */
+  reachL?: { x: number; y: number } | "chin";
+  reachR?: { x: number; y: number } | "chin";
+  reachK?: number;
 }
 
 export interface ProRig {
@@ -115,25 +119,102 @@ export interface ProRig {
   shoulderR: { x: number; y: number };
 }
 
-/** A tapered limb segment with round ends. */
-function capsule(ctx: CanvasRenderingContext2D, ax: number, ay: number, bx: number, by: number, ra: number, rb: number) {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const L = Math.hypot(dx, dy) || 1;
-  const nx = -dy / L;
-  const ny = dx / L;
-  // The side band, then a round cap at each end (filled as one path: no seams at the joints).
+/** Shadows are a cool violet (not black) and highlights a touch of white: the illustrator's palette. */
+const SHADOW = "#24123f";
+const shade = (c: string, k: number) => mixHex(c, SHADOW, k);
+const light = (c: string, k: number) => mixHex(c, "#ffffff", k);
+type P = [number, number];
+
+/**
+ * A limb through three joints (hip–knee–ankle, shoulder–elbow–wrist) as one seamless tapered
+ * shape: straight sides, a rounded bend at the middle joint, round ends. One fill, so no seams.
+ */
+function limbPath(ctx: CanvasRenderingContext2D, p0: P, p1: P, p2: P, r0: number, r1: number, r2: number) {
+  const nrm = (a: P, b: P): P => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const L = Math.hypot(dx, dy) || 1;
+    return [-dy / L, dx / L];
+  };
+  const n1 = nrm(p0, p1);
+  const n2 = nrm(p1, p2);
+  let bx = n1[0] + n2[0];
+  let by = n1[1] + n2[1];
+  const bl = Math.hypot(bx, by) || 1;
+  bx /= bl;
+  by /= bl;
+  const cosh = Math.max(0.55, bx * n1[0] + by * n1[1]);
+  const m = r1 / cosh;
+  const at = (p: P, n: P, r: number, s: number): P => [p[0] + n[0] * r * s, p[1] + n[1] * r * s];
+  const a2 = Math.atan2(n2[1], n2[0]);
+  const a0 = Math.atan2(-n1[1], -n1[0]);
   ctx.beginPath();
-  ctx.moveTo(ax + nx * ra, ay + ny * ra);
-  ctx.lineTo(bx + nx * rb, by + ny * rb);
-  ctx.lineTo(bx - nx * rb, by - ny * rb);
-  ctx.lineTo(ax - nx * ra, ay - ny * ra);
+  const A1 = at(p0, n1, r0, 1);
+  ctx.moveTo(A1[0], A1[1]);
+  const A2 = at(p1, n1, r1, 1);
+  ctx.lineTo(A2[0], A2[1]);
+  const A3 = at(p1, n2, r1, 1);
+  ctx.quadraticCurveTo(p1[0] + bx * m, p1[1] + by * m, A3[0], A3[1]);
+  const A4 = at(p2, n2, r2, 1);
+  ctx.lineTo(A4[0], A4[1]);
+  ctx.arc(p2[0], p2[1], r2, a2, a2 - Math.PI, true);
+  const B3 = at(p1, n2, r1, -1);
+  ctx.lineTo(B3[0], B3[1]);
+  const B2 = at(p1, n1, r1, -1);
+  ctx.quadraticCurveTo(p1[0] - bx * m, p1[1] - by * m, B2[0], B2[1]);
+  const B1 = at(p0, n1, r0, -1);
+  ctx.lineTo(B1[0], B1[1]);
+  ctx.arc(p0[0], p0[1], r0, a0, a0 - Math.PI, true);
   ctx.closePath();
-  ctx.moveTo(bx + rb, by);
-  ctx.arc(bx, by, rb, 0, TAU);
-  ctx.moveTo(ax + ra, ay);
-  ctx.arc(ax, ay, ra, 0, TAU);
-  ctx.fill("nonzero");
+}
+
+/** A mitten hand at the wrist, pointing along `a` (radians from straight down). */
+function drawHand(ctx: CanvasRenderingContext2D, wx: number, wy: number, a: number, H: number, skin: string, kind: Hand, inner: number) {
+  ctx.save();
+  ctx.translate(wx, wy);
+  ctx.rotate(-a);
+  const w = H * 0.038;
+  const l = H * 0.05;
+  ctx.fillStyle = skin;
+  if (kind === "open") {
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -H * 0.004, w, l, [w * 0.35, w * 0.35, w * 0.5, w * 0.5]);
+    ctx.fill();
+    // Thumb, out to the inside.
+    ctx.beginPath();
+    ctx.ellipse(inner * w * 0.55, l * 0.32, w * 0.2, w * 0.36, inner * 0.6, 0, TAU);
+    ctx.fill();
+    // Finger line.
+    ctx.strokeStyle = shade(skin, 0.22);
+    ctx.lineWidth = H * 0.0028;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.1 * inner, l * 0.55);
+    ctx.lineTo(-w * 0.1 * inner, l * 0.9);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.roundRect(-w * 0.55, 0, w * 1.1, w * 1.05, w * 0.42);
+    ctx.fill();
+    if (kind === "point") {
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.16, w * 0.6, w * 0.32, l * 0.95, w * 0.16);
+      ctx.fill();
+    } else if (kind === "thumb") {
+      ctx.save();
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.15, -w * 0.75, w * 0.3, w * 0.75, w * 0.15);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.strokeStyle = shade(skin, 0.22);
+    ctx.lineWidth = H * 0.0028;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.3, w * 0.72);
+    ctx.lineTo(w * 0.3, w * 0.72);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /**
@@ -144,17 +225,16 @@ export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: numbe
   const f = clamp(pose.facing, -1, 1);
   const af = Math.abs(f);
   const fs = f >= 0 ? 1 : -1;
-  const headR = H * 0.088;
+  const headR = H * 0.09;
   const thigh = H * 0.235;
   const shin = H * 0.225;
   const upper = H * 0.165;
-  const fore = H * 0.15;
+  const fore = H * 0.145;
   const torso = H * 0.3;
-  const shW = H * 0.235 * (1 - af * 0.42);
-  const hipW = H * 0.17 * (1 - af * 0.45);
+  const shW = H * 0.24 * (1 - af * 0.42);
+  const hipW = H * 0.17 * (1 - af * 0.42);
   const legL = pose.legL ?? [-0.04, 0];
   const legR = pose.legR ?? [0.04, 0];
-  // Feet relative to the hips: the lower foot stands on the ground.
   const footOf = (sx: number, [a, k]: [number, number]) => {
     const [d1x, d1y] = dir(a);
     const kx = sx + d1x * thigh;
@@ -162,152 +242,194 @@ export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: numbe
     const [d2x, d2y] = dir(a + k);
     return { kx, ky, ax: kx + d2x * shin, ay: ky + d2y * shin };
   };
-  const hipOff = (s: number) => s * hipW * 0.32 * (1 - af * 0.8);
+  const hipOff = (s: number) => s * hipW * 0.3 * (1 - af * 0.8);
   const fl = footOf(hipOff(-1), legL);
   const fr = footOf(hipOff(1), legR);
-  const ankleH = H * 0.025;
+  const ankleH = H * 0.028;
   const hipY = groundY - ankleH - Math.max(fl.ay, fr.ay) - (pose.lift ?? 0) * H;
   const hipX = x;
   const lean = pose.lean ?? 0;
   const [ux, uy] = [Math.sin(lean), -Math.cos(lean)];
   const neckX = hipX + ux * torso;
   const neckY = hipY + uy * torso;
-  const headX = neckX + ux * (H * 0.035 + headR) + Math.sin(pose.headTilt ?? 0) * headR * 0.2;
-  const headY = neckY + uy * (H * 0.035 + headR * 0.95);
-  // Shoulders sit just under the neck; in profile they come together.
-  const shoulder = (s: number) => ({ x: neckX + s * shW * 0.5 * (1 - af * 0.75) - f * shW * 0.08, y: neckY + H * 0.03 });
+  const headX = neckX + ux * (H * 0.03 + headR) + Math.sin(pose.headTilt ?? 0) * headR * 0.2;
+  const headY = neckY + uy * (H * 0.03 + headR * 0.95);
+  // (Tucked just inside the torso's rounded shoulder, so the sleeve grows out of it.)
+  const shoulder = (s: number) => ({ x: neckX + s * (shW * 0.5 - H * 0.012) * (1 - af * 0.75) - f * shW * 0.08, y: neckY + H * 0.05 });
   const sL = shoulder(-1);
   const sR = shoulder(1);
   const far = af > 0.3 ? (fs > 0 ? "L" : "R") : null;
-  const shade = (c: string, k: number) => mixHex(c, "#000000", k);
+  const out: ProRig = { head: { x: headX, y: headY, r: headR }, top: headY - headR * 1.22, handL: { x: 0, y: 0 }, handR: { x: 0, y: 0 }, shoulderL: sL, shoulderR: sR };
+  const sleeve = look.jacket ?? look.top;
 
   const drawLeg = (side: "L" | "R") => {
     const s = side === "L" ? -1 : 1;
     const g = side === "L" ? fl : fr;
-    const hx = hipX + hipOff(s);
-    const dim = far === side ? 0.14 : 0;
+    const dim = far === side ? 0.16 : 0;
+    const hip: P = [hipX + hipOff(s), hipY];
+    const knee: P = [hipX + g.kx, hipY + g.ky];
+    const ank: P = [hipX + g.ax, hipY + g.ay];
+    // Trousers: one shape, with the shadow side (away from the light) a tone darker.
     ctx.fillStyle = shade(look.bottom, dim);
-    capsule(ctx, hx, hipY, hipX + g.kx, hipY + g.ky, H * 0.05, H * 0.042);
-    capsule(ctx, hipX + g.kx, hipY + g.ky, hipX + g.ax, hipY + g.ay, H * 0.042, H * 0.032);
-    // Shoe: pointing the way the character faces (a rounded toe-cap in front view).
-    const ax = hipX + g.ax;
-    const ay = hipY + g.ay;
-    ctx.fillStyle = shade(look.shoe, dim);
-    ctx.beginPath();
-    if (af > 0.3) ctx.ellipse(ax + fs * H * 0.03, ay + H * 0.012, H * 0.062, H * 0.026, 0, 0, TAU);
-    else ctx.ellipse(ax + s * H * 0.008, ay + H * 0.014, H * 0.038, H * 0.026, 0, 0, TAU);
+    limbPath(ctx, hip, knee, ank, H * 0.05, H * 0.041, H * 0.033);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = shade(look.bottom, dim + 0.18);
+    ctx.fillRect(hip[0] + (af > 0.3 ? -fs : 1) * H * 0.012, hipY - H * 0.1, H * (af > 0.3 ? -fs : 1) * 0.2, H * 0.7);
+    ctx.restore();
+    // Sneaker: a rounded upper and a white sole (pointing the way the character faces).
+    const ax = ank[0];
+    const ay = ank[1];
+    const toe = af > 0.3 ? fs : s * 0.15;
+    const sw = af > 0.3 ? H * 0.115 : H * 0.07;
+    const sx = ax - sw / 2 + toe * H * 0.03;
+    ctx.fillStyle = light(look.shoe, 0.06 - dim * 0.3);
     ctx.beginPath();
-    ctx.ellipse(ax + (af > 0.3 ? fs * H * 0.05 : 0), ay + H * 0.004, H * 0.014, H * 0.006, 0, 0, TAU);
+    ctx.roundRect(sx, ay - H * 0.012, sw, H * 0.04, [H * 0.02, H * 0.024, H * 0.012, H * 0.012]);
+    ctx.fill();
+    ctx.fillStyle = shade("#f4f2f7", dim);
+    ctx.beginPath();
+    ctx.roundRect(sx - H * 0.002, ay + H * 0.018, sw + H * 0.004, H * 0.013, H * 0.006);
     ctx.fill();
   };
 
+  /** Two-joint IK: the shoulder and elbow angles that put the wrist on a target, elbow out. */
+  const reach = (sh: { x: number; y: number }, tx: number, ty: number, s: number): [number, number] => {
+    const dx = tx - sh.x;
+    const dy = ty - sh.y;
+    const d = clamp(Math.hypot(dx, dy), Math.abs(upper - fore) + 1e-3, upper + fore - 1e-3);
+    const base = Math.atan2(dx, dy);
+    const alpha = Math.acos(clamp((upper * upper + d * d - fore * fore) / (2 * upper * d), -1, 1));
+    const a = base + s * alpha;
+    const ex = sh.x + Math.sin(a) * upper;
+    const ey = sh.y + Math.cos(a) * upper;
+    let a2 = Math.atan2(sh.x + (dx / Math.hypot(dx, dy || 1e-6)) * d - ex, sh.y + (dy / Math.hypot(dx, dy || 1e-6)) * d - ey);
+    // Keep the bend continuous (no wrap-around jump between the two angles).
+    while (a2 - a > Math.PI) a2 -= TAU;
+    while (a2 - a < -Math.PI) a2 += TAU;
+    return [a, a2 - a];
+  };
+  const chin = { x: headX + f * headR * 0.25 + Math.sin(pose.headTilt ?? 0) * headR, y: headY + headR * 1.08 };
   const drawArm = (side: "L" | "R") => {
     const s = side === "L" ? -1 : 1;
     const sh = side === "L" ? sL : sR;
-    const [a, b] = side === "L" ? pose.armL : pose.armR;
-    const [d1x, d1y] = dir(a);
-    const ex = sh.x + d1x * upper;
-    const ey = sh.y + d1y * upper;
-    const [d2x, d2y] = dir(a + b);
-    const wx = ex + d2x * fore;
-    const wy = ey + d2y * fore;
-    const dim = far === side ? 0.14 : 0;
-    const sleeve = look.jacket ?? look.top;
-    ctx.fillStyle = shade(sleeve, dim);
-    capsule(ctx, sh.x, sh.y, ex, ey, H * 0.04, H * 0.034);
-    capsule(ctx, ex, ey, wx - d2x * H * 0.01, wy - d2y * H * 0.01, H * 0.034, H * 0.028);
-    // Cuff.
-    ctx.fillStyle = shade(look.top, dim + 0.05);
-    capsule(ctx, wx - d2x * H * 0.022, wy - d2y * H * 0.022, wx - d2x * H * 0.008, wy - d2y * H * 0.008, H * 0.029, H * 0.029);
-    // Hand.
-    const hand = (side === "L" ? pose.handL : pose.handR) ?? "open";
-    const hx = wx + d2x * H * 0.03;
-    const hy = wy + d2y * H * 0.03;
-    ctx.fillStyle = shade(look.skin, dim);
-    ctx.beginPath();
-    if (hand === "open") ctx.ellipse(hx, hy, H * 0.026, H * 0.034, -(a + b), 0, TAU);
-    else ctx.arc(hx, hy, H * 0.026, 0, TAU);
-    ctx.fill();
-    // Thumb on the inside of the hand.
-    const tx = hx - s * H * 0.02 * (hand === "thumb" ? 0 : 1);
-    const ty = hy - (hand === "thumb" ? H * 0.035 : H * 0.005);
-    ctx.beginPath();
-    ctx.ellipse(tx, ty, H * 0.01, hand === "thumb" ? H * 0.02 : H * 0.014, hand === "thumb" ? 0 : s * 0.6, 0, TAU);
-    ctx.fill();
-    if (hand === "point") {
-      ctx.strokeStyle = shade(look.skin, dim);
-      ctx.lineCap = "round";
-      ctx.lineWidth = H * 0.014;
-      ctx.beginPath();
-      ctx.moveTo(hx, hy);
-      ctx.lineTo(hx + d2x * H * 0.05, hy + d2y * H * 0.05);
-      ctx.stroke();
+    let [a, b] = side === "L" ? pose.armL : pose.armR;
+    const target = side === "L" ? pose.reachL : pose.reachR;
+    if (target) {
+      const tp = target === "chin" ? chin : target;
+      // The wrist sits a hand's length short of the target, so the hand lands on it.
+      const [ra, rb] = reach(sh, tp.x - s * H * 0.01, tp.y + H * 0.035, s);
+      const k = clamp(pose.reachK ?? 1);
+      a = lerp(a, ra, k);
+      b = lerp(b, rb, k);
     }
-    return { x: hx, y: hy };
+    const [d1x, d1y] = dir(a);
+    const el: P = [sh.x + d1x * upper, sh.y + d1y * upper];
+    const [d2x, d2y] = dir(a + b);
+    const wr: P = [el[0] + d2x * fore, el[1] + d2y * fore];
+    const dim = far === side ? 0.16 : 0;
+    ctx.fillStyle = shade(sleeve, dim);
+    limbPath(ctx, [sh.x, sh.y], el, wr, H * 0.042, H * 0.035, H * 0.029);
+    ctx.fill();
+    // Shadow down the back of the arm.
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = shade(sleeve, dim + 0.16);
+    limbPath(ctx, [sh.x + H * 0.014, sh.y + H * 0.01], [el[0] + H * 0.014, el[1]], [wr[0] + H * 0.01, wr[1]], H * 0.03, H * 0.024, H * 0.018);
+    ctx.fill();
+    ctx.restore();
+    // Shirt cuff showing under a jacket sleeve, or a lighter cuff band.
+    const cx = wr[0] - d2x * H * 0.012;
+    const cy = wr[1] - d2y * H * 0.012;
+    ctx.fillStyle = look.jacket ? light(look.top, 0.1) : shade(look.top, dim + 0.12);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, H * 0.03, H * 0.012, -(a + b), 0, TAU);
+    ctx.fill();
+    const hx = wr[0] + d2x * H * 0.004;
+    const hy = wr[1] + d2y * H * 0.004;
+    drawHand(ctx, hx, hy, a + b, H, shade(look.skin, dim), (side === "L" ? pose.handL : pose.handR) ?? "open", -s);
+    return { x: wr[0] + d2x * H * 0.03, y: wr[1] + d2y * H * 0.03 };
   };
 
-  // Torso path (shirt), shoulders to hips with a waist.
+  // The torso: rounded shoulders, a waist, hips; x follows the lean.
+  const top = neckY - H * 0.004;
+  const bot = hipY + H * 0.026;
+  const cxAt = (y: number) => lerp(neckX, hipX, clamp((y - top) / (bot - top)));
   const torsoPath = () => {
-    const r = H * 0.045;
-    const top = neckY - H * 0.006;
-    const L = sL.x - H * 0.022;
-    const R = sR.x + H * 0.022;
-    const waistIn = shW * 0.08;
-    const bot = hipY + H * 0.02;
+    const nw = H * 0.03;
+    const L = sL.x - H * 0.03;
+    const R = sR.x + H * 0.03;
+    const shy = sL.y + H * 0.012;
+    const wy = lerp(top, bot, 0.62);
+    const wh = shW * 0.4;
+    const hh = hipW * 0.56;
     ctx.beginPath();
-    ctx.moveTo(L + r, top);
-    ctx.lineTo(R - r, top);
-    ctx.quadraticCurveTo(R, top, R, top + r);
-    ctx.quadraticCurveTo(R - waistIn * 0.5, lerp(top, bot, 0.55), hipX + hipW * 0.52, bot);
-    ctx.lineTo(hipX - hipW * 0.52, bot);
-    ctx.quadraticCurveTo(L + waistIn * 0.5, lerp(top, bot, 0.55), L, top + r);
-    ctx.quadraticCurveTo(L, top, L + r, top);
+    ctx.moveTo(neckX - nw, top);
+    ctx.quadraticCurveTo(L + H * 0.006, top + H * 0.002, L, shy);
+    ctx.bezierCurveTo(L - H * 0.004, shy + H * 0.1, cxAt(wy) - wh, wy - H * 0.06, cxAt(wy) - wh, wy);
+    ctx.quadraticCurveTo(cxAt(wy) - wh, lerp(wy, bot, 0.6), hipX - hh, bot);
+    ctx.lineTo(hipX + hh, bot);
+    ctx.quadraticCurveTo(cxAt(wy) + wh, lerp(wy, bot, 0.6), cxAt(wy) + wh, wy);
+    ctx.bezierCurveTo(cxAt(wy) + wh, wy - H * 0.06, R + H * 0.004, shy + H * 0.1, R, shy);
+    ctx.quadraticCurveTo(R - H * 0.006, top + H * 0.002, neckX + nw, top);
+    ctx.quadraticCurveTo(neckX, top + H * 0.014, neckX - nw, top);
     ctx.closePath();
   };
 
-  const out: ProRig = { head: { x: headX, y: headY, r: headR }, top: headY - headR * 1.15, handL: { x: 0, y: 0 }, handR: { x: 0, y: 0 }, shoulderL: sL, shoulderR: sR };
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   // Ground shadow.
-  const sg = ctx.createRadialGradient(x, groundY, 0, x, groundY, H * 0.18);
-  sg.addColorStop(0, "rgba(0,0,0,0.22)");
-  sg.addColorStop(1, "rgba(0,0,0,0)");
+  const sg = ctx.createRadialGradient(x, groundY, 0, x, groundY, H * 0.2);
+  sg.addColorStop(0, "rgba(20,10,40,0.22)");
+  sg.addColorStop(1, "rgba(20,10,40,0)");
   ctx.fillStyle = sg;
   ctx.beginPath();
-  ctx.ellipse(x, groundY, H * 0.18, H * 0.03, 0, 0, TAU);
+  ctx.ellipse(x, groundY + H * 0.004, H * 0.2, H * 0.032, 0, 0, TAU);
   ctx.fill();
-  // Hair behind the head (long, bob, ponytail).
-  const backHair = () => {
-    ctx.fillStyle = shade(look.hair, 0.05);
-    if (look.hairStyle === "long") {
-      ctx.beginPath();
-      ctx.roundRect(headX - headR * 1.1 - fs * af * headR * 0.2, headY - headR * 0.4, headR * 2.2, headR * 2.35, [headR, headR, headR * 0.5, headR * 0.5]);
-      ctx.fill();
-    } else if (look.hairStyle === "bob") {
-      ctx.beginPath();
-      ctx.roundRect(headX - headR * 1.12, headY - headR * 0.5, headR * 2.24, headR * 1.55, [headR, headR, headR * 0.4, headR * 0.4]);
-      ctx.fill();
-    } else if (look.hairStyle === "ponytail") {
-      const sw = pose.sway ?? 0;
-      const bx = headX - fs * af * headR * 0.85;
-      const by = headY - headR * 0.55;
-      const [tx, ty] = dir(-fs * (0.35 + af * 0.4) + sw);
-      ctx.beginPath();
-      ctx.moveTo(bx - headR * 0.18, by);
-      ctx.quadraticCurveTo(bx + tx * headR * 0.9 - headR * 0.3, by + ty * headR * 0.9, bx + tx * headR * 1.7, by + ty * headR * 1.8);
-      ctx.quadraticCurveTo(bx + tx * headR * 0.9 + headR * 0.3, by + ty * headR * 0.9, bx + headR * 0.18, by);
-      ctx.closePath();
-      ctx.fill();
-    } else if (look.hairStyle === "bun") {
-      ctx.beginPath();
-      ctx.arc(headX - fs * af * headR * 0.5, headY - headR * 1.05, headR * 0.42, 0, TAU);
-      ctx.fill();
-    }
-  };
-  backHair();
+
+  // Hair behind the head.
+  ctx.fillStyle = shade(look.hair, 0.1);
+  if (look.hairStyle === "long") {
+    ctx.beginPath();
+    ctx.moveTo(headX - headR * 1.12 + f * headR * 0.1, headY - headR * 0.2);
+    ctx.bezierCurveTo(headX - headR * 1.3, headY + headR * 1.4, headX - headR * 1.05, headY + headR * 2.3, headX - headR * 0.6, headY + headR * 2.35);
+    ctx.lineTo(headX + headR * 0.6, headY + headR * 2.35);
+    ctx.bezierCurveTo(headX + headR * 1.05, headY + headR * 2.3, headX + headR * 1.3, headY + headR * 1.4, headX + headR * 1.12 + f * headR * 0.1, headY - headR * 0.2);
+    ctx.closePath();
+    ctx.fill();
+  } else if (look.hairStyle === "bob") {
+    ctx.beginPath();
+    ctx.roundRect(headX - headR * 1.16, headY - headR * 0.5, headR * 2.32, headR * 1.6, [headR, headR, headR * 0.5, headR * 0.5]);
+    ctx.fill();
+  } else if (look.hairStyle === "ponytail") {
+    const sw = pose.sway ?? 0;
+    const bx = headX - fs * af * headR * 0.9;
+    const by = headY - headR * 0.6;
+    const [tx, ty] = dir(-fs * (0.35 + af * 0.45) + sw);
+    ctx.beginPath();
+    ctx.moveTo(bx - headR * 0.22, by);
+    ctx.bezierCurveTo(bx + tx * headR * 0.7 - headR * 0.45, by + ty * headR * 0.8, bx + tx * headR * 1.6 - headR * 0.2, by + ty * headR * 1.7, bx + tx * headR * 1.9, by + ty * headR * 2.0);
+    ctx.bezierCurveTo(bx + tx * headR * 1.4 + headR * 0.3, by + ty * headR * 1.3, bx + tx * headR * 0.6 + headR * 0.4, by + ty * headR * 0.6, bx + headR * 0.22, by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = shade(look.top, 0.1);
+    ctx.beginPath();
+    ctx.arc(bx, by, headR * 0.16, 0, TAU);
+    ctx.fill();
+  } else if (look.hairStyle === "bun") {
+    ctx.fillStyle = look.hair;
+    ctx.beginPath();
+    ctx.arc(headX - fs * af * headR * 0.55, headY - headR * 1.12, headR * 0.44, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = shade(look.hair, 0.25);
+    ctx.lineWidth = headR * 0.05;
+    ctx.beginPath();
+    ctx.arc(headX - fs * af * headR * 0.55, headY - headR * 1.12, headR * 0.26, 0.6, 2.4);
+    ctx.stroke();
+  }
+
   if (far === "L") out.handL = drawArm("L");
   if (far === "R") out.handR = drawArm("R");
   if (far === "L") {
@@ -317,124 +439,192 @@ export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: numbe
     drawLeg("R");
     drawLeg("L");
   }
-  // Shirt.
-  const tg = ctx.createLinearGradient(sL.x, neckY, sR.x, hipY);
-  tg.addColorStop(0, mixHex(look.top, "#ffffff", 0.12));
-  tg.addColorStop(1, shade(look.top, 0.12));
-  ctx.fillStyle = tg;
+
+  // Shirt, with its shadow side.
+  ctx.fillStyle = look.top;
   torsoPath();
   ctx.fill();
-  // Belt line.
-  ctx.fillStyle = shade(look.bottom, 0.2);
-  ctx.fillRect(hipX - hipW * 0.5, hipY - H * 0.002, hipW, H * 0.022);
-  // Open jacket: two panels over the shirt (one in profile).
-  if (look.jacket) {
-    ctx.save();
-    torsoPath();
-    ctx.clip();
-    const jg = ctx.createLinearGradient(sL.x, neckY, sR.x, hipY);
-    jg.addColorStop(0, mixHex(look.jacket, "#ffffff", 0.1));
-    jg.addColorStop(1, shade(look.jacket, 0.15));
-    ctx.fillStyle = jg;
-    const gap = shW * 0.16 * (1 - af);
-    const cx = neckX + f * shW * 0.25;
-    ctx.beginPath();
-    ctx.moveTo(cx - gap, neckY - H * 0.01);
-    ctx.lineTo(cx - gap * 0.6, hipY + H * 0.03);
-    ctx.lineTo(hipX - H, hipY + H * 0.03);
-    ctx.lineTo(hipX - H, neckY - H * 0.05);
-    ctx.closePath();
-    if (af < 0.85 || fs > 0) ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(cx + gap, neckY - H * 0.01);
-    ctx.lineTo(cx + gap * 0.6, hipY + H * 0.03);
-    ctx.lineTo(hipX + H, hipY + H * 0.03);
-    ctx.lineTo(hipX + H, neckY - H * 0.05);
-    ctx.closePath();
-    if (af < 0.85 || fs < 0) ctx.fill();
-    // Lapels.
-    ctx.strokeStyle = shade(look.jacket, 0.3);
-    ctx.lineWidth = H * 0.004;
-    ctx.beginPath();
-    ctx.moveTo(cx - gap, neckY);
-    ctx.lineTo(cx - gap * 1.8, neckY + torso * 0.35);
-    ctx.moveTo(cx + gap, neckY);
-    ctx.lineTo(cx + gap * 1.8, neckY + torso * 0.35);
-    ctx.stroke();
-    ctx.restore();
-  }
-  // Neck with a soft shadow under the jaw, and a collar.
-  ctx.fillStyle = shade(look.skin, 0.08);
-  capsule(ctx, neckX, neckY + H * 0.01, neckX + ux * H * 0.04, neckY + uy * H * 0.04, H * 0.026, H * 0.024);
-  ctx.fillStyle = mixHex(look.top, "#ffffff", 0.18);
+  ctx.save();
+  torsoPath();
+  ctx.clip();
+  ctx.fillStyle = shade(look.top, 0.16);
   ctx.beginPath();
-  ctx.moveTo(neckX - H * 0.034 + f * H * 0.01, neckY - H * 0.004);
-  ctx.lineTo(neckX + f * H * 0.012, neckY + H * 0.028);
-  ctx.lineTo(neckX + H * 0.034 + f * H * 0.01, neckY - H * 0.004);
-  ctx.lineTo(neckX + H * 0.024, neckY - H * 0.012);
-  ctx.lineTo(neckX + f * H * 0.012, neckY + H * 0.012);
-  ctx.lineTo(neckX - H * 0.024, neckY - H * 0.012);
+  ctx.moveTo(neckX + shW * 0.22, top - H * 0.02);
+  ctx.bezierCurveTo(neckX + shW * 0.1, lerp(top, bot, 0.35), hipX + hipW * 0.12, lerp(top, bot, 0.75), hipX + hipW * 0.24, bot + H * 0.02);
+  ctx.lineTo(hipX + H, bot + H * 0.02);
+  ctx.lineTo(neckX + H, top - H * 0.02);
   ctx.closePath();
   ctx.fill();
+  // Front view: a button placket and a chest pocket.
+  if (af < 0.45 && !look.jacket) {
+    const px = neckX + f * shW * 0.2;
+    ctx.strokeStyle = shade(look.top, 0.28);
+    ctx.lineWidth = H * 0.003;
+    ctx.beginPath();
+    ctx.moveTo(px, top + H * 0.016);
+    ctx.lineTo(lerp(px, hipX, 0.9), bot - H * 0.03);
+    ctx.stroke();
+    ctx.fillStyle = light(look.top, 0.45);
+    for (let k = 0; k < 3; k++) {
+      const yy = lerp(top + H * 0.05, bot - H * 0.05, k / 2);
+      ctx.beginPath();
+      ctx.arc(lerp(px, hipX, (yy - top) / (bot - top)) + H * 0.006, yy, H * 0.004, 0, TAU);
+      ctx.fill();
+    }
+    ctx.strokeStyle = shade(look.top, 0.22);
+    ctx.beginPath();
+    ctx.roundRect(neckX - shW * 0.32, top + H * 0.06, shW * 0.16, H * 0.04, [0, 0, H * 0.008, H * 0.008]);
+    ctx.stroke();
+  }
+  // Open jacket: two panels with lapels; one panel in profile.
+  if (look.jacket) {
+    const gap = shW * 0.14 * (1 - af);
+    const cx = neckX + f * shW * 0.25;
+    const panel = (s: number) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + s * gap, top - H * 0.01);
+      ctx.lineTo(cx + s * gap * 0.7, bot + H * 0.02);
+      ctx.lineTo(cx + s * H, bot + H * 0.02);
+      ctx.lineTo(cx + s * H, top - H * 0.05);
+      ctx.closePath();
+    };
+    for (const s of [-1, 1]) {
+      if (af > 0.85 && s === -fs) continue;
+      ctx.fillStyle = s > 0 ? shade(look.jacket, 0.14) : look.jacket;
+      panel(s);
+      ctx.fill();
+      // Lapel: a lighter fold from the collar down to the chest.
+      ctx.fillStyle = light(look.jacket, 0.1);
+      ctx.beginPath();
+      ctx.moveTo(cx + s * gap, top);
+      ctx.lineTo(cx + s * (gap + shW * 0.16), top);
+      ctx.lineTo(cx + s * (gap + shW * 0.08), top + torso * 0.22);
+      ctx.lineTo(cx + s * gap * 0.9, top + torso * 0.4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  // Belt with a buckle.
+  ctx.fillStyle = shade(look.bottom, 0.3);
+  ctx.fillRect(hipX - H, bot - H * 0.026, H * 2, H * 0.024);
+  if (af < 0.5) {
+    ctx.fillStyle = "#c9b38a";
+    ctx.fillRect(hipX + f * hipW * 0.3 - H * 0.012, bot - H * 0.026, H * 0.024, H * 0.024);
+  }
+  ctx.restore();
+
+  // Neck (with the jaw's shadow on it) and collar points.
+  ctx.fillStyle = look.skin;
+  ctx.beginPath();
+  ctx.roundRect(neckX - H * 0.024 + ux * H * 0.02, neckY - H * 0.04, H * 0.048, H * 0.05, H * 0.014);
+  ctx.fill();
+  ctx.fillStyle = shade(look.skin, 0.2);
+  ctx.beginPath();
+  ctx.roundRect(neckX - H * 0.024 + ux * H * 0.02, neckY - H * 0.04, H * 0.048, H * 0.022, H * 0.01);
+  ctx.fill();
+  ctx.fillStyle = light(look.top, 0.25);
+  for (const s of [-1, 1]) {
+    if (af > 0.7 && s === -fs) continue;
+    ctx.beginPath();
+    ctx.moveTo(neckX + s * H * 0.006 + f * H * 0.01, neckY + H * 0.02);
+    ctx.lineTo(neckX + s * H * 0.036 + f * H * 0.01, neckY - H * 0.006);
+    ctx.lineTo(neckX + s * H * 0.026 + f * H * 0.01, neckY - H * 0.016);
+    ctx.lineTo(neckX + s * H * 0.004 + f * H * 0.01, neckY + H * 0.004);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   // Head.
   ctx.save();
   ctx.translate(headX, headY);
   ctx.rotate(pose.headTilt ?? 0);
-  const fx = f * headR * 0.42;
-  // Ears (one in profile, at the back of the head).
-  ctx.fillStyle = shade(look.skin, 0.06);
+  const R = headR;
+  const fx = f * R * 0.42;
+  // Ears.
   for (const s of [-1, 1]) {
     if (af > 0.6 && s === fs) continue;
+    const ex = s * R * 0.98 * (1 - af * 0.6) - f * R * 0.15;
+    ctx.fillStyle = shade(look.skin, 0.06);
     ctx.beginPath();
-    ctx.ellipse(s * headR * 0.98 * (1 - af * 0.6) - f * headR * 0.15, headR * 0.12, headR * 0.17, headR * 0.24, 0, 0, TAU);
+    ctx.ellipse(ex, R * 0.12, R * 0.17, R * 0.24, 0, 0, TAU);
     ctx.fill();
+    ctx.strokeStyle = shade(look.skin, 0.25);
+    ctx.lineWidth = R * 0.04;
+    ctx.beginPath();
+    ctx.arc(ex, R * 0.12, R * 0.08, -1.2 * s + (s > 0 ? 0 : Math.PI), 1.2 * s + (s > 0 ? 0 : Math.PI), s < 0);
+    ctx.stroke();
   }
-  const hg = ctx.createRadialGradient(-headR * 0.35 + fx * 0.3, -headR * 0.45, headR * 0.1, 0, 0, headR * 1.15);
-  hg.addColorStop(0, mixHex(look.skin, "#ffffff", 0.14));
-  hg.addColorStop(1, shade(look.skin, 0.06));
-  ctx.fillStyle = hg;
-  // Skull and jaw: rounder in profile, with the nose bridge on the facing side.
-  ctx.beginPath();
-  ctx.moveTo(-headR, -headR * 0.05);
-  ctx.bezierCurveTo(-headR, -headR * 1.3, headR, -headR * 1.3, headR, -headR * 0.05);
-  ctx.bezierCurveTo(headR, headR * 0.65 + af * headR * 0.1, headR * 0.45 + fx * 0.5, headR * 1.12, fx * 0.6, headR * 1.12);
-  ctx.bezierCurveTo(-headR * 0.45 + fx * 0.5, headR * 1.12, -headR, headR * 0.65 + af * headR * 0.1, -headR, -headR * 0.05);
-  ctx.closePath();
+  // Face shape.
+  const face = () => {
+    ctx.beginPath();
+    ctx.moveTo(-R, -R * 0.05);
+    ctx.bezierCurveTo(-R, -R * 1.3, R, -R * 1.3, R, -R * 0.05);
+    ctx.bezierCurveTo(R, R * 0.62 + af * R * 0.1, R * 0.45 + fx * 0.5, R * 1.1, fx * 0.6, R * 1.1);
+    ctx.bezierCurveTo(-R * 0.45 + fx * 0.5, R * 1.1, -R, R * 0.62 + af * R * 0.1, -R, -R * 0.05);
+    ctx.closePath();
+  };
+  ctx.fillStyle = look.skin;
+  face();
   ctx.fill();
   if (af > 0.3) {
-    // Nose in profile.
     ctx.beginPath();
-    ctx.moveTo(fs * headR * 0.86, headR * 0.02);
-    ctx.quadraticCurveTo(fs * headR * (1.12 + 0.08 * af), headR * 0.32, fs * headR * 0.9, headR * 0.4);
-    ctx.lineTo(fs * headR * 0.8, headR * 0.36);
+    ctx.moveTo(fs * R * 0.86, R * 0.02);
+    ctx.quadraticCurveTo(fs * R * (1.12 + 0.08 * af), R * 0.32, fs * R * 0.9, R * 0.4);
+    ctx.lineTo(fs * R * 0.8, R * 0.36);
     ctx.closePath();
     ctx.fill();
   }
+  // Face shadows: the side away from the light, and the hairline's shadow on the forehead.
+  ctx.save();
+  face();
+  ctx.clip();
+  ctx.fillStyle = shade(look.skin, 0.13);
+  ctx.beginPath();
+  ctx.moveTo(R * 0.5 + fx * 0.4, -R * 1.2);
+  ctx.bezierCurveTo(R * 0.85 + fx * 0.2, -R * 0.2, R * 0.75 + fx * 0.2, R * 0.6, R * 0.2 + fx * 0.6, R * 1.2);
+  ctx.lineTo(R * 2, R * 1.2);
+  ctx.lineTo(R * 2, -R * 1.2);
+  ctx.closePath();
+  ctx.fill();
+  if (look.hairStyle !== "buzz") {
+    ctx.fillStyle = shade(look.skin, 0.2);
+    ctx.beginPath();
+    ctx.moveTo(-R * 1.1, -R * 0.3);
+    ctx.quadraticCurveTo(-R * 0.6, -R * 0.36, -R * 0.15 + fx * 0.4, -R * 0.22);
+    ctx.quadraticCurveTo(R * 0.4 - fx * 0.3, -R * 0.4, R * 1.1, -R * 0.15);
+    ctx.lineTo(R * 1.1, -R * 1.4);
+    ctx.lineTo(-R * 1.1, -R * 1.4);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
   // Beard along the jaw.
   if (look.beard) {
-    ctx.fillStyle = rgba(look.hair, 0.85);
+    ctx.fillStyle = look.hair;
     ctx.beginPath();
-    ctx.moveTo(-headR * 0.95, headR * 0.2);
-    ctx.bezierCurveTo(-headR * 0.9, headR * 1.0, -headR * 0.3 + fx * 0.5, headR * 1.22, fx * 0.6, headR * 1.2);
-    ctx.bezierCurveTo(headR * 0.3 + fx * 0.5, headR * 1.22, headR * 0.9, headR * 1.0, headR * 0.95, headR * 0.2);
-    ctx.lineTo(headR * 0.7, headR * 0.35);
-    ctx.quadraticCurveTo(fx * 0.6, headR * 0.95, -headR * 0.7, headR * 0.35);
+    ctx.moveTo(-R * 0.97, R * 0.15);
+    ctx.bezierCurveTo(-R * 0.92, R * 1.0, -R * 0.3 + fx * 0.5, R * 1.24, fx * 0.6, R * 1.22);
+    ctx.bezierCurveTo(R * 0.3 + fx * 0.5, R * 1.24, R * 0.92, R * 1.0, R * 0.97, R * 0.15);
+    ctx.lineTo(R * 0.72, R * 0.3);
+    ctx.quadraticCurveTo(R * 0.5, R * 0.62, fx * 0.6 + R * 0.25, R * 0.55);
+    ctx.quadraticCurveTo(fx * 0.6, R * 0.5, fx * 0.6 - R * 0.25, R * 0.55);
+    ctx.quadraticCurveTo(-R * 0.5, R * 0.62, -R * 0.72, R * 0.3);
     ctx.closePath();
     ctx.fill();
   }
-  // Eyes: white, iris, pupil, catch-light and an upper lid that closes for blinks.
+  // Eyes.
   const blink = clamp(pose.blink ?? 0);
-  const lx = (pose.lookX ?? 0) * headR * 0.06 + f * headR * 0.04;
-  const ly = (pose.lookY ?? 0) * headR * 0.05;
-  const eyeY = headR * 0.06;
-  const spread = headR * 0.4 * (1 - af * 0.6);
+  const lx = (pose.lookX ?? 0) * R * 0.06 + f * R * 0.04;
+  const ly = (pose.lookY ?? 0) * R * 0.05;
+  const eyeY = R * 0.08;
+  const spread = R * 0.4 * (1 - af * 0.6);
   for (const s of [-1, 1]) {
     const isFar = af > 0.25 && s !== fs;
     if (isFar && af > 0.75) continue;
     const exx = fx + s * spread;
     const sx = 1 - (isFar ? af * 0.6 : af * 0.2);
-    const rx = headR * 0.17 * sx;
-    const ry = headR * 0.14;
+    const rx = R * 0.16 * sx;
+    const ry = R * 0.15;
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(exx, eyeY, rx, ry, 0, 0, TAU);
@@ -443,144 +633,172 @@ export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: numbe
     ctx.clip();
     ctx.fillStyle = look.iris;
     ctx.beginPath();
-    ctx.arc(exx + lx, eyeY + ly + headR * 0.01, headR * 0.1, 0, TAU);
+    ctx.arc(exx + lx, eyeY + ly + R * 0.015, R * 0.105, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = "#16121a";
+    ctx.fillStyle = "#120e18";
     ctx.beginPath();
-    ctx.arc(exx + lx, eyeY + ly + headR * 0.01, headR * 0.052, 0, TAU);
+    ctx.arc(exx + lx, eyeY + ly + R * 0.015, R * 0.058, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.beginPath();
-    ctx.arc(exx + lx + headR * 0.035, eyeY + ly - headR * 0.03, headR * 0.026, 0, TAU);
+    ctx.arc(exx + lx + R * 0.04, eyeY + ly - R * 0.03, R * 0.03, 0, TAU);
     ctx.fill();
-    // Upper lid: rests a little over the iris, and closes for a blink.
-    ctx.fillStyle = shade(look.skin, 0.04);
-    const lid = lerp(0.22, 1.05, blink);
+    const lid = lerp(0.24, 1.05, blink);
+    ctx.fillStyle = shade(look.skin, 0.08);
     ctx.fillRect(exx - rx - 2, eyeY - ry - 2, rx * 2 + 4, ry * 2 * lid + 2);
     ctx.restore();
-    // Lash line.
-    ctx.strokeStyle = "#2a1d18";
-    ctx.lineWidth = headR * 0.045;
+    // Upper lid line, thicker at the outer corner.
+    ctx.strokeStyle = "#241812";
+    ctx.lineWidth = R * 0.05;
+    const ly2 = eyeY - ry + ry * 2 * lerp(0.24, 1.0, blink);
     ctx.beginPath();
-    ctx.ellipse(exx, eyeY - ry + ry * 2 * lerp(0.22, 1.0, blink), rx * 1.05, headR * 0.02, 0, Math.PI, TAU);
+    ctx.moveTo(exx - rx * 1.05, ly2 + R * 0.01);
+    ctx.quadraticCurveTo(exx, ly2 - R * 0.035, exx + rx * 1.1 * s * s, ly2 + R * 0.005);
     ctx.stroke();
     // Brows.
     const b = pose.brows ?? 0;
-    ctx.strokeStyle = shade(look.hair, 0.1);
-    ctx.lineWidth = headR * 0.075;
-    const by = eyeY - ry - headR * (0.13 + 0.06 * Math.max(0, b));
-    const inner = b < 0 ? -b * headR * 0.08 : 0;
+    ctx.strokeStyle = shade(look.hair, 0.05);
+    ctx.lineWidth = R * 0.085;
+    const by = eyeY - ry - R * (0.14 + 0.06 * Math.max(0, b));
+    const innerUp = b < 0 ? -b * R * 0.09 : 0;
     ctx.beginPath();
-    ctx.moveTo(exx - s * rx * 1.05, by + headR * 0.02);
-    ctx.quadraticCurveTo(exx, by - headR * 0.04, exx + s * rx * 1.05 * -1 * -1 - s * 0, by);
+    ctx.moveTo(exx - s * rx * 1.1, by - innerUp);
+    ctx.quadraticCurveTo(exx, by - R * 0.05, exx + s * rx * 1.15, by + R * 0.025);
     ctx.stroke();
-    if (inner) {
-      ctx.beginPath();
-      ctx.moveTo(exx - s * rx * 0.9, by);
-      ctx.lineTo(exx - s * rx * 1.1, by - inner);
-      ctx.stroke();
-    }
   }
   // Glasses.
   if (look.glasses) {
     ctx.strokeStyle = "#1d1a22";
-    ctx.lineWidth = headR * 0.05;
+    ctx.lineWidth = R * 0.055;
     for (const s of [-1, 1]) {
       if (af > 0.75 && s !== fs) continue;
       ctx.beginPath();
-      ctx.roundRect(fx + s * spread - headR * 0.24 * (1 - af * 0.4), eyeY - headR * 0.2, headR * 0.48 * (1 - af * 0.4), headR * 0.38, headR * 0.1);
+      ctx.roundRect(fx + s * spread - R * 0.25 * (1 - af * 0.4), eyeY - R * 0.21, R * 0.5 * (1 - af * 0.4), R * 0.4, R * 0.12);
       ctx.stroke();
     }
     if (af < 0.75) {
       ctx.beginPath();
-      ctx.moveTo(fx - spread + headR * 0.24, eyeY - headR * 0.04);
-      ctx.lineTo(fx + spread - headR * 0.24, eyeY - headR * 0.04);
+      ctx.moveTo(fx - spread + R * 0.25, eyeY - R * 0.04);
+      ctx.quadraticCurveTo(fx, eyeY - R * 0.1, fx + spread - R * 0.25, eyeY - R * 0.04);
       ctx.stroke();
     }
   }
-  // Nose (front): a soft shadow and a nostril line.
+  // Nose (front): a soft shadow shape.
   if (af <= 0.3) {
-    ctx.strokeStyle = shade(look.skin, 0.25);
-    ctx.lineWidth = headR * 0.05;
+    ctx.fillStyle = shade(look.skin, 0.2);
     ctx.beginPath();
-    ctx.moveTo(fx + headR * 0.04, headR * 0.22);
-    ctx.quadraticCurveTo(fx + headR * 0.12, headR * 0.38, fx, headR * 0.4);
-    ctx.stroke();
+    ctx.moveTo(fx + R * 0.05, R * 0.16);
+    ctx.quadraticCurveTo(fx + R * 0.15, R * 0.4, fx + R * 0.02, R * 0.43);
+    ctx.quadraticCurveTo(fx - R * 0.06, R * 0.44, fx - R * 0.08, R * 0.4);
+    ctx.quadraticCurveTo(fx + R * 0.06, R * 0.38, fx + R * 0.05, R * 0.16);
+    ctx.fill();
   }
-  // Mouth: lips that smile, frown or open into talking shapes.
+  // Mouth.
   const open = clamp(pose.mouth ?? 0);
   const smile = clamp(pose.smile ?? 0.3, -1, 1);
-  const mx = fx * 1.05 + (af > 0.3 ? fs * headR * 0.12 : 0);
-  const my = headR * 0.62;
-  const mw = headR * 0.3 * (1 - af * 0.45);
+  const mx = fx * 1.05 + (af > 0.3 ? fs * R * 0.12 : 0);
+  const my = R * 0.64;
+  const mw = R * 0.28 * (1 - af * 0.45);
   if (open > 0.06) {
-    const oh = headR * (0.06 + 0.22 * open);
-    ctx.fillStyle = "#5a1f27";
+    const oh = R * (0.06 + 0.22 * open);
+    ctx.fillStyle = "#4e1822";
     ctx.beginPath();
-    ctx.moveTo(mx - mw, my - smile * headR * 0.05);
-    ctx.quadraticCurveTo(mx, my - oh * 0.25, mx + mw, my - smile * headR * 0.05);
-    ctx.quadraticCurveTo(mx, my + oh * 1.6, mx - mw, my - smile * headR * 0.05);
+    ctx.moveTo(mx - mw, my - smile * R * 0.05);
+    ctx.quadraticCurveTo(mx, my - oh * 0.25, mx + mw, my - smile * R * 0.05);
+    ctx.quadraticCurveTo(mx, my + oh * 1.6, mx - mw, my - smile * R * 0.05);
     ctx.fill();
     ctx.save();
     ctx.clip();
-    ctx.fillStyle = "#f6f2ee";
+    ctx.fillStyle = "#f7f3ef";
     ctx.fillRect(mx - mw, my - oh, mw * 2, oh * 0.55);
-    ctx.fillStyle = "#e8737f";
+    ctx.fillStyle = "#e46f7c";
     ctx.beginPath();
     ctx.ellipse(mx, my + oh * 1.05, mw * 0.55, oh * 0.45, 0, 0, TAU);
     ctx.fill();
     ctx.restore();
   } else {
-    ctx.strokeStyle = "#7a2f35";
-    ctx.lineWidth = headR * 0.06;
+    ctx.strokeStyle = "#6e2630";
+    ctx.lineWidth = R * 0.06;
     ctx.beginPath();
-    ctx.moveTo(mx - mw, my - smile * headR * 0.08);
-    ctx.quadraticCurveTo(mx, my + smile * headR * 0.16, mx + mw, my - smile * headR * 0.08);
+    ctx.moveTo(mx - mw, my - smile * R * 0.08);
+    ctx.quadraticCurveTo(mx, my + smile * R * 0.16, mx + mw, my - smile * R * 0.08);
+    ctx.stroke();
+    // Lower lip shadow.
+    ctx.strokeStyle = shade(look.skin, 0.18);
+    ctx.lineWidth = R * 0.04;
+    ctx.beginPath();
+    ctx.moveTo(mx - mw * 0.35, my + R * 0.12 + smile * R * 0.05);
+    ctx.lineTo(mx + mw * 0.35, my + R * 0.12 + smile * R * 0.05);
     ctx.stroke();
   }
-  // Cheeks.
-  ctx.fillStyle = "rgba(240,110,110,0.16)";
+  ctx.fillStyle = "rgba(235,105,110,0.15)";
   for (const s of [-1, 1]) {
     if (af > 0.6 && s !== fs) continue;
     ctx.beginPath();
-    ctx.ellipse(fx + s * headR * 0.55 * (1 - af * 0.4), headR * 0.4, headR * 0.16, headR * 0.1, 0, 0, TAU);
+    ctx.ellipse(fx + s * R * 0.56 * (1 - af * 0.4), R * 0.42, R * 0.16, R * 0.1, 0, 0, TAU);
     ctx.fill();
   }
-  // Hair on top: a cap with a side-swept fringe (or curls, or a buzz cut).
-  const hairCap = (h: number) => {
-    ctx.beginPath();
-    ctx.moveTo(-headR * 1.04, headR * h);
-    ctx.bezierCurveTo(-headR * 1.12, -headR * 1.42, headR * 1.12, -headR * 1.42, headR * 1.04, headR * h);
-    ctx.quadraticCurveTo(headR * 0.95, -headR * 0.45, headR * 0.35 - fx * 0.3, -headR * 0.55);
-    ctx.quadraticCurveTo(-headR * 0.2 + fx * 0.4, -headR * 0.25, -headR * 0.75, -headR * 0.42);
-    ctx.quadraticCurveTo(-headR * 0.98, -headR * 0.2, -headR * 1.04, headR * h);
-    ctx.closePath();
-  };
+  // Hair on top: a full shape with volume, a swept fringe and a highlight streak.
+  const hx = -f * R * 0.12;
   ctx.fillStyle = look.hair;
-  if (look.hairStyle === "buzz") {
-    ctx.globalAlpha *= 0.75;
-    hairCap(-0.25);
-    ctx.fill();
-    ctx.globalAlpha /= 0.75;
-  } else if (look.hairStyle === "curly") {
-    for (let k = 0; k < 11; k++) {
-      const a = Math.PI * (0.95 + (k / 10) * 1.1);
+  if (look.hairStyle === "curly") {
+    for (let k = 0; k < 13; k++) {
+      const a = Math.PI * (0.92 + (k / 12) * 1.16);
+      const rr = R * (0.3 + 0.06 * Math.sin(k * 2.3));
       ctx.beginPath();
-      ctx.arc(Math.cos(a) * headR * 0.95, Math.sin(a) * headR * 0.95 - headR * 0.08, headR * 0.34, 0, TAU);
+      ctx.arc(hx + Math.cos(a) * R * 0.98, Math.sin(a) * R * 0.98 - R * 0.1, rr, 0, TAU);
       ctx.fill();
     }
-  } else {
-    hairCap(look.hairStyle === "long" || look.hairStyle === "bob" ? 0.35 : 0.05);
-    ctx.fill();
-    // A soft highlight on the hair.
-    ctx.strokeStyle = "rgba(255,255,255,0.14)";
-    ctx.lineWidth = headR * 0.08;
     ctx.beginPath();
-    ctx.arc(-headR * 0.1, -headR * 0.1, headR * 0.85, Math.PI * 1.15, Math.PI * 1.45);
+    ctx.ellipse(hx, -R * 0.62, R * 0.95, R * 0.5, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = light(look.hair, 0.2);
+    for (let k = 0; k < 5; k++) {
+      const a = Math.PI * (1.15 + k * 0.17);
+      ctx.beginPath();
+      ctx.arc(hx + Math.cos(a) * R * 0.85, Math.sin(a) * R * 0.85 - R * 0.12, R * 0.06, 0, TAU);
+      ctx.fill();
+    }
+  } else if (look.hairStyle === "buzz") {
+    ctx.globalAlpha *= 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-R * 1.0, -R * 0.15);
+    ctx.bezierCurveTo(-R * 1.06, -R * 1.34, R * 1.06, -R * 1.34, R * 1.0, -R * 0.15);
+    ctx.quadraticCurveTo(R * 0.6, -R * 0.55, hx, -R * 0.58);
+    ctx.quadraticCurveTo(-R * 0.6, -R * 0.55, -R * 1.0, -R * 0.15);
+    ctx.fill();
+    ctx.globalAlpha /= 0.8;
+  } else {
+    const pulledBack = look.hairStyle === "bun" || look.hairStyle === "ponytail";
+    const side = look.hairStyle === "long" || look.hairStyle === "bob" ? R * 0.55 : R * 0.08;
+    ctx.beginPath();
+    ctx.moveTo(-R * 1.07 + hx, side);
+    ctx.bezierCurveTo(-R * 1.22 + hx, -R * 1.5, R * 1.22 + hx, -R * 1.5, R * 1.07 + hx, side);
+    if (pulledBack) {
+      ctx.quadraticCurveTo(R * 0.9, -R * 0.5, hx, -R * 0.62);
+      ctx.quadraticCurveTo(-R * 0.9, -R * 0.5, -R * 1.07 + hx, side);
+    } else {
+      // A swept fringe: two soft scallops falling to one side.
+      ctx.quadraticCurveTo(R * 0.98, -R * 0.42, R * 0.52 + hx, -R * 0.42);
+      ctx.quadraticCurveTo(R * 0.22, -R * 0.3, -R * 0.05 + hx, -R * 0.4);
+      ctx.quadraticCurveTo(-R * 0.45, -R * 0.2, -R * 0.82 + hx, -R * 0.28);
+      ctx.quadraticCurveTo(-R * 1.0, -R * 0.1, -R * 1.07 + hx, side);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // Highlight streak along the crown.
+    ctx.strokeStyle = rgba(light(look.hair, 0.4), 0.55);
+    ctx.lineWidth = R * 0.1;
+    ctx.beginPath();
+    ctx.arc(hx - R * 0.1, -R * 0.1, R * 0.92, Math.PI * 1.18, Math.PI * 1.42);
+    ctx.stroke();
+    ctx.lineWidth = R * 0.05;
+    ctx.beginPath();
+    ctx.arc(hx - R * 0.1, -R * 0.1, R * 0.92, Math.PI * 1.48, Math.PI * 1.56);
     ctx.stroke();
   }
   ctx.restore();
-  // Near arms in front of the body.
+
   if (far !== "L") out.handL = drawArm("L");
   if (far !== "R") out.handR = drawArm("R");
   ctx.restore();
@@ -894,7 +1112,9 @@ function proThinker(sc: SkillContext) {
     // (Thinking: one arm across the body under the other elbow, that hand at the chin.)
     armL: [lerp(-0.2, idle.armL[0], idea), lerp(1.45, idle.armL[1], idea)],
     handL: "fist",
-    armR: [lerp(0.22, 2.9, idea), lerp(-2.95, -0.15, idea)],
+    armR: [2.9, -0.15],
+    reachR: "chin",
+    reachK: 1 - idea,
     handR: idea > 0.5 ? "point" : "fist",
     lift: idle.lift + hop,
     lean: idle.lean,
