@@ -12,8 +12,9 @@ import { lightSweep } from "../fx";
  *                      upright and grows to fill the stage, then slides back.
  * - service-board:     an airport-style split-flap board: its letters flip into the service names,
  *                      the current row lights up and a ticker types its detail.
- * - service-bento:     a bento grid where the current service's tile grows into the big tile while
- *                      the others shrink and rearrange round it.
+ * - service-bento:     a bento grid: the big box tells the current service (its content changing
+ *                      from one service to the next) while a small tile per service stays put
+ *                      beside it like tabs, the current one lit.
  * - service-spotlight: a dark stage with the services on plinths; a spotlight swings to each in
  *                      turn, the lit one rises and glows, and its name is told large in capitals
  *                      under the stage.
@@ -539,95 +540,97 @@ function serviceBento(sc: SkillContext) {
   const H = narrow ? room * 0.94 : Math.min(room * 0.92, W * 0.56);
   const L = st.left;
   const top = st.top + (room - H) / 2;
-  /** Every tile's place when service `s` holds the big tile. */
-  const layout = (s: number): Rect[] => {
-    const others = P.map((_, i) => i).filter((i) => i !== s);
-    const rects: Rect[] = new Array(n);
-    if (!narrow) {
-      const bigW = W * 0.58;
-      rects[s] = { x: L, y: top, w: bigW, h: H };
-      const cols = others.length > 3 ? 2 : 1;
-      const rows = Math.ceil(others.length / cols);
-      const cw = (W - bigW - gap - gap * (cols - 1)) / cols;
-      const rh = (H - gap * (rows - 1)) / rows;
-      others.forEach((i, k) => {
-        rects[i] = { x: L + bigW + gap + (k % cols) * (cw + gap), y: top + Math.floor(k / cols) * (rh + gap), w: cw, h: rh };
-      });
-    } else {
-      const bigH = H * 0.56;
-      rects[s] = { x: L, y: top, w: W, h: bigH };
-      const cols = 2;
-      const rows = Math.max(1, Math.ceil(others.length / cols));
-      const cw = (W - gap) / cols;
-      const rh = (H - bigH - gap - gap * (rows - 1)) / rows;
-      others.forEach((i, k) => {
-        rects[i] = { x: L + (k % cols) * (cw + gap), y: top + bigH + gap + Math.floor(k / cols) * (rh + gap), w: cw, h: rh };
-      });
-    }
-    return rects;
-  };
+  // A fixed bento: the big box (whose content changes to the current service) and one small tile
+  // per service beside it (under it in vertical frames), which stay put like tabs.
+  let big: Rect;
+  const tabs: Rect[] = [];
+  if (!narrow) {
+    const bigW = W * 0.58;
+    big = { x: L, y: top, w: bigW, h: H };
+    const cols = n > 4 ? 2 : 1;
+    const rows = Math.ceil(n / cols);
+    const cw = (W - bigW - gap - gap * (cols - 1)) / cols;
+    const rh = (H - gap * (rows - 1)) / rows;
+    for (let i = 0; i < n; i++) tabs.push({ x: L + bigW + gap + (i % cols) * (cw + gap), y: top + Math.floor(i / cols) * (rh + gap), w: cw, h: rh });
+  } else {
+    const bigH = H * 0.56;
+    big = { x: L, y: top, w: W, h: bigH };
+    const cols = 2;
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const cw = (W - gap) / cols;
+    const rh = (H - bigH - gap - gap * (rows - 1)) / rows;
+    for (let i = 0; i < n; i++) tabs.push({ x: L + (i % cols) * (cw + gap), y: top + bigH + gap + Math.floor(i / cols) * (rh + gap), w: cw, h: rh });
+  }
   const pos = servicePos(T, t, 0.55);
-  const s0 = Math.min(n - 1, Math.floor(pos));
-  const f = pos - s0;
-  const A = layout(s0);
-  const B = s0 + 1 < n ? layout(s0 + 1) : A;
-  const rects = A.map((a, i) => ({ x: lerp(a.x, B[i].x, f), y: lerp(a.y, B[i].y, f), w: lerp(a.w, B[i].w, f), h: lerp(a.h, B[i].h, f) }));
-  const bigArea = layout(0)[0].w * layout(0)[0].h;
-  const smallArea = n > 1 ? layout(0)[1].w * layout(0)[1].h : bigArea * 0.5;
+  // How "on" each tab is, 0..1: it lights up as its service comes up and eases off as the next does.
+  const on = (i: number) => clamp(1 - Math.abs(pos - i));
+  const live = t >= T[0] - 0.2 ? ease.outCubic(range(t, T[0] - 0.2, T[0] + 0.3)) : 0;
   ctx.save();
   ctx.globalAlpha = 1 - ex;
-  const order = rects.map((r, i) => ({ i, a: r.w * r.h })).sort((a, b) => a.a - b.a);
-  for (const { i, a } of order) {
-    const r = rects[i];
-    const k = clamp(spring(t - 0.15 - i * 0.08, 11, 7), 0, 1.04);
-    if (k <= 0) continue;
-    const b = clamp((a - smallArea) / Math.max(1, bigArea - smallArea));
-    ctx.save();
-    ctx.globalAlpha *= clamp(k);
+  // (Draws into the caller's saved state: it scales round the card's centre and clips to it.)
+  const card = (r: Rect, k: number, glow: number) => {
     ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
     ctx.scale(0.9 + 0.1 * Math.min(1, k), 0.9 + 0.1 * Math.min(1, k));
     ctx.translate(-(r.x + r.w / 2), -(r.y + r.h / 2));
-    if (b > 0.5) {
-      ctx.shadowColor = rgba(palette.primary, 0.4 * b);
-      ctx.shadowBlur = 30 * u;
+    if (glow > 0.02) {
+      ctx.shadowColor = rgba(palette.primary, 0.4 * glow);
+      ctx.shadowBlur = 30 * u * glow;
     }
     glassCard(sc, r.x, r.y, r.w, r.h, { r: 22 * u, tint: palette.bg1 });
     ctx.shadowBlur = 0;
     ctx.beginPath();
     ctx.roundRect(r.x, r.y, r.w, r.h, 22 * u);
     const bd = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0);
-    bd.addColorStop(0, rgba(palette.primary, 0.2 + 0.7 * b));
-    bd.addColorStop(1, rgba(palette.secondary, 0.15 + 0.5 * b));
+    bd.addColorStop(0, rgba(palette.primary, 0.2 + 0.7 * glow));
+    bd.addColorStop(1, rgba(palette.secondary, 0.15 + 0.5 * glow));
     ctx.strokeStyle = bd;
-    ctx.lineWidth = (1.5 + b) * u;
+    ctx.lineWidth = (1.5 + glow) * u;
     ctx.stroke();
-    ctx.save();
     ctx.clip();
-    // The big tile glows in the corner.
-    if (b > 0.05) {
-      const gl = ctx.createLinearGradient(r.x + r.w, r.y, r.x + r.w * 0.4, r.y + r.h * 0.6);
-      gl.addColorStop(0, rgba(palette.primary, 0.28 * b));
-      gl.addColorStop(1, rgba(palette.primary, 0));
-      ctx.fillStyle = gl;
+  };
+  // The tabs.
+  tabs.forEach((r, i) => {
+    const k = clamp(spring(t - 0.25 - i * 0.07, 11, 7), 0, 1.04);
+    if (k <= 0) return;
+    const a = on(i) * live;
+    ctx.save();
+    ctx.globalAlpha *= clamp(k) * (0.6 + 0.4 * Math.max(a, 1 - live));
+    card(r, k, a);
+    // The current tab fills with a wash of the brand colour and a bar along its left edge.
+    if (a > 0.01) {
+      ctx.fillStyle = rgba(palette.primary, (palette.light ? 0.1 : 0.16) * a);
       ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = rgba(palette.primary, a);
+      ctx.fillRect(r.x, r.y + r.h * 0.2, 4 * u, r.h * 0.6);
     }
-    // Small: icon and name in a row.
-    if (b < 1) {
+    const ts = Math.min(r.h * 0.5, 52 * u * S);
+    iconTile(sc, icons[i], r.x + 20 * u + ts / 2, r.y + r.h / 2, ts);
+    ctx.fillStyle = rgba(palette.text, 0.75 + 0.25 * a);
+    ctx.font = subFont(Math.min(r.h * 0.24, 28 * u * S), 700);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    fillTextFit(ctx, P[i].title, r.x + 34 * u + ts, r.y + r.h / 2, r.w - ts - 50 * u, { maxLines: 2, lineHeight: 1.1, minScale: 0.6 });
+    ctx.restore();
+  });
+  // The big box: the current service, the outgoing one lifting away as the next rises in.
+  const kb = clamp(spring(t - 0.15, 11, 7), 0, 1.04);
+  if (kb > 0) {
+    const r = big;
+    ctx.save();
+    ctx.globalAlpha *= clamp(kb);
+    card(r, kb, 1);
+    const gl = ctx.createLinearGradient(r.x + r.w, r.y, r.x + r.w * 0.4, r.y + r.h * 0.6);
+    gl.addColorStop(0, rgba(palette.primary, 0.28));
+    gl.addColorStop(1, rgba(palette.primary, 0));
+    ctx.fillStyle = gl;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    const s0 = Math.min(n - 1, Math.floor(pos));
+    const f = pos - s0;
+    const show = (i: number, alpha: number, dy: number) => {
+      if (alpha <= 0.01 || i >= n) return;
       ctx.save();
-      ctx.globalAlpha *= 1 - b;
-      const ts = Math.min(r.h * 0.42, 56 * u * S);
-      iconTile(sc, icons[i], r.x + 20 * u + ts / 2, r.y + r.h / 2, ts);
-      ctx.fillStyle = palette.text;
-      ctx.font = subFont(Math.min(r.h * 0.22, 30 * u * S), 700);
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      fillTextFit(ctx, P[i].title, r.x + 36 * u + ts, r.y + r.h / 2, r.w - ts - 52 * u, { maxLines: 2, lineHeight: 1.1, minScale: 0.6 });
-      ctx.restore();
-    }
-    // Big: a large icon, the label, the name and its detail.
-    if (b > 0) {
-      ctx.save();
-      ctx.globalAlpha *= b;
+      ctx.globalAlpha *= alpha;
+      ctx.translate(0, dy);
       const pad = Math.min(r.w, r.h) * 0.1;
       const ts = Math.min(r.h * 0.26, 120 * u * S);
       iconTile(sc, icons[i], r.x + pad + ts / 2, r.y + pad + ts / 2, ts);
@@ -644,8 +647,12 @@ function serviceBento(sc: SkillContext) {
         fillTextFit(ctx, P[i].detail, r.x + pad, r.y + r.h * 0.6 + tl * fs * 1.05, r.w - pad * 2, { maxLines: 2, lineHeight: 1.2, minScale: 0.7 });
       }
       ctx.restore();
-    }
-    ctx.restore();
+    };
+    const lift = r.h * 0.08;
+    // The first service settles in as the grid builds; later ones cross over.
+    const first = s0 === 0 && f === 0 ? ease.outCubic(range(t, T[0] - 0.3, T[0] + 0.2)) : 1;
+    show(s0, (1 - ease.inCubic(clamp(f * 1.6))) * first, -ease.inCubic(clamp(f * 1.6)) * lift + (1 - first) * lift);
+    show(s0 + 1, ease.outCubic(clamp((f - 0.35) / 0.65)), (1 - ease.outCubic(clamp((f - 0.35) / 0.65))) * lift);
     ctx.restore();
   }
   ctx.restore();
@@ -840,7 +847,7 @@ export const creativeServiceSkills: Skill[] = [
   {
     id: "service-bento",
     name: "Bento Focus",
-    tagline: "A bento grid where the current service's tile grows into the big tile, with a large icon, its name and detail, while the others shrink and rearrange round it.",
+    tagline: "A bento grid: the big box shows the current service large (icon, name and detail), changing from one to the next, while a small tile per service stays put beside it like tabs, the current one lit.",
     bestFor: "Services or product areas with a modern SaaS look: 3–6 ('Service — short description').",
     sample: { text: "One team, *many talents*", items: SERVICES },
     itemsHint: "3–6 services: 'Service — short description'",
