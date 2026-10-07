@@ -13,13 +13,13 @@ export async function GET(req: Request) {
   return Response.json({ films: await listSavedFilms(u.id), limit: (await limitsFor(u)).savedFilms }, { headers: noStore });
 }
 
-/** Save a film: { id? (to update), title?, plan, thumb? }. */
+/** Save a film: { id? (to update), title?, plan, thumb?, inputs? (what it was made from) }. */
 export async function POST(req: Request) {
   const limited = rateLimit(req, "account");
   if (limited) return limited;
   const u = await requireUser(req);
   if (u instanceof Response) return u;
-  const body = (await req.json().catch(() => null)) as { id?: unknown; title?: unknown; plan?: unknown; thumb?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { id?: unknown; title?: unknown; plan?: unknown; thumb?: unknown; inputs?: unknown } | null;
   if (!body?.plan || typeof body.plan !== "object") return Response.json({ error: "Missing video" }, { status: 400 });
   let plan;
   try {
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       title: typeof body.title === "string" ? body.title : undefined,
       plan,
       thumb: typeof body.thumb === "string" ? body.thumb : undefined,
+      inputs: body.inputs,
     });
     return Response.json({ id: film.id, title: film.title, updatedAt: film.updatedAt }, { headers: noStore });
   } catch (e) {

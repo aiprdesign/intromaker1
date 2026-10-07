@@ -64,6 +64,24 @@ function introTitle(plan: VideoPlan, prompt: string) {
   const p = prompt.trim().split(/[,.\n]/)[0].trim();
   return p ? (p.length > 40 ? `${p.slice(0, 38)}…` : p) : "Untitled intro";
 }
+/**
+ * What an intro was made from: the Create fields as they were at Generate or Import (the link, the
+ * description, product photos, length and story), plus the imported site and its colours, so
+ * opening the intro again fills them back in and remakes work from the same source.
+ */
+type MadeFrom = {
+  url?: string;
+  prompt?: string;
+  photos?: string[];
+  length?: Length;
+  story?: "auto" | Angle;
+  site?: SiteData | null;
+  brandColors?: Brand["colors"];
+  logoColors?: Brand["colors"];
+  brandMode?: "site" | "logo" | "off";
+};
+/** The part of MadeFrom kept on the account (the fields, not the imported site's data). */
+const accountInputs = (m: MadeFrom | null) => (m ? { url: m.url, prompt: m.prompt, photos: m.photos, length: m.length, story: m.story } : undefined);
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string; angle?: Angle };
 
 const PRODUCT_VOICE_OFF = "intromaker.product-voice-off";
@@ -615,6 +633,30 @@ export default function Studio() {
   /** Which brand colours drive the film: detected across the site (auto), the logo's, or none. */
   const [brandMode, setBrandMode] = useState<"site" | "logo" | "off">("site");
   const activeColors = brandMode === "logo" ? logoColors : brandMode === "site" ? brandColors : undefined;
+  /** What the intro on screen was made from (saved with it; see MadeFrom). */
+  const madeFromRef = useRef<MadeFrom | null>(null);
+  /** Fill the Create fields with what an intro was made from (an older intro: just its description). */
+  const restoreInputs = (m: MadeFrom | null | undefined, fallbackPrompt = "") => {
+    const from = m ?? (fallbackPrompt ? { prompt: fallbackPrompt } : null);
+    madeFromRef.current = from;
+    setSiteUrl(from?.url ?? from?.site?.url ?? "");
+    setUrlHint(null);
+    setImportError(null);
+    setPrompt(from?.prompt ?? "");
+    promptRef.current = from?.prompt ?? "";
+    setPhotos(Array.isArray(from?.photos) ? from.photos.filter((x) => typeof x === "string").slice(0, MAX_PHOTOS) : []);
+    setPhotoError(null);
+    if (from?.length && isLength(from.length)) setLength(from.length);
+    const st = from?.story;
+    if (st && (st === "auto" || ANGLES.some((a) => a.id === st))) {
+      setStory(st);
+      storyRef.current = st;
+    }
+    setSite(from?.site ?? null);
+    setBrandColors(from?.brandColors);
+    setLogoColors(from?.logoColors);
+    if (from?.brandMode) setBrandMode(from.brandMode);
+  };
   const colourChoice: ColourChoice =
     palette !== "auto" ? palette : brandMode === "logo" && logoColors ? "logo" : brandMode === "site" && brandColors ? "brand" : "template";
   /** Apply a colour choice to the current film instantly (and to future generations). */
@@ -784,7 +826,7 @@ export default function Studio() {
     setLoading(true);
     setNote(null);
     // The film on screen and its versions, so making a new one can be undone.
-    const before = { plan: planRef.current, takes, current, engine, engineLabel, prompt: promptRef.current, localId: localIdRef.current, savedId: savedIdRef.current };
+    const before = { plan: planRef.current, takes, current, engine, engineLabel, prompt: promptRef.current, localId: localIdRef.current, savedId: savedIdRef.current, madeFrom: madeFromRef.current };
     try {
       const take = await direct({ ...opts, signal });
       if (!stillRunning(run)) return;
@@ -795,6 +837,17 @@ export default function Studio() {
       localIdRef.current = id;
       setLocalId(id);
       promptRef.current = (opts.prompt ?? prompt).trim();
+      const usedSite = opts.site !== undefined ? opts.site : site;
+      madeFromRef.current = {
+        url: usedSite?.url ?? (siteUrl.trim() || undefined),
+        prompt: promptRef.current || undefined,
+        photos: photosRef.current.length ? [...photosRef.current] : undefined,
+        length: opts.length ?? length,
+        story: storyRef.current,
+        site: usedSite ?? null,
+        brandColors: opts.colors ?? activeColors,
+        brandMode,
+      };
       setTakes([{ ...take, label: "Original" }]);
       if (before.plan !== HERO_PLAN && booted.current && !bootingRef.current)
         setToast({
@@ -802,6 +855,7 @@ export default function Studio() {
           key: Date.now(),
           undo: () => {
             setPlan(before.plan);
+            madeFromRef.current = before.madeFrom;
             setLocalId(before.localId);
             localIdRef.current = before.localId;
             setSavedId(before.savedId);
@@ -897,6 +951,7 @@ export default function Studio() {
     // (Retold from what the video on screen was made from, not from an edit typed since.)
     const source = promptRef.current.trim();
     if (!(site || source) || loading || importing || remaking || takesLoading) return;
+    if (madeFromRef.current) madeFromRef.current = { ...madeFromRef.current, story: choice };
     const { run, signal } = startRun();
     setRemaking(true);
     setNote(null);
@@ -1024,6 +1079,8 @@ export default function Studio() {
       const chosen = brandMode === "logo" ? fromLogo ?? colors : brandMode === "site" ? colors : undefined;
       if (brandMode === "logo" && !fromLogo) setBrandMode("site");
       await generate({ site: s, colors: chosen, length: len, aspect: fmt.aspect, signal });
+      // The site's and the logo's colours, so reopening the intro offers both again.
+      if (stillRunning(run) && madeFromRef.current?.site === s) madeFromRef.current = { ...madeFromRef.current, brandColors: colors, logoColors: fromLogo, brandMode: brandMode === "logo" && !fromLogo ? "site" : brandMode };
     } catch (e) {
       clearInterval(timer);
       if (stopped(e) || !stillRunning(run)) return;
@@ -1099,7 +1156,7 @@ export default function Studio() {
     if (x.key.startsWith("a:")) {
       fetch(`/api/account/films/${encodeURIComponent(id)}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((f: { id: string; plan: VideoPlan }) => {
+        .then((f: { id: string; plan: VideoPlan; inputs?: MadeFrom }) => {
           const p = sanitizePlan(f.plan);
           setPlan(p);
           setAspect(p.aspect);
@@ -1108,6 +1165,9 @@ export default function Studio() {
           setCurrent(0);
           setSavedId(f.id);
           const local = localIntros.find((l) => l.savedId === f.id);
+          // The fields it was made from: this browser's copy has the imported site too.
+          const kept = local ? loadLocalIntro<{ inputs?: MadeFrom; prompt?: string }>(local.id) : null;
+          restoreInputs(kept?.inputs ?? f.inputs, kept?.prompt ?? "");
           localIdRef.current = local?.id ?? null;
           setLocalId(local?.id ?? null);
           setEngine("manual");
@@ -1116,7 +1176,7 @@ export default function Studio() {
         .catch(() => setToast({ text: "That intro couldn't be opened.", key: Date.now() }));
       return;
     }
-    const saved = loadLocalIntro<{ plan: VideoPlan; prompt?: string; savedId?: string | null }>(id);
+    const saved = loadLocalIntro<{ plan: VideoPlan; prompt?: string; savedId?: string | null; inputs?: MadeFrom }>(id);
     if (!saved?.plan?.scenes?.length) {
       setToast({ text: "That intro is no longer in this browser.", key: Date.now() });
       return;
@@ -1125,8 +1185,7 @@ export default function Studio() {
     setPlan(p);
     setAspect(p.aspect);
     if (p.template) setTemplate(p.template);
-    setPrompt(saved.prompt ?? "");
-    promptRef.current = saved.prompt ?? "";
+    restoreInputs(saved.inputs, saved.prompt ?? "");
     setSavedId(saved.savedId ?? null);
     setTakes([]);
     setCurrent(0);
@@ -1138,11 +1197,7 @@ export default function Studio() {
   /** + New intro: an empty studio, the description box ready. */
   const newIntro = () => {
     if (busy) return;
-    setSite(null);
-    setBrandColors(undefined);
-    setImportError(null);
-    setPrompt("");
-    promptRef.current = "";
+    restoreInputs(null);
     setPlan(HERO_PLAN);
     setTakes([]);
     setCurrent(0);
@@ -1187,12 +1242,12 @@ export default function Studio() {
       try {
         const r = await fetch(`/api/account/films/${encodeURIComponent(id)}`);
         if (!r.ok) throw new Error();
-        const f = (await r.json()) as { plan: VideoPlan; title?: string; thumb?: string };
+        const f = (await r.json()) as { plan: VideoPlan; title?: string; thumb?: string; inputs?: MadeFrom };
         const plan = sanitizePlan(f.plan);
         // The account keeps the copy too, when there's room (otherwise it stays in this browser).
-        const res = await fetch("/api/account/films", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `${x.title} copy`.slice(0, 120), plan, thumb: f.thumb }) });
+        const res = await fetch("/api/account/films", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `${x.title} copy`.slice(0, 120), plan, thumb: f.thumb, inputs: f.inputs }) });
         const saved = res.ok ? ((await res.json()) as { id: string }) : null;
-        made = duplicateLocalIntro({ title: x.title, color: plan.brand?.colors?.primary ?? "#7c5cff", aspect: plan.aspect }, { v: 1, plan, prompt: "", current: 0, takes: [] });
+        made = duplicateLocalIntro({ title: x.title, color: plan.brand?.colors?.primary ?? "#7c5cff", aspect: plan.aspect }, { v: 1, plan, prompt: f.inputs?.prompt ?? "", inputs: f.inputs, current: 0, takes: [] });
         if (made && saved) made = { id: made.id, list: saveLocalIntro({ ...made.list.find((l) => l.id === made!.id)!, savedId: saved.id }, { ...loadLocalIntro<Record<string, unknown>>(made.id), savedId: saved.id }) };
         if (saved) loadAccountFilms();
         else if (res.status === 402) setToast({ text: "Your plan's saved intros are full, so the copy is kept in this browser.", key: Date.now(), link: { label: "My intros", href: "/account" } });
@@ -1250,7 +1305,7 @@ export default function Studio() {
   useEffect(() => {
     if (!saving.current || plan === HERO_PLAN) return;
     const timer = window.setTimeout(() => {
-      const film = { v: 1, plan, prompt, current, savedId: savedIdRef.current, localId: localIdRef.current, takes: takes.map(({ plan: tp, engine: te, engineLabel: tl, label }) => ({ plan: tp, engine: te, engineLabel: tl, label })) };
+      const film = { v: 1, plan, prompt, inputs: madeFromRef.current ?? undefined, current, savedId: savedIdRef.current, localId: localIdRef.current, takes: takes.map(({ plan: tp, engine: te, engineLabel: tl, label }) => ({ plan: tp, engine: te, engineLabel: tl, label })) };
       // The sidebar's copy of this intro.
       if (localIdRef.current)
         setLocalIntros(
@@ -1305,7 +1360,7 @@ export default function Studio() {
       cleanUrl();
       fetch(`/api/account/films/${encodeURIComponent(filmId)}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((f: { id: string; plan: VideoPlan }) => {
+        .then((f: { id: string; plan: VideoPlan; inputs?: MadeFrom }) => {
           const p = sanitizePlan(f.plan);
           setPlan(p);
           setAspect(p.aspect);
@@ -1313,6 +1368,13 @@ export default function Studio() {
           setTakes([]);
           setCurrent(0);
           setSavedId(f.id);
+          const local = listLocalIntros().find((l) => l.savedId === f.id);
+          const kept = local ? loadLocalIntro<{ inputs?: MadeFrom; prompt?: string }>(local.id) : null;
+          if (local) {
+            localIdRef.current = local.id;
+            setLocalId(local.id);
+          }
+          restoreInputs(kept?.inputs ?? f.inputs, kept?.prompt ?? "");
           setEngine("manual");
           setVersion((v) => v + 1);
         })
@@ -1330,8 +1392,7 @@ export default function Studio() {
           setPlan(restored);
           setAspect(restored.aspect);
           if (restored.template) setTemplate(restored.template);
-          setPrompt(saved.prompt ?? "");
-          promptRef.current = saved.prompt ?? "";
+          restoreInputs(saved.inputs, saved.prompt ?? "");
           if (typeof saved.savedId === "string") setSavedId(saved.savedId);
           const lid = typeof saved.localId === "string" ? saved.localId : newIntroId();
           localIdRef.current = lid;
@@ -1811,7 +1872,7 @@ export default function Studio() {
       const res = await fetch("/api/account/films", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: savedIdRef.current ?? undefined, plan: p, thumb }),
+        body: JSON.stringify({ id: savedIdRef.current ?? undefined, plan: p, thumb, inputs: accountInputs(madeFromRef.current) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -2001,7 +2062,8 @@ export default function Studio() {
                 {photos.map((src) => (
                   <span key={src} className="photo-thumb">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" />
+                    {/* (A photo past the 48-hour clean-up no longer loads: it drops off the list.) */}
+                    <img src={src} alt="" onError={() => setPhotos((cur) => cur.filter((x) => x !== src))} />
                     <button className="icon-btn sm" aria-label="Remove photo" onClick={() => setPhotos((cur) => cur.filter((x) => x !== src))}>
                       ✕
                     </button>

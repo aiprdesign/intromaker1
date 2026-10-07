@@ -64,11 +64,21 @@ export interface User {
   billingFlag?: "refunded" | "disputed";
 }
 
+/** What an intro was made from (the studio's Create fields), so opening it fills them in again. */
+export interface FilmInputs {
+  url?: string;
+  prompt?: string;
+  photos?: string[];
+  length?: string;
+  story?: string;
+}
+
 export interface SavedFilm {
   id: string;
   title: string;
   plan: VideoPlan;
   thumb?: string;
+  inputs?: FilmInputs;
   createdAt: number;
   updatedAt: number;
 }
@@ -406,7 +416,7 @@ export async function listSavedFilms(uid: string) {
   const films = await Promise.all(names.filter((n) => n.endsWith(".json")).map((n) => readJson<SavedFilm>(join(filmDir(uid), n))));
   return films
     .filter((f): f is SavedFilm => !!f)
-    .map(({ plan, ...rest }) => ({ ...rest, aspect: plan.aspect, scenes: plan.scenes.length, seconds: Math.round(plan.scenes.reduce((a, s) => a + s.duration, 0) * 10) / 10 }))
+    .map(({ plan, inputs: _inputs, ...rest }) => ({ ...rest, aspect: plan.aspect, scenes: plan.scenes.length, seconds: Math.round(plan.scenes.reduce((a, s) => a + s.duration, 0) * 10) / 10 }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
@@ -415,7 +425,23 @@ export async function getSavedFilm(uid: string, id: string) {
 }
 
 /** Save a film: a new one (within the plan's limit), or an update of one the account owns. */
-export async function saveFilm(u: User, input: { id?: string; title?: string; plan: VideoPlan; thumb?: string }) {
+/** Only plain, short values: a link, the description, uploaded photo links and two choices. */
+export function sanitizeInputs(raw: unknown): FilmInputs | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const str = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
+  const out: FilmInputs = {
+    url: str(r.url, 2000),
+    prompt: str(r.prompt, 1000),
+    photos: Array.isArray(r.photos) ? r.photos.filter((x): x is string => typeof x === "string" && /^(\/api\/shot\/|https?:\/\/)/.test(x) && x.length <= 600).slice(0, 12) : undefined,
+    length: typeof r.length === "string" && /^[a-z]{2,12}$/.test(r.length) ? r.length : undefined,
+    story: typeof r.story === "string" && /^[a-z]{2,12}$/.test(r.story) ? r.story : undefined,
+  };
+  if (!out.photos?.length) delete out.photos;
+  return Object.values(out).some((v) => v !== undefined) ? out : undefined;
+}
+
+export async function saveFilm(u: User, input: { id?: string; title?: string; plan: VideoPlan; thumb?: string; inputs?: unknown }) {
   const planJson = JSON.stringify(input.plan);
   if (planJson.length > MAX_FILM_BYTES) throw new AccountError("This video is too large to save (it holds very large images).", 413);
   const thumb = typeof input.thumb === "string" && input.thumb.startsWith("data:image/") && input.thumb.length <= MAX_THUMB ? input.thumb : undefined;
@@ -435,6 +461,7 @@ export async function saveFilm(u: User, input: { id?: string; title?: string; pl
       title,
       plan: input.plan,
       thumb: thumb ?? existing?.thumb,
+      inputs: sanitizeInputs(input.inputs) ?? existing?.inputs,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
