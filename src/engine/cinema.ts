@@ -13,8 +13,12 @@
  * - Variety: the same slide twice in a row reads as a mistake, so the second becomes the style's own
  *   slide for that part of the story.
  *
+ * - Contrast slides (see contrast.ts) land on a hard cut or a flash and leave on a cut or a zoom,
+ *   so the colour change hits like an edit, not a fade.
+ *
  * Idempotent: running it again changes nothing.
  */
+import { contrastSlides } from "./contrast";
 import type { Scene, SkillId, Transition, VideoPlan } from "./types";
 
 /** Transitions with a lot of movement or texture: one at a time. */
@@ -23,6 +27,66 @@ const BIG = new Set<Transition>(["cube", "spin", "portal", "split", "liquid", "g
 const BUSY = new Set<Transition>(["glitch", "swipe", "split", "spin", "shutter", "cube", "whip"]);
 /** Calm transitions for the end card. */
 const CALM = new Set<Transition>(["dissolve", "dolly", "push", "morph", "leak", "iris", "cut"]);
+
+/** Zoom moves: a zoom-through (dolly) or a punch-in (zoom). */
+export const ZOOMS = new Set<Transition>(["dolly", "zoom"]);
+
+/**
+ * Which transitions fit going into each part of the story, best first: a zoom that reveals the
+ * product, the brand or the answer; sideways moves between lists; hard cuts and flashes into
+ * punchy lines; calm moves into quotes and the end card.
+ */
+const FIT: Record<string, Transition[]> = {
+  reveal: ["dolly", "zoom", "iris", "portal", "morph", "flash"],
+  meet: ["dolly", "zoom", "push", "morph", "cube"],
+  tour: ["zoom", "dolly", "push", "morph"],
+  demo: ["push", "zoom", "swipe", "dolly", "morph"],
+  solve: ["dolly", "zoom", "split", "push"],
+  compare: ["split", "swipe", "push", "zoom"],
+  how: ["push", "swipe", "whip", "split", "cube"],
+  features: ["swipe", "push", "whip", "cube", "spin", "dissolve"],
+  bento: ["push", "swipe", "cube", "whip", "dissolve"],
+  cards: ["swipe", "push", "whip", "spin", "dissolve"],
+  integrations: ["push", "swipe", "spin", "dissolve"],
+  logos: ["push", "dissolve", "swipe"],
+  gallery: ["swipe", "push", "whip", "dissolve"],
+  reach: ["zoom", "push", "dissolve"],
+  support: ["push", "dissolve", "swipe"],
+  hook: ["cut", "flash", "glitch", "shutter"],
+  pain: ["cut", "glitch", "shutter", "flash", "split"],
+  promise: ["whip", "cut", "flash", "spin", "shutter", "swipe"],
+  stat: ["zoom", "cut", "flash", "push"],
+  metric: ["zoom", "push", "cut", "flash"],
+  quote: ["dissolve", "leak", "morph", "dolly"],
+  cta: ["dissolve", "dolly", "iris", "morph", "leak", "push"],
+};
+/** Story parts a zoom reveals: added even when the style's own set has no zoom. */
+const ZOOM_INTO = new Set(["reveal", "meet", "tour", "solve"]);
+
+/**
+ * The transition into a slide, chosen for where it is in the story rather than at random: from the
+ * style's own set where it has a fitting move, plus a zoom to reveal the brand, the product or the
+ * answer to a problem. Never the transition just used, never two zooms in a row, and at most one
+ * zoom in three. `r` is the plan's seeded random, so a remake gets a different mix.
+ */
+export function mixTransition(role: string | undefined, prevRole: string | undefined, pool: readonly Transition[], last: Transition, zooms: number, count: number, r: () => number): Transition {
+  // A style with one signature move (Liquid) keeps it.
+  if (pool.length === 1) return pool[0];
+  const afterPain = prevRole === "pain" && role !== "pain";
+  const want = afterPain ? ["dolly", "zoom", ...(FIT[role ?? ""] ?? [])] : FIT[role ?? ""] ?? [];
+  const zoomOk = !ZOOMS.has(last) && zooms < Math.max(1, Math.ceil(count / 3));
+  const fits = [...new Set(want as Transition[])].filter(
+    (t) => t !== last && (pool.includes(t) || (ZOOMS.has(t) && (afterPain || ZOOM_INTO.has(role ?? "")))) && (zoomOk || !ZOOMS.has(t)),
+  );
+  if (fits.length) {
+    // Mostly the best fit, sometimes the next ones, so videos in one style don't cut alike.
+    const x = r();
+    return fits[x < 0.55 || fits.length === 1 ? 0 : x < 0.85 || fits.length === 2 ? 1 : 2];
+  }
+  const rest = pool.filter((t) => t !== last && (zoomOk || !ZOOMS.has(t)));
+  const from = rest.length ? rest : pool.filter((t) => t !== last);
+  return from.length ? from[Math.floor(r() * from.length)] : "cut";
+}
 
 const isEnd = (s: Scene, i: number, n: number) => i === n - 1 || s.role === "cta" || /^(cta|qr-end|product-end)$/.test(s.skill);
 const isReveal = (s: Scene) => s.role === "reveal" || /^logo-|^liquid-logo$/.test(s.skill);
@@ -42,6 +106,7 @@ export function cinematography(plan: VideoPlan, opts: CinemaOpts = {}): VideoPla
   const snap = (d: number) => Math.max(4, Math.round(d / beat)) * beat;
   let changed = false;
   const scenes = plan.scenes.map((s) => ({ ...s }));
+  const flips = contrastSlides(plan);
   scenes.forEach((s, i) => {
     let tr = s.transition;
     const prev = i > 0 ? scenes[i - 1] : undefined;
@@ -56,6 +121,9 @@ export function cinematography(plan: VideoPlan, opts: CinemaOpts = {}): VideoPla
       if (prev && BIG.has(prev.transition) && BIG.has(tr)) tr = "cut";
       const before = i > 1 ? scenes[i - 2] : undefined;
       if (prev && before && prev.transition === tr && before.transition === tr && tr !== "cut") tr = pool.find((t) => t !== tr && !(BIG.has(t) && BIG.has(prev.transition))) ?? "cut";
+      // Contrast slides cut in hard (or flash, where the style has it) and leave on a cut or a zoom.
+      if (flips.has(i) && !["cut", "flash", "glitch", "shutter"].includes(tr)) tr = pool.includes("flash") && prev?.transition !== "flash" ? "flash" : "cut";
+      else if (flips.has(i - 1) && !["cut", "zoom", "dolly", "flash"].includes(tr)) tr = prev?.transition !== "zoom" && !isEnd(s, i, n) ? "zoom" : "cut";
       // Last word: the end card always arrives calmly (a different calm move if this one would repeat).
       if (isEnd(s, i, n) && !CALM.has(tr)) tr = fresh(["dissolve", "dolly", "morph", "push", "iris", "leak"]);
     }

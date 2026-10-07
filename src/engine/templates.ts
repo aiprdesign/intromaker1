@@ -1,4 +1,4 @@
-import { cinematography } from "./cinema";
+import { cinematography, mixTransition, ZOOMS } from "./cinema";
 import { clamp, hashString, rng } from "./math";
 import type { FontId, Look, PaletteId, Scene, SkillId, Transition, VideoPlan } from "./types";
 
@@ -1171,6 +1171,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   const beat = 60 / tpl.bpm;
   const r = rng(hashString(`${plan.seed}:${tpl.id}`));
   let last: Transition = "cut";
+  let zooms = 0;
   const base = trailerCut(plan, tpl);
   const scenes = base.map((scene, i, all) => {
     const role = roleOf(scene, i, all.length);
@@ -1187,9 +1188,11 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
+    // Each slide enters on a move that fits it: a zoom reveal into the brand, the product or the
+    // answer, slides between lists, cuts into punchy lines (see mixTransition).
     if (i > 0) {
-      const pool = tpl.transitions.filter((t) => t !== last);
-      transition = (pool.length ? pool : tpl.transitions)[Math.floor(r() * (pool.length || tpl.transitions.length))];
+      transition = mixTransition(role, roleOf(all[i - 1], i - 1, all.length), tpl.transitions, last, zooms, all.length, r);
+      if (ZOOMS.has(transition)) zooms++;
     }
     // Out of the cold open, the product lands on a flash.
     if (i > 0 && all[i - 1].skill === "product-teaser") transition = "flash";

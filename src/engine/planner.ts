@@ -2701,6 +2701,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
         : "cut",
       baseTransition: (TRANSITIONS as readonly string[]).includes(s.baseTransition as string) ? (s.baseTransition as Transition) : undefined,
       media: sanitizeMedia(s.media),
+      contrast: typeof s.contrast === "boolean" ? s.contrast : undefined,
       eyebrow: typeof s.eyebrow === "string" && s.eyebrow.trim() ? s.eyebrow.slice(0, 40) : undefined,
       role: typeof s.role === "string" && /^[a-z]{2,14}$/.test(s.role) ? s.role : undefined,
       items: Array.isArray(s.items)
@@ -2732,6 +2733,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     speed: typeof raw.speed === "number" && raw.speed !== 1 && playSpeed({ speed: raw.speed }) === raw.speed ? raw.speed : undefined,
     pointer: (POINTER_STYLES as readonly string[]).includes(raw.pointer as string) && raw.pointer !== "auto" ? (raw.pointer as VideoPlan["pointer"]) : undefined,
     shapes: raw.shapes === false ? false : undefined,
+    contrast: raw.contrast === false ? false : undefined,
     shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) && raw.shapeSet !== "geometric" ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,
     textFx: (TEXT_FX as readonly string[]).includes(raw.textFx as string) ? (raw.textFx as VideoPlan["textFx"]) : undefined,

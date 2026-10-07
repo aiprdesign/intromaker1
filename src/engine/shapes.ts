@@ -11,8 +11,8 @@
  *
  * Shapes float around the edges of the frame in the palette's colours. They drift and turn slowly
  * on the film's own clock (so they carry on across cuts instead of jumping), sit at different
- * depths (near ones bigger, brighter and drifting further), breathe gently and swell a touch on
- * each kick of the score. Faint, kept in the outer band of the frame, and never flashing. On by
+ * depths (near ones bigger, brighter and drifting further), breathe gently and swell and turn a
+ * touch on each kick of the score (the beat moves them, never the whole frame). Faint, kept in the outer band of the frame, and never flashing. On by
  * default for SaaS videos (VideoPlan.shapes = false turns them off).
  */
 import { clamp, noise1, rgba, rng, TAU } from "./math";
@@ -79,11 +79,12 @@ export function geoShapes(sc: SkillContext) {
     const reach = (30 + depth * 60) * u;
     const x = w * (0.5 + Math.cos(a) * band * (portrait ? 0.95 : 1.05)) + noise1(T * 0.07 + phase) * reach;
     const y = h * (0.5 + Math.sin(a) * band * (portrait ? 1 : 0.95)) + noise1(T * 0.06 + phase + 31) * reach;
-    const s = size * (1 + kick * 0.07 * (0.5 + depth)) * (0.96 + 0.04 * Math.sin(T * 0.9 + phase));
+    const s = size * (1 + kick * 0.14 * (0.5 + depth)) * (0.96 + 0.04 * Math.sin(T * 0.9 + phase));
     const alpha = (light ? 0.4 : 0.32) * (0.55 + 0.45 * depth) * (0.85 + 0.15 * Math.sin(T * 0.7 + phase)) * fadeIn;
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(upright ? Math.sin(T * 0.5 + phase) * 0.12 : phase + T * spin);
+    // On a kick each shape swells and gives a small turn (the frame itself stays still).
+    ctx.rotate(upright ? Math.sin(T * 0.5 + phase) * 0.12 : phase + T * spin + kick * 0.12 * (spin < 0 ? -1 : 1));
     ctx.strokeStyle = rgba(col, alpha);
     ctx.fillStyle = rgba(col, alpha * (filled ? 0.45 : 1));
     ctx.lineWidth = (1.4 + depth * 1.4) * u;

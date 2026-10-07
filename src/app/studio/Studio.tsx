@@ -291,6 +291,26 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.motionBlur !== false) !== motionBlur) setPlan((p) => ({ ...p, motionBlur: motionBlur ? undefined : false }));
   }, [plan, motionBlur]);
+  // Contrast slides (a bold colour-block text beat every few slides): on by default; remembered.
+  const [contrastOn, setContrastOn] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.contrast") === "off") setContrastOn(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseContrast = (on: boolean) => {
+    setContrastOn(on);
+    try {
+      localStorage.setItem("intromaker.contrast", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.contrast !== false) !== contrastOn) setPlan((p) => ({ ...p, contrast: contrastOn ? undefined : false }));
+  }, [plan, contrastOn]);
   // The mouse pointer's look (auto: white on dark styles, graphite on light); remembered.
   const [pointer, setPointer] = useState<PointerStyle>("auto");
   useEffect(() => {
@@ -2189,6 +2209,18 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Every exported frame pin-sharp, even mid-move."}</p>
+          <label className="field-label">
+            Contrast slides <span className="tpl-desc">{contrastOn ? "On" : "Off"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={contrastOn ? "active" : ""} onClick={() => chooseContrast(true)}>
+              Colour breaks
+            </button>
+            <button className={!contrastOn ? "active" : ""} onClick={() => chooseContrast(false)}>
+              Off
+            </button>
+          </div>
+          <p className="hint">{contrastOn ? "Now and then a words-only slide flips to a bold block of your colour, to change the pace." : "Slides keep the style's own background."}</p>
           <details className="fold">
             <summary>
               <span className="field-label inline">Mouse pointer</span> <span className="tpl-desc">{POINTER_NAMES[pointer]}</span>

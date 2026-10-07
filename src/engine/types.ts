@@ -335,6 +335,11 @@ export interface Scene {
   baseTransition?: Transition;
   /** Image or video shown by media skills. */
   media?: Media;
+  /**
+   * A contrast slide: the stage flips to a bold block of the video's colour with type to match, to
+   * break the rhythm. Unset: the director decides (see contrast.ts); true or false: your choice.
+   */
+  contrast?: boolean;
   /** List content for multi-item skills (bento features, pain points, logos…). */
   items?: string[];
   /** Chapter label shown above the headline ("How it works", "Loved by teams"). */
@@ -420,6 +425,8 @@ export interface VideoPlan {
    * as long. The slides keep their timing; the clock runs faster or slower. Unset: 1.
    */
   speed?: number;
+  /** Contrast slides (a bold colour-block text beat every few slides). On by default; false turns them off. */
+  contrast?: boolean;
   /** The mouse pointer's look (unset: auto). */
   pointer?: PointerStyle;
   /** Animated geometric shapes behind SaaS slides. On by default; false turns them off. */

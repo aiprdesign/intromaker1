@@ -8,6 +8,7 @@ import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
 import { drawLogo, getImage } from "./media";
 import { withPlaceholders } from "./placeholders";
+import { canContrast, contrastSlides } from "./contrast";
 import { isMovieStyle } from "./trailers";
 import { pairedSubFamily, setBrandFont, setSubFamily, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
@@ -59,7 +60,7 @@ function resetCtx(ctx: CanvasRenderingContext2D) {
 }
 
 export interface RenderOptions {
-  /** Handheld drift + beat pulse camera. */
+  /** Handheld drift camera (the frame never pumps on the beat). */
   camera?: boolean;
   bloom?: boolean;
   grade?: boolean;
@@ -121,8 +122,13 @@ function drawScene(
   music?: MusicPulse,
 ) {
   // A slide that shows your pictures but has none yet shows a placeholder graphic in their place.
+  // A contrast slide flips the stage to a block of the video's colour (see contrast.ts).
+  const flip =
+    plan.style === "saas" &&
+    (plan.scenes?.[index]?.skill === scene.skill ? contrastSlides(plan).has(index) : scene.contrast === true && canContrast(scene));
   ({ scene, plan } = withPlaceholders(scene, plan));
-  const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  const base = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  const palette = flip ? contrastPalette(base) : base;
   const beat = 60 / (plan.bpm ?? 120);
   const saas = plan.style === "saas";
   // Beat-locked motion: within each beat, animation is front-loaded so moves hit on the beat and
@@ -146,7 +152,8 @@ function drawScene(
     style: plan.style,
     // The studio's text effect overrides the template's. (A plan without a look renders like
     // NO_LOOK, so the override starts from that.)
-    look: plan.textFx ? { ...(plan.look ?? NO_LOOK), text: plan.textFx } : plan.look,
+    // (A contrast slide is a flat colour block: no shader stage.)
+    look: flip ? { ...(plan.look ?? NO_LOOK), shader: undefined, ...(plan.textFx ? { text: plan.textFx } : {}) } : plan.textFx ? { ...(plan.look ?? NO_LOOK), text: plan.textFx } : plan.look,
     globalT,
     concept: plan.concept,
     product: plan.product,
@@ -547,6 +554,34 @@ export function brandPalette(id: VideoPlan["palette"], brand?: VideoPlan["brand"
   return legible(scheme === "60-30-10" ? ruleOf(p) : p);
 }
 
+/**
+ * A contrast slide's palette: the stage becomes a bold block of the video's main colour, deepened
+ * for white type (or, for yellows, kept light with near-black type), with the highlights taken
+ * from the other colours and nudged until they read on the block. Body text keeps 7:1.
+ */
+export function contrastPalette(p: Palette): Palette {
+  const block = /^#[0-9a-f]{6}$/i.test(p.primary) ? p.primary : "#5b5bf0";
+  const ink = "#0b0b12";
+  // Deepen the colour until white type reads; only a colour that would turn muddy first (yellows,
+  // limes) stays light with near-black type, so pale brand colours still give a rich block.
+  let bg0 = block;
+  for (let k = 0.06; k <= 0.62 && contrast("#ffffff", bg0) < 4.8; k += 0.06) bg0 = mixHex(block, "#000000", k);
+  const dark = contrast("#ffffff", bg0) >= 4.5;
+  if (!dark) bg0 = mixHex(block, "#ffffff", 0.12);
+  const text = dark ? "#ffffff" : ink;
+  return legible({
+    ...p,
+    light: !dark,
+    bg0,
+    bg1: mixHex(bg0, dark ? "#000000" : "#ffffff", 0.28),
+    support: mixHex(bg0, text, 0.14),
+    primary: mixHex(p.secondary, text, dark ? 0.35 : 0.2),
+    secondary: mixHex(p.accent, text, 0.4),
+    accent: mixHex(p.secondary, text, 0.55),
+    text,
+  });
+}
+
 /** Render the whole plan at absolute time `time`. */
 export function renderFrame(
   ctx: CanvasRenderingContext2D,
@@ -930,24 +965,13 @@ function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, 
 }
 
 /**
- * Virtual camera: slight overscan, slow handheld drift and a punch-in on every beat,
- * so even static typography breathes with the soundtrack.
+ * Virtual camera: slight overscan and a slow handheld drift. The frame itself never pumps on the
+ * beat (a whole slide zooming on every kick reads as a wobble); beats move elements instead: the
+ * background shapes, the light motes and the stage light swell on kicks, and slides time their own
+ * items to the beat.
  */
 function applyCamera(sc: SkillContext, globalT: number) {
-  const { ctx, w, h, u, beat } = sc;
-  let pulse: number;
-  if (sc.music) {
-    // Punch on the kicks the score actually plays (none under the hook or in the breakdown),
-    // with a bigger hit when the track drops.
-    const m = sc.music;
-    const kick = Number.isFinite(m.kick) ? Math.exp(-m.kick * 12) * 0.011 * m.energy : 0;
-    const drop = m.drop < 0.8 ? Math.exp(-m.drop * 6) * 0.03 : 0;
-    pulse = kick + drop;
-  } else {
-    const phase = (globalT / beat) % 1;
-    const bar = Math.floor(globalT / beat) % 4 === 0 ? 1.6 : 1;
-    pulse = Math.exp(-phase * 7) * 0.012 * bar;
-  }
+  const { ctx, w, h, u } = sc;
   // Cinematic dolly: every shot keeps pulling back slowly (5% over the shot, from slightly closer
   // to its resting framing), drifting a touch to one side, so no frame is ever static. Cuts hide
   // the reset.
@@ -957,7 +981,7 @@ function applyCamera(sc: SkillContext, globalT: number) {
   const side = sc.seed % 2 ? 1 : -1;
   // SaaS shots land: a quick settle from slightly closer and turned, like a camera move ending.
   const arrive = saas ? 1 - ease.outExpo(clamp(sc.t / 0.75)) : 0;
-  const s = 1.035 + push + pulse + 0.05 * arrive;
+  const s = 1.035 + push + 0.05 * arrive;
   // Each shot gets its own camera grammar (so a film doesn't repeat one move): a pull-back that
   // drifts aside, one that cranes up, or one that trucks across — all inside the overscan.
   const move = (sc.seed >>> 3) % 3;
@@ -1053,7 +1077,7 @@ function epicPass(ctx: CanvasRenderingContext2D, plan: VideoPlan, local: number,
     ctx.fillStyle = `rgba(255,255,255,${(light ? 0.12 : 0.2) * Math.exp(-music.drop * 12)})`;
     ctx.fillRect(0, 0, w, h);
   }
-  // Foreground light motes, drifting up; brighter on each kick.
+  // Foreground light motes, drifting up; brighter and a touch bigger on each kick.
   const kick = music && Number.isFinite(music.kick) ? Math.exp(-music.kick * 9) * music.energy : 0;
   const r = rng(plan.seed * 5 + 91);
   const n = Math.round(18 * (w * h) / (1920 * 1080) + 8);
@@ -1062,7 +1086,7 @@ function epicPass(ctx: CanvasRenderingContext2D, plan: VideoPlan, local: number,
     const speed = 0.012 + r() * 0.03;
     const y = (((r() - time * speed) % 1) + 1) % 1;
     const x = (x0 + Math.sin(time * (0.2 + r() * 0.3) + i) * 0.01) * w;
-    const size = (1.2 + r() * 3.2) * u;
+    const size = (1.2 + r() * 3.2) * u * (1 + 0.35 * kick);
     const tw = 0.5 + 0.5 * Math.sin(time * (1.5 + r() * 2) + i * 1.7);
     const a = (light ? 0.25 : 0.45) * (0.35 + 0.65 * tw) * (0.7 + 0.8 * kick);
     const c = i % 3 === 0 ? "#ffffff" : i % 3 === 1 ? palette.primary : palette.secondary;
