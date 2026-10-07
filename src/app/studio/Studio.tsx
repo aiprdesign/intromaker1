@@ -8,6 +8,7 @@ import SkillPicker from "@/components/SkillPicker";
 import PointerPicker, { POINTER_NAMES } from "@/components/PointerPicker";
 import { CastThumb, CharacterDesignerModal, loadCast, saveCast } from "@/components/CharacterDesigner";
 import { brandPalette } from "@/engine/renderer";
+import { cartoonStyleFor, themeCharacterStyle, WANTS_CHARACTERS } from "@/engine/charpick";
 import ShapesPicker from "@/components/ShapesPicker";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
@@ -83,19 +84,6 @@ type MadeFrom = {
   brandMode?: "site" | "logo" | "off";
 };
 /** Which cartoon style suits a description: comic, storybook, clay, outdoors, night, else Cartoon Pals. */
-function cartoonStyleFor(prompt: string) {
-  const p = prompt.toLowerCase();
-  if (/\b(abstract|minimal|minimalist|geometric|shapes?)\b/.test(p)) return /\b(memphis|retro|crowd|parade)\b/.test(p) ? "memphis" : "abstract";
-  if (/\b(memphis)\b/.test(p)) return "memphis";
-  if (/\b(explainer|explains?|walkthrough|presenters?|hosts?|realistic|advanced characters?)\b/.test(p)) return "explainer";
-  if (/\b(journey|adventure|together|community|friends)\b/.test(p) && /\b(outdoors?|parks?|nature|hills?|river)\b/.test(p)) return "storycast";
-  if (/\b(comics?|superheroe?s?|funny|comedy|jokes?)\b/.test(p)) return "comic";
-  if (/\b(story|stories|storybook|bedtime|fairy ?tales?|picture books?)\b/.test(p)) return "storybook";
-  if (/\b(clay|plush|cuddly|squishy|toys?)\b/.test(p)) return "claybuddies";
-  if (/\b(night|sleep|sleeping|dreams?|stars?|moon)\b/.test(p)) return "nightowls";
-  if (/\b(outdoors?|outside|parks?|gardens?|gardening|farms?|nature|picnics?|camping|hiking|walks?)\b/.test(p)) return "sunnypark";
-  return "cartoon";
-}
 /** The part of MadeFrom kept on the account (the fields, not the imported site's data). */
 const accountInputs = (m: MadeFrom | null) => (m ? { url: m.url, prompt: m.prompt, photos: m.photos, length: m.length, story: m.story } : undefined);
 type Take = { plan: VideoPlan; engine: Engine; engineLabel: string; label: string; note?: string; angle?: Angle };
@@ -528,11 +516,16 @@ export default function Studio() {
     // Product videos look best in the bright studio (or, as a trailer, in a trailer style); software
     // films get their category's style.
     const trailerCut = styleRef.current === "trailer";
-    // Asked for characters (a cartoon, a mascot, a video for kids): the cartoon style tells it.
-    const cartoon = p.style === "saas" && !p.product && /\b(cartoons?|animated characters?|characters?|mascots?|kids?|children|preschool|animated explainer|abstract people|abstract characters?)\b/i.test(promptRef.current);
+    // Asked for characters (a cartoon, a mascot, stick figures, a video for kids): the cartoon style
+    // that fits the words. Not asked, but a words-only video whose theme works better with
+    // characters (kids, classrooms, hiring, a retro brand): the character style made for it.
+    const cartoon = p.style === "saas" && !p.product && WANTS_CHARACTERS.test(promptRef.current);
+    const themed = p.style === "saas" && !p.product && !cartoon && !p.scenes.some((s) => s.media) ? themeCharacterStyle(promptRef.current) : undefined;
     const id = cartoon
       ? cartoonStyleFor(promptRef.current)
-      : p.style === "saas"
+      : themed
+        ? themed
+        : p.style === "saas"
         ? p.product
           ? trailerCut
             ? TEMPLATE_MAP[p.template ?? ""]?.trailer

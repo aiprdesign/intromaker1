@@ -22,12 +22,13 @@ import { BODIES, HAIR_STYLES, HAIRS, introColors, matchColors, NEUTRALS, PLAYFUL
 import { clamp, ease, hashString, lerp, mixHex, rgba, rng, TAU } from "../math";
 import { saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
-import type { ArtStyle, CastMember, Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
+import type { ArtStyle, CastMember, CharacterKind, Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
+import { drawFace, drawHeadHair, painter } from "./abspaint";
+import { drawBlob, drawClassic, drawMemphis, drawStick } from "./abskinds";
 import { blinkAt, fitBubble, pointTimes, pop, speech, useToon } from "./characters";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
-const INK = "#17131f";
 const plain = (s: string) => s.replace(/\*/g, "").trim();
 
 /* ───────────────────────── The generator ───────────────────────── */
@@ -36,8 +37,8 @@ const plain = (s: string) => s.replace(/\*/g, "").trim();
 export type AbsSpec = CastMember;
 type Hair = AbsSpec["hair"];
 
-/** A new character from a seed, dressed partly in the video's own colours. */
-export function makeCharacter(seed: number, p: Palette): AbsSpec {
+/** A new character of a `kind` from a seed, dressed in the video's own colours. */
+export function makeCharacter(seed: number, p: Palette, kind: CharacterKind = "abstract"): AbsSpec {
   const r = rng(hashString(`abs:${seed}`));
   const pick = <T,>(xs: readonly T[]) => xs[Math.floor(r() * xs.length) % xs.length];
   // Dressed in the intro's own colours (and neutrals for trousers and shoes).
@@ -47,7 +48,8 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
   if (patternColor === bodyColor) patternColor = mixHex(bodyColor, "#ffffff", 0.45);
   const skin = r() < 0.18 ? pick(PLAYFUL_SKINS) : pick(SKINS);
   const tall = r();
-  return {
+  const lineColor = p.light ? NEUTRALS[1] : NEUTRALS[3];
+  const c: AbsSpec = {
     body: pick(BODIES),
     bodyW: 0.24 + r() * 0.16,
     bodyH: 0.3 + r() * 0.14,
@@ -61,7 +63,7 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
     hair: pick(HAIR_STYLES),
     hairColor: r() < 0.85 ? pick(HAIRS.slice(0, 5)) : pick(colors),
     legLen: 0.22 + tall * 0.18,
-    legColor: r() < 0.55 ? (p.light ? NEUTRALS[1] : NEUTRALS[3]) : mixHex(pick(colors), "#000000", 0.2),
+    legColor: r() < 0.55 ? lineColor : mixHex(pick(colors), "#000000", 0.2),
     shoe: r() < 0.6 ? NEUTRALS[0] : pick(colors),
     armColor: r() < 0.5 ? skin : bodyColor,
     eyes: pick(["dots", "dots", "lines", "ovals"] as const),
@@ -69,6 +71,21 @@ export function makeCharacter(seed: number, p: Palette): AbsSpec {
     cheeks: r() < 0.55,
     nose: r() < 0.4,
   };
+  switch (kind) {
+    case "memphis": {
+      // Playful skin tones are the look; mostly bare arms with big hands; trousers in a deep colour.
+      const mskin = r() < 0.6 ? pick([...PLAYFUL_SKINS, mixHex(pick(colors), "#ffffff", 0.35)]) : skin;
+      return { ...c, kind, skin: mskin, armColor: r() < 0.7 ? mskin : bodyColor, legColor: mixHex(pick(colors), "#000000", 0.35), pattern: pick(["none", "none", "none", "stripes", "half"] as const), eyes: "dots", nose: false };
+    }
+    case "blob":
+      return { ...c, kind, armColor: bodyColor, legColor: mixHex(bodyColor, "#000000", 0.2), shoe: mixHex(bodyColor, "#000000", 0.35), pattern: pick(["none", "half", "half", "dots"] as const), hair: pick(["none", "cap", "bun", "spikes", "wave", "afro", "beanie"] as const), eyes: pick(["dots", "dots", "dots", "ovals", "lines"] as const), cheeks: r() < 0.75, glasses: r() < 0.1 };
+    case "stick":
+      return { ...c, kind, legColor: lineColor, body: pick(["pill", "pill", "block", "triangle"] as const), pattern: pick(["none", "stripes", "dots", "half", "half"] as const), head: "circle", glasses: r() < 0.15 };
+    case "classic":
+      return { ...c, kind, head: "circle", shoe: pick(["#8a4b2a", "#c0392b", "#1d1b26", "#f1c40f"]), hair: pick(["none", "cap", "spikes", "bun", "wave"] as const), eyes: pick(["dots", "dots", "ovals"] as const), nose: r() < 0.7, glasses: r() < 0.1, legColor: "#1d1b26", armColor: "#1d1b26" };
+    default:
+      return c;
+  }
 }
 
 /** The character in a slide's `slot`: the video's own cast first (from the character designer), then generated people. */
@@ -76,9 +93,11 @@ function person(sc: SkillContext, slot: number, seed: number): AbsSpec {
   const own = sc.cast?.[slot];
   // Your characters wear the intro's colours unless you gave them their own.
   if (own) return matchColors(own, sc.palette, slot);
-  // Generated people match the cast's lead, else the style's own look.
+  // Generated people match the cast's lead in drawing style, else the style's own look…
   const art = sc.cast?.[0]?.art ?? sc.look?.art ?? TOON_ART[sc.look?.toon ?? "flat"];
-  const c = makeCharacter(seed, sc.palette);
+  // …and the lead's kind (or the style's).
+  const kind = sc.cast?.length ? (sc.cast[0].kind ?? "abstract") : (sc.look?.people ?? "abstract");
+  const c = makeCharacter(seed, sc.palette, kind);
   return art === "flat" ? c : { ...c, art };
 }
 const TOON_ART: Record<NonNullable<NonNullable<SkillContext["look"]>["toon"]>, ArtStyle> = { flat: "flat", comic: "outline", soft: "soft", doodle: "line" };
@@ -88,6 +107,8 @@ function middleOut(i: number, n: number) {
   const mid = (n - 1) / 2;
   return [...Array(n).keys()].sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b).indexOf(i);
 }
+
+const KIND_DRAW: Record<Exclude<CharacterKind, "abstract">, typeof drawMemphis> = { memphis: drawMemphis, blob: drawBlob, stick: drawStick, classic: drawClassic };
 
 export interface AbsPose {
   /** Arm angles from hanging down (radians, positive = out and up on that side). */
@@ -118,6 +139,8 @@ export interface AbsRig {
 
 /** Draw a generated character standing on `groundY` at `x`, `H` tall (a unit; shapes vary). */
 export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: AbsSpec, pose: AbsPose): AbsRig {
+  // The other kinds of character (abskinds.ts) take the same design and pose.
+  if (c.kind && c.kind !== "abstract") return KIND_DRAW[c.kind](ctx, x, groundY, H, c, pose);
   const legLen = c.legLen * H;
   const bw = c.bodyW * H;
   const bh = c.bodyH * H;
@@ -144,55 +167,8 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
   ctx.lineJoin = "round";
   // The drawing style: how shapes are filled and limbs stroked (see ART_STYLES).
   const art = c.art ?? "flat";
-  const inked = art === "outline" || art === "line";
-  const inkW = Math.max(1.2, H * (art === "line" ? 0.0075 : 0.011));
-  const m = ctx.getTransform();
-  const px = Math.hypot(m.a, m.b);
-  const paperOn = () => {
-    if (art !== "paper") return;
-    ctx.shadowColor = "rgba(40,24,70,0.26)";
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = H * 0.007 * px;
-    ctx.shadowOffsetY = H * 0.011 * px;
-  };
-  const paperOff = () => {
-    if (art === "paper") ctx.shadowColor = "transparent";
-  };
-  const tint = (col: string) => (art === "line" ? mixHex(col, "#ffffff", 0.8) : col);
-  const inkStroke = () => {
-    if (!inked) return;
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = inkW;
-    ctx.stroke();
-  };
-  /** Fill the current path in this style (y0..y1: the shape's extent, for soft shading). */
-  const fillShape = (col: string, y0: number, y1: number, ink = true) => {
-    if (art === "soft") {
-      const g = ctx.createLinearGradient(0, y0, 0, y1);
-      g.addColorStop(0, mixHex(col, "#ffffff", 0.3));
-      g.addColorStop(1, mixHex(col, "#000000", 0.16));
-      ctx.fillStyle = g;
-    } else ctx.fillStyle = tint(col);
-    paperOn();
-    ctx.fill();
-    paperOff();
-    if (ink) inkStroke();
-  };
-  /** Stroke a limb (traced by `trace`) in this style: ink-edged, a plain ink line, or a coloured noodle. */
-  const strokeLimb = (col: string, width: number, trace: () => void) => {
-    if (art === "outline") {
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = width + inkW * 2;
-      trace();
-      ctx.stroke();
-    }
-    paperOn();
-    ctx.strokeStyle = art === "line" ? INK : col;
-    ctx.lineWidth = art === "line" ? inkW * 1.15 : width;
-    trace();
-    ctx.stroke();
-    paperOff();
-  };
+  const P = painter(ctx, H, art);
+  const { inked, tint, inkStroke, fillShape, strokeLimb } = P;
   // Legs: thin noodles with big shoes; a walk swings them.
   const lw = Math.max(2, H * 0.024);
   for (const s of [-1, 1]) {
@@ -336,159 +312,8 @@ export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: 
       ctx.lineTo(x, headY + hr * 0.6);
     });
   }
-  // Hair behind the head.
-  if (c.hair === "bob") {
-    ctx.beginPath();
-    ctx.roundRect(x - hr * 1.12, headY - hr * 0.6, hr * 2.24, hr * 1.65, [hr, hr, hr * 0.3, hr * 0.3]);
-    fillShape(c.hairColor, headY - hr * 0.6, headY + hr * 1.05);
-  } else if (c.hair === "afro") {
-    ctx.beginPath();
-    ctx.arc(x, headY - hr * 0.25, hr * 1.45, 0, TAU);
-    fillShape(c.hairColor, headY - hr * 1.7, headY + hr * 1.2);
-  }
-  // Head.
-  ctx.beginPath();
-  if (c.head === "oval") ctx.ellipse(x, headY, hr * 0.86, hr * 1.06, 0, 0, TAU);
-  else if (c.head === "squircle") ctx.roundRect(x - hr, headY - hr, hr * 2, hr * 2, hr * 0.7);
-  else ctx.arc(x, headY, hr, 0, TAU);
-  fillShape(c.skin, headY - hr, headY + hr);
-  if (art === "soft") {
-    // A soft sheen on the forehead.
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
-    ctx.beginPath();
-    ctx.ellipse(x - hr * 0.35, headY - hr * 0.45, hr * 0.32, hr * 0.18, -0.5, 0, TAU);
-    ctx.fill();
-  }
-  // Hair on top.
-  const hairFill = () => fillShape(c.hairColor, headY - hr * 1.6, headY);
-  switch (c.hair) {
-    case "cap":
-    case "bob":
-      ctx.beginPath();
-      ctx.arc(x, headY, hr * 1.04, Math.PI * 1.05, Math.PI * 1.95);
-      ctx.quadraticCurveTo(x + hr * 0.3, headY - hr * 0.3, x - hr * 0.98, headY - hr * 0.3);
-      ctx.closePath();
-      hairFill();
-      break;
-    case "bun":
-      ctx.beginPath();
-      ctx.arc(x, headY - hr * 1.2, hr * 0.42, 0, TAU);
-      ctx.arc(x, headY, hr * 1.03, Math.PI * 1.08, Math.PI * 1.92);
-      hairFill();
-      break;
-    case "spikes":
-      ctx.beginPath();
-      ctx.moveTo(x - hr, headY - hr * 0.2);
-      for (let k = 0; k <= 5; k++) {
-        const kx = x - hr + (k / 5) * hr * 2;
-        ctx.lineTo(kx - hr * 0.2, headY - hr * (k % 2 ? 1.5 : 0.9));
-        ctx.lineTo(kx, headY - hr * 0.7);
-      }
-      ctx.lineTo(x + hr, headY - hr * 0.2);
-      ctx.arc(x, headY, hr * 1.02, Math.PI * 2 - 0.2, Math.PI + 0.2, true);
-      hairFill();
-      break;
-    case "wave":
-      ctx.beginPath();
-      ctx.moveTo(x - hr * 1.05, headY);
-      ctx.bezierCurveTo(x - hr * 1.3, headY - hr * 1.6, x + hr * 0.6, headY - hr * 1.7, x + hr * 1.15, headY - hr * 0.5);
-      ctx.quadraticCurveTo(x + hr * 0.4, headY - hr * 0.7, x - hr * 0.2, headY - hr * 0.45);
-      ctx.quadraticCurveTo(x - hr * 0.7, headY - hr * 0.3, x - hr * 1.05, headY);
-      hairFill();
-      break;
-    case "beanie":
-      ctx.beginPath();
-      ctx.arc(x, headY - hr * 0.25, hr * 1.05, Math.PI, 0);
-      ctx.closePath();
-      fillShape(c.patternColor, headY - hr * 1.3, headY - hr * 0.25);
-      ctx.beginPath();
-      ctx.rect(x - hr * 1.12, headY - hr * 0.32, hr * 2.24, hr * 0.3);
-      fillShape(c.patternColor, headY - hr * 0.32, headY - hr * 0.02);
-      ctx.beginPath();
-      ctx.arc(x, headY - hr * 1.35, hr * 0.22, 0, TAU);
-      fillShape(c.patternColor, headY - hr * 1.57, headY - hr * 1.13);
-      break;
-    case "afro":
-      break;
-  }
-  // Face: minimal.
-  const lk = (pose.look ?? 0) * hr * 0.15;
-  const ey = headY + hr * 0.08;
-  const blink = clamp(pose.blink ?? 0);
-  ctx.fillStyle = "#17131f";
-  ctx.strokeStyle = "#17131f";
-  ctx.lineWidth = Math.max(1.5, hr * 0.1);
-  for (const s of [-1, 1]) {
-    const ex = x + s * hr * 0.38 + lk;
-    if (c.eyes === "lines" || blink > 0.6) {
-      ctx.beginPath();
-      ctx.moveTo(ex - hr * 0.12, ey);
-      ctx.lineTo(ex + hr * 0.12, ey);
-      ctx.stroke();
-    } else if (c.eyes === "ovals") {
-      ctx.beginPath();
-      ctx.ellipse(ex, ey, hr * 0.09, hr * 0.15 * (1 - blink), 0, 0, TAU);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(ex, ey, hr * 0.1 * (1 - blink * 0.8), 0, TAU);
-      ctx.fill();
-    }
-  }
-  if (c.glasses) {
-    ctx.lineWidth = Math.max(1.2, hr * 0.07);
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.arc(x + s * hr * 0.38 + lk, ey, hr * 0.24, 0, TAU);
-      ctx.stroke();
-    }
-    ctx.beginPath();
-    ctx.moveTo(x - hr * 0.14 + lk, ey);
-    ctx.lineTo(x + hr * 0.14 + lk, ey);
-    ctx.stroke();
-  }
-  if (c.cheeks) {
-    ctx.fillStyle = "rgba(255,110,120,0.32)";
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.ellipse(x + s * hr * 0.58 + lk, headY + hr * 0.42, hr * 0.15, hr * 0.09, 0, 0, TAU);
-      ctx.fill();
-    }
-  }
-  if (c.nose) {
-    ctx.strokeStyle = mixHex(c.skin, "#000000", 0.3);
-    ctx.lineWidth = Math.max(1.2, hr * 0.07);
-    ctx.beginPath();
-    ctx.moveTo(x + lk * 1.2, headY + hr * 0.18);
-    ctx.quadraticCurveTo(x + lk * 1.2 + hr * 0.1, headY + hr * 0.32, x + lk * 1.2 - hr * 0.02, headY + hr * 0.36);
-    ctx.stroke();
-  }
-  const my = headY + hr * 0.55;
-  ctx.fillStyle = "#3a1220";
-  ctx.strokeStyle = "#17131f";
-  ctx.lineWidth = Math.max(1.5, hr * 0.09);
-  ctx.beginPath();
-  switch (pose.mouth ?? "smile") {
-    case "open":
-      ctx.moveTo(x - hr * 0.26 + lk, my - hr * 0.04);
-      ctx.quadraticCurveTo(x + lk, my + hr * 0.42, x + hr * 0.26 + lk, my - hr * 0.04);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    case "o":
-      ctx.arc(x + lk, my + hr * 0.04, hr * 0.1, 0, TAU);
-      ctx.fill();
-      break;
-    case "flat":
-      ctx.moveTo(x - hr * 0.16 + lk, my + hr * 0.04);
-      ctx.lineTo(x + hr * 0.16 + lk, my + hr * 0.04);
-      ctx.stroke();
-      break;
-    default:
-      ctx.moveTo(x - hr * 0.24 + lk, my - hr * 0.02);
-      ctx.quadraticCurveTo(x + lk, my + hr * 0.24, x + hr * 0.24 + lk, my - hr * 0.02);
-      ctx.stroke();
-  }
+  drawHeadHair(ctx, P, x, headY, hr, c);
+  drawFace(ctx, x, headY, hr, c, pose);
   ctx.restore();
   return out;
 }

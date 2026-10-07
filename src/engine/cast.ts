@@ -11,6 +11,11 @@ export const PATTERNS = ["none", "stripes", "dots", "half"] as const;
 export const HEADS = ["circle", "oval", "squircle"] as const;
 export const HAIR_STYLES = ["none", "cap", "bun", "spikes", "wave", "bob", "afro", "beanie"] as const;
 export const EYES = ["dots", "lines", "ovals"] as const;
+/**
+ * Kinds of character: abstract noodle people, the Corporate Memphis trend, blob mascots, stick
+ * figures and classic rubber-hose cartoons.
+ */
+export const KINDS = ["abstract", "memphis", "blob", "stick", "classic"] as const;
 /** Drawing styles: flat colour, soft 3D shading, bold outlines, line art, or paper cut-outs with hard shadows. */
 export const ART_STYLES = ["flat", "soft", "outline", "line", "paper"] as const;
 
@@ -50,8 +55,10 @@ export function sanitizeMember(raw: unknown): CastMember | null {
   const bodyColor = hex(r.bodyColor, MODERN[0]);
   const name = typeof r.name === "string" ? r.name.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 24) : "";
   const art = one(ART_STYLES, r.art, "flat");
+  const kind = one(KINDS, r.kind, "abstract");
   return {
     ...(name ? { name } : {}),
+    ...(kind !== "abstract" ? { kind } : {}),
     ...(art !== "flat" ? { art } : {}),
     body: one(BODIES, r.body, "pill"),
     bodyW: num(r.bodyW, RANGES.bodyW),
@@ -168,6 +175,8 @@ export function matchColors(c: CastMember, p: Palette, slot = 0): CastMember {
   let pattern = set[(slot + 2) % n];
   if (ratio(pattern, body) < 1.4) pattern = lum(body) > 0.35 ? mixHex(body, "#000000", 0.35) : mixHex(body, "#ffffff", 0.6);
   const second = set[(slot + 1) % n];
+  // A blob's arms and feet are its body colour.
+  if (c.kind === "blob") return { ...c, bodyColor: body, patternColor: pattern, armColor: body, legColor: mixHex(body, "#000000", 0.2), shoe: mixHex(body, "#000000", 0.35), hairColor: NATURAL_HAIR.has(c.hairColor) ? c.hairColor : second };
   return {
     ...c,
     bodyColor: body,

@@ -1,5 +1,5 @@
 import { assetUrl } from "./assets";
-import { ART_STYLES, sanitizeCast } from "./cast";
+import { ART_STYLES, KINDS, sanitizeCast } from "./cast";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { ownMoment } from "./momentitems";
@@ -621,7 +621,7 @@ function naturalCase(phrase: string, source: string) {
  * features too.
  */
 /** "An intro for …" / "Launch video about …" / "A cartoon video with characters for …": the request, not the product. */
-const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer|cartoon|animated|fun)\s+)*(?:video|film|teaser|trailer|intro|promo)(?:\s+with\s+(?:cartoon\s+|animated\s+|abstract\s+)?(?:characters?|a\s+mascot|mascots))?\s+(?:for|about|of)\s+/i;
+const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer|cartoon|animated|fun)\s+)*(?:video|film|teaser|trailer|intro|promo|cartoon|animation|explainer)(?:\s+with\s+(?:cartoon\s+|animated\s+|abstract\s+|blob\s+|memphis\s+|classic\s+|rubber[- ]hose\s+)?(?:characters?|a\s+mascot|mascots|stick\s+figures?|blobs?|people))?\s+(?:for|about|of)\s+/i;
 
 export function parseSaasPrompt(prompt: string) {
   const brand = extractBrand(prompt);
@@ -2757,6 +2757,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
             card: ["glass", "frost", "flat", "brutal", "clay"].includes(raw.look.card as string) ? raw.look.card : undefined,
             toon: ["flat", "comic", "soft", "doodle"].includes(raw.look.toon as string) ? raw.look.toon : undefined,
             art: (ART_STYLES as readonly string[]).includes(raw.look.art as string) ? raw.look.art : undefined,
+            people: (KINDS as readonly string[]).includes(raw.look.people as string) ? raw.look.people : undefined,
             shader: ["mesh", "grain", "warp", "smoke", "neuro", "rays", "panels", "metaballs", "swirl", "voronoi", "dither", "waves"].includes(raw.look.shader as string) ? raw.look.shader : undefined,
             shaderStrength: raw.look.shaderStrength !== undefined ? Math.min(1, Math.max(0, Number(raw.look.shaderStrength) || 0)) : undefined,
             shaderSpeed: raw.look.shaderSpeed !== undefined ? Math.min(3, Math.max(0, Number(raw.look.shaderSpeed) || 0)) : undefined,

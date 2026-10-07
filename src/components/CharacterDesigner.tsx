@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ART_STYLES, BODIES, CAST_MAX, EYES, HAIR_STYLES, HAIRS, HEADS, introColors, matchColors, MODERN, NEUTRALS, PATTERNS, PLAYFUL_SKINS, RANGES, sanitizeCast, SKINS } from "@/engine/cast";
+import { ART_STYLES, BODIES, KINDS, CAST_MAX, EYES, HAIR_STYLES, HAIRS, HEADS, introColors, matchColors, MODERN, NEUTRALS, PATTERNS, PLAYFUL_SKINS, RANGES, sanitizeCast, SKINS } from "@/engine/cast";
 import { PALETTES } from "@/engine/palettes";
 import { drawAbstract, idle, makeCharacter, waveArm, type AbsPose } from "@/engine/skills/abstract";
 import { blinkAt } from "@/engine/skills/characters";
-import type { CastMember, Palette } from "@/engine/types";
+import { mixHex } from "@/engine/math";
+import type { CastMember, CharacterKind, Palette } from "@/engine/types";
 
 /** Where the designed characters are kept in the browser (shared by the studio and /characters). */
 export const CAST_KEY = "intromaker.cast";
@@ -30,11 +31,16 @@ export function saveCast(cast: CastMember[]) {
 const SHOWCASE: Palette = { ...PALETTES.pastel, primary: "#8338ec", secondary: "#ff6b6b", accent: "#06d6a0", bg0: "#f4f1fb", bg1: "#ffffff", light: true };
 
 /** A brand-new random character, dressed in `palette`'s colours. */
-export function newCharacter(palette: Palette = SHOWCASE): CastMember {
-  return makeCharacter(Math.floor(Math.random() * 2 ** 31), palette);
+export function newCharacter(palette: Palette = SHOWCASE, kind: CharacterKind = "abstract"): CastMember {
+  return makeCharacter(Math.floor(Math.random() * 2 ** 31), palette, kind);
 }
 
 const LABELS: Record<string, string> = {
+  abstract: "Abstract",
+  memphis: "Memphis",
+  blob: "Blob",
+  stick: "Stick figure",
+  classic: "Classic cartoon",
   flat: "Flat",
   soft: "Soft 3D",
   outline: "Outline",
@@ -75,16 +81,21 @@ const hairTop = (c: CastMember) => (c.hair === "spikes" || c.hair === "bun" || c
  * close-up of the head and shoulders.
  */
 function paintFigure(ctx: CanvasRenderingContext2D, W: number, H: number, c: CastMember, pose: AbsPose, focus: "full" | "head" = "full") {
-  const below = c.legLen + c.bodyH + c.neck + c.headR * 0.85;
+  // Measure the figure (any kind) with a dry run at a 100-unit height, standing at the origin.
+  const rig = drawAbstract(scratch(), 0, 0, 100, c, pose);
   if (focus === "head") {
-    const unit = (H * 0.5) / (c.headR * (1 + hairTop(c)));
-    drawAbstract(ctx, W / 2, H * 0.6 + below * unit, unit, c, pose);
+    const span = rig.head.y - rig.top + rig.head.r;
+    const unit = (H * 0.5 * 100) / span;
+    drawAbstract(ctx, W / 2, H * 0.6 - (rig.head.y / 100) * unit, unit, c, pose);
     return;
   }
-  const total = below + c.headR * hairTop(c);
+  const total = -rig.top / 100;
   const unit = Math.min((H * 0.84) / total, W * 1.4);
   drawAbstract(ctx, W / 2, H * 0.93, unit, c, pose);
 }
+
+let scratchCtx: CanvasRenderingContext2D | null = null;
+const scratch = () => (scratchCtx ??= document.createElement("canvas").getContext("2d")!);
 
 /** A still render of a character on a small canvas (option tiles, the cast strip). */
 function Figure({ c, w, h, focus = "full" }: { c: CastMember; w: number; h: number; focus?: "full" | "head" }) {
@@ -200,6 +211,39 @@ function LivePreview({ c }: { c: CastMember }) {
   return <canvas ref={ref} className="cd-live" aria-label="Your character, moving" role="img" />;
 }
 
+/** What each type of character is. */
+const KIND_HINT: Record<CharacterKind, string> = {
+  abstract: "Minimal geometric people with bendy noodle limbs.",
+  memphis: "The modern Corporate Memphis look: tiny heads, long bendy limbs, big hands and feet.",
+  blob: "A cute one-shape mascot with big eyes and stubby legs, great for kids and friendly apps.",
+  stick: "A classic stick figure with one splash of colour: clear and simple, great for explainers.",
+  classic: "A traditional rubber-hose cartoon: white gloves, pie-cut eyes and big shoes.",
+};
+const BODY_LABELS: Partial<Record<CharacterKind, Record<string, string>>> = {
+  blob: { arch: "Ghost", bell: "Pear", triangle: "Gumdrop" },
+  stick: { pill: "Plain", triangle: "Dress" },
+};
+const PATTERN_LABELS: Partial<Record<CharacterKind, Record<string, string>>> = {
+  blob: { half: "Belly" },
+  stick: { none: "None", stripes: "Scarf", dots: "Bow tie", half: "T-shirt" },
+};
+const HAIR_LABELS: Partial<Record<CharacterKind, Record<string, string>>> = {
+  blob: { cap: "Tuft", bun: "Antenna", spikes: "Spikes", wave: "Sprout", afro: "Fluffy", beanie: "Beanie" },
+};
+const EYE_LABELS: Partial<Record<CharacterKind, Record<string, string>>> = {
+  blob: { dots: "Big eyes", lines: "Happy", ovals: "Beady" },
+  classic: { dots: "Pie-cut", lines: "Happy", ovals: "Classic" },
+};
+
+/** Switching type: the parts that type needs set sensibly (a blob's arms and feet match its body…). */
+function kindFix(m: CastMember, k: CharacterKind): Partial<CastMember> {
+  const fix: Partial<CastMember> = { kind: k === "abstract" ? undefined : k };
+  if (k === "blob") Object.assign(fix, { armColor: m.bodyColor, legColor: mixHex(m.bodyColor, "#000000", 0.2), shoe: mixHex(m.bodyColor, "#000000", 0.35) });
+  if (k === "stick") Object.assign(fix, { body: m.body === "bell" || m.body === "triangle" ? "triangle" : "pill", legColor: NEUTRALS.includes(m.legColor) ? m.legColor : NEUTRALS[1] });
+  if ((m.kind === "blob" || m.kind === "classic") && (k === "abstract" || k === "memphis")) Object.assign(fix, { armColor: m.skin, legColor: NEUTRALS[1], shoe: NEUTRALS[0] });
+  return fix;
+}
+
 /** Save one character as a transparent PNG. */
 function downloadPng(c: CastMember) {
   const W = 1024;
@@ -218,13 +262,13 @@ function downloadPng(c: CastMember) {
   }, "image/png");
 }
 
-function Tiles<T extends string>({ name, options, value, make, focus, onPick }: { name: string; options: readonly T[]; value: T; make: (o: T) => CastMember; focus?: "full" | "head"; onPick: (o: T) => void }) {
+function Tiles<T extends string>({ name, options, value, make, focus, onPick, labels }: { name: string; options: readonly T[]; value: T; make: (o: T) => CastMember; focus?: "full" | "head"; onPick: (o: T) => void; labels?: Partial<Record<string, string>> }) {
   return (
     <div className="cd-tiles" role="radiogroup" aria-label={name}>
       {options.map((o) => (
-        <button key={o} type="button" role="radio" aria-checked={o === value} className={`cd-tile${o === value ? " active" : ""}`} onClick={() => onPick(o)} title={label(o)}>
+        <button key={o} type="button" role="radio" aria-checked={o === value} className={`cd-tile${o === value ? " active" : ""}`} onClick={() => onPick(o)} title={labels?.[o] ?? label(o)}>
           <Figure c={make(o)} w={58} h={64} focus={focus} />
-          <span>{label(o)}</span>
+          <span>{labels?.[o] ?? label(o)}</span>
         </button>
       ))}
     </div>
@@ -275,7 +319,7 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
   const styled = (c: CastMember, art = cast[sel]?.art ?? cast[0]?.art) => (art && art !== "flat" ? { ...c, art } : c);
   const add = () => {
     if (cast.length >= CAST_MAX) return;
-    onChange([...cast, styled(newCharacter(palette))]);
+    onChange([...cast, styled(newCharacter(palette, cast[sel]?.kind ?? cast[0]?.kind))]);
     setSel(cast.length);
   };
   if (!raw || !m) {
@@ -297,7 +341,7 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
     if (patch.bodyColor && base.armColor === base.bodyColor) next.armColor = patch.bodyColor;
     onChange(cast.map((c, k) => (k === i ? next : c)));
   };
-  const shuffle = () => update({ ...styled(newCharacter(palette), raw.art), art: raw.art, name: raw.name, ownColors: raw.ownColors });
+  const shuffle = () => update({ ...newCharacter(palette, raw.kind), art: raw.art, name: raw.name, ownColors: raw.ownColors });
   const recolor = () => {
     // A new mix of the intro's colours (yours from now on).
     const set = introColors(palette);
@@ -320,6 +364,7 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
     setSel(j);
   };
   const sleeves = m.armColor !== m.skin;
+  const kind = m.kind ?? "abstract";
 
   return (
     <div className="cd">
@@ -371,6 +416,11 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
 
       <div className="cd-controls">
         <section>
+          <h3>Type</h3>
+          <Tiles name="Type of character" options={KINDS} value={kind} make={(o) => ({ ...m, ...kindFix(m, o) })} onPick={(o) => update(kindFix(m, o))} />
+          <p className="hint">{KIND_HINT[kind]}</p>
+        </section>
+        <section>
           <h3>Style</h3>
           <Tiles name="Drawing style" options={ART_STYLES} value={m.art ?? "flat"} make={(o) => ({ ...m, art: o })} onPick={(o) => update({ art: o === "flat" ? undefined : o })} />
           <div className="cd-actions">
@@ -392,36 +442,38 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
           <p className="hint">{raw.ownColors ? "Keeps the colours you chose in any video." : match ? "Dressed in this video's colours, and they follow if you change them. Pick any colour below to choose your own." : "In a video, the clothes take that video's colours. Pick any colour below to keep your own."}</p>
         </section>
         <section>
-          <h3>Body</h3>
-          <Tiles name="Body shape" options={BODIES} value={m.body} make={(o) => ({ ...m, body: o })} onPick={(o) => update({ body: o })} />
-          <Tiles name="Pattern" options={PATTERNS} value={m.pattern} make={(o) => ({ ...m, pattern: o })} onPick={(o) => update({ pattern: o })} />
-          <span className="cd-label">Colour</span>
+          <h3>{kind === "blob" ? "Shape" : "Body"}</h3>
+          {kind !== "classic" && <Tiles name="Body shape" options={kind === "stick" ? (["pill", "triangle"] as const) : BODIES} labels={BODY_LABELS[kind]} value={m.body} make={(o) => ({ ...m, body: o })} onPick={(o) => update({ body: o })} />}
+          {kind !== "classic" && <Tiles name={kind === "stick" ? "Accent" : "Pattern"} options={PATTERNS} labels={PATTERN_LABELS[kind]} value={m.pattern} make={(o) => ({ ...m, pattern: o })} onPick={(o) => update({ pattern: o })} />}
+          <span className="cd-label">{kind === "stick" ? "Accent colour" : kind === "classic" ? "Shirt" : "Colour"}</span>
           <Colors name="Body colour" colors={[...brand, ...MODERN]} value={m.bodyColor} onPick={(c) => update({ bodyColor: c }, true)} />
-          {m.pattern !== "none" && (
+          {(kind === "classic" || (m.pattern !== "none" && kind !== "stick")) && (
             <>
-              <span className="cd-label">Pattern colour</span>
+              <span className="cd-label">{kind === "classic" ? "Shorts" : kind === "blob" && m.pattern === "half" ? "Belly" : "Pattern colour"}</span>
               <Colors name="Pattern colour" colors={["#ffffff", ...brand, ...MODERN]} value={m.patternColor} onPick={(c) => update({ patternColor: c }, true)} />
             </>
           )}
           <div className="cd-ranges">
-            <Range name="Width" value={m.bodyW} range={RANGES.bodyW} onChange={(v) => update({ bodyW: v })} />
-            <Range name="Height" value={m.bodyH} range={RANGES.bodyH} onChange={(v) => update({ bodyH: v })} />
+            {kind !== "stick" && <Range name="Width" value={m.bodyW} range={RANGES.bodyW} onChange={(v) => update({ bodyW: v })} />}
+            <Range name={kind === "stick" ? "Body length" : "Height"} value={m.bodyH} range={RANGES.bodyH} onChange={(v) => update({ bodyH: v })} />
           </div>
         </section>
+        {kind !== "blob" && (
+          <section>
+            <h3>Head</h3>
+            {(kind === "abstract" || kind === "memphis") && <Tiles name="Head shape" options={HEADS} value={m.head} make={(o) => ({ ...m, head: o })} focus="head" onPick={(o) => update({ head: o })} />}
+            <span className="cd-label">Skin</span>
+            <Colors name="Skin" colors={[...SKINS, ...PLAYFUL_SKINS]} value={m.skin} onPick={(c) => update({ skin: c })} />
+            <div className="cd-ranges">
+              <Range name="Size" value={m.headR} range={RANGES.headR} onChange={(v) => update({ headR: v })} />
+              {kind !== "classic" && <Range name="Neck" value={m.neck} range={RANGES.neck} onChange={(v) => update({ neck: v })} />}
+            </div>
+          </section>
+        )}
         <section>
-          <h3>Head</h3>
-          <Tiles name="Head shape" options={HEADS} value={m.head} make={(o) => ({ ...m, head: o })} focus="head" onPick={(o) => update({ head: o })} />
-          <span className="cd-label">Skin</span>
-          <Colors name="Skin" colors={[...SKINS, ...PLAYFUL_SKINS]} value={m.skin} onPick={(c) => update({ skin: c })} />
-          <div className="cd-ranges">
-            <Range name="Size" value={m.headR} range={RANGES.headR} onChange={(v) => update({ headR: v })} />
-            <Range name="Neck" value={m.neck} range={RANGES.neck} onChange={(v) => update({ neck: v })} />
-          </div>
-        </section>
-        <section>
-          <h3>Hair</h3>
-          <Tiles name="Hair style" options={HAIR_STYLES} value={m.hair} make={(o) => ({ ...m, hair: o })} focus="head" onPick={(o) => update({ hair: o })} />
-          {m.hair !== "none" && (
+          <h3>{kind === "blob" ? "On top" : "Hair"}</h3>
+          <Tiles name="Hair style" options={kind === "blob" ? (["none", "cap", "bun", "spikes", "wave", "afro", "beanie"] as const) : HAIR_STYLES} labels={HAIR_LABELS[kind]} value={m.hair} make={(o) => ({ ...m, hair: o })} focus="head" onPick={(o) => update({ hair: o })} />
+          {m.hair !== "none" && m.hair !== "beanie" && (
             <>
               <span className="cd-label">Colour</span>
               <Colors name="Hair colour" colors={[...HAIRS, ...MODERN.slice(0, 5)]} value={m.hairColor} onPick={(c) => update({ hairColor: c }, !HAIRS.slice(0, 5).includes(c))} />
@@ -430,29 +482,39 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
         </section>
         <section>
           <h3>Face</h3>
-          <Tiles name="Eyes" options={EYES} value={m.eyes} make={(o) => ({ ...m, eyes: o })} focus="head" onPick={(o) => update({ eyes: o })} />
+          <Tiles name="Eyes" options={EYES} labels={EYE_LABELS[kind]} value={m.eyes} make={(o) => ({ ...m, eyes: o })} focus="head" onPick={(o) => update({ eyes: o })} />
           <div className="cd-toggles">
-            {(["glasses", "cheeks", "nose"] as const).map((k) => (
+            {(kind === "blob" || kind === "memphis" ? (["glasses", "cheeks"] as const) : (["glasses", "cheeks", "nose"] as const)).map((k) => (
               <button key={k} type="button" className={`chip${m[k] ? " active" : ""}`} aria-pressed={m[k]} onClick={() => update({ [k]: !m[k] })}>
-                {k === "glasses" ? "Glasses" : k === "cheeks" ? "Rosy cheeks" : "Nose"}
+                {k === "glasses" ? "Glasses" : k === "cheeks" ? "Rosy cheeks" : kind === "classic" ? "Button nose" : "Nose"}
               </button>
             ))}
           </div>
         </section>
         <section>
-          <h3>Arms and legs</h3>
-          <div className="seg-control">
-            <button type="button" className={!sleeves ? "active" : ""} onClick={() => update({ armColor: m.skin })}>
-              Bare arms
-            </button>
-            <button type="button" className={sleeves ? "active" : ""} onClick={() => update({ armColor: m.bodyColor }, true)}>
-              Sleeves
-            </button>
-          </div>
-          <span className="cd-label">Legs</span>
-          <Colors name="Leg colour" colors={[...NEUTRALS, ...MODERN.slice(0, 6)]} value={m.legColor} onPick={(c) => update({ legColor: c }, true)} />
-          <span className="cd-label">Shoes</span>
-          <Colors name="Shoe colour" colors={[...NEUTRALS.slice(0, 3), ...brand, ...MODERN.slice(0, 5)]} value={m.shoe} onPick={(c) => update({ shoe: c }, true)} />
+          <h3>{kind === "stick" ? "Lines" : kind === "classic" ? "Shoes" : "Arms and legs"}</h3>
+          {(kind === "abstract" || kind === "memphis") && (
+            <div className="seg-control">
+              <button type="button" className={!sleeves ? "active" : ""} onClick={() => update({ armColor: m.skin })}>
+                Bare arms
+              </button>
+              <button type="button" className={sleeves ? "active" : ""} onClick={() => update({ armColor: m.bodyColor }, true)}>
+                Sleeves
+              </button>
+            </div>
+          )}
+          {kind !== "classic" && (
+            <>
+              <span className="cd-label">{kind === "stick" ? "Line colour" : kind === "memphis" ? "Trousers" : "Legs"}</span>
+              <Colors name="Leg colour" colors={[...NEUTRALS, ...MODERN.slice(0, 6)]} value={m.legColor} onPick={(c) => update({ legColor: c }, true)} />
+            </>
+          )}
+          {kind !== "stick" && (
+            <>
+              <span className="cd-label">{kind === "blob" ? "Feet" : "Shoes"}</span>
+              <Colors name="Shoe colour" colors={[...NEUTRALS.slice(0, 3), "#8a4b2a", ...brand, ...MODERN.slice(0, 5)]} value={m.shoe} onPick={(c) => update({ shoe: c }, true)} />
+            </>
+          )}
           <div className="cd-ranges">
             <Range name="Leg length" value={m.legLen} range={RANGES.legLen} onChange={(v) => update({ legLen: v })} />
           </div>

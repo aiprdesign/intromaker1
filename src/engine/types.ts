@@ -469,9 +469,13 @@ export interface VideoPlan {
  */
 /** Abstract characters' drawing styles (see cast.ts ART_STYLES). */
 export type ArtStyle = "flat" | "soft" | "outline" | "line" | "paper";
+/** Kinds of generated character (see cast.ts KINDS and skills/abskinds.ts). */
+export type CharacterKind = "abstract" | "memphis" | "blob" | "stick" | "classic";
 
 export interface CastMember {
   name?: string;
+  /** The kind of character (unset: abstract). */
+  kind?: CharacterKind;
   /** The drawing style (unset: flat). */
   art?: ArtStyle;
   body: "pill" | "arch" | "bell" | "triangle" | "round" | "block";
@@ -533,6 +537,8 @@ export interface Look {
   toon?: "flat" | "comic" | "soft" | "doodle";
   /** How generated abstract characters are drawn (unset: from toon). Your own characters keep theirs. */
   art?: ArtStyle;
+  /** Which kind of character the abstract slides generate (unset: abstract). */
+  people?: CharacterKind;
   /** UI card treatment: frosted glass (default), frosted-light, flat, or neo-brutalist. */
   card?: "glass" | "frost" | "flat" | "brutal" | "clay";
   /** Headline size multiplier (kinetic-type styles go big). */
