@@ -1354,6 +1354,21 @@ textarea {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+/* Playback speed, beside the format switch. */
+.speed-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.speed-pick .select {
+  width: auto;
+  min-width: 0;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Remake: a small menu above the button (design or story). */
 .remake-wrap {
   position: relative;

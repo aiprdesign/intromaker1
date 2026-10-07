@@ -6,6 +6,7 @@ import { canEncodeSize, canExport, exportFormat, exportThumbnail, exportVideo, s
 import { ensureFonts } from "@/engine/fonts";
 import { drawGridOverlay } from "@/engine/grid";
 import { onMediaReady, preloadPlanMedia } from "@/engine/media";
+import { playSpeed, SPEEDS } from "@/engine/speed";
 import { PALETTES } from "@/engine/palettes";
 import { aspectSize, renderFrame, sceneAt as sceneAtTime, totalDuration } from "@/engine/renderer";
 import { previewsQuiet } from "./previewScheduler";
@@ -46,6 +47,7 @@ export default function Player({
   beforeExport,
   limits,
   onAspect,
+  onSpeed,
   onEditScene,
 }: {
   plan: VideoPlan;
@@ -67,6 +69,8 @@ export default function Player({
   limits?: PlanLimits;
   /** Shows the frame picker (9:16, 16:9, 1:1) in the toolbar; called with the chosen format. */
   onAspect?: (aspect: Aspect) => void;
+  /** Shows the playback-speed picker; called with the chosen speed (1 = normal). */
+  onSpeed?: (speed: number) => void;
   /** Lets the paused preview edit a slide's points in place (UI Zoom Tour's areas, Detail Zoom's lens stops). */
   onEditScene?: (index: number, patch: Partial<Scene>) => void;
 }) {
@@ -141,6 +145,7 @@ export default function Player({
   const soundRef = useRef<Soundtrack | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const duration = totalDuration(plan);
+  const speed = playSpeed(plan);
   const { w, h } = aspectSize(plan.aspect, 1280);
 
   // Paused on a slide with editable points (a tour's highlight areas, a zoom's lens stops), the
@@ -265,7 +270,8 @@ export default function Player({
       let lastState = 0;
       let cost = 0;
       const tick = (now: number) => {
-        let t = startAt + (now - t0) / 1000;
+        // The slides' clock runs at the video's playback speed.
+        let t = startAt + ((now - t0) / 1000) * speed;
         if (t < duration && (now - lastDraw < Math.max(1000 / 30 - 2, cost * 2) || previewsQuiet())) {
           raf = requestAnimationFrame(tick);
           return;
@@ -445,7 +451,7 @@ export default function Player({
             <svg viewBox="0 0 24 24" width="20" height="20"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
           )}
         </button>
-        <span className="time">{fmt(time)} / {fmt(duration)}</span>
+        <span className="time">{fmt(time / speed)} / {fmt(duration / speed)}</span>
         <div
           className="timeline"
           onPointerDown={(e) => {
@@ -477,6 +483,27 @@ export default function Player({
           })}
           <div className="playhead" style={{ left: `${(time / duration) * 100}%` }} />
         </div>
+        {onSpeed && (
+          <label className="speed-pick" title="Playback speed. The export plays at this speed too: 2× makes a video half as long, 0.5× twice as long.">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden>
+              <path d="M4 15a8 8 0 1 1 16 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path d="M12 15l4-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <select
+              className="select sm"
+              value={String(speed)}
+              onChange={(e) => onSpeed(Number(e.target.value))}
+              disabled={exporting !== null}
+              aria-label="Playback speed"
+            >
+              {SPEEDS.map((k) => (
+                <option key={k} value={String(k)}>
+                  {k === 1 ? "1× speed" : `${k}×`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {onAspect && (
           <div className="view-size aspect-pick" role="radiogroup" aria-label="Video format">
             {ASPECTS.map(([a, title]) => (

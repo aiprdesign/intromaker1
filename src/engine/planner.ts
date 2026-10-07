@@ -2,6 +2,7 @@ import { assetUrl } from "./assets";
 import { hashString, rng } from "./math";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { ownMoment } from "./momentitems";
+import { playSpeed } from "./speed";
 import { DEMO_SKILLS } from "./templates";
 import { hasSpecificIcon } from "./icons";
 import { writeVoiceover } from "./script";
@@ -2728,6 +2729,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     scheme: raw.scheme === "vibrant" || raw.scheme === "60-30-10" ? raw.scheme : undefined,
     glow: raw.glow === true ? true : undefined,
     motionBlur: raw.motionBlur === false ? false : undefined,
+    speed: typeof raw.speed === "number" && raw.speed !== 1 && playSpeed({ speed: raw.speed }) === raw.speed ? raw.speed : undefined,
     pointer: (POINTER_STYLES as readonly string[]).includes(raw.pointer as string) && raw.pointer !== "auto" ? (raw.pointer as VideoPlan["pointer"]) : undefined,
     shapes: raw.shapes === false ? false : undefined,
     shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) && raw.shapeSet !== "geometric" ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,

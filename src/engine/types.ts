@@ -415,6 +415,11 @@ export interface VideoPlan {
   glow?: boolean;
   /** Camera motion blur (a 180° shutter). On by default; false turns it off. */
   motionBlur?: boolean;
+  /**
+   * Playback speed of the whole video (see SPEEDS): 2 plays it twice as fast and exports a video half
+   * as long. The slides keep their timing; the clock runs faster or slower. Unset: 1.
+   */
+  speed?: number;
   /** The mouse pointer's look (unset: auto). */
   pointer?: PointerStyle;
   /** Animated geometric shapes behind SaaS slides. On by default; false turns them off. */

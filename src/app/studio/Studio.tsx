@@ -12,6 +12,7 @@ import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/com
 import type { PlanLimits } from "@/lib/plans";
 import { pauseThumbs, sceneThumb, thumbsReady, restyleScene } from "@/lib/thumbs";
 import { redesignPlan } from "@/engine/redesign";
+import { outputDuration, playSpeed } from "@/engine/speed";
 import IntroSidebar, { type SidebarIntro } from "@/components/IntroSidebar";
 import { listLocalIntros, loadLocalIntro, newIntroId, saveLocalIntro, type LocalIntro } from "@/lib/localIntros";
 import SlideTimeline from "@/components/SlideTimeline";
@@ -2394,6 +2395,7 @@ export default function Studio() {
                 setAspect(a);
                 setGlobal({ aspect: a });
               }}
+              onSpeed={(k) => setGlobal({ speed: k === 1 ? undefined : k })}
               beforeExport={async () => {
                 // Slides still showing a placeholder instead of your picture.
                 const waiting = plan.scenes.map((x, k) => (needsPicture(x, plan) ? k + 1 : 0)).filter(Boolean);
@@ -2440,7 +2442,7 @@ export default function Studio() {
           <div className="edit-bar">
             <span className="hint">
               <strong>
-                {plan.scenes.length} slides · {plan.scenes.reduce((a, x) => a + x.duration, 0).toFixed(1)}s
+                {plan.scenes.length} slides · {outputDuration(plan).toFixed(1)}s{playSpeed(plan) !== 1 ? ` at ${playSpeed(plan)}×` : ""}
               </strong>{" "}
               · {selected === null ? "Click a slide to edit it, drag to reorder" : `Editing slide ${selected + 1}`}
               <span className="kbd-hint" title="Space play/pause · ← → previous/next slide · Delete remove · D duplicate · Esc done · Ctrl+Z undo · Ctrl+Shift+Z redo">

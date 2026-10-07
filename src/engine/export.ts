@@ -13,6 +13,7 @@ import { ensureFonts } from "./fonts";
 import { mediaState, preloadPlanMedia, syncVideos } from "./media";
 import { aspectSize, renderFrame, sceneAt, totalDuration, renderFrameBlurred } from "./renderer";
 import type { VideoPlan } from "./types";
+import { playSpeed } from "./speed";
 
 const MIME_CANDIDATES = [
   "video/mp4;codecs=avc1.640028,mp4a.40.2",
@@ -93,15 +94,19 @@ async function exportOffline(plan: VideoPlan, opts: ExportOptions): Promise<Expo
       await audio.add(await Soundtrack.renderOffline(plan, 48000));
       audio.close();
     }
-    const duration = totalDuration(plan);
+    // At another playback speed the video lasts total ÷ speed; each frame shows the slides at
+    // (frame time × speed), and the shutter spans the same share of a frame.
+    const k = playSpeed(plan);
+    const duration = totalDuration(plan) / k;
     const frames = Math.max(1, Math.round(duration * opts.fps));
     const dt = 1 / opts.fps;
     for (let i = 0; i < frames; i++) {
       if (opts.signal?.aborted) throw new DOMException("Export cancelled", "AbortError");
-      const at = sceneAt(plan, i * dt);
+      const t = Math.min(totalDuration(plan) - 1e-4, i * dt * k);
+      const at = sceneAt(plan, t);
       if (at) await syncVideos(plan, at.index, at.local);
       // Offline, so every frame gets full camera motion blur (6 samples across a 180° shutter).
-      renderFrameBlurred(ctx, plan, i * dt, w, h, { watermark: opts.watermark }, { samples: 6, fps: opts.fps });
+      renderFrameBlurred(ctx, plan, t, w, h, { watermark: opts.watermark }, { samples: 6, fps: opts.fps / k });
       await video.add(i * dt, dt);
       opts.onProgress((i + 1) / frames);
       // Let the page repaint the progress UI now and then.
@@ -152,6 +157,7 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const stopped = new Promise<void>((res) => (recorder.onstop = () => res()));
 
+  const k = playSpeed(plan);
   const duration = totalDuration(plan);
   recorder.start(250);
   sound?.play(plan, 0);
@@ -163,10 +169,10 @@ async function exportRealtime(plan: VideoPlan, opts: ExportOptions): Promise<Exp
         reject(new DOMException("Export cancelled", "AbortError"));
         return;
       }
-      const t = (performance.now() - t0) / 1000;
+      const t = ((performance.now() - t0) / 1000) * k;
       renderFrame(ctx, plan, Math.min(t, duration), w, h, { watermark: opts.watermark });
       opts.onProgress(Math.min(1, t / duration));
-      if (t >= duration + 0.15) resolve();
+      if (t >= duration + 0.15 * k) resolve();
       else requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

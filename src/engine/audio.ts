@@ -2,6 +2,7 @@ import { arrange, sectionAt, type Arrangement } from "./arrange";
 import { styleOf, type SaasStyle } from "./music";
 import { SKILL_MAP } from "./skills";
 import { voiceTimeline } from "./voice";
+import { audioTiming, outputDuration, playSpeed } from "./speed";
 import type { SfxKind, VideoPlan } from "./types";
 
 /** A minor: i – VI – III – VII, one chord per bar (MIDI notes). */
@@ -164,7 +165,7 @@ export class Soundtrack {
 
   /** Render the full score for `plan` offline, faster than realtime. */
   static async renderOffline(plan: VideoPlan, sampleRate = 48000): Promise<AudioBuffer> {
-    const total = plan.scenes.reduce((a, s) => a + s.duration, 0);
+    const total = outputDuration(plan);
     const off = new OfflineAudioContext(2, Math.ceil(total * sampleRate), sampleRate);
     new Soundtrack(off).play(plan, 0, 0);
     return off.startRendering();
@@ -337,16 +338,23 @@ export class Soundtrack {
   /** Schedule the score for `plan`, starting playback at video time `from`. */
   play(plan: VideoPlan, from: number, lead = 0.05) {
     this.stop();
+    // At another playback speed the score is composed for the new timing (see audioTiming); the
+    // slides' sound effects keep their cues, mapped onto the faster or slower clock.
+    const k = playSpeed(plan);
+    const slides = plan;
+    const fromSlides = from;
+    plan = audioTiming(plan);
+    from = from / k;
     const now = this.ctx.currentTime + lead;
     const at = (videoT: number) => now + (videoT - from);
-    this.scheduleSfx(plan, from, at);
+    this.scheduleSfx(slides, fromSlides, (t) => at(t / k));
     this.musicFilter.frequency.cancelScheduledValues(0);
     this.musicFilter.frequency.setValueAtTime(20000, this.ctx.currentTime);
     // The produced SaaS cue is denser than the trailer score: trim it to the same loudness.
     const musicLevel = (plan.music ?? plan.style) === "saas" ? 0.36 : 1;
     this.musicBus.gain.cancelScheduledValues(0);
     this.musicBus.gain.setValueAtTime(musicLevel, this.ctx.currentTime);
-    this.scheduleVoice(plan, from, at, musicLevel);
+    this.scheduleVoice(plan, from, at, musicLevel, k);
     if ((plan.music ?? plan.style) === "saas") {
       this.playSaas(plan, from, at);
       return;
@@ -416,20 +424,22 @@ export class Soundtrack {
   }
 
   /** Narration clips on the timeline, with the music ducking smoothly under every line. */
-  private scheduleVoice(plan: VideoPlan, from: number, at: (t: number) => number, musicLevel: number) {
+  private scheduleVoice(plan: VideoPlan, from: number, at: (t: number) => number, musicLevel: number, rate = 1) {
     const cues = voiceTimeline(plan);
     if (!cues.length) return;
     const c = this.ctx;
     const spans: [number, number][] = [];
     for (const cue of cues) {
-      const end = cue.start + cue.clip.duration;
+      // (At another speed the narrator speeds up or slows down with the video.)
+      const end = cue.start + cue.clip.duration / rate;
       if (end <= from) continue;
       const buf = c.createBuffer(1, cue.clip.samples.length, cue.clip.rate);
       buf.copyToChannel(cue.clip.samples as Float32Array<ArrayBuffer>, 0);
       const src = this.track(c.createBufferSource());
       src.buffer = buf;
+      src.playbackRate.value = rate;
       src.connect(this.voiceBus);
-      const offset = Math.max(0, from - cue.start);
+      const offset = Math.max(0, from - cue.start) * rate;
       src.start(at(Math.max(from, cue.start)), offset);
       const last = spans[spans.length - 1];
       if (last && cue.start - last[1] < 0.6) last[1] = end;
