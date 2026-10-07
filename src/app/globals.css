@@ -5906,3 +5906,137 @@ code.secret {
     width: 100%;
   }
 }
+
+/* ───────── Studio pixel fixes (round 2) ───────── */
+/* 1–3. Colours: the template/brand cards on the same column grid as the palettes, names that wrap
+   to a second line instead of cutting off ("Volt (black & y…"), group labels 8px from their grid. */
+.studio .pal-grid,
+.studio .pal-grid.top {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+.studio .pal-chooser {
+  gap: var(--sp-2);
+}
+.studio .pal-group {
+  margin-top: var(--sp-3);
+  line-height: 16px;
+}
+.studio .pal-name {
+  white-space: normal;
+  line-height: 14px;
+  min-height: 28px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+/* 4–5. Voice: the panel starts on the same line as the other tabs, and its checkbox is a 16px box
+   flush with the content edge, centred on its label. */
+.studio .voice-panel {
+  margin-top: 0;
+}
+.studio .check-row {
+  margin-top: 0;
+  min-height: 20px;
+}
+.studio .check-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--cyan);
+}
+/* 6–8. Slide cards: every text field 36px (the headline 40px), the footer row's controls 32px. */
+.studio .scene-card .input:not(.sm):not(.headline),
+.studio .scene-card .eyebrow-input {
+  height: 36px;
+  font-size: 13px;
+  padding: 0 var(--sp-3);
+}
+.studio .scene-card .input.headline {
+  height: 40px;
+  padding: 0 var(--sp-3);
+}
+.studio .scene-row .input.sm,
+.studio .scene-row .select,
+.studio .scene-row .select.sm {
+  height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.studio .scene-row .icon-btn.sm {
+  width: 32px;
+  height: 32px;
+}
+/* 9. A field's hint wraps under its caption instead of being cut off mid-word. */
+.studio .fld-cap {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  line-height: 16px;
+}
+.studio .fld-cap em {
+  white-space: normal;
+  overflow: visible;
+}
+/* 10. The QR option lines up with the fields (left), not centred under them. */
+.studio .qr-add {
+  align-self: flex-start;
+  padding: var(--sp-1) 2px;
+  font-size: 13px;
+}
+/* 11. Generate and Remake are one height. */
+.studio .panel-foot .gen-row > .btn,
+.studio .panel-foot .remake-wrap > .btn {
+  height: 48px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+/* 12. Folded rail: New intro and the intro icons share one 44px column. */
+.studio .intro-rail.folded .rail-new,
+.studio .intro-rail.folded .rail-item {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+}
+/* 13–15. AI settings: the Provider label centred on the search box, the provider list fading out
+   where it scrolls (not cut mid-card), and a round 36px close button like the other buttons. */
+.provider-toolbar .field-label {
+  margin-top: 0;
+}
+.provider-toolbar .input {
+  height: 32px;
+}
+.provider-groups {
+  padding-bottom: var(--sp-3);
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+}
+.modal-head .icon-btn.sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+/* 16. "3 more takes": the same border weight as the take cards, text at body size. */
+.studio .take-card.more {
+  border-width: 1.5px;
+  font-size: 14px;
+}
+/* 17. The edit bar's Done link in the same muted cyan as Undo and Redo. */
+.studio .edit-bar-actions .link-btn {
+  color: color-mix(in srgb, var(--cyan) 75%, var(--muted));
+}
+/* 18–20. Whole-pixel type: hints and labels on integer sizes and line heights, so their baselines
+   land on pixels instead of blurring between two. */
+.studio .hint {
+  font-size: 13px;
+  line-height: 20px;
+}
+.studio .field-label {
+  font-size: 12px;
+}
+.studio .pal-group,
+.studio .fld-cap {
+  font-size: 11px;
+}
