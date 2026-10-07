@@ -6040,3 +6040,26 @@ code.secret {
 .studio .fld-cap {
   font-size: 11px;
 }
+/* (Slide cards) The footer stays one row: the transition picker gives way to the four 32px
+   actions instead of pushing them onto a line of their own. */
+.studio .scene-row {
+  flex-wrap: nowrap;
+}
+.studio .scene-row .transition-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: 32px;
+}
+.studio .scene-row .transition-field .skill-field-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio .scene-actions {
+  flex: none;
+}
+/* A shorter card in a storyboard row keeps its footer on the bottom edge, level with its neighbour's. */
+.studio .scene-card > .scene-row:last-child {
+  margin-top: auto;
+}
