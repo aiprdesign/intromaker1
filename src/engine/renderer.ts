@@ -1,4 +1,5 @@
 import { arrange, energyAt, sinceDrop, sinceKick, type Arrangement } from "./arrange";
+import { companionFamily, drawCompanion, wantsCompanion } from "./skills/companion";
 import { clamp, ease, lerp, mixHex, noise1, range, rgba, rng } from "./math";
 import { tokens } from "./grid";
 import { styleOf } from "./music";
@@ -75,6 +76,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   brand?: VideoPlan["brand"];
   product?: boolean;
   cast?: VideoPlan["cast"];
+  characters?: VideoPlan["characters"];
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
@@ -169,6 +171,12 @@ function drawScene(
     edit: opts.edit ? (l) => opts.edit!(index, l) : undefined,
   };
   resetCtx(target);
+  // In a Cartoon style, a slide without characters of its own gets the companion (see companion.ts).
+  const fam = !opts.edit && wantsCompanion(scene.skill) ? companionFamily(plan) : null;
+  const renderSlide = (c: SkillContext) => {
+    SKILL_MAP[scene.skill].render(c);
+    if (fam) drawCompanion(c, fam);
+  };
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
   // set their own depth); headline, logo and closing shots stay flat so their type reads cleanly.
   // The 3D logo intros stage their own 3D, so they're never put on a tilted panel as well.
@@ -197,7 +205,7 @@ function drawScene(
     glassFace(csc);
     if (opts.camera !== false) applyCamera(csc, globalT);
     if (transitionIn) applyTransitionIn(csc);
-    SKILL_MAP[scene.skill].render(csc);
+    renderSlide(csc);
     layer.ctx.restore();
     const shot = exitLayer(layer.canvas, w, h, exit, sc.u);
     if (slab) projectSlab(target, shot, w, h, globalT, sc);
@@ -213,7 +221,7 @@ function drawScene(
     layer.ctx.save();
     if (opts.camera !== false) applyCamera(csc, globalT);
     if (transitionIn) applyTransitionIn(csc);
-    SKILL_MAP[scene.skill].render(csc);
+    renderSlide(csc);
     layer.ctx.restore();
     projectPlane(target, exitLayer(layer.canvas, w, h, exit, sc.u), w, h, depth, globalT, level);
     resetCtx(target);
@@ -226,7 +234,7 @@ function drawScene(
     const csc: SkillContext = { ...sc, ctx: layer.ctx, noStage: true };
     layer.ctx.save();
     if (opts.camera !== false) applyCamera(csc, globalT);
-    SKILL_MAP[scene.skill].render(csc);
+    renderSlide(csc);
     layer.ctx.restore();
     target.drawImage(exitLayer(layer.canvas, w, h, exit, sc.u), 0, 0);
     resetCtx(target);
@@ -235,7 +243,7 @@ function drawScene(
   target.save();
   if (opts.camera !== false) applyCamera(sc, globalT);
   if (transitionIn) applyTransitionIn(sc);
-  SKILL_MAP[scene.skill].render(sc);
+  renderSlide(sc);
   target.restore();
   resetCtx(target);
   return sc;

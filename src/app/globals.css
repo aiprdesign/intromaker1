@@ -6354,3 +6354,22 @@ code.secret {
 .char-lab .cd-stage {
   top: calc(var(--bar-h, 65px) + 16px);
 }
+.kind-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.kind-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.kind-picker .cd-tiles {
+  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+.kind-picker .cd-tile canvas {
+  border-radius: 8px;
+}

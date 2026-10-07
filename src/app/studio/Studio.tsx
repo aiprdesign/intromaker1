@@ -8,7 +8,8 @@ import SkillPicker from "@/components/SkillPicker";
 import PointerPicker, { POINTER_NAMES } from "@/components/PointerPicker";
 import { CastThumb, CharacterDesignerModal, loadCast, saveCast } from "@/components/CharacterDesigner";
 import { brandPalette } from "@/engine/renderer";
-import { cartoonStyleFor, themeCharacterStyle, WANTS_CHARACTERS } from "@/engine/charpick";
+import { cartoonPick, themePick, WANTS_CHARACTERS, type CharacterPick } from "@/engine/charpick";
+import CharacterKindPicker, { CHARACTER_NAMES, type CharacterChoice } from "@/components/CharacterKindPicker";
 import ShapesPicker from "@/components/ShapesPicker";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
@@ -511,21 +512,25 @@ export default function Studio() {
       }
     }
   };
+  /**
+   * Asked for characters (a cartoon, a mascot, stick figures, a video for kids): the Cartoon style
+   * and characters that fit the words. Not asked, but a words-only video whose theme works better
+   * with characters (kids, classrooms, hiring, a retro brand): the pick made for that theme.
+   */
+  const characterPick = (p: VideoPlan): CharacterPick | undefined => {
+    if (p.style !== "saas" || p.product) return undefined;
+    if (WANTS_CHARACTERS.test(promptRef.current)) return cartoonPick(promptRef.current);
+    return p.scenes.some((s) => s.media) ? undefined : themePick(promptRef.current);
+  };
   /** The style suggested for a plan's kind of product (when auto is on and it differs). */
   const suggestedFor = (p: VideoPlan) => {
     // Product videos look best in the bright studio (or, as a trailer, in a trailer style); software
     // films get their category's style.
     const trailerCut = styleRef.current === "trailer";
-    // Asked for characters (a cartoon, a mascot, stick figures, a video for kids): the cartoon style
-    // that fits the words. Not asked, but a words-only video whose theme works better with
-    // characters (kids, classrooms, hiring, a retro brand): the character style made for it.
-    const cartoon = p.style === "saas" && !p.product && WANTS_CHARACTERS.test(promptRef.current);
-    const themed = p.style === "saas" && !p.product && !cartoon && !p.scenes.some((s) => s.media) ? themeCharacterStyle(promptRef.current) : undefined;
-    const id = cartoon
-      ? cartoonStyleFor(promptRef.current)
-      : themed
-        ? themed
-        : p.style === "saas"
+    const picked = characterPick(p)?.template;
+    const id = picked
+      ? picked
+      : p.style === "saas"
         ? p.product
           ? trailerCut
             ? TEMPLATE_MAP[p.template ?? ""]?.trailer
@@ -554,6 +559,33 @@ export default function Studio() {
     // A palette the user picked survives template switches; otherwise the template's colours apply.
     setPlan((p) => (p.style === "saas" ? applyBackground(applyTemplate(p, id, { palette: palette !== "auto" ? palette : undefined }), bgRef.current) : p));
     setVersion((v) => v + 1);
+  };
+  // The characters a Cartoon style tells the story with: Auto (the best fit for the intro), the
+  // style's own, or a kind you chose. Remembered.
+  const [chars, setChars] = useState<CharacterChoice | "auto">("auto");
+  const charsRef = useRef<CharacterChoice | "auto">("auto");
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("intromaker.characters");
+      if (v && (v === "auto" || v in CHARACTER_NAMES)) {
+        setChars(v as CharacterChoice | "auto");
+        charsRef.current = v as CharacterChoice | "auto";
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseChars = (v: CharacterChoice | "auto") => {
+    setChars(v);
+    charsRef.current = v;
+    try {
+      localStorage.setItem("intromaker.characters", v);
+    } catch {
+      /* ignore */
+    }
+    const kind = v === "auto" ? characterPick(planRef.current)?.characters : v === "own" ? undefined : v;
+    setPlan((p) => (p.style === "saas" && p.template ? applyBackground(applyTemplate({ ...p, characters: kind }, p.template, { palette: palette !== "auto" ? palette : undefined }), bgRef.current) : p));
+    setVersion((n) => n + 1);
   };
   /** The trailer style matched to this film's product (what Auto uses). */
   const detectedTrailer = () =>
@@ -846,6 +878,13 @@ export default function Studio() {
     if (index !== undefined) setCurrent(index);
     let p = take.plan;
     const suggested = autoStyleRef.current ? suggestedFor(p) : undefined;
+    // The characters in a Cartoon style: the best fit for the intro (Auto), or the ones you chose.
+    const chars = charsRef.current === "auto" ? characterPick(p)?.characters : charsRef.current === "own" ? undefined : charsRef.current;
+    if (p.characters !== chars) {
+      p = { ...p, characters: chars };
+      const tid = suggested ?? p.template;
+      if (p.style === "saas" && tid && TEMPLATE_MAP[tid]?.category === "Cartoon" && (!suggested || suggested === p.template)) p = applyTemplate(p, tid, { palette: palette !== "auto" ? palette : undefined });
+    }
     if (suggested && suggested !== p.template) {
       p = applyTemplate(p, suggested, { palette: palette !== "auto" ? palette : undefined });
       setTemplate(suggested);
@@ -2358,6 +2397,23 @@ export default function Studio() {
               </button>
               <TemplatePicker value={template} onChange={(id) => chooseTemplate(id)} categories={plan.product && style === "trailer" ? ["Product Trailers"] : undefined} />
               <p className="hint">{TEMPLATE_MAP[template]?.description}</p>
+              {TEMPLATE_MAP[template]?.category === "Cartoon" && plan.style === "saas" && (
+                <div className="kind-row">
+                  <label className="field-label">
+                    Characters <span className="tpl-desc">{CHARACTER_NAMES[plan.characters ?? "own"]}{chars === "auto" ? " (Auto)" : ""}</span>
+                  </label>
+                  <CharacterKindPicker
+                    value={plan.characters ?? "own"}
+                    auto={chars === "auto"}
+                    onChange={chooseChars}
+                    onAuto={() => chooseChars("auto")}
+                    palette={brandPalette(plan.palette, plan.brand, plan.scheme)}
+                    look={TEMPLATE_MAP[template].look}
+                    own={TEMPLATE_MAP[template].roles.hook?.startsWith("pro-") ? "pro" : TEMPLATE_MAP[template].roles.hook?.startsWith("abs-") ? "abs" : "char"}
+                  />
+                  <p className="hint">Characters appear on as many slides as they can; slides with your pictures or logo get a small companion character in the corner.</p>
+                </div>
+              )}
               <details className="fold">
                 <summary>
                   <span className="field-label inline">Text effect</span>{" "}

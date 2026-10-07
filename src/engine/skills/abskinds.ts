@@ -379,9 +379,10 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
   const P = painter(ctx, H, c.art ?? "flat");
   const lift = (pose.lift ?? 0) * H;
   const lw = Math.max(2, H * 0.02);
-  const legLen = c.legLen * 1.15 * H;
-  const bodyLen = c.bodyH * 0.95 * H;
-  const hr = c.headR * 1.05 * H;
+  const legLen = c.legLen * 1.0 * H;
+  const bodyLen = c.bodyH * 0.8 * H;
+  // A big round head on a small body: cute rather than diagrammatic.
+  const hr = c.headR * 1.35 * H;
   const hipY = groundY - legLen - lift;
   const neckY = hipY - bodyLen;
   const headY = neckY - hr - c.neck * H * 0.6;

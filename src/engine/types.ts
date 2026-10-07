@@ -461,6 +461,8 @@ export interface VideoPlan {
   voiceover?: VoiceSettings;
   /** Custom abstract characters (the character designer's cast), cast first in the abstract slides. */
   cast?: CastMember[];
+  /** The characters a Cartoon style tells the story with (unset: the style's own). */
+  characters?: CharacterKind;
 }
 
 /**

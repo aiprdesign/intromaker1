@@ -158,9 +158,17 @@ const sample = (text: string, skill: SkillId = "blur-reveal", extra: Partial<Sce
 
 /** The character slides for each part of the story (the cartoon styles). */
 /** The advanced characters for each part of the story. */
-const PRO_ROLES: Template["roles"] = { hook: "pro-walk", features: "pro-explainer", bento: "pro-explainer", how: "pro-explainer", cards: "pro-duo", quote: "pro-duo", solve: "pro-thinker", promise: "pro-unveil", cta: "pro-highfive" };
-const ABS_ROLES: Template["roles"] = { hook: "abs-hello", features: "abs-features", bento: "abs-features", how: "abs-parade", cards: "abs-crowd", quote: "abs-chat", solve: "abs-chat", promise: "abs-parade", cta: "abs-cheer" };
-const ROLES: Template["roles"] = { hook: "char-hello", features: "char-presenter", cards: "char-team", bento: "char-presenter", solve: "char-aha", demo: "char-desk", cta: "char-cheer" };
+// Cartoon styles give characters as many slides as they can (pictures, logos and QR codes keep
+// theirs, with the companion character beside them: see companion.ts).
+const PRO_ROLES: Template["roles"] = { hook: "pro-walk", pain: "pro-thinker", features: "pro-explainer", bento: "pro-explainer", how: "pro-explainer", cards: "pro-duo", quote: "pro-duo", solve: "pro-thinker", compare: "pro-thinker", promise: "pro-unveil", stat: "pro-explainer", metric: "pro-explainer", integrations: "pro-duo", support: "pro-duo", reach: "pro-walk", demo: "pro-explainer", cta: "pro-highfive" };
+const ABS_ROLES: Template["roles"] = { hook: "abs-hello", pain: "abs-features", features: "abs-features", bento: "abs-features", how: "abs-parade", cards: "abs-crowd", quote: "abs-chat", solve: "abs-chat", compare: "abs-chat", promise: "abs-parade", stat: "abs-features", metric: "abs-features", integrations: "abs-crowd", support: "abs-chat", reach: "abs-crowd", demo: "abs-features", cta: "abs-cheer" };
+const ROLES: Template["roles"] = { hook: "char-hello", pain: "char-aha", features: "char-presenter", cards: "char-team", bento: "char-presenter", how: "char-presenter", quote: "char-team", solve: "char-aha", compare: "char-aha", promise: "char-hello", stat: "char-presenter", metric: "char-presenter", integrations: "char-team", support: "char-desk", reach: "char-team", demo: "char-desk", cta: "char-cheer" };
+/** The middle-of-the-story character slides of each family, to swap in for a repeat. */
+const CHARACTER_POOLS = [
+  ["char-presenter", "char-team", "char-aha", "char-desk"],
+  ["pro-explainer", "pro-duo", "pro-thinker", "pro-unveil"],
+  ["abs-features", "abs-crowd", "abs-chat", "abs-parade"],
+] as SkillId[][];
 
 export const TEMPLATES: Template[] = [
   {
@@ -432,60 +440,6 @@ export const TEMPLATES: Template[] = [
     roles: ABS_ROLES,
     revealNoLogo: "abs-hello",
     sample: sample("Join the *crowd*."),
-  },
-  {
-    id: "blobs",
-    name: "Blob Buddies",
-    category: "Cartoon",
-    description: "Cute blob mascots (pills, gumdrops, pears and ghosts with big eyes and stubby legs) bounce, chat and cheer in soft shaded colour.",
-    vibe: "Cute, warm and playful, made for kids and families. Short, simple, cheerful copy; round characters and bouncy motion.",
-    palette: "clay",
-    font: "manrope",
-    bpm: 116,
-    music: "saas",
-    flavor: "soft",
-    look: { grid: false, beams: 0, aurora: 0.6, backdrop: "blobs", text: "pop", grain: 0.2, toon: "soft", art: "soft", people: "blob" },
-    transitions: ["push", "swipe", "zoom", "dissolve"],
-    pace: 1,
-    roles: ABS_ROLES,
-    revealNoLogo: "abs-hello",
-    sample: sample("Learning, *made playful*."),
-  },
-  {
-    id: "whiteboard",
-    name: "Whiteboard Sketch",
-    category: "Cartoon",
-    description: "Stick figures on a clean white board, each with one splash of colour (a scarf, bow tie, T-shirt or dress): a clear, classic explainer.",
-    vibe: "Clear, calm and helpful, like a teacher at a whiteboard. Plain, simple copy that explains one step at a time.",
-    palette: "paper",
-    font: "manrope",
-    bpm: 108,
-    music: "saas",
-    flavor: "minimal",
-    look: { grid: false, beams: 0, aurora: 0, backdrop: "plain", text: "pop", grain: 0.1, toon: "flat", people: "stick" },
-    transitions: ["push", "swipe", "dissolve"],
-    pace: 0.95,
-    roles: ABS_ROLES,
-    revealNoLogo: "abs-hello",
-    sample: sample("Here's *how it works*."),
-  },
-  {
-    id: "rubberhose",
-    name: "Rubber Hose",
-    category: "Cartoon",
-    description: "A traditional 1930s-style cartoon: rubber-hose limbs, white gloves, pie-cut eyes and big shoes, inked on warm cream with film grain.",
-    vibe: "Nostalgic, charming and cheeky, like an old cartoon short. Short, upbeat copy with a wink; bouncy, swinging motion.",
-    palette: "cream",
-    font: "jost",
-    bpm: 128,
-    music: "saas",
-    flavor: "pop",
-    look: { grid: false, beams: 0, aurora: 0.2, text: "pop", grain: 0.55, vignette: 0.45, toon: "comic", art: "outline", people: "classic" },
-    transitions: ["swipe", "push", "dissolve"],
-    pace: 1.05,
-    roles: ABS_ROLES,
-    revealNoLogo: "abs-hello",
-    sample: sample("Good things, *the classic way*."),
   },
   {
     id: "keynote",
@@ -1431,18 +1385,37 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   let last: Transition = "cut";
   let zooms = 0;
   const base = trailerCut(plan, tpl);
+  // A Cartoon style can tell the story with another kind of character (plan.characters): the
+  // abstract-family slides, drawn as that kind, in the style's own look.
+  const people = tpl.category === "Cartoon" ? plan.characters : undefined;
+  const roles = people ? ABS_ROLES : tpl.roles;
+  let prevSkill: SkillId | undefined;
   const scenes = base.map((scene, i, all) => {
     const role = roleOf(scene, i, all.length);
     if (!role) return scene;
-    let skill = tpl.roles[role] ?? DEFAULT_ROLE_SKILL[role];
-    if (role === "reveal" && !plan.brand?.logo) skill = tpl.revealNoLogo;
-    if (role === "demo" && DEMO_SKILLS.has(scene.skill)) skill = scene.skill;
+    let skill = roles[role] ?? DEFAULT_ROLE_SKILL[role];
+    if (role === "reveal" && !plan.brand?.logo) skill = people ? "abs-hello" : tpl.revealNoLogo;
+    // In a Cartoon style a character slide wins over the director's words-only design (not over a
+    // QR end card, a logo or product moment, or a slide that shows your pictures).
+    const cartoonOver = tpl.category === "Cartoon" && CHARACTER_SLIDE.test(skill) && !scene.media && !/^(qr-end|liquid-logo|logo-|product-)/.test(scene.skill);
+    // (A Cartoon style shows a character instead of a mock-up demo, unless the demo has your pictures.)
+    if (role === "demo" && DEMO_SKILLS.has(scene.skill) && !(tpl.category === "Cartoon" && CHARACTER_SLIDE.test(skill) && !scene.media)) skill = scene.skill;
     // The product assembled from its own components beats a flat page scroll whenever it's available.
     if (role === "meet" && scene.skill === "ui-assemble") skill = scene.skill;
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill)) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill) && !(CHARACTER_SLIDE.test(scene.skill) && CHARACTER_SLIDE.test(skill)) && !cartoonOver) skill = scene.skill;
+    // Pictures are never dropped for characters: the slide keeps them (and gets the companion).
+    if (scene.media && CHARACTER_SLIDE.test(skill)) skill = CHARACTER_SLIDE.test(scene.skill) ? DEFAULT_ROLE_SKILL[role] : scene.skill;
+    // No character slide twice in a row: the next one in its family steps in.
+    const prev = i > 0 ? prevSkill : undefined;
+    if (prev === skill && CHARACTER_SLIDE.test(skill)) {
+      const pool = CHARACTER_POOLS.find((p) => p.includes(skill) || p[0].slice(0, 4) === skill.slice(0, 4));
+      const alt = pool?.find((x) => x !== skill);
+      if (alt) skill = alt;
+    }
+    prevSkill = skill;
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
@@ -1455,7 +1428,9 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // Out of the cold open, the product lands on a flash.
     if (i > 0 && all[i - 1].skill === "product-teaser") transition = "flash";
     last = transition;
-    return { ...scene, role, skill, duration, transition };
+    // A word swap ("planned|built|shared") turned into a character slide keeps its first word.
+    const text = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && scene.text?.includes("|") ? scene.text.replace(/([^\s|]+)(?:\|[^\s|]+)+/g, "$1") : scene.text;
+    return { ...scene, text, role, skill, duration, transition };
   });
   // Templates change the feel, not the runtime: keep the film within -12%/+10% of the length
   // the same storyboard runs at a neutral 120 bpm, scaling every scene proportionally.
@@ -1476,13 +1451,16 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     style: "saas",
     music: tpl.music,
     flavor: tpl.flavor,
-    look: tpl.look,
+    look: people ? { ...tpl.look, people } : tpl.look,
     scenes: scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round((s.duration * fit) / beat)) * beat })),
   };
   const fitted = plan.target ? fitLength(styledPlan, plan.target) : styledPlan;
   // The cinematography pass: transition grammar, holds and variety, in this style's own vocabulary.
-  return cinematography(fitted, { pool: tpl.transitions, roleSkill: (role) => (role in DEFAULT_ROLE_SKILL ? (tpl.roles[role as Role] ?? DEFAULT_ROLE_SKILL[role as Role]) : undefined) });
+  return cinematography(fitted, { pool: tpl.transitions, roleSkill: (role) => (role in DEFAULT_ROLE_SKILL ? (roles[role as Role] ?? DEFAULT_ROLE_SKILL[role as Role]) : undefined) });
 }
+
+/** Character slides: switching characters swaps one for another rather than keeping the old one. */
+const CHARACTER_SLIDE = /^(char|pro|abs)-/;
 
 /**
  * Stretch or compress scene lengths so the film lands on the requested length (within what
