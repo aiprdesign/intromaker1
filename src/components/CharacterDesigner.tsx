@@ -216,7 +216,7 @@ const KIND_HINT: Record<CharacterKind, string> = {
   abstract: "Minimal geometric people with bendy noodle limbs.",
   memphis: "The modern Corporate Memphis look: tiny heads, long bendy limbs, big hands and feet.",
   blob: "A cute one-shape mascot with big eyes and stubby legs, great for kids and friendly apps.",
-  stick: "A classic stick figure with one splash of colour: clear and simple, great for explainers.",
+  stick: "A minimal stick figure: an empty round head and line limbs in one colour, great for explainers.",
   classic: "A traditional rubber-hose cartoon: white gloves, pie-cut eyes and big shoes.",
 };
 const BODY_LABELS: Partial<Record<CharacterKind, Record<string, string>>> = {
@@ -443,10 +443,14 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
         </section>
         <section>
           <h3>{kind === "blob" ? "Shape" : "Body"}</h3>
-          {kind !== "classic" && <Tiles name="Body shape" options={kind === "stick" ? (["pill", "triangle"] as const) : BODIES} labels={BODY_LABELS[kind]} value={m.body} make={(o) => ({ ...m, body: o })} onPick={(o) => update({ body: o })} />}
-          {kind !== "classic" && <Tiles name={kind === "stick" ? "Accent" : "Pattern"} options={PATTERNS} labels={PATTERN_LABELS[kind]} value={m.pattern} make={(o) => ({ ...m, pattern: o })} onPick={(o) => update({ pattern: o })} />}
-          <span className="cd-label">{kind === "stick" ? "Accent colour" : kind === "classic" ? "Shirt" : "Colour"}</span>
-          <Colors name="Body colour" colors={[...brand, ...MODERN]} value={m.bodyColor} onPick={(c) => update({ bodyColor: c }, true)} />
+          {kind !== "classic" && kind !== "stick" && <Tiles name="Body shape" options={BODIES} labels={BODY_LABELS[kind]} value={m.body} make={(o) => ({ ...m, body: o })} onPick={(o) => update({ body: o })} />}
+          {kind !== "classic" && kind !== "stick" && <Tiles name="Pattern" options={PATTERNS} labels={PATTERN_LABELS[kind]} value={m.pattern} make={(o) => ({ ...m, pattern: o })} onPick={(o) => update({ pattern: o })} />}
+          {kind !== "stick" && (
+            <>
+              <span className="cd-label">{kind === "classic" ? "Shirt" : "Colour"}</span>
+              <Colors name="Body colour" colors={[...brand, ...MODERN]} value={m.bodyColor} onPick={(c) => update({ bodyColor: c }, true)} />
+            </>
+          )}
           {(kind === "classic" || (m.pattern !== "none" && kind !== "stick")) && (
             <>
               <span className="cd-label">{kind === "classic" ? "Shorts" : kind === "blob" && m.pattern === "half" ? "Belly" : "Pattern colour"}</span>
@@ -462,14 +466,19 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
           <section>
             <h3>Head</h3>
             {(kind === "abstract" || kind === "memphis") && <Tiles name="Head shape" options={HEADS} value={m.head} make={(o) => ({ ...m, head: o })} focus="head" onPick={(o) => update({ head: o })} />}
-            <span className="cd-label">Skin</span>
-            <Colors name="Skin" colors={[...SKINS, ...PLAYFUL_SKINS]} value={m.skin} onPick={(c) => update({ skin: c })} />
+            {kind !== "stick" && (
+              <>
+                <span className="cd-label">Skin</span>
+                <Colors name="Skin" colors={[...SKINS, ...PLAYFUL_SKINS]} value={m.skin} onPick={(c) => update({ skin: c })} />
+              </>
+            )}
             <div className="cd-ranges">
               <Range name="Size" value={m.headR} range={RANGES.headR} onChange={(v) => update({ headR: v })} />
-              {kind !== "classic" && <Range name="Neck" value={m.neck} range={RANGES.neck} onChange={(v) => update({ neck: v })} />}
+              {kind !== "classic" && kind !== "stick" && <Range name="Neck" value={m.neck} range={RANGES.neck} onChange={(v) => update({ neck: v })} />}
             </div>
           </section>
         )}
+        {kind !== "stick" && (<>
         <section>
           <h3>{kind === "blob" ? "On top" : "Hair"}</h3>
           <Tiles name="Hair style" options={kind === "blob" ? (["none", "cap", "bun", "spikes", "wave", "afro", "beanie"] as const) : HAIR_STYLES} labels={HAIR_LABELS[kind]} value={m.hair} make={(o) => ({ ...m, hair: o })} focus="head" onPick={(o) => update({ hair: o })} />
@@ -491,6 +500,7 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
             ))}
           </div>
         </section>
+        </>)}
         <section>
           <h3>{kind === "stick" ? "Lines" : kind === "classic" ? "Shoes" : "Arms and legs"}</h3>
           {(kind === "abstract" || kind === "memphis") && (

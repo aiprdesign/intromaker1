@@ -82,7 +82,7 @@ export function makeCharacter(seed: number, p: Palette, kind: CharacterKind = "a
     case "stick":
       return { ...c, kind, legColor: lineColor, body: pick(["pill", "pill", "block", "triangle"] as const), pattern: pick(["none", "stripes", "dots", "half", "half"] as const), head: "circle", glasses: r() < 0.15, cheeks: r() < 0.8, eyes: pick(["dots", "dots", "ovals"] as const) };
     case "classic":
-      return { ...c, kind, head: "circle", shoe: pick(["#8a4b2a", "#c0392b", "#1d1b26", "#f1c40f"]), hair: pick(["none", "cap", "spikes", "bun", "wave"] as const), eyes: pick(["dots", "dots", "ovals"] as const), nose: r() < 0.7, glasses: r() < 0.1, legColor: "#1d1b26", armColor: "#1d1b26" };
+      return { ...c, kind, head: "circle", shoe: pick(["#8a4b2a", "#c0392b", "#1d1b26", "#f1c40f"]), hair: pick(["none", "cap", "cap", "bun", "wave"] as const), hairColor: pick(HAIRS.slice(0, 5)), eyes: pick(["dots", "dots", "ovals"] as const), nose: r() < 0.7, glasses: r() < 0.1, legColor: "#1d1b26", armColor: "#1d1b26" };
     default:
       return c;
   }

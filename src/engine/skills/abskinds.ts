@@ -120,8 +120,9 @@ export function drawMemphis(ctx: CanvasRenderingContext2D, x: number, groundY: n
   const arm = (s: number): Pt => {
     const a = s < 0 ? pose.armL : pose.armR;
     const curl = (s < 0 ? pose.curlL : pose.curlR) ?? 0.3;
-    const sx = x + s * bw * 0.4;
-    const sy = top + H * 0.035;
+    // From inside the shoulder (not the torso's rounded corner), so there's no notch.
+    const sx = x + s * bw * 0.34;
+    const sy = top + H * 0.045;
     const ex = sx + s * Math.sin(a) * armLen;
     const ey = sy + Math.cos(a) * armLen;
     const mx = (sx + ex) / 2 + s * Math.cos(a) * armLen * 0.3 * curl;
@@ -376,19 +377,19 @@ export function drawBlob(ctx: CanvasRenderingContext2D, x: number, groundY: numb
 /* ───────────────────────── Stick figure ───────────────────────── */
 
 export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: CastMember, pose: AbsPose): AbsRig {
+  // A true stick figure: one line colour, an empty round head, no face, hair, clothes or fills.
   const P = painter(ctx, H, c.art ?? "flat");
   const lift = (pose.lift ?? 0) * H;
   const lw = Math.max(2, H * 0.02);
   const legLen = c.legLen * 1.0 * H;
-  const bodyLen = c.bodyH * 0.8 * H;
-  // A big round head on a small body: cute rather than diagrammatic.
-  const hr = c.headR * 1.35 * H;
+  const bodyLen = c.bodyH * 0.85 * H;
+  const hr = c.headR * 1.15 * H;
   const hipY = groundY - legLen - lift;
   const neckY = hipY - bodyLen;
-  const headY = neckY - hr - c.neck * H * 0.6;
+  const headY = neckY - hr - lw * 0.5;
   const lc = c.legColor;
-  beginFigure(ctx, x, groundY, H, pose, H * 0.1);
-  const line = (trace: () => void, col = lc, w = lw) => P.strokeLimb(col, w, trace, true);
+  beginFigure(ctx, x, groundY, H, pose, H * 0.08);
+  const line = (trace: () => void) => P.strokeLimb(lc, lw, trace, true);
   // Legs with knees.
   for (const s of [-1, 1]) {
     const { swing, raise } = stride(pose.walk, s, legLen);
@@ -401,19 +402,7 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
       ctx.moveTo(x, hipY);
       ctx.lineTo(kx, ky);
       ctx.lineTo(fx, fy - lw * 0.5);
-      ctx.lineTo(fx + H * 0.028, fy - lw * 0.5);
     });
-  }
-  // A dress (bell and triangle bodies), under the spine.
-  if (c.body === "triangle" || c.body === "bell") {
-    const dy = neckY + bodyLen * 0.22;
-    ctx.beginPath();
-    ctx.moveTo(x - H * 0.02, dy);
-    ctx.lineTo(x + H * 0.02, dy);
-    ctx.lineTo(x + bodyLen * 0.38, hipY + H * 0.03);
-    ctx.lineTo(x - bodyLen * 0.38, hipY + H * 0.03);
-    ctx.closePath();
-    P.fillShape(c.bodyColor, dy, hipY);
   }
   // The spine.
   line(() => {
@@ -421,42 +410,20 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
     ctx.moveTo(x, neckY);
     ctx.lineTo(x, hipY);
   });
-  // The accent: a T-shirt, scarf or bow tie.
-  if (c.pattern === "half" && c.body !== "triangle" && c.body !== "bell") {
-    ctx.beginPath();
-    ctx.roundRect(x - H * 0.045, neckY + H * 0.004, H * 0.09, bodyLen * 0.55, H * 0.02);
-    P.fillShape(c.bodyColor, neckY, neckY + bodyLen * 0.55);
-  } else if (c.pattern === "stripes") {
-    line(() => {
-      ctx.beginPath();
-      ctx.moveTo(x - hr * 0.5, neckY + lw * 0.6);
-      ctx.lineTo(x + hr * 0.5, neckY + lw * 0.6);
-      ctx.moveTo(x + hr * 0.3, neckY + lw * 0.6);
-      ctx.quadraticCurveTo(x + hr * 0.75, neckY + bodyLen * 0.22, x + hr * 0.55, neckY + bodyLen * 0.42);
-    }, c.bodyColor, lw * 1.9);
-  } else if (c.pattern === "dots") {
-    const by = neckY + lw * 1.2;
-    ctx.beginPath();
-    ctx.moveTo(x, by);
-    ctx.lineTo(x - H * 0.03, by - H * 0.016);
-    ctx.lineTo(x - H * 0.03, by + H * 0.016);
-    ctx.closePath();
-    ctx.moveTo(x, by);
-    ctx.lineTo(x + H * 0.03, by - H * 0.016);
-    ctx.lineTo(x + H * 0.03, by + H * 0.016);
-    ctx.closePath();
-    P.fillShape(c.bodyColor, by - H * 0.02, by + H * 0.02);
-  }
   // Arms with elbows.
-  const shY = neckY + bodyLen * 0.14;
+  const shY = neckY + bodyLen * 0.16;
   const armLen = H * 0.27;
   const arm = (s: number): Pt => {
     const a = s < 0 ? pose.armL : pose.armR;
     const curl = (s < 0 ? pose.curlL : pose.curlR) ?? 0.3;
-    const ex = x + s * Math.sin(a) * armLen;
-    const ey = shY + Math.cos(a) * armLen;
-    const elx = (x + ex) / 2 + s * Math.cos(a) * armLen * 0.22 * curl;
-    const ely = (shY + ey) / 2 - Math.sin(a) * armLen * 0.22 * curl;
+    // A raised arm keeps its upper half out to the side (the forearm does the reaching), so it
+    // never crosses the big head.
+    const ua = a > 1.8 ? 1.8 : a;
+    const fa = a > 1.8 ? a + (a - 1.8) * 0.6 : a;
+    const elx = x + s * Math.sin(ua) * armLen * 0.52 + (a > 1.8 ? 0 : s * Math.cos(a) * armLen * 0.12 * curl);
+    const ely = shY + Math.cos(ua) * armLen * 0.52 - (a > 1.8 ? 0 : Math.sin(a) * armLen * 0.12 * curl);
+    const ex = elx + s * Math.sin(fa) * armLen * 0.48;
+    const ey = ely + Math.cos(fa) * armLen * 0.48;
     line(() => {
       ctx.beginPath();
       ctx.moveTo(x, shY);
@@ -467,18 +434,13 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
   };
   const l = arm(-1);
   const r = arm(1);
-  // The head, outlined like a drawing.
-  drawHeadHair(ctx, P, x, headY, hr, { ...c, head: "circle" });
-  if (!P.inked) {
-    ctx.strokeStyle = lc;
-    ctx.lineWidth = lw * 0.8;
+  // The head: an empty circle.
+  line(() => {
     ctx.beginPath();
     ctx.arc(x, headY, hr, 0, TAU);
-    ctx.stroke();
-  }
-  drawFace(ctx, x, headY, hr, c, pose);
+  });
   ctx.restore();
-  return { head: { x, y: headY, r: hr }, top: headY - hr * hairTop(c), ...hands(x, pose.flip, l, r) };
+  return { head: { x, y: headY, r: hr }, top: headY - hr - lw, ...hands(x, pose.flip, l, r) };
 }
 
 /* ───────────────────────── Classic rubber hose ───────────────────────── */

@@ -884,9 +884,13 @@ function proWalk(sc: SkillContext) {
     facing,
     legL: walking ? wk.legL : [-0.05, 0],
     legR: walking ? wk.legR : [0.05, 0],
-    armL: walking ? wk.armL : talk > 0 ? [lerp(idle.armL[0], -0.55, talk), lerp(idle.armL[1], -1.1, talk)] : idle.armL,
-    armR: walking ? wk.armR : [lerp(idle.armR[0], 2.4, ease.inOutCubic(waveK)), lerp(idle.armR[1], -0.4 + Math.sin(t * 10) * 0.35, waveK)],
-    handL: talk > 0.5 ? "open" : "open",
+    // Presenting: the upper arm stays near the body, the forearm comes up and forward, palm open.
+    armL: walking ? wk.armL : talk > 0 ? [lerp(idle.armL[0], -0.28, talk), lerp(idle.armL[1], -1.05, talk)] : idle.armL,
+    // A natural wave: the upper arm out at shoulder height, the elbow bent so the forearm stands up
+    // beside the head, rocking from the elbow (never bent back the wrong way).
+    armR: walking ? wk.armR : [lerp(idle.armR[0], 1.75, ease.inOutCubic(waveK)), lerp(idle.armR[1], 1.2 + Math.sin(t * 9) * 0.28, ease.inOutCubic(waveK))],
+    handL: "open",
+    handR: waveK > 0.3 ? "open" : undefined,
     lift: walking ? wk.lift : idle.lift,
     lean: walking ? wk.lean : idle.lean,
     sway: walking ? wk.sway : idle.sway,
@@ -1300,8 +1304,8 @@ function proHighFive(sc: SkillContext) {
       facing: lerp(s * 0.9, s * 0.25, after),
       legL: walking ? wk.legL : [-0.05, 0],
       legR: walking ? wk.legR : [0.05, 0],
-      armL: inner === "L" ? [lerp(walking ? wk.armL[0] : base.armL[0], raise[0], up), lerp(walking ? wk.armL[1] : base.armL[1], raise[1], up)] : cheer > 0 ? [lerp(base.armL[0], -2.5, cheer), lerp(base.armL[1], 0.2, cheer)] : walking ? wk.armL : base.armL,
-      armR: inner === "R" ? [lerp(walking ? wk.armR[0] : base.armR[0], raise[0], up), lerp(walking ? wk.armR[1] : base.armR[1], raise[1], up)] : cheer > 0 ? [lerp(base.armR[0], 2.5, cheer), lerp(base.armR[1], -0.2, cheer)] : walking ? wk.armR : base.armR,
+      armL: inner === "L" ? [lerp(walking ? wk.armL[0] : base.armL[0], raise[0], up), lerp(walking ? wk.armL[1] : base.armL[1], raise[1], up)] : cheer > 0 ? [lerp(base.armL[0], -2.5, cheer), lerp(base.armL[1], -0.25, cheer)] : walking ? wk.armL : base.armL,
+      armR: inner === "R" ? [lerp(walking ? wk.armR[0] : base.armR[0], raise[0], up), lerp(walking ? wk.armR[1] : base.armR[1], raise[1], up)] : cheer > 0 ? [lerp(base.armR[0], 2.5, cheer), lerp(base.armR[1], 0.25, cheer)] : walking ? wk.armR : base.armR,
       handL: "open",
       handR: "open",
       lift: (walking ? wk.lift : 0) + hop,
