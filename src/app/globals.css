@@ -1260,6 +1260,124 @@ textarea {
 .rail-all:hover {
   color: var(--text);
 }
+/* An intro's ⋯ menu: the button shows on hover, focus, the open intro and while its menu is open. */
+.rail-row {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.rail-more {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: #1b1828;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+.rail-row:hover .rail-more,
+.rail-row:focus-within .rail-more,
+.rail-row.menu-open .rail-more {
+  opacity: 1;
+}
+.rail-more:hover,
+.rail-row.menu-open .rail-more {
+  color: var(--text);
+  background: #262238;
+}
+@media (hover: none) {
+  .rail-more {
+    opacity: 1;
+  }
+}
+.intro-rail.open .rail-row:hover .rail-name,
+.intro-rail.open .rail-row.menu-open .rail-name {
+  padding-right: 30px;
+}
+.rail-editing {
+  cursor: default;
+}
+.rail-rename {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid color-mix(in srgb, var(--cyan) 60%, transparent);
+  border-radius: 7px;
+  padding: 5px 7px;
+  outline: none;
+}
+.rail-menu {
+  position: fixed;
+  z-index: 90;
+  width: 168px;
+  padding: 5px;
+  border-radius: 12px;
+  background: #15131f;
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  display: grid;
+  gap: 2px;
+}
+.rail-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.rail-menu-item:hover,
+.rail-menu-item:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  outline: none;
+}
+.rail-menu-item.danger {
+  color: #ff7a7a;
+}
+.rail-menu-item.danger:hover,
+.rail-menu-item.danger:focus-visible {
+  background: rgba(255, 90, 90, 0.12);
+}
+.rail-confirm {
+  margin: 4px 6px 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.rail-confirm b {
+  color: var(--text);
+}
+.rail-confirm-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.rail-confirm-row .rail-menu-item {
+  justify-content: center;
+}
+.rail-confirm-row .danger {
+  background: rgba(255, 90, 90, 0.14);
+}
 /* Folded: hovering an icon names it (fixed, so the scrolling list doesn't clip it). */
 .rail-tip {
   position: fixed;

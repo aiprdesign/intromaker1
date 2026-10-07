@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 
 export interface SidebarIntro {
@@ -28,12 +28,16 @@ const ago = (t: number) => {
  * box once there are more than six; + New intro at the top and All intros at the bottom. It folds
  * to icons only (its button or ⌘/Ctrl+B; hovering an icon names the intro), remembered on this
  * device; open on wide screens and folded on smaller ones until you choose. Hidden on phones.
+ * Each intro's ⋯ menu (or a right-click) renames, duplicates or deletes it (deleting asks first).
  */
 export default function IntroSidebar({
   intros,
   current,
   onOpen,
   onNew,
+  onRename,
+  onDuplicate,
+  onDelete,
   allHref,
   note,
 }: {
@@ -41,12 +45,48 @@ export default function IntroSidebar({
   current: string | null;
   onOpen: (intro: SidebarIntro) => void;
   onNew: () => void;
+  onRename?: (intro: SidebarIntro, title: string) => void;
+  onDuplicate?: (intro: SidebarIntro) => void;
+  onDelete?: (intro: SidebarIntro) => void;
   allHref: string;
   /** A line under the list (e.g. that intros are kept in this browser until you sign in). */
   note?: string;
 }) {
   const [open, setOpen] = useState(true);
   const [q, setQ] = useState("");
+  // An intro's menu (drawn fixed, outside the scrolling list), and the one being renamed.
+  const [menu, setMenu] = useState<{ intro: SidebarIntro; top: number; left: number; confirm?: boolean } | null>(null);
+  const [renaming, setRenaming] = useState<{ key: string; value: string } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const actions = !!(onRename || onDuplicate || onDelete);
+  const openMenu = (intro: SidebarIntro, anchor: { top: number; left: number }) => {
+    setTip(null);
+    setMenu({ intro, top: Math.min(anchor.top, window.innerHeight - 170), left: anchor.left });
+  };
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", esc);
+    window.addEventListener("resize", () => setMenu(null), { once: true });
+    // Focus the first choice, so the menu works from the keyboard.
+    requestAnimationFrame(() => menuRef.current?.querySelector<HTMLElement>("button")?.focus());
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [menu]);
+  const finishRename = (save: boolean) => {
+    const r = renaming;
+    setRenaming(null);
+    if (!r || !save) return;
+    const x = intros.find((i) => i.key === r.key);
+    const title = r.value.trim();
+    if (x && title && title !== x.title) onRename?.(x, title);
+  };
   // Folded: hovering an icon names it (drawn outside the scrolling list, so it isn't clipped).
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
   const tipProps = (text: string) => ({
@@ -124,19 +164,74 @@ export default function IntroSidebar({
       <ul className="rail-list">
         {shown.map((x) => {
           const on = x.key === current;
+          const editing = renaming?.key === x.key;
           return (
-            <li key={x.key}>
-              <button type="button" className={`rail-item${on ? " current" : ""}`} onClick={() => onOpen(x)} aria-current={on ? "page" : undefined} aria-label={open ? undefined : x.title} {...tipProps(x.title)}>
-                <span className="rail-icon" style={{ background: x.thumb ? undefined : x.color }} aria-hidden>
-                  {x.thumb ? <img src={x.thumb} alt="" /> : (x.title.trim()[0] ?? "•").toUpperCase()}
-                </span>
-                {open && (
-                  <span className="rail-text">
-                    <span className="rail-name">{x.title}</span>
-                    <small>{ago(x.updatedAt)}</small>
+            <li key={x.key} className={`rail-row${menu?.intro.key === x.key ? " menu-open" : ""}`}>
+              {editing ? (
+                <div className={`rail-item rail-editing${on ? " current" : ""}`}>
+                  <span className="rail-icon" style={{ background: x.thumb ? undefined : x.color }} aria-hidden>
+                    {x.thumb ? <img src={x.thumb} alt="" /> : (x.title.trim()[0] ?? "•").toUpperCase()}
                   </span>
-                )}
-              </button>
+                  <input
+                    className="rail-rename"
+                    autoFocus
+                    value={renaming.value}
+                    maxLength={80}
+                    aria-label="Intro name"
+                    onChange={(e) => setRenaming({ key: x.key, value: e.target.value })}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") finishRename(true);
+                      if (e.key === "Escape") finishRename(false);
+                    }}
+                    onBlur={() => finishRename(true)}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={`rail-item${on ? " current" : ""}`}
+                  onClick={() => onOpen(x)}
+                  onContextMenu={(e) => {
+                    if (!actions) return;
+                    e.preventDefault();
+                    openMenu(x, { top: e.clientY, left: e.clientX });
+                  }}
+                  aria-current={on ? "page" : undefined}
+                  aria-label={open ? undefined : x.title}
+                  {...tipProps(x.title)}
+                >
+                  <span className="rail-icon" style={{ background: x.thumb ? undefined : x.color }} aria-hidden>
+                    {x.thumb ? <img src={x.thumb} alt="" /> : (x.title.trim()[0] ?? "•").toUpperCase()}
+                  </span>
+                  {open && (
+                    <span className="rail-text">
+                      <span className="rail-name">{x.title}</span>
+                      <small>{ago(x.updatedAt)}</small>
+                    </span>
+                  )}
+                </button>
+              )}
+              {open && actions && !editing && (
+                <button
+                  type="button"
+                  className="rail-more"
+                  aria-label={`More for ${x.title}`}
+                  aria-haspopup="menu"
+                  aria-expanded={menu?.intro.key === x.key}
+                  onClick={(e) => {
+                    if (menu?.intro.key === x.key) return setMenu(null);
+                    const r = e.currentTarget.getBoundingClientRect();
+                    openMenu(x, { top: r.bottom + 4, left: r.right - 168 });
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+                    <circle cx="5" cy="12" r="1.8" fill="currentColor" />
+                    <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                    <circle cx="19" cy="12" r="1.8" fill="currentColor" />
+                  </svg>
+                </button>
+              )}
             </li>
           );
         })}
@@ -148,6 +243,70 @@ export default function IntroSidebar({
         <Icon name="Layers" size={16} />
         {open && <span>All intros</span>}
       </a>
+      {menu && (
+        <div ref={menuRef} className="rail-menu" role="menu" aria-label={menu.intro.title} style={{ top: menu.top, left: Math.max(8, menu.left) }}>
+          {menu.confirm ? (
+            <>
+              <p className="rail-confirm">
+                Delete <b>{menu.intro.title}</b>? {menu.intro.key.startsWith("a:") ? "It's removed from your account." : "It's removed from this browser."} This can't be undone.
+              </p>
+              <div className="rail-confirm-row">
+                <button type="button" role="menuitem" className="rail-menu-item" onClick={() => setMenu(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="rail-menu-item danger"
+                  onClick={() => {
+                    const x = menu.intro;
+                    setMenu(null);
+                    onDelete?.(x);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {onRename && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="rail-menu-item"
+                  onClick={() => {
+                    if (!open) toggle();
+                    setRenaming({ key: menu.intro.key, value: menu.intro.title });
+                    setMenu(null);
+                  }}
+                >
+                  <Icon name="Pencil" size={15} /> Rename
+                </button>
+              )}
+              {onDuplicate && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="rail-menu-item"
+                  onClick={() => {
+                    const x = menu.intro;
+                    setMenu(null);
+                    onDuplicate(x);
+                  }}
+                >
+                  <Icon name="Copy" size={15} /> Duplicate
+                </button>
+              )}
+              {onDelete && (
+                <button type="button" role="menuitem" className="rail-menu-item danger" onClick={() => setMenu({ ...menu, confirm: true })}>
+                  <Icon name="Trash2" size={15} /> Delete
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
       {tip && (
         <span className="rail-tip" role="tooltip" style={{ top: tip.top, left: tip.left }}>
           {tip.text}

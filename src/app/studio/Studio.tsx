@@ -14,7 +14,7 @@ import { pauseThumbs, sceneThumb, thumbsReady, restyleScene } from "@/lib/thumbs
 import { redesignPlan } from "@/engine/redesign";
 import { outputDuration, playSpeed } from "@/engine/speed";
 import IntroSidebar, { type SidebarIntro } from "@/components/IntroSidebar";
-import { listLocalIntros, loadLocalIntro, newIntroId, saveLocalIntro, type LocalIntro } from "@/lib/localIntros";
+import { duplicateLocalIntro, listLocalIntros, loadLocalIntro, newIntroId, removeLocalIntro, renameLocalIntro, saveLocalIntro, type LocalIntro } from "@/lib/localIntros";
 import SlideTimeline from "@/components/SlideTimeline";
 import Icon from "@/components/Icon";
 import { useReorder } from "@/components/useReorder";
@@ -1160,6 +1160,84 @@ export default function Studio() {
     requestAnimationFrame(() => document.getElementById("studio-prompt")?.focus());
   };
 
+  /** Sidebar ⋯ menu: rename an intro (the account copy and this browser's). */
+  const renameIntro = (x: SidebarIntro, title: string) => {
+    const id = x.key.slice(2);
+    if (x.key.startsWith("a:")) {
+      setAccountFilms((fs) => fs.map((f) => (f.id === id ? { ...f, title } : f)));
+      const local = localIntros.find((l) => l.savedId === id);
+      if (local) setLocalIntros(renameLocalIntro(local.id, title));
+      fetch(`/api/account/films/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) })
+        .then((r) => {
+          if (!r.ok) throw new Error();
+        })
+        .catch(() => {
+          setToast({ text: "Couldn't rename that intro.", key: Date.now() });
+          loadAccountFilms();
+        });
+      return;
+    }
+    setLocalIntros(renameLocalIntro(id, title));
+  };
+  /** Sidebar ⋯ menu: a copy of an intro, kept in this browser (and in the account when signed in). */
+  const duplicateIntro = async (x: SidebarIntro) => {
+    const id = x.key.slice(2);
+    let made: { id: string; list: LocalIntro[] } | null = null;
+    if (x.key.startsWith("a:")) {
+      try {
+        const r = await fetch(`/api/account/films/${encodeURIComponent(id)}`);
+        if (!r.ok) throw new Error();
+        const f = (await r.json()) as { plan: VideoPlan; title?: string; thumb?: string };
+        const plan = sanitizePlan(f.plan);
+        // The account keeps the copy too, when there's room (otherwise it stays in this browser).
+        const res = await fetch("/api/account/films", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `${x.title} copy`.slice(0, 120), plan, thumb: f.thumb }) });
+        const saved = res.ok ? ((await res.json()) as { id: string }) : null;
+        made = duplicateLocalIntro({ title: x.title, color: plan.brand?.colors?.primary ?? "#7c5cff", aspect: plan.aspect }, { v: 1, plan, prompt: "", current: 0, takes: [] });
+        if (made && saved) made = { id: made.id, list: saveLocalIntro({ ...made.list.find((l) => l.id === made!.id)!, savedId: saved.id }, { ...loadLocalIntro<Record<string, unknown>>(made.id), savedId: saved.id }) };
+        if (saved) loadAccountFilms();
+        else if (res.status === 402) setToast({ text: "Your plan's saved intros are full, so the copy is kept in this browser.", key: Date.now(), link: { label: "My intros", href: "/account" } });
+      } catch {
+        made = null;
+      }
+    } else {
+      const l = localIntros.find((i) => i.id === id);
+      made = l ? duplicateLocalIntro(l) : null;
+    }
+    if (!made) {
+      setToast({ text: "Couldn't duplicate that intro.", key: Date.now() });
+      return;
+    }
+    setLocalIntros(made.list);
+    setToast({ text: `Duplicated as “${made.list.find((l) => l.id === made!.id)?.title ?? "a copy"}”.`, key: Date.now() });
+  };
+  /** Sidebar ⋯ menu: delete an intro (after the menu's confirm). Deleting the open one starts a new intro. */
+  const deleteIntro = (x: SidebarIntro) => {
+    const id = x.key.slice(2);
+    const wasOpen = x.key === currentIntro;
+    if (x.key.startsWith("a:")) {
+      setAccountFilms((fs) => fs.filter((f) => f.id !== id));
+      // This browser's copy of it goes too, so it doesn't reappear as a local intro.
+      let list = localIntros;
+      for (const l of localIntros) if (l.savedId === id) list = removeLocalIntro(l.id);
+      setLocalIntros(list);
+      fetch(`/api/account/films/${encodeURIComponent(id)}`, { method: "DELETE" })
+        .then((r) => {
+          if (!r.ok) throw new Error();
+        })
+        .catch(() => {
+          setToast({ text: "Couldn't delete that intro from your account.", key: Date.now() });
+          loadAccountFilms();
+        });
+    } else setLocalIntros(removeLocalIntro(id));
+    if (wasOpen) {
+      // Nothing left to autosave into the deleted intro.
+      savedIdRef.current = null;
+      localIdRef.current = null;
+      newIntro();
+    }
+    setToast({ text: `Deleted “${x.title}”.`, key: Date.now() });
+  };
+
   const clearSite = () => {
     setSite(null);
     setBrandColors(undefined);
@@ -1177,7 +1255,18 @@ export default function Studio() {
       if (localIdRef.current)
         setLocalIntros(
           saveLocalIntro(
-            { id: localIdRef.current, title: introTitle(plan, prompt), updatedAt: Date.now(), color: plan.brand?.colors?.primary ?? "#7c5cff", aspect: plan.aspect, savedId: savedIdRef.current ?? undefined },
+            {
+              id: localIdRef.current,
+              // A name you gave it stays; otherwise it follows the video's name.
+              ...(() => {
+                const was = listLocalIntros().find((x) => x.id === localIdRef.current);
+                return was?.named ? { title: was.title, named: true } : { title: introTitle(plan, prompt) };
+              })(),
+              updatedAt: Date.now(),
+              color: plan.brand?.colors?.primary ?? "#7c5cff",
+              aspect: plan.aspect,
+              savedId: savedIdRef.current ?? undefined,
+            },
             { ...film, takes: [], current: 0 },
           ),
         );
@@ -1804,6 +1893,9 @@ export default function Studio() {
           current={currentIntro}
           onOpen={openIntro}
           onNew={newIntro}
+          onRename={renameIntro}
+          onDuplicate={duplicateIntro}
+          onDelete={deleteIntro}
           allHref="/account"
           note={account?.user ? undefined : "Kept in this browser. Sign in to save them to your account."}
         />

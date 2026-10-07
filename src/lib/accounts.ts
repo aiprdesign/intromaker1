@@ -419,10 +419,11 @@ export async function saveFilm(u: User, input: { id?: string; title?: string; pl
   const planJson = JSON.stringify(input.plan);
   if (planJson.length > MAX_FILM_BYTES) throw new AccountError("This video is too large to save (it holds very large images).", 413);
   const thumb = typeof input.thumb === "string" && input.thumb.startsWith("data:image/") && input.thumb.length <= MAX_THUMB ? input.thumb : undefined;
-  const title = (input.title || input.plan.title || "Untitled").trim().slice(0, 120);
   return serial(async () => {
     await mkdir(filmDir(u.id), { recursive: true });
     const existing = input.id ? await getSavedFilm(u.id, input.id) : null;
+    // Saving again keeps a title you gave it (a rename) unless a new one is passed.
+    const title = (input.title || existing?.title || input.plan.title || "Untitled").trim().slice(0, 120);
     if (!existing) {
       const limit = (await limitsFor(u)).savedFilms;
       if ((await countFilms(u.id)) >= limit)

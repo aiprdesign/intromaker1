@@ -265,6 +265,8 @@ import {
   Cat,
   Bone,
   ImagePlus,
+  Pencil,
+  Trash2,
 } from "lucide";
 
 export type IconNode = [tag: string, attrs: Record<string, string | number | undefined>][];
@@ -535,4 +537,6 @@ export const LUCIDE = {
   Cat,
   Bone,
   ImagePlus,
+  Pencil,
+  Trash2,
 } as unknown as Record<string, IconNode>;
