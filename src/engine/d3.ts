@@ -274,7 +274,12 @@ export function gable(gl: OGLRenderingContext, width: number, rise: number, dept
       nor.push(...n);
       uv.push(i === 1 || i === 2 ? 1 : 0, i >= 2 ? 1 : 0);
     });
-    idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    // Wind the face so it faces outwards (along its normal), or it's culled as a back face.
+    const e1 = [p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2]];
+    const e2 = [p[2][0] - p[0][0], p[2][1] - p[0][1], p[2][2] - p[0][2]];
+    const c = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    if (c[0] * n[0] + c[1] * n[1] + c[2] * n[2] >= 0) idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    else idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
   };
   quadF([[-a, 0, z], [-a, 0, -z], [0, rise, -z], [0, rise, z]], nl);
   quadF([[a, 0, -z], [a, 0, z], [0, rise, z], [0, rise, -z]], nr);
@@ -334,6 +339,7 @@ uniform float uClip;
 uniform vec4 uFog;
 uniform float uFlat;
 uniform float uSheen;
+uniform vec3 uRim;
 uniform sampler2D tShadow;
 uniform float uShadowSoft;
 #ifdef MAP
@@ -348,6 +354,10 @@ uniform float uFloorAlpha;
 #endif
 #ifdef GRASS
 uniform vec3 uColor2;
+#endif
+#ifdef BACKDROP
+uniform vec3 uGlowA;
+uniform vec3 uGlowB;
 #endif
 
 float unpackDepth(vec4 c) { return dot(c, 1.0 / vec4(1.0, 255.0, 65025.0, 16581375.0)); }
@@ -405,6 +415,13 @@ void main() {
 #ifdef SHINGLE
   base *= 1.0 - 0.14 * smoothstep(0.75, 1.0, fract(vW.y * 5.5)) - 0.05 * step(0.5, fract(floor(vW.y * 5.5) * 0.5 + vW.z * 1.4));
 #endif
+#ifdef BACKDROP
+  // Soft pools of the brand's colours on the backdrop, like coloured studio lights.
+  float ga = exp(-(pow(vW.x + 5.5, 2.0) + pow(vW.y - 3.5, 2.0) * 1.4 + pow(vW.z + 8.0, 2.0) * 0.2) / 26.0);
+  float gb = exp(-(pow(vW.x - 6.0, 2.0) + pow(vW.y - 2.0, 2.0) * 1.4 + pow(vW.z + 8.0, 2.0) * 0.2) / 22.0);
+  base = mix(base, uGlowA, ga * 0.55);
+  base = mix(base, uGlowB, gb * 0.45);
+#endif
 #ifdef GRASS
   float nz = hash(floor(vW.xz * 6.0)) * 0.5 + hash(floor(vW.xz * 1.3)) * 0.5;
   base = mix(uColor, uColor2, nz);
@@ -426,7 +443,8 @@ void main() {
 #ifdef MAP
   // A screen: the picture glows (cover-fitted, scrolling), behind glass with a corner radius.
   vec2 sUv = vUv * uUv.xy + uUv.zw;
-  vec3 img = texture2D(tMap, vec2(sUv.x, 1.0 - sUv.y)).rgb;
+  // (Textures load flipped, so the image's top is t = 1; the window runs down from its top.)
+  vec3 img = texture2D(tMap, vec2(sUv.x, 1.0 - ((1.0 - vUv.y) * uUv.y + uUv.w))).rgb;
   vec2 q = abs(vUv - 0.5) * vec2(uRound.y, 1.0) - (vec2(uRound.y, 1.0) * 0.5 - uRound.x);
   float mask = 1.0 - smoothstep(-0.002, 0.002, length(max(q, 0.0)) - uRound.x);
   vec3 dark = vec3(0.02, 0.022, 0.03);
@@ -451,6 +469,10 @@ void main() {
   return;
 #endif
   col += uEmit;
+#if !defined(MAP) && !defined(FLOOR) && !defined(BACKDROP)
+  // A coloured rim light catching the edges.
+  col += uRim * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (1.0 - uFlat);
+#endif
   // Haze with distance (outdoor scenes), towards the horizon's colour.
   if (uFog.a > 0.0 && uFlat < 0.5) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
   col *= uExposure;
@@ -478,7 +500,7 @@ export interface MatOpts {
   metal?: number;
   gloss?: number;
   alpha?: number;
-  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass" | "siding" | "shingle";
+  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass" | "siding" | "shingle" | "backdrop";
   color2?: string;
   /** Light it gives off (a lit window), added to its shading. */
   emit?: string | Num3;
@@ -534,10 +556,11 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     uFog: { value: [1, 1, 1, 0] },
     uFlat: { value: 0 },
     uSheen: { value: -9 },
+    uRim: { value: [0, 0, 0] },
   };
   const blank = new Texture(gl, { image: new Uint8Array([0, 0, 0, 255]), width: 1, height: 1 });
   const mat = (o: MatOpts) => {
-    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : o.kind === "siding" ? "#define SIDING\n" : o.kind === "shingle" ? "#define SHINGLE\n" : "";
+    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : o.kind === "siding" ? "#define SIDING\n" : o.kind === "shingle" ? "#define SHINGLE\n" : o.kind === "backdrop" ? "#define BACKDROP\n" : "";
     const uniforms: Record<string, { value: unknown }> = {
       ...env,
       uColor: { value: typeof o.color === "string" ? rgb(o.color) : o.color },
@@ -550,6 +573,7 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     if (o.kind === "screen") Object.assign(uniforms, { tMap: { value: blank }, uUv: { value: [1, 1, 0, 0] }, uGlow: { value: 1 }, uRound: { value: [0.04, 1.6, 0] } });
     if (o.kind === "floor") Object.assign(uniforms, { uBlob: { value: new Array(24).fill(0) }, uFloorAlpha: { value: 1 } });
     if (o.kind === "grass") uniforms.uColor2 = { value: rgb(o.color2 ?? "#5a9e48") };
+    if (o.kind === "backdrop") Object.assign(uniforms, { uGlowA: { value: [1, 1, 1] }, uGlowB: { value: [1, 1, 1] } });
     const transparent = o.transparent ?? (o.kind === "floor" || o.kind === "screen" || (o.alpha ?? 1) < 1);
     return new Program(gl, { vertex: VERT, fragment: defines + FRAG, uniforms, transparent, depthWrite: o.kind !== "floor", cullFace: o.doubleSided ? false : gl.BACK });
   };
@@ -580,6 +604,8 @@ export interface View {
   sky?: Num3;
   gnd?: Num3;
   exposure?: number;
+  /** A coloured rim light on edges (rgb, 0 for none). */
+  rim?: Num3;
   /** Where a light sweep crosses the screens (0 → 1.4 across; unset: none). */
   sheen?: number;
   /** Draw it flat, as a 2D illustration: a straight-on (orthographic) camera and two-tone colour. */
@@ -621,6 +647,7 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   env.uFog.value = v.fog ?? [1, 1, 1, 0];
   env.uFlat.value = v.flat ? 1 : 0;
   env.uSheen.value = v.sheen ?? -9;
+  env.uRim.value = v.rim ?? [0, 0, 0];
   const size = v.shadowSize ?? 4;
   const c = v.shadowAt ?? v.target;
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });
@@ -637,7 +664,7 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
 }
 
 /** Set a screen material's picture: cover-fit `aspect` (w/h of the screen), scrolled `scroll` (0 → 1) down a tall image. */
-export function setScreen(p: Program, tex: Texture, imgW: number, imgH: number, aspect: number, scroll: number, glow: number, radius = 0.04) {
+export function setScreen(p: Program, tex: Texture, imgW: number, imgH: number, aspect: number, scroll: number, glow: number, radius = 0.04, maxScreens = 2.5) {
   const ia = imgW && imgH ? imgW / imgH : aspect;
   // Width fills the screen; the visible window's height is a fraction of the image's.
   let sx = 1;
@@ -646,7 +673,8 @@ export function setScreen(p: Program, tex: Texture, imgW: number, imgH: number, 
     sx = 1 / sy;
     sy = 1;
   }
-  const oy = (1 - sy) * Math.min(1, Math.max(0, scroll));
+  // A tall page scrolls down a few screens at most, at a readable pace.
+  const oy = Math.min(1 - sy, sy * maxScreens) * Math.min(1, Math.max(0, scroll));
   p.uniforms.tMap.value = tex;
   p.uniforms.uUv.value = [sx, sy, (1 - sx) / 2, oy];
   p.uniforms.uGlow.value = glow;

@@ -28,6 +28,8 @@ export interface Capture {
   parts: SitePart[];
   /** The header logo: an image URL from the page, or a saved SVG/PNG (/api/shot URL). */
   logo: string | null;
+  /** The site on a phone (390 px wide, top of the page down a few screens), for phone mock-ups. */
+  mobile: string | null;
 }
 
 async function launch(): Promise<Browser | null> {
@@ -574,12 +576,56 @@ async function captureSiteNow(url: string): Promise<Capture | null> {
     const html = await page.content();
     // Last: the logo capture may clear page backgrounds for a transparent screenshot.
     const logo = await captureLogo(page, key).catch(() => null);
-    return { html, finalUrl: page.url(), hero, full, sections, bands, parts, logo };
+    // The same page as a phone shows it, for phone screens in device slides.
+    const finalUrl = page.url();
+    const mobile = await Promise.race([captureMobile(browser, finalUrl, key).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 25_000).unref?.())]);
+    return { html, finalUrl, hero, full, sections, bands, parts, logo, mobile };
   } catch (e) {
     console.warn("[capture] live capture failed, using static fetch:", (e as Error).message);
     return null;
   } finally {
     await browser.close().catch(() => {});
+  }
+}
+
+/** The page on a phone: a mobile viewport and user agent, cleaned like the desktop shots. */
+async function captureMobile(browser: Browser, url: string, key: string): Promise<string | null> {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    colorScheme: "dark",
+    locale: "en-US",
+  });
+  try {
+    // The same public-address check as the desktop capture (SSRF guard).
+    await context.route("**/*", async (route) => {
+      const u = route.request().url();
+      if (u.startsWith("data:") || u.startsWith("blob:")) return route.continue();
+      if (!/^https?:/i.test(u) || !(await hostAllowed(u))) return route.abort();
+      return route.continue();
+    });
+    const page = await context.newPage();
+    const res = await page.goto(url, { waitUntil: "load", timeout: 15_000 }).catch(() => null);
+    if (!res || res.status() >= 400) return null;
+    await page.waitForTimeout(800);
+    await cleanPage(page);
+    await page.evaluate(async () => {
+      for (let y = 0; y < 2600; y += 600) {
+        window.scrollTo(0, y);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      window.scrollTo(0, 0);
+    });
+    await page.waitForTimeout(500);
+    await cleanPage(page);
+    const h = await page.evaluate(() => document.documentElement.scrollHeight);
+    const shot = await page.screenshot({ type: "jpeg", quality: 80, scale: "css", fullPage: true, clip: { x: 0, y: 0, width: 390, height: Math.max(844, Math.min(h, 2600)) } });
+    return await save(`${key}-mobile`, shot);
+  } finally {
+    await context.close().catch(() => {});
   }
 }
 

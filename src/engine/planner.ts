@@ -1027,6 +1027,8 @@ export function brandFromSite(site: SiteData, colors?: Brand["colors"]): Brand {
     domain: site.domain,
     logo: site.logo ? assetUrl(site.logo) : undefined,
     icon: site.icon ? assetUrl(site.icon) : undefined,
+    shot: site.shots?.hero ? assetUrl(site.shots.hero) : undefined,
+    mobile: site.shots?.mobile ? assetUrl(site.shots.mobile) : undefined,
     page: site.shots?.full && site.shots.bands?.length ? { src: site.shots.full, bands: site.shots.bands } : undefined,
     images: site.images.map(assetUrl),
     videos: site.videos.map(assetUrl),
@@ -1074,6 +1076,7 @@ export function readSite(raw: unknown): SiteData | null {
         sections: (Array.isArray(sh.sections) ? sh.sections : []).filter(isShot).slice(0, 6),
         parts: sanitizeParts(sh.parts),
         bands: sanitizeBands(sh.bands),
+        mobile: isShot(sh.mobile) ? sh.mobile : null,
       };
     })(),
     cta: typeof r.cta === "string" ? r.cta.slice(0, 40) : null,
@@ -2585,7 +2588,7 @@ export function beatSync(plan: VideoPlan): VideoPlan {
 }
 
 /** Only same-origin proxied assets may be referenced by a plan. */
-const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|s\d|p\d{1,2}|u\d{1,2}|logo)$/.test(s);
+const isShot = (s: unknown): s is string => typeof s === "string" && /^\/api\/shot\?id=[a-f0-9]{16}-(hero|full|mobile|s\d|p\d{1,2}|u\d{1,2}|logo)$/.test(s);
 const PART_KINDS = new Set(["media", "panel", "card", "button"]);
 function sanitizeParts(v: unknown): SitePart[] {
   if (!Array.isArray(v)) return [];
@@ -2635,6 +2638,8 @@ function sanitizeBrand(b: unknown): Brand | undefined {
     domain: typeof brand.domain === "string" ? brand.domain.slice(0, 80) : undefined,
     logo: isAsset(brand.logo) ? brand.logo : undefined,
     icon: isAsset(brand.icon) ? brand.icon : undefined,
+    shot: isAsset(brand.shot) ? brand.shot : undefined,
+    mobile: isAsset(brand.mobile) ? brand.mobile : undefined,
     page: brand.page && isAsset(brand.page.src) && sanitizeBands(brand.page.bands).length ? { src: brand.page.src, bands: sanitizeBands(brand.page.bands) } : undefined,
     images: (brand.images ?? []).filter(isAsset).slice(0, 14),
     videos: (brand.videos ?? []).filter(isAsset).slice(0, 4),

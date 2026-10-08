@@ -10,7 +10,7 @@
  * - d3-dive:    the camera flies from a wide shot straight into the laptop's screen, landing on the page.
  * - d3-desk:    a desk scene from above: the laptop, a phone, a mug in your colour, a notebook, a plant.
  */
-import type { Program, Transform } from "ogl";
+import { Torus, type Program, type Transform } from "ogl";
 import { cove, quad, render, rgb, setScreen, slab, cylinder, sphere, box, world, type View, type World } from "../d3";
 import { desktopUI, mobileUI } from "../uiscreens";
 import { getMedia, type Drawable } from "../media";
@@ -24,11 +24,24 @@ import { exitOf, stage } from "./beats";
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 type Num3 = [number, number, number];
 
-/** The slide's picture (or the site's screenshot); without one, a designed app screen in the video's colours. */
+const picOf = (sc: SkillContext, src?: string) => (src ? getMedia({ src, kind: "image" }, sc.t) : undefined);
+
+/**
+ * What a screen shows, picked automatically: the slide's own picture when it suits the screen, else
+ * the website itself (the full page on laptops and tablets, scrolling; the site as a phone shows it
+ * on phones), else a designed app screen in the video's colours with the brand's name.
+ */
 function shotOf(sc: SkillContext, mobile = false): Drawable | HTMLCanvasElement {
-  const { scene, brand, t } = sc;
-  const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
-  if (media) return media;
+  const { scene, brand } = sc;
+  const own = scene.media ? getMedia(scene.media, sc.t) : undefined;
+  if (own) {
+    const { w, h } = sizeOf(own);
+    // A phone takes a portrait picture; a wide one goes on the laptop and the phone shows the mobile site.
+    if (!mobile || h > w * 1.15) return own;
+  }
+  const site = mobile ? (picOf(sc, brand?.mobile) ?? picOf(sc, brand?.page?.src) ?? picOf(sc, brand?.shot)) : (picOf(sc, brand?.page?.src) ?? picOf(sc, brand?.shot));
+  if (site) return site;
+  if (own) return own;
   const name = (brand?.name ?? "").replace(/[*|]/g, "").trim();
   return mobile ? mobileUI(sc.palette, name, sc.seed) : desktopUI(sc.palette, name, sc.seed);
 }
@@ -192,6 +205,7 @@ interface DeviceParts {
   floor: Program;
   floorMesh: Transform;
   wall: Program;
+  candy: { node: Transform; mat: Program }[];
   podium: Transform;
   podiumTop: Program;
   ring: Program;
@@ -210,7 +224,7 @@ function devicesWorld(W: World): DeviceParts {
   f.rotation.x = -Math.PI / 2;
   // The studio: a seamless backdrop curving from floor to wall, and a round podium with a light
   // ring in the brand's colour.
-  const wall = W.mat({ color: "#eef0f4", gloss: 0.18 });
+  const wall = W.mat({ color: "#eef0f4", gloss: 0.18, kind: "backdrop" });
   const c = W.mesh(cove(gl, 80, 30, 6, 30), wall, W.scene, false);
   c.position.set(0, 0, -5);
   const podium = group(W);
@@ -219,7 +233,27 @@ function devicesWorld(W: World): DeviceParts {
   W.mesh(cylinder(gl, 2.7, 2.75, POD - 0.04, 72), podiumTop, podium).position.y = (POD - 0.04) / 2;
   W.mesh(cylinder(gl, 2.76, 2.76, 0.035, 72), ring, podium, false).position.y = 0.06;
   W.mesh(cylinder(gl, 2.66, 2.7, 0.04, 72), podiumTop, podium).position.y = POD - 0.02;
-  return { lap, phone, tab, floor, floorMesh: f, wall, podium, podiumTop, ring };
+  // Eye candy: glossy shapes in the brand's colours that float slowly round the devices.
+  const candy: { node: Transform; mat: Program }[] = [];
+  const shapes = [
+    sphere(gl, 0.42, 40, 28),
+    new Torus(gl, { radius: 0.42, tube: 0.15, radialSegments: 28, tubularSegments: 64 }),
+    slab(gl, 0.62, 0.62, 0.62, 0.16, 0.14),
+    sphere(gl, 0.2, 28, 20),
+    cylinder(gl, 0.16, 0.16, 0.7, 36),
+    sphere(gl, 0.28, 32, 22),
+  ];
+  shapes.forEach((g, i) => {
+    const n = group(W);
+    const mat = W.mat({ color: "#ffffff", metal: i === 3 ? 0.9 : 0.12, gloss: 0.88 });
+    if ("front" in g) {
+      W.mesh(g.front, mat, n);
+      W.mesh(g.back, mat, n);
+      W.mesh(g.body, mat, n);
+    } else W.mesh(g as ReturnType<typeof sphere>, mat, n);
+    candy.push({ node: n, mat });
+  });
+  return { lap, phone, tab, floor, floorMesh: f, wall, candy, podium, podiumTop, ring };
 }
 
 /** Device finishes that suit the stage: silver on light stages, space grey on dark ones; the phone's back in a soft tint of the brand. */
@@ -229,6 +263,10 @@ function finish(sc: SkillContext, P: DeviceParts) {
   for (const m of [...P.lap.metal, ...P.phone.metal, ...P.tab.metal]) m.uniforms.uColor.value = alu;
   for (const s of [P.phone, P.tab]) if (s.back) s.back.uniforms.uColor.value = rgb(mixHex(light ? "#eceef2" : "#5d626c", sc.palette.primary, 0.22));
   P.wall.uniforms.uColor.value = rgb(studioTone(sc));
+  P.wall.uniforms.uGlowA.value = rgb(mixHex(sc.palette.primary, light ? "#ffffff" : "#000000", light ? 0.35 : 0.2));
+  P.wall.uniforms.uGlowB.value = rgb(mixHex(sc.palette.secondary, light ? "#ffffff" : "#000000", light ? 0.35 : 0.2));
+  const tints = [sc.palette.primary, sc.palette.secondary, sc.palette.accent, light ? "#e9ebf0" : "#c9ccd6", mixHex(sc.palette.primary, "#ffffff", 0.45), "#ffffff"];
+  P.candy.forEach((c, i) => void (c.mat.uniforms.uColor.value = rgb(tints[i % tints.length])));
   P.podiumTop.uniforms.uColor.value = rgb(mixHex(studioTone(sc), light ? "#ffffff" : "#000000", 0.35));
   const pr = rgb(sc.palette.primary);
   P.ring.uniforms.uColor.value = pr;
@@ -249,6 +287,47 @@ function studio(sc: SkillContext) {
   ctx.fillRect(0, 0, w, h);
 }
 
+/**
+ * Float the eye candy: each shape at its spot in `layout` ([x, y, z, scale]), bobbing and turning
+ * slowly on the slide's clock; it rises into place at the start. Shapes past the layout hide.
+ */
+function floatCandy(P: DeviceParts, layout: [number, number, number, number][], t: number) {
+  P.candy.forEach((c, i) => {
+    const L = layout[i];
+    const on = !!L;
+    c.node.visible = on;
+    c.node.traverse((n) => void (n.visible = on));
+    if (!L) return;
+    const rise = ease.outCubic(range(t, 0.1 + i * 0.08, 1.1 + i * 0.08));
+    c.node.position.set(L[0], L[1] + Math.sin(t * 0.9 + i * 1.7) * 0.12 - (1 - rise) * 1.2, L[2]);
+    const k = L[3] * Math.max(0.001, rise);
+    c.node.scale.set(k, k, k);
+    c.node.rotation.set(t * 0.25 + i, t * 0.35 + i * 2, i % 2 ? t * 0.2 : 0);
+  });
+}
+const CANDY_LAPTOP: [number, number, number, number][] = [
+  [-2.9, 2.5, -1.2, 1],
+  [3.0, 2.1, -0.9, 1],
+  [2.6, 0.75, 1.3, 0.8],
+  [-2.3, 1.0, 1.4, 1],
+  [-3.4, 1.4, 0.3, 0.9],
+  [3.5, 3.0, -1.8, 0.9],
+];
+const CANDY_PHONE: [number, number, number, number][] = [
+  [-1.25, 2.1, -0.5, 0.75],
+  [1.3, 1.7, -0.4, 0.75],
+  [1.0, 0.75, 0.7, 0.6],
+  [-0.95, 0.9, 0.8, 0.9],
+  [-1.6, 1.3, -1.0, 0.7],
+  [1.65, 2.5, -1.1, 0.6],
+];
+const CANDY_LINEUP: [number, number, number, number][] = [
+  [-4.6, 2.9, -1.6, 1],
+  [4.4, 2.6, -1.4, 1],
+  [0.6, 3.4, -2.2, 0.8],
+  [-1.6, 3.1, -1.8, 1],
+];
+
 /** Stand the devices on the podium (or on the studio floor). */
 function onPodium(P: DeviceParts, on: boolean) {
   P.podium.visible = on;
@@ -265,6 +344,7 @@ function lighting(sc: SkillContext): Partial<View> {
     gnd: light ? [0.55, 0.53, 0.52] : [0.25, 0.25, 0.3],
     exposure: light ? 1.0 : 1.08,
     flat: !!sc.flat3d,
+    rim: rgb(mixHex(sc.palette.primary, "#ffffff", 0.3)).map((v) => v * (light ? 0.22 : 0.5)) as Num3,
     // A light sweep crosses the glass once the screen is on, now and then.
     sheen: ((sc.t - 1.6) % 4.5) * 0.9 - 0.3,
   };
@@ -285,7 +365,25 @@ function show(P: DeviceParts, which: { lap?: boolean; phone?: boolean; tab?: boo
 }
 
 /** Put the picture on a screen. */
-function paint(W: World, p: Program, shot: Drawable | HTMLCanvasElement, aspect: number, scroll: number, glow: number, radius: number) {
+const copies = new WeakMap<object, HTMLCanvasElement>();
+/** Images go to the GPU as a canvas copy, so they upload the same way (and the right way up) as drawn screens. */
+function asCanvas(src: Drawable | HTMLCanvasElement): Drawable | HTMLCanvasElement {
+  if (!(src instanceof HTMLImageElement) || !src.naturalWidth) return src;
+  let c = copies.get(src);
+  if (!c) {
+    c = document.createElement("canvas");
+    // (Kept within common GPU texture limits.)
+    const k = Math.min(1, 8192 / Math.max(src.naturalWidth, src.naturalHeight));
+    c.width = Math.round(src.naturalWidth * k);
+    c.height = Math.round(src.naturalHeight * k);
+    c.getContext("2d")!.drawImage(src, 0, 0, c.width, c.height);
+    copies.set(src, c);
+  }
+  return c;
+}
+
+function paint(W: World, p: Program, shot0: Drawable | HTMLCanvasElement, aspect: number, scroll: number, glow: number, radius: number) {
+  const shot = asCanvas(shot0);
   const tex = textureOf(W.renderer, shot);
   const { w, h } = sizeOf(shot);
   setScreen(p, tex, w, h, aspect, scroll, glow, radius);
@@ -354,6 +452,7 @@ function d3Laptop(sc: SkillContext) {
       finish(sc, P);
       show(P, { lap: true });
       onPodium(P, true);
+      floatCandy(P, CANDY_LAPTOP, t);
       P.lap.root.position.set(0, POD + 0.015, 0);
       P.lap.root.rotation.y = 0;
       const open = ease.inOutCubic(range(t, 0.15, 1.7));
@@ -385,6 +484,7 @@ function d3Phone(sc: SkillContext) {
       finish(sc, P);
       show(P, { phone: true });
       onPodium(P, true);
+      floatCandy(P, CANDY_PHONE.map(([x, y, z, k]) => [x, y + POD, z, k] as [number, number, number, number]), t);
       const turn = ease.inOutCubic(range(t, 0.1, 1.9));
       const bob = Math.sin(t * 1.6) * 0.04;
       P.phone.root.position.set(0, 1.05 + POD + bob, 0);
@@ -414,6 +514,7 @@ function d3Lineup(sc: SkillContext) {
       finish(sc, P);
       show(P, { lap: true, phone: true, tab: true });
       onPodium(P, false);
+      floatCandy(P, CANDY_LINEUP, t);
       P.lap.root.position.set(0, 0, 0);
       P.lap.root.rotation.y = 0;
       P.lap.hinge.rotation.x = -0.3;
@@ -459,6 +560,7 @@ function d3Dive(sc: SkillContext) {
       finish(sc, P);
       show(P, { lap: true });
       onPodium(P, true);
+      floatCandy(P, CANDY_LAPTOP, t);
       P.lap.root.position.set(0, POD + 0.015, 0);
       P.lap.root.rotation.y = 0;
       const lean = -0.3;
@@ -593,7 +695,7 @@ export const devices3dSkills: Skill[] = [
     id: "d3-laptop",
     name: "3D Laptop",
     tagline: "A real 3D laptop: the lid opens on its hinge as the camera swings round to the front, the screen wakes and your site scrolls.",
-    bestFor: "Introducing a website or web app with a premium, product-film feel; a short headline.",
+    bestFor: "Introducing a website or web app with a premium, product-film feel; a short headline. Shows the site's own screenshot automatically (the full page, scrolling).",
     sample: { text: "Meet your new *workspace*" },
     render: d3Laptop,
     sfx: () => [at(0.2, "whoosh"), at(1.6, "click")],
@@ -602,7 +704,7 @@ export const devices3dSkills: Skill[] = [
     id: "d3-phone",
     name: "3D Phone",
     tagline: "A real 3D phone turns from its back (camera lenses, buttons) to its screen, floating over its shadow, your app scrolling.",
-    bestFor: "Mobile apps and mobile sites: a short headline.",
+    bestFor: "Mobile apps and mobile sites: a short headline. Shows the site as a phone displays it automatically (or the slide's portrait picture).",
     sample: { text: "In your *pocket*" },
     render: d3Phone,
     sfx: () => [at(0.1, "whoosh"), at(1.8, "pop")],
@@ -611,7 +713,7 @@ export const devices3dSkills: Skill[] = [
     id: "d3-lineup",
     name: "3D Device Lineup",
     tagline: "A laptop, a tablet and a phone stand together in real 3D, screens lit with your product, as the camera glides across them.",
-    bestFor: "'Works everywhere' moments: the same product on every screen size; a short headline.",
+    bestFor: "'Works everywhere' moments: the same product on laptop, tablet and phone; a short headline. Uses the site's desktop and mobile screenshots automatically.",
     sample: { text: "On every *screen*" },
     render: d3Lineup,
     sfx: () => [at(0.35, "pop"), at(0.55, "pop"), at(0.75, "pop")],

@@ -1422,6 +1422,13 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
       skill = ind;
       usedIndustry.add(ind);
     }
+    // With the site captured, 3D styles show it on real 3D devices (once per part of the story).
+    const site = !!(plan.brand?.page || plan.brand?.shot);
+    const dev = site && tpl.category === "3D" && !scene.media ? DEVICE_ROLES[role] : undefined;
+    if (dev && !usedIndustry.has(dev)) {
+      skill = dev;
+      usedIndustry.add(dev);
+    }
     if (role === "reveal" && !plan.brand?.logo) skill = people ? "abs-hello" : tpl.revealNoLogo;
     // In a Cartoon style a character slide wins over the director's words-only design (not over a
     // QR end card, a logo or product moment, or a slide that shows your pictures).
@@ -1434,6 +1441,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
     if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "ind-hometour", "ind-build", "ind-site", "ind-care", "ind-menu", "ind-shop", "ind-lesson", "ind-team", "ind-route", "d3-laptop", "d3-phone", "d3-lineup", "d3-dive", "d3-desk", "home-hero", "home-aerial", "home-build3d", "home-plan", "home-energy", "home-choice", "home-journey", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill) && !(CHARACTER_SLIDE.test(scene.skill) && CHARACTER_SLIDE.test(skill)) && !cartoonOver) skill = scene.skill;
+    // The flat device mock-up becomes the real 3D lineup (it shows the same screenshots).
+    if (skill === "device-trio") skill = "d3-lineup";
     // Pictures are never dropped for characters: the slide keeps them (and gets the companion).
     if (scene.media && CHARACTER_SLIDE.test(skill)) skill = CHARACTER_SLIDE.test(scene.skill) ? DEFAULT_ROLE_SKILL[role] : scene.skill;
     // No character slide twice in a row: the next one in its family steps in.
@@ -1498,6 +1507,9 @@ function staged(tpl: Template, look: Template["look"], setting: VideoPlan["setti
 
 /** Homebuilder and real-estate intros in the other styles: the home in real 3D, by part of the story. */
 const HOME_ROLES: Partial<Record<Role, SkillId>> = { hook: "home-hero", features: "home-plan", bento: "home-energy", how: "home-build3d", promise: "home-journey", reach: "home-aerial", cards: "home-choice", compare: "home-choice", stat: "home-energy", metric: "home-energy" };
+
+/** Real 3D device slides for 3D styles when the site is captured, by part of the story. */
+const DEVICE_ROLES: Partial<Record<Role, SkillId>> = { meet: "d3-laptop", tour: "d3-dive", reach: "d3-lineup", demo: "d3-desk", promise: "d3-phone" };
 
 /** The industry slides a setting gets, by part of the story. */
 const INDUSTRY_ROLES: Partial<Record<NonNullable<VideoPlan["setting"]>, Partial<Record<Role, SkillId>>>> = {

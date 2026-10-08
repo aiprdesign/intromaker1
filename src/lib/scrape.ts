@@ -617,7 +617,7 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
     steps,
     pains,
     font,
-    shots: { hero: live?.hero ?? null, full: live?.full ?? null, sections: live?.sections ?? [], parts: live?.parts ?? [], bands: live?.bands ?? [] },
+    shots: { hero: live?.hero ?? null, full: live?.full ?? null, sections: live?.sections ?? [], parts: live?.parts ?? [], bands: live?.bands ?? [], mobile: live?.mobile ?? null },
     cta,
     logo,
     icon: appIcon(root, pageBase),

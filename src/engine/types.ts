@@ -302,6 +302,10 @@ export interface Brand {
   logo?: string;
   /** App icon: shown with the name beneath it when the logo is a wide wordmark. */
   icon?: string;
+  /** The site's hero screenshot (desktop, first screen), for device screens. */
+  shot?: string;
+  /** The site as a phone shows it (a tall mobile screenshot), for phone screens. */
+  mobile?: string;
   /** The full-page screenshot and its real sections ([top, bottom] fractions), shown section by section. */
   page?: { src: string; bands: [number, number][] };
   images: string[];
@@ -341,7 +345,7 @@ export interface SiteData {
   font: string | null;
   /** Screenshots from the live browser capture (same-origin /api/shot URLs). */
   /** bands: the page's real sections on `full`, as [top, bottom] fractions of its height. */
-  shots: { hero: string | null; full: string | null; sections: string[]; parts?: SitePart[]; bands?: [number, number][] };
+  shots: { hero: string | null; full: string | null; sections: string[]; parts?: SitePart[]; bands?: [number, number][]; mobile?: string | null };
   cta: string | null;
   logo: string | null;
   /** The site's app icon (apple-touch / SVG icon), used where a wide wordmark won't fit. */
