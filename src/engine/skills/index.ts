@@ -4,6 +4,7 @@ import { characterSkills } from "./characters";
 import { charProSkills } from "./charpro";
 import { abstractSkills } from "./abstract";
 import { industrySkills } from "./industries";
+import { devices3dSkills } from "./devices3d";
 import { componentSkills } from "./components";
 import { endingSkills } from "./endings";
 import { editorialSkills } from "./editorial";
@@ -58,6 +59,7 @@ export const SKILLS: Skill[] = [
   ...charProSkills,
   ...abstractSkills,
   ...industrySkills,
+  ...devices3dSkills,
   ...productSkills,
   beatSkills[3],
   ...typeFxSkills,
@@ -105,6 +107,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Advanced characters", skills: charProSkills },
   { name: "Abstract characters", skills: abstractSkills },
   { name: "Industries", skills: industrySkills },
+  { name: "3D devices", skills: devices3dSkills },
   { name: "Media & gallery", skills: [...productSkills, beatSkills[3], ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Epic screens", skills: [...epicSkills, ...iconicSkills] },
@@ -114,6 +117,11 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
 
 /** Slides that show a picture or video of their own (`scene.media`), which can be changed per slide. */
 export const MEDIA_SKILLS = new Set<SkillId>([
+  "d3-laptop",
+  "d3-phone",
+  "d3-lineup",
+  "d3-dive",
+  "d3-desk",
   "ui-tour",
   "ui-cards",
   "ui-assemble",
