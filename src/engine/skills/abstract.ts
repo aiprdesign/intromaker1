@@ -25,7 +25,7 @@ import { saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
 import type { ArtStyle, CastMember, CharacterKind, Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
-import { drawFace, drawHeadHair, painter } from "./abspaint";
+import { drawFace, drawHeadHair, painter, sitLeg } from "./abspaint";
 import { drawBlob, drawClassic, drawMemphis, drawStick } from "./abskinds";
 import { blinkAt, fitBubble, pointTimes, pop, speech, useToon } from "./characters";
 
@@ -40,6 +40,12 @@ type Hair = AbsSpec["hair"];
 
 /** A new character of a `kind` from a seed, dressed in the video's own colours. */
 export function makeCharacter(seed: number, p: Palette, kind: CharacterKind = "abstract"): AbsSpec {
+  const c = makeBase(seed, p, kind);
+  // Now and then a wheelchair user (from a seed of its own, so the rest of the design holds).
+  return kind !== "blob" && rng(hashString(`wheels:${seed}`))() < 0.12 ? { ...c, wheelchair: true } : c;
+}
+
+function makeBase(seed: number, p: Palette, kind: CharacterKind): AbsSpec {
   const r = rng(hashString(`abs:${seed}`));
   const pick = <T,>(xs: readonly T[]) => xs[Math.floor(r() * xs.length) % xs.length];
   // Dressed in the intro's own colours (and neutrals for trousers and shoes).
@@ -129,6 +135,8 @@ export interface AbsPose {
   look?: number;
   /** Mirror (face left). */
   flip?: boolean;
+  /** Seated (a wheelchair user): the thigh length, in character heights. Set by drawAbstract for `wheelchair` characters. */
+  sit?: number;
 }
 
 export interface AbsRig {
@@ -141,7 +149,120 @@ export interface AbsRig {
 /** Draw a generated character standing on `groundY` at `x`, `H` tall (a unit; shapes vary). */
 /** Draw the character; while fading it fades as one solid piece (see solid.ts). */
 export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: AbsSpec, pose: AbsPose): AbsRig {
-  return solid(ctx, (c2) => drawAbstractRaw(c2, x, groundY, H, c, pose));
+  return solid(ctx, (c2) => (c.wheelchair && c.kind !== "blob" ? drawSeated(c2, x, groundY, H, c, pose) : drawAbstractRaw(c2, x, groundY, H, c, pose)));
+}
+
+/** How long each kind draws its legs, for `legLen` (see the drawers). */
+const LEG_K: Record<CharacterKind, number> = { abstract: 1, memphis: 1.2, stick: 1, classic: 0.85, blob: 0.32 };
+
+/**
+ * A wheelchair user: the character seated (thighs forward, feet on the footrest) in a side-on
+ * chair with a big wheel that turns as they move (the walk phase rolls it), a backrest with push
+ * handles, a cushion and a little front caster. Drawn in the character's own drawing style; a stick
+ * figure's chair is line art in its line colour.
+ */
+function drawSeated(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: AbsSpec, pose: AbsPose): AbsRig {
+  const kind = c.kind ?? "abstract";
+  const seated: AbsSpec = { ...c, legLen: 0.11 + c.legLen * 0.22 };
+  const thigh = kind === "memphis" ? 0.22 : kind === "stick" ? 0.18 : 0.2;
+  const footY = groundY - H * 0.05;
+  const hipY = footY - seated.legLen * LEG_K[kind] * H;
+  const seatY = hipY + H * 0.014;
+  const dir = pose.flip ? -1 : 1;
+  const X = (v: number) => x + dir * v * H;
+  const bodyHalf = kind === "stick" ? 0.03 : c.bodyW * (kind === "memphis" ? 0.47 : 0.5);
+  const back = -Math.max(0.09, bodyHalf * 0.85);
+  const R = (groundY - seatY) * 0.52;
+  const wx = X(-0.04);
+  const wy = groundY - R;
+  const stick = kind === "stick";
+  const P = painter(ctx, H, c.art ?? "flat");
+  const frame = stick ? c.legColor : "#3d4154";
+  const lw = stick ? Math.max(2, H * 0.02) : Math.max(2, H * 0.016);
+  const bar = (trace: () => void, col = frame, w = lw) => P.strokeLimb(col, w, trace, stick);
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // The chair's shadow.
+  ctx.fillStyle = "rgba(20,10,40,0.16)";
+  ctx.beginPath();
+  ctx.ellipse(x + dir * H * 0.04, groundY + H * 0.008, H * 0.2, H * 0.022, 0, 0, TAU);
+  ctx.fill();
+  // Backrest with a push handle, the seat, and the frame down to the footrest.
+  const topY = hipY - H * (stick ? 0.16 : 0.2);
+  bar(() => {
+    ctx.beginPath();
+    ctx.moveTo(X(back + 0.01), seatY);
+    ctx.lineTo(X(back), topY);
+    ctx.lineTo(X(back - 0.05), topY - H * 0.004);
+  });
+  if (!stick) {
+    ctx.beginPath();
+    ctx.roundRect(Math.min(X(back - 0.012), X(back + 0.03)), topY + H * 0.02, H * 0.042, seatY - topY - H * 0.03, H * 0.012);
+    P.fillShape(mixHex(c.patternColor, "#000000", 0.25), topY, seatY);
+  }
+  bar(() => {
+    ctx.beginPath();
+    ctx.moveTo(X(thigh - 0.02), seatY + H * 0.02);
+    ctx.lineTo(X(thigh + 0.03), footY);
+    ctx.lineTo(X(thigh + 0.1), footY);
+  });
+  // The seat cushion, then the seated character, then the near wheel over the hips.
+  if (stick) {
+    bar(() => {
+      ctx.beginPath();
+      ctx.moveTo(X(back + 0.01), seatY + lw);
+      ctx.lineTo(X(thigh), seatY + lw);
+    });
+  } else {
+    ctx.beginPath();
+    ctx.roundRect(Math.min(X(back), X(thigh)), seatY, Math.abs(X(thigh) - X(back)), H * 0.03, H * 0.012);
+    P.fillShape(c.patternColor, seatY, seatY + H * 0.03);
+  }
+  const rig = drawAbstractRaw(ctx, x, footY, H, seated, { ...pose, walk: undefined, lift: 0, squash: 0, sit: thigh });
+  // The big wheel: a tyre, a push rim and spokes that roll with the walk.
+  const spin = dir * (pose.walk ?? 0) * 0.55;
+  if (!stick) {
+    ctx.beginPath();
+    ctx.arc(wx, wy, R, 0, TAU);
+    ctx.arc(wx, wy, R * 0.8, 0, TAU, true);
+    P.fillShape("#26282f", wy - R, wy + R);
+  }
+  bar(() => {
+    ctx.beginPath();
+    ctx.arc(wx, wy, stick ? R : R * 0.68, 0, TAU);
+  }, stick ? frame : "#b8bfcc", stick ? lw : Math.max(1.5, H * 0.01));
+  bar(() => {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = spin + (i * Math.PI) / 3;
+      ctx.moveTo(wx, wy);
+      ctx.lineTo(wx + Math.cos(a) * R * (stick ? 0.92 : 0.8), wy + Math.sin(a) * R * (stick ? 0.92 : 0.8));
+    }
+  }, stick ? frame : "#9aa3b2", stick ? lw * 0.6 : Math.max(1, H * 0.006));
+  ctx.beginPath();
+  ctx.arc(wx, wy, H * 0.016, 0, TAU);
+  P.fillShape(stick ? frame : c.bodyColor, wy - H * 0.016, wy + H * 0.016);
+  // The front caster on its fork.
+  const cr = H * 0.028;
+  const cx = X(thigh + 0.02);
+  bar(() => {
+    ctx.beginPath();
+    ctx.moveTo(X(thigh - 0.005), seatY + H * 0.03);
+    ctx.lineTo(cx, groundY - cr);
+  });
+  if (stick) {
+    bar(() => {
+      ctx.beginPath();
+      ctx.arc(cx, groundY - cr, cr, 0, TAU);
+    });
+  } else {
+    ctx.beginPath();
+    ctx.arc(cx, groundY - cr, cr, 0, TAU);
+    P.fillShape("#26282f", groundY - cr * 2, groundY);
+  }
+  ctx.restore();
+  return rig;
 }
 
 function drawAbstractRaw(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: AbsSpec, pose: AbsPose): AbsRig {
@@ -158,11 +279,13 @@ function drawAbstractRaw(ctx: CanvasRenderingContext2D, x: number, groundY: numb
   const headY = top - c.neck * H - hr * 0.85;
   const out: AbsRig = { head: { x, y: headY, r: hr }, top: headY - hr * (c.hair === "spikes" || c.hair === "bun" || c.hair === "beanie" ? 1.5 : 1.15), handL: { x, y: 0 }, handR: { x, y: 0 } };
   ctx.save();
-  // Ground shadow (stays on the ground when hopping).
-  ctx.fillStyle = `rgba(20,10,40,${0.16 * clamp(1 - lift / (H * 0.3))})`;
-  ctx.beginPath();
-  ctx.ellipse(x, groundY + H * 0.008, bw * 0.55, H * 0.022, 0, 0, TAU);
-  ctx.fill();
+  // Ground shadow (stays on the ground when hopping; seated, the chair casts it).
+  if (pose.sit === undefined) {
+    ctx.fillStyle = `rgba(20,10,40,${0.16 * clamp(1 - lift / (H * 0.3))})`;
+    ctx.beginPath();
+    ctx.ellipse(x, groundY + H * 0.008, bw * 0.55, H * 0.022, 0, 0, TAU);
+    ctx.fill();
+  }
   // Squash and stretch around the feet, and a lean.
   ctx.translate(x, groundY);
   ctx.scale(1 - sq * 0.6, 1 + sq);
@@ -179,6 +302,18 @@ function drawAbstractRaw(ctx: CanvasRenderingContext2D, x: number, groundY: numb
   const lw = Math.max(2, H * 0.024);
   for (const s of [-1, 1]) {
     const hx = x + s * bw * 0.18;
+    if (pose.sit !== undefined) {
+      const L = sitLeg(s, x, hipY, groundY, H, pose.sit);
+      strokeLimb(c.legColor, lw, () => {
+        ctx.beginPath();
+        ctx.moveTo(hx, hipY - H * 0.01);
+        ctx.quadraticCurveTo(L.bend.x, L.bend.y, L.foot.x, L.foot.y - H * 0.012);
+      });
+      ctx.beginPath();
+      ctx.ellipse(L.foot.x + H * 0.022, L.foot.y - H * 0.008, H * 0.045, H * 0.02, 0, 0, TAU);
+      fillShape(c.shoe, L.foot.y - H * 0.03, L.foot.y + H * 0.012);
+      continue;
+    }
     const ph = pose.walk !== undefined ? pose.walk + (s > 0 ? Math.PI : 0) : 0;
     const swing = pose.walk !== undefined ? Math.sin(ph) * legLen * 0.45 : 0;
     const raise = pose.walk !== undefined ? Math.max(0, Math.cos(ph)) * legLen * 0.18 : 0;

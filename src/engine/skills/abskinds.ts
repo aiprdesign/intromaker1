@@ -17,7 +17,7 @@
 import { clamp, lerp, mixHex, TAU } from "../math";
 import type { CastMember } from "../types";
 import type { AbsPose, AbsRig } from "./abstract";
-import { beginFigure, drawFace, drawHeadHair, drawMouth, hairTop, INK, painter, taperPath, type Painter } from "./abspaint";
+import { beginFigure, drawFace, drawHeadHair, drawMouth, hairTop, INK, painter, sitLeg, taperPath, type Painter } from "./abspaint";
 
 type Pt = { x: number; y: number };
 
@@ -80,6 +80,15 @@ export function drawMemphis(ctx: CanvasRenderingContext2D, x: number, groundY: n
   // Thick tapered trousers and long flat feet.
   for (const s of [-1, 1]) {
     const hx = x + s * bw * 0.2;
+    if (pose.sit !== undefined) {
+      const L = sitLeg(s, x, hipY, groundY, H, pose.sit);
+      taperPath(ctx, { x: hx, y: hipY - H * 0.02 }, L.bend, { x: L.foot.x, y: L.foot.y - H * 0.03 }, H * 0.085, H * 0.048);
+      P.fillShape(c.legColor, hipY, L.foot.y);
+      ctx.beginPath();
+      ctx.ellipse(L.foot.x + H * 0.032, L.foot.y - H * 0.018, H * 0.068, H * 0.024, 0, 0, TAU);
+      P.fillShape(c.shoe, L.foot.y - H * 0.04, L.foot.y);
+      continue;
+    }
     const { swing, raise } = stride(pose.walk, s, legLen);
     const fx = hx + swing;
     const fy = groundY - raise - lift;
@@ -392,6 +401,16 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
   const line = (trace: () => void) => P.strokeLimb(lc, lw, trace, true);
   // Legs with knees.
   for (const s of [-1, 1]) {
+    if (pose.sit !== undefined) {
+      const L = sitLeg(s, x, hipY, groundY, H, pose.sit);
+      line(() => {
+        ctx.beginPath();
+        ctx.moveTo(x, hipY);
+        ctx.lineTo(L.knee.x, L.knee.y);
+        ctx.lineTo(L.foot.x, L.foot.y - lw * 0.5);
+      });
+      continue;
+    }
     const { swing, raise } = stride(pose.walk, s, legLen);
     const fx = x + s * H * 0.06 + swing;
     const fy = groundY - raise - lift;
@@ -506,21 +525,24 @@ export function drawClassic(ctx: CanvasRenderingContext2D, x: number, groundY: n
   // Rubber-hose legs and big shoes.
   for (const s of [-1, 1]) {
     const hx = x + s * bw * 0.2;
-    const { swing, raise } = stride(pose.walk, s, legLen);
-    const fx = hx + swing + s * H * 0.01;
+    const L = pose.sit !== undefined ? sitLeg(s, x, hipY, groundY, H, pose.sit) : undefined;
+    const { swing, raise } = stride(L ? undefined : pose.walk, s, legLen);
+    const fx = L ? L.foot.x : hx + swing + s * H * 0.01;
     const fy = groundY - raise - lift;
+    const toe = L ? 1 : s;
     P.strokeLimb(hose, lw, () => {
       ctx.beginPath();
       ctx.moveTo(hx, hipY - H * 0.01);
-      ctx.quadraticCurveTo(lerp(hx, fx, 0.5) + s * H * 0.035, lerp(hipY, fy, 0.5), fx, fy - H * 0.03);
+      if (L) ctx.quadraticCurveTo(L.bend.x, L.bend.y, fx, fy - H * 0.03);
+      else ctx.quadraticCurveTo(lerp(hx, fx, 0.5) + s * H * 0.035, lerp(hipY, fy, 0.5), fx, fy - H * 0.03);
     }, true);
     ctx.beginPath();
-    ctx.ellipse(fx + s * H * 0.03, fy - H * 0.026, H * 0.072, H * 0.034, s * -0.08, 0, TAU);
+    ctx.ellipse(fx + toe * H * 0.03, fy - H * 0.026, H * 0.072, H * 0.034, toe * -0.08, 0, TAU);
     P.fillShape(c.shoe, fy - H * 0.06, fy);
     if (!P.inked) {
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.beginPath();
-      ctx.ellipse(fx + s * H * 0.045, fy - H * 0.04, H * 0.022, H * 0.009, s * -0.2, 0, TAU);
+      ctx.ellipse(fx + toe * H * 0.045, fy - H * 0.04, H * 0.022, H * 0.009, toe * -0.2, 0, TAU);
       ctx.fill();
     }
   }

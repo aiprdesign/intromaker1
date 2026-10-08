@@ -525,6 +525,13 @@ export default function CharacterDesigner({ cast, onChange, palette = SHOWCASE, 
               <Colors name="Shoe colour" colors={[...NEUTRALS.slice(0, 3), "#8a4b2a", ...brand, ...MODERN.slice(0, 5)]} value={m.shoe} onPick={(c) => update({ shoe: c }, true)} />
             </>
           )}
+          {kind !== "blob" && (
+            <div className="cd-toggles">
+              <button type="button" className={`chip${m.wheelchair ? " active" : ""}`} aria-pressed={!!m.wheelchair} onClick={() => update({ wheelchair: !m.wheelchair || undefined })}>
+                Wheelchair user
+              </button>
+            </div>
+          )}
           <div className="cd-ranges">
             <Range name="Leg length" value={m.legLen} range={RANGES.legLen} onChange={(v) => update({ legLen: v })} />
           </div>

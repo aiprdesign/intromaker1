@@ -81,6 +81,7 @@ export function sanitizeMember(raw: unknown): CastMember | null {
     cheeks: r.cheeks === true,
     nose: r.nose === true,
     ...(r.ownColors === true ? { ownColors: true } : {}),
+    ...(r.wheelchair === true ? { wheelchair: true } : {}),
   };
 }
 

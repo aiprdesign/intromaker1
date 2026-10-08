@@ -11,6 +11,7 @@ import { liquidText } from "./gl";
 import { drawLucide, iconFor as lucideFor, iconsFor as lucideIconsFor } from "./icons";
 import { scratch } from "./scratch";
 import { planetStage, plexusStage, rainStage, warpStage, wormholeStage } from "./scifi";
+import { sceneStage } from "./scenes";
 import { renderShaderBg } from "./shaderbg";
 import { fillTextMid, subFont, type HeadlineLayout } from "./text";
 import type { FontId, Palette, PointerStyle, SkillContext, TextFx } from "./types";
@@ -320,6 +321,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   else if (backdrop === "rain") rainStage(sc, glowOp);
   else if (backdrop === "plexus") plexusStage(sc, glowOp);
   else if (backdrop === "meadow") meadowStage(sc);
+  else sceneStage(sc, backdrop);
 
   if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
     // Over a shader stage the grid lives on its own layer, masked to fade at the edges;

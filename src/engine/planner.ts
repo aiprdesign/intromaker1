@@ -1,6 +1,7 @@
 import { assetUrl } from "./assets";
 import { ART_STYLES, KINDS, sanitizeCast } from "./cast";
 import { hashString, rng } from "./math";
+import { SCENES } from "./scenes";
 import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { ownMoment } from "./momentitems";
 import { playSpeed } from "./speed";
@@ -2738,6 +2739,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     contrast: raw.contrast === false ? false : undefined,
     cast: sanitizeCast(raw.cast),
     characters: (KINDS as readonly string[]).includes(raw.characters as string) ? (raw.characters as VideoPlan["characters"]) : undefined,
+    setting: (SCENES as readonly string[]).includes(raw.setting as string) ? raw.setting : undefined,
     shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) && raw.shapeSet !== "geometric" ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,
     textFx: (TEXT_FX as readonly string[]).includes(raw.textFx as string) ? (raw.textFx as VideoPlan["textFx"]) : undefined,
@@ -2754,7 +2756,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
             beams: Math.min(8, Math.max(0, Number(raw.look.beams) || 0)),
             aurora: Math.min(3, Math.max(0, Number(raw.look.aurora) || 0)),
             text: (TEXT_FX as readonly string[]).includes(raw.look.text as string) ? raw.look.text : undefined,
-            backdrop: ["grid", "dots", "blobs", "scanlines", "plain", "horizon", "stars", "eclipse", "studio", "ribbon", "beam", "bloom", "warp", "planet", "wormhole", "rain", "plexus", "meadow"].includes(raw.look.backdrop as string) ? raw.look.backdrop : undefined,
+            backdrop: ["grid", "dots", "blobs", "scanlines", "plain", "horizon", "stars", "eclipse", "studio", "ribbon", "beam", "bloom", "warp", "planet", "wormhole", "rain", "plexus", "meadow", ...SCENES].includes(raw.look.backdrop as string) ? raw.look.backdrop : undefined,
             card: ["glass", "frost", "flat", "brutal", "clay"].includes(raw.look.card as string) ? raw.look.card : undefined,
             toon: ["flat", "comic", "soft", "doodle"].includes(raw.look.toon as string) ? raw.look.toon : undefined,
             art: (ART_STYLES as readonly string[]).includes(raw.look.art as string) ? raw.look.art : undefined,

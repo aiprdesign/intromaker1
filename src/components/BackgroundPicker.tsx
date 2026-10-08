@@ -1,9 +1,10 @@
 "use client";
 
 import type { PaletteId, Scene, VideoPlan } from "@/engine/types";
+import type { SceneBackdrop } from "@/engine/scenes";
 import LoopCanvas from "./LoopCanvas";
 
-type Stage = "eclipse" | "studio" | "ribbon" | "beam" | "bloom";
+type Stage = "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "meadow" | SceneBackdrop;
 export type BgChoice = "template" | "none" | NonNullable<NonNullable<VideoPlan["look"]>["shader"]> | `stage-${Stage}`;
 
 export const BG_OPTIONS: { id: BgChoice; name: string }[] = [
@@ -13,6 +14,15 @@ export const BG_OPTIONS: { id: BgChoice; name: string }[] = [
   { id: "stage-ribbon", name: "Silk ribbons" },
   { id: "stage-beam", name: "Light beam" },
   { id: "stage-bloom", name: "Colour bloom" },
+  { id: "stage-meadow", name: "Park (meadow)" },
+  { id: "stage-office", name: "Office" },
+  { id: "stage-city", name: "City street" },
+  { id: "stage-construction", name: "Construction site" },
+  { id: "stage-hospital", name: "Hospital" },
+  { id: "stage-classroom", name: "Classroom" },
+  { id: "stage-home", name: "Living room" },
+  { id: "stage-shop", name: "Shop" },
+  { id: "stage-cafe", name: "Café" },
   { id: "mesh", name: "Mesh gradient" },
   { id: "grain", name: "Grainy gradient" },
   { id: "warp", name: "Silk flow" },

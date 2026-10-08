@@ -1451,12 +1451,21 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     style: "saas",
     music: tpl.music,
     flavor: tpl.flavor,
-    look: people ? { ...tpl.look, people } : tpl.look,
+    look: staged(tpl, people ? { ...tpl.look, people } : tpl.look, plan.setting),
     scenes: scenes.map((s) => ({ ...s, duration: Math.max(4, Math.round((s.duration * fit) / beat)) * beat })),
   };
   const fitted = plan.target ? fitLength(styledPlan, plan.target) : styledPlan;
   // The cinematography pass: transition grammar, holds and variety, in this style's own vocabulary.
   return cinematography(fitted, { pool: tpl.transitions, roleSkill: (role) => (role in DEFAULT_ROLE_SKILL ? (roles[role as Role] ?? DEFAULT_ROLE_SKILL[role as Role]) : undefined) });
+}
+
+/**
+ * A flat Cartoon style's characters stand in the intro's setting (an office, a hospital…) when it
+ * has one; styles with a stage of their own (night stars, a GPU gradient) keep it.
+ */
+function staged(tpl: Template, look: Template["look"], setting: VideoPlan["setting"]): Template["look"] {
+  if (!setting || tpl.category !== "Cartoon" || look?.toon !== "flat" || look.shader || look.backdrop === "stars") return look;
+  return { ...look, backdrop: setting, aurora: 0, grid: false };
 }
 
 /** Character slides: switching characters swaps one for another rather than keeping the old one. */

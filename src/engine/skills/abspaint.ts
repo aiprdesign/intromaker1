@@ -67,6 +67,17 @@ export function painter(ctx: CanvasRenderingContext2D, H: number, art: ArtStyle)
 }
 
 /**
+ * A seated leg (a wheelchair user): the thigh runs forward from the hip at seat height and the shin
+ * drops to the foot on the footrest. `thigh` is in character heights; the far leg (s = −1) sits a
+ * touch behind. `bend` is the knee corner, for a quadratic from the hip to the foot.
+ */
+export function sitLeg(s: number, x: number, hipY: number, groundY: number, H: number, thigh: number) {
+  const kx = x + thigh * H + s * H * 0.014;
+  const ky = hipY + H * (s < 0 ? 0.004 : 0.012);
+  return { knee: { x: kx, y: ky }, bend: { x: kx + H * 0.008, y: ky + H * 0.006 }, foot: { x: kx + H * 0.014, y: groundY } };
+}
+
+/**
  * Start a figure: its ground shadow (`r`: half its width), then squash and stretch around the feet,
  * a lean and the mirror. Pair with ctx.restore().
  */
@@ -74,10 +85,13 @@ export function beginFigure(ctx: CanvasRenderingContext2D, x: number, groundY: n
   const lift = (pose.lift ?? 0) * H;
   const sq = pose.squash ?? 0;
   ctx.save();
-  ctx.fillStyle = `rgba(20,10,40,${0.16 * clamp(1 - lift / (H * 0.3))})`;
-  ctx.beginPath();
-  ctx.ellipse(x, groundY + H * 0.008, r, H * 0.022, 0, 0, TAU);
-  ctx.fill();
+  // Seated (in a wheelchair), the chair casts the shadow.
+  if (pose.sit === undefined) {
+    ctx.fillStyle = `rgba(20,10,40,${0.16 * clamp(1 - lift / (H * 0.3))})`;
+    ctx.beginPath();
+    ctx.ellipse(x, groundY + H * 0.008, r, H * 0.022, 0, 0, TAU);
+    ctx.fill();
+  }
   ctx.translate(x, groundY);
   ctx.scale(1 - sq * 0.6, 1 + sq);
   ctx.rotate(pose.lean ?? 0);

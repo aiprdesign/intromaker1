@@ -8,7 +8,7 @@ import SkillPicker from "@/components/SkillPicker";
 import PointerPicker, { POINTER_NAMES } from "@/components/PointerPicker";
 import { CastThumb, CharacterDesignerModal, loadCast, saveCast } from "@/components/CharacterDesigner";
 import { brandPalette } from "@/engine/renderer";
-import { cartoonPick, themePick, WANTS_CHARACTERS, type CharacterPick } from "@/engine/charpick";
+import { cartoonPick, scenePick, themePick, WANTS_CHARACTERS, type CharacterPick } from "@/engine/charpick";
 import CharacterKindPicker, { CHARACTER_NAMES, type CharacterChoice } from "@/components/CharacterKindPicker";
 import ShapesPicker from "@/components/ShapesPicker";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
@@ -884,8 +884,10 @@ export default function Studio() {
     const suggested = autoStyleRef.current ? suggestedFor(p) : undefined;
     // The characters in a Cartoon style: the best fit for the intro (Auto), or the ones you chose.
     const chars = charsRef.current === "auto" ? characterPick(p)?.characters : charsRef.current === "own" ? undefined : charsRef.current;
-    if (p.characters !== chars) {
-      p = { ...p, characters: chars };
+    // Where they are (an office, a hospital…), from the intro's theme.
+    const setting = p.style === "saas" && !p.product ? scenePick(promptRef.current) : undefined;
+    if (p.characters !== chars || p.setting !== setting) {
+      p = { ...p, characters: chars, setting };
       const tid = suggested ?? p.template;
       if (p.style === "saas" && tid && TEMPLATE_MAP[tid]?.category === "Cartoon" && (!suggested || suggested === p.template)) p = applyTemplate(p, tid, { palette: palette !== "auto" ? palette : undefined });
     }

@@ -463,6 +463,8 @@ export interface VideoPlan {
   cast?: CastMember[];
   /** The characters a Cartoon style tells the story with (unset: the style's own). */
   characters?: CharacterKind;
+  /** Where a flat Cartoon style's characters are (an office, a hospital…), from the intro's theme (see scenes.ts). */
+  setting?: "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe";
 }
 
 /**
@@ -503,6 +505,8 @@ export interface CastMember {
   nose: boolean;
   /** Keep these colours; unset: dressed in each video's own colours (see cast.ts matchColors). */
   ownColors?: boolean;
+  /** Uses a wheelchair (every kind but blob). */
+  wheelchair?: boolean;
 }
 
 export interface Palette {
@@ -534,7 +538,7 @@ export interface Look {
   /** Vignette strength multiplier. */
   vignette?: number;
   /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, plain, synthwave horizon, stars, the clean-epic stages (eclipse rim, studio sweep, silk ribbons, light beam, colour bloom), or the sci-fi stages (light-speed warp, ringed planet, wormhole, data rain, quantum mesh). */
-  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow";
+  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow" | "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe";
   /** How cartoon characters are drawn (character slides): flat, comic ink with cel shading, soft clay, or hand-drawn doodle. */
   toon?: "flat" | "comic" | "soft" | "doodle";
   /** How generated abstract characters are drawn (unset: from toon). Your own characters keep theirs. */
