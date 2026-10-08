@@ -11,21 +11,26 @@
  * - d3-desk:    a desk scene from above: the laptop, a phone, a mug in your colour, a notebook, a plant.
  */
 import type { Program, Transform } from "ogl";
-import { quad, render, rgb, setScreen, slab, cylinder, sphere, box, world, type View, type World } from "../d3";
+import { cove, quad, render, rgb, setScreen, slab, cylinder, sphere, box, world, type View, type World } from "../d3";
+import { desktopUI, mobileUI } from "../uiscreens";
 import { getMedia, type Drawable } from "../media";
 import { textureOf, sizeOf } from "../gl";
 import { clamp, ease, lerp, mixHex, range } from "../math";
 import { saasBackground } from "../saasfx";
+import { scratch } from "../scratch";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, stage } from "./beats";
-import { mockShot } from "./gallery";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 type Num3 = [number, number, number];
 
-function shotOf(sc: SkillContext): Drawable | HTMLCanvasElement {
+/** The slide's picture (or the site's screenshot); without one, a designed app screen in the video's colours. */
+function shotOf(sc: SkillContext, mobile = false): Drawable | HTMLCanvasElement {
   const { scene, brand, t } = sc;
-  return getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t) ?? mockShot(sc.palette, sc.seed, 0);
+  const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
+  if (media) return media;
+  const name = (brand?.name ?? "").replace(/[*|]/g, "").trim();
+  return mobile ? mobileUI(sc.palette, name, sc.seed) : desktopUI(sc.palette, name, sc.seed);
 }
 
 /* ───────────────────────── Models ───────────────────────── */
@@ -82,6 +87,28 @@ function laptop(W: World, parent?: Transform): Laptop {
   const screen = W.mat({ color: "#000000", gloss: 0.9, kind: "screen" });
   const s = W.mesh(quad(gl, LAP.scrW, LAP.scrH), screen, lid, false);
   s.position.set(0, 0.04, LAP.lidT / 2 + 0.002);
+  // Details: the camera in the bezel, a polished logo on the lid, rubber feet, ports on the side.
+  const black = W.mat({ color: "#050608", metal: 0.3, gloss: 0.9 });
+  const cam = W.mesh(cylinder(gl, 0.018, 0.018, 0.004, 20), black, lid, false);
+  cam.rotation.x = Math.PI / 2;
+  cam.position.set(0, LAP.lidH / 2 - 0.045, LAP.lidT / 2 + 0.003);
+  const logo = W.mesh(cylinder(gl, 0.16, 0.16, 0.004, 40), W.mat({ color: "#f2f3f6", metal: 1, gloss: 0.98 }), lid, false);
+  logo.rotation.x = Math.PI / 2;
+  logo.position.set(0, 0.05, -LAP.lidT / 2 - 0.002);
+  const rubber = W.mat({ color: "#1c1d21", gloss: 0.2 });
+  for (const [fx, fz] of [
+    [-1.35, -0.85],
+    [1.35, -0.85],
+    [-1.35, 0.85],
+    [1.35, 0.85],
+  ]) {
+    const foot = W.mesh(cylinder(gl, 0.09, 0.1, 0.03, 20), rubber, root, false);
+    foot.position.set(fx, -0.012, fz);
+  }
+  for (const pz of [-0.35, -0.12]) {
+    const port = W.mesh(box(gl, 0.01, 0.035, 0.12), black, root, false);
+    port.position.set(-LAP.w / 2 - 0.002, LAP.t * 0.48, pz);
+  }
   return { root, hinge, screen, metal: [metal, deck] };
 }
 
@@ -117,6 +144,18 @@ function slate(W: World, dims: typeof PHONE, phone: boolean, parent?: Transform)
       lens.rotation.x = Math.PI / 2;
       lens.position.set(lx, ly, 0.02);
     }
+    const ring = W.mat({ color: "#b9bcc5", metal: 1, gloss: 0.9 });
+    for (const [lx, ly] of [
+      [-0.065, 0.065],
+      [0.065, -0.065],
+    ]) {
+      const r2 = W.mesh(cylinder(gl, 0.062, 0.064, 0.02, 32), ring, island, false);
+      r2.rotation.x = Math.PI / 2;
+      r2.position.set(lx, ly, 0.012);
+    }
+    const flash = W.mesh(cylinder(gl, 0.018, 0.018, 0.01, 16), W.mat({ color: "#f5ead2", gloss: 0.9 }), island, false);
+    flash.rotation.x = Math.PI / 2;
+    flash.position.set(0.075, 0.075, 0.016);
     for (const [y, len] of [
       [0.35, 0.22],
       [0.05, 0.14],
@@ -124,6 +163,24 @@ function slate(W: World, dims: typeof PHONE, phone: boolean, parent?: Transform)
       const btn = W.mesh(box(gl, 0.02, len, 0.03), metal, root);
       btn.position.set(dims.w / 2 + 0.006, y, 0);
     }
+    const act = W.mesh(box(gl, 0.02, 0.1, 0.03), metal, root);
+    act.position.set(-dims.w / 2 - 0.006, 0.45, 0);
+    // Antenna bands in the frame, the speaker slot, the port and speaker holes at the bottom.
+    const dark = W.mat({ color: "#2a2c31", gloss: 0.4 });
+    for (const [x, y] of [
+      [dims.w / 2 + 0.001, 0.62],
+      [-dims.w / 2 - 0.001, -0.62],
+      [dims.w / 2 + 0.001, -0.62],
+      [-dims.w / 2 - 0.001, 0.62],
+    ]) W.mesh(box(gl, 0.004, 0.012, dims.t * 0.9), dark, root, false).position.set(x, y, 0);
+    W.mesh(box(gl, 0.09, 0.005, 0.03), dark, root, false).position.set(0, -dims.h / 2 - 0.001, 0);
+    for (let i = 0; i < 5; i++) {
+      for (const sx of [-1, 1]) W.mesh(cylinder(gl, 0.006, 0.006, 0.004, 10), dark, root, false).position.set(sx * (0.09 + i * 0.022), -dims.h / 2 - 0.001, 0);
+    }
+  } else {
+    const cam = W.mesh(cylinder(gl, 0.012, 0.012, 0.004, 16), W.mat({ color: "#050608", gloss: 0.9 }), root, false);
+    cam.rotation.x = Math.PI / 2;
+    cam.position.set(0, dims.h / 2 - 0.03, dims.t / 2 + 0.003);
   }
   return { root, screen, metal: [metal], back };
 }
@@ -133,7 +190,15 @@ interface DeviceParts {
   phone: Slate;
   tab: Slate;
   floor: Program;
+  floorMesh: Transform;
+  wall: Program;
+  podium: Transform;
+  podiumTop: Program;
+  ring: Program;
 }
+
+/** The podium's height (devices stand on it). */
+const POD = 0.32;
 
 function devicesWorld(W: World): DeviceParts {
   const { gl } = W;
@@ -143,7 +208,18 @@ function devicesWorld(W: World): DeviceParts {
   const floor = W.mat({ color: "#000000", kind: "floor" });
   const f = W.mesh(quad(gl, 40, 40), floor, W.scene, false);
   f.rotation.x = -Math.PI / 2;
-  return { lap, phone, tab, floor };
+  // The studio: a seamless backdrop curving from floor to wall, and a round podium with a light
+  // ring in the brand's colour.
+  const wall = W.mat({ color: "#eef0f4", gloss: 0.18 });
+  const c = W.mesh(cove(gl, 80, 30, 6, 30), wall, W.scene, false);
+  c.position.set(0, 0, -5);
+  const podium = group(W);
+  const podiumTop = W.mat({ color: "#f4f5f8", gloss: 0.55 });
+  const ring = W.mat({ color: "#7c5cff", gloss: 0.6, emit: [0.5, 0.4, 1] });
+  W.mesh(cylinder(gl, 2.7, 2.75, POD - 0.04, 72), podiumTop, podium).position.y = (POD - 0.04) / 2;
+  W.mesh(cylinder(gl, 2.76, 2.76, 0.035, 72), ring, podium, false).position.y = 0.06;
+  W.mesh(cylinder(gl, 2.66, 2.7, 0.04, 72), podiumTop, podium).position.y = POD - 0.02;
+  return { lap, phone, tab, floor, floorMesh: f, wall, podium, podiumTop, ring };
 }
 
 /** Device finishes that suit the stage: silver on light stages, space grey on dark ones; the phone's back in a soft tint of the brand. */
@@ -152,6 +228,32 @@ function finish(sc: SkillContext, P: DeviceParts) {
   const alu = rgb(light ? "#d9dce2" : "#7b808b");
   for (const m of [...P.lap.metal, ...P.phone.metal, ...P.tab.metal]) m.uniforms.uColor.value = alu;
   for (const s of [P.phone, P.tab]) if (s.back) s.back.uniforms.uColor.value = rgb(mixHex(light ? "#eceef2" : "#5d626c", sc.palette.primary, 0.22));
+  P.wall.uniforms.uColor.value = rgb(studioTone(sc));
+  P.podiumTop.uniforms.uColor.value = rgb(mixHex(studioTone(sc), light ? "#ffffff" : "#000000", 0.35));
+  const pr = rgb(sc.palette.primary);
+  P.ring.uniforms.uColor.value = pr;
+  P.ring.uniforms.uEmit.value = pr.map((v) => v * 0.8);
+}
+
+/** The studio's colour: a soft tint of the brand on light stages, a deep one on dark stages. */
+const studioTone = (sc: SkillContext) => (sc.palette.light ? mixHex("#eceef3", sc.palette.primary, 0.07) : mixHex("#15171e", sc.palette.primary, 0.12));
+
+/** The studio behind the headline (the same colour as the backdrop, lit from above). */
+function studio(sc: SkillContext) {
+  const { ctx, w, h } = sc;
+  const tone = studioTone(sc);
+  const g = ctx.createRadialGradient(w / 2, h * 0.35, 0, w / 2, h * 0.35, Math.max(w, h) * 0.75);
+  g.addColorStop(0, mixHex(tone, "#ffffff", sc.palette.light ? 0.5 : 0.08));
+  g.addColorStop(1, mixHex(tone, "#000000", sc.palette.light ? 0.03 : 0.25));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/** Stand the devices on the podium (or on the studio floor). */
+function onPodium(P: DeviceParts, on: boolean) {
+  P.podium.visible = on;
+  P.podium.traverse((n) => void (n.visible = on));
+  P.floorMesh.position.y = on ? POD + 0.002 : 0.002;
 }
 
 function lighting(sc: SkillContext): Partial<View> {
@@ -193,8 +295,21 @@ function frame(sc: SkillContext, top: number, draw: (w: number, h: number) => HT
   const cv = draw(w, rh);
   ctx.save();
   ctx.globalAlpha *= 1 - exitOf(sc);
-  if (cv) ctx.drawImage(cv, 0, top, w, rh);
-  else fallback();
+  if (cv) {
+    // The render's top edge melts into the studio behind the headline.
+    const L = scratch("d3-fade", w, rh);
+    L.ctx.clearRect(0, 0, w, rh);
+    L.ctx.globalCompositeOperation = "source-over";
+    L.ctx.drawImage(cv, 0, 0, w, rh);
+    L.ctx.globalCompositeOperation = "destination-in";
+    const g = L.ctx.createLinearGradient(0, 0, 0, rh * 0.22);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,1)");
+    L.ctx.fillStyle = g;
+    L.ctx.fillRect(0, 0, w, rh);
+    L.ctx.globalCompositeOperation = "source-over";
+    ctx.drawImage(L.canvas, 0, top, w, rh);
+  } else fallback();
   ctx.restore();
 }
 
@@ -222,7 +337,7 @@ const fit = (sc: SkillContext, top: number) => {
 
 function d3Laptop(sc: SkillContext) {
   const { t, d } = sc;
-  saasBackground(sc, { beams: 0.6 });
+  studio(sc);
   const st = stage(sc);
   const top = st.top - 20 * sc.u;
   const shot = shotOf(sc);
@@ -235,7 +350,8 @@ function d3Laptop(sc: SkillContext) {
       const { W, parts: P } = R;
       finish(sc, P);
       show(P, { lap: true });
-      P.lap.root.position.set(0, 0, 0);
+      onPodium(P, true);
+      P.lap.root.position.set(0, POD + 0.015, 0);
       P.lap.root.rotation.y = 0;
       const open = ease.inOutCubic(range(t, 0.15, 1.7));
       P.lap.hinge.rotation.x = lerp(Math.PI / 2 - 0.02, -0.3, open);
@@ -244,7 +360,7 @@ function d3Laptop(sc: SkillContext) {
       const k = ease.inOutCubic(range(t, 0, d * 0.75));
       const F = fit(sc, top);
       const eye = mixShot([4.4 * F, 1.35, 4.6 * F], [-1.5 * F, 2.4, 7.0 * F], k);
-      return render(W, { ...lighting(sc), eye, target: [0, lerp(0.55, 1.0, open), -0.4], fov: 30, shadowSize: 3.5, shadowAt: [0, 0.8, -0.3] }, w, h);
+      return render(W, { ...lighting(sc), eye: [eye[0], eye[1] + POD, eye[2]], target: [0, lerp(0.35, 0.78, open) + POD, -0.4], fov: 30, shadowSize: 3.5, shadowAt: [0, 0.8, -0.3] }, w, h);
     },
     () => flat(sc, shot, top),
   );
@@ -252,10 +368,10 @@ function d3Laptop(sc: SkillContext) {
 
 function d3Phone(sc: SkillContext) {
   const { t, d } = sc;
-  saasBackground(sc, { beams: 0.6 });
+  studio(sc);
   const st = stage(sc);
   const top = st.top - 20 * sc.u;
-  const shot = shotOf(sc);
+  const shot = shotOf(sc, true);
   frame(
     sc,
     top,
@@ -265,14 +381,15 @@ function d3Phone(sc: SkillContext) {
       const { W, parts: P } = R;
       finish(sc, P);
       show(P, { phone: true });
+      onPodium(P, true);
       const turn = ease.inOutCubic(range(t, 0.1, 1.9));
       const bob = Math.sin(t * 1.6) * 0.04;
-      P.phone.root.position.set(0, 1.05 + bob, 0);
+      P.phone.root.position.set(0, 1.05 + POD + bob, 0);
       P.phone.root.rotation.set(lerp(0.25, 0.08, turn), lerp(Math.PI + 0.5, -0.32, turn) + Math.sin(t * 0.9) * 0.04, lerp(-0.15, 0.04, turn));
       paint(W, P.phone.screen, shot, PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 2.2, d - 0.4)), range(t, 1.2, 1.9), 0.11);
       blobs(P, [[0, 0, 0.32, 0.12]]);
       const F = fit(sc, top);
-      return render(W, { ...lighting(sc), eye: [0.25 * F, 1.45, 5.4 * F], target: [0, 1.05, 0], fov: 26, shadowSize: 2, shadowAt: [0, 0.8, 0] }, w, h);
+      return render(W, { ...lighting(sc), eye: [0.25 * F, 1.5 + POD, 5.4 * F], target: [0, 0.95 + POD, 0], fov: 26, shadowSize: 2.8, shadowAt: [0, 0.8, 0] }, w, h);
     },
     () => flat(sc, shot, top),
   );
@@ -280,7 +397,7 @@ function d3Phone(sc: SkillContext) {
 
 function d3Lineup(sc: SkillContext) {
   const { t, d } = sc;
-  saasBackground(sc, { beams: 0.6 });
+  studio(sc);
   const st = stage(sc);
   const top = st.top - 20 * sc.u;
   const shot = shotOf(sc);
@@ -293,6 +410,7 @@ function d3Lineup(sc: SkillContext) {
       const { W, parts: P } = R;
       finish(sc, P);
       show(P, { lap: true, phone: true, tab: true });
+      onPodium(P, false);
       P.lap.root.position.set(0, 0, 0);
       P.lap.root.rotation.y = 0;
       P.lap.hinge.rotation.x = -0.3;
@@ -304,7 +422,7 @@ function d3Lineup(sc: SkillContext) {
       const scroll = ease.inOutCubic(range(t, 1.4, d - 0.4));
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, scroll, range(t, 0.2, 0.8), 0.02);
       paint(W, P.tab.screen, shot, TAB.scrW / TAB.scrH, scroll, range(t, 0.5, 1.1), 0.06);
-      paint(W, P.phone.screen, shot, PHONE.scrW / PHONE.scrH, scroll, range(t, 0.7, 1.3), 0.11);
+      paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, scroll, range(t, 0.7, 1.3), 0.11);
       blobs(P, [
         [0, -0.1, LAP.w / 2 - 0.1, LAP.d / 2 - 0.1],
         [-2.75, 0.1, 0.8, 0.06],
@@ -321,7 +439,7 @@ function d3Lineup(sc: SkillContext) {
 
 function d3Dive(sc: SkillContext) {
   const { ctx, t, d, w, h } = sc;
-  saasBackground(sc, { beams: 0.6 });
+  studio(sc);
   const st = stage(sc);
   // The headline gives way as the camera dives; the page ends full frame.
   const dive = ease.inOutCubic(range(t, 0.9, d - 1.1));
@@ -337,14 +455,15 @@ function d3Dive(sc: SkillContext) {
       const { W, parts: P } = R;
       finish(sc, P);
       show(P, { lap: true });
-      P.lap.root.position.set(0, 0, 0);
+      onPodium(P, true);
+      P.lap.root.position.set(0, POD + 0.015, 0);
       P.lap.root.rotation.y = 0;
       const lean = -0.3;
       P.lap.hinge.rotation.x = lean;
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, 0, 1, 0.02);
       blobs(P, [[0, -0.1, LAP.w / 2 - 0.1, LAP.d / 2 - 0.1]]);
       // The screen's centre and facing, from the hinge.
-      const hy = LAP.t;
+      const hy = LAP.t + POD + 0.015;
       const hz = -LAP.d / 2 + 0.06;
       const cy = LAP.lidH / 2 + 0.04;
       const sc0: Num3 = [0, hy + Math.cos(lean) * cy + Math.sin(-lean) * 0, hz - Math.sin(-lean) * cy + LAP.lidT / 2];
@@ -355,8 +474,8 @@ function d3Dive(sc: SkillContext) {
       const dist = fitH / Math.tan(((fov / 2) * Math.PI) / 180) * 1.0;
       const near: Num3 = [sc0[0] + nrm[0] * dist, sc0[1] + nrm[1] * dist, sc0[2] + nrm[2] * dist];
       const F = fit(sc, st.top);
-      const eye = mixShot([3.6 * F, 2.6, 6.8 * F], near, dive);
-      const target = mixShot([0, 0.9, -0.4], sc0, dive);
+      const eye = mixShot([3.6 * F, 2.6 + POD, 6.8 * F], near, dive);
+      const target = mixShot([0, 0.9 + POD, -0.4], sc0, dive);
       return render(W, { ...lighting(sc), eye, target, fov, shadowSize: 3.5, shadowAt: [0, 0.8, -0.3] }, cw, ch);
     },
     () => flat(sc, shot, st.top),
@@ -450,7 +569,7 @@ function d3Desk(sc: SkillContext) {
       if (P.phone.back) P.phone.back.uniforms.uColor.value = rgb(mixHex("#eceef2", palette.primary, 0.25));
       P.mug.uniforms.uColor.value = rgb(palette.primary);
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, ease.inOutCubic(range(t, 1.2, d - 0.4)), range(t, 0.1, 0.7), 0.02);
-      paint(W, P.phone.screen, shot, PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.11);
+      paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.11);
       const k = ease.inOutCubic(range(t, 0, d));
       const a = lerp(0.55, -0.35, k);
       const F = fit(sc, top);

@@ -112,6 +112,38 @@ export function slab(gl: OGLRenderingContext, w: number, h: number, d: number, r
   return { front: face(d / 2, 1), back: face(-d / 2, -1), body: geo(gl, pos, nor, uv, idx) };
 }
 
+/**
+ * A photo studio's seamless backdrop (a cyclorama): a floor that curves up into a back wall, `width`
+ * wide, the floor running from z = +depth to the curve, the wall rising to `height`.
+ */
+export function cove(gl: OGLRenderingContext, width: number, depth: number, radius: number, height: number) {
+  const prof: { y: number; z: number; ny: number; nz: number }[] = [];
+  prof.push({ y: 0, z: depth, ny: 1, nz: 0 });
+  prof.push({ y: 0, z: 0, ny: 1, nz: 0 });
+  const steps = 16;
+  for (let i = 1; i <= steps; i++) {
+    const a = (i / steps) * (Math.PI / 2);
+    prof.push({ y: radius - Math.cos(a) * radius, z: -Math.sin(a) * radius, ny: Math.cos(a), nz: Math.sin(a) });
+  }
+  prof.push({ y: height, z: -radius, ny: 0, nz: 1 });
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  prof.forEach((q, i) => {
+    for (const x of [-width / 2, width / 2]) {
+      pos.push(x, q.y, q.z);
+      nor.push(0, q.ny, q.nz);
+      uv.push(x > 0 ? 1 : 0, i / (prof.length - 1));
+    }
+  });
+  for (let i = 0; i < prof.length - 1; i++) {
+    const a = i * 2;
+    idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  }
+  return geo(gl, pos, nor, uv, idx);
+}
+
 /** A flat rectangle in the XY plane (facing +z), for screens and decals. */
 export function quad(gl: OGLRenderingContext, w: number, h: number) {
   const a = w / 2;
