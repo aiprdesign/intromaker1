@@ -2568,7 +2568,7 @@ export default function Studio() {
               Off
             </button>
           </div>
-          <p className="hint">{contrastOn ? "Now and then a words-only slide flips to a bold block of your colour, to change the pace." : "Slides keep the style's own background."}</p>
+          <p className="hint">{contrastOn ? "Now and then a words-only slide flips to a bold block of your colour, or splits with one half in inverse colours, to change the pace." : "Slides keep the style's own background."}</p>
           <details className="fold">
             <summary>
               <span className="field-label inline">Mouse pointer</span> <span className="tpl-desc">{POINTER_NAMES[pointer]}</span>

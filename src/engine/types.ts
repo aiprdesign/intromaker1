@@ -387,9 +387,11 @@ export interface Scene {
   media?: Media;
   /**
    * A contrast slide: the stage flips to a bold block of the video's colour with type to match, to
-   * break the rhythm. Unset: the director decides (see contrast.ts); true or false: your choice.
+   * break the rhythm. Unset: the director decides (see contrast.ts); true or false: your choice;
+   * "left" or "right": a split, only that half of the frame flipped (type crossing the seam
+   * changes colour mid-word).
    */
-  contrast?: boolean;
+  contrast?: boolean | "left" | "right";
   /** You chose this slide's style yourself: re-styling the video keeps it. */
   locked?: boolean;
   /**

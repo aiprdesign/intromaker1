@@ -10,7 +10,7 @@ import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
 import { drawLogo, getImage } from "./media";
 import { withPlaceholders } from "./placeholders";
-import { canContrast, contrastSlides } from "./contrast";
+import { canContrast, contrastSlides, contrastSplit } from "./contrast";
 import { isMovieStyle } from "./trailers";
 import { pairedSubFamily, setBrandFont, setSubFamily, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
@@ -128,14 +128,54 @@ function drawScene(
   transitionIn = true,
   music?: MusicPulse,
 ) {
+  // A split contrast slide: drawn as usual, then flipped, and one half of the frame shows the
+  // flipped copy, its seam easing in from the edge to the middle (see contrast.ts).
+  const own = plan.scenes?.[index]?.skill === scene.skill;
+  const side = plan.style === "saas" && !opts.edit && (own ? contrastSlides(plan).has(index) && contrastSplit(plan, index) : scene.contrast === "left" || scene.contrast === "right" ? scene.contrast : undefined);
+  if (!side || !canContrast(scene)) return drawSceneOnce(target, scene, plan, t, w, h, index, opts, globalT, d, transitionIn, music);
+  const sc = drawSceneOnce(target, scene, plan, t, w, h, index, opts, globalT, d, transitionIn, music, false);
+  const layer = scratch("split-contrast", w, h);
+  drawSceneOnce(layer.ctx, scene, plan, t, w, h, index, opts, globalT, d, transitionIn, music, true, true);
+  const open = (w / 2) * ease.inOutCubic(clamp(t / 0.6));
+  target.save();
+  target.setTransform(1, 0, 0, 1, 0, 0);
+  target.beginPath();
+  if (side === "left") target.rect(0, 0, open, h);
+  else target.rect(w - open, 0, open, h);
+  target.clip();
+  target.drawImage(layer.canvas, 0, 0, w, h);
+  target.restore();
+  resetCtx(target);
+  return sc;
+}
+
+function drawSceneOnce(
+  target: CanvasRenderingContext2D,
+  scene: Scene,
+  plan: PlanLike,
+  t: number,
+  w: number,
+  h: number,
+  index: number,
+  opts: RenderOptions,
+  globalT: number,
+  d = scene.duration,
+  transitionIn = true,
+  music?: MusicPulse,
+  /** Flipped or not regardless of the plan (the two halves of a split contrast slide). */
+  forceFlip?: boolean,
+  /** Flipped to the inverse of the stage (a split's half: see inversePalette). */
+  inverse = false,
+) {
   // A slide that shows your pictures but has none yet shows a placeholder graphic in their place.
   // A contrast slide flips the stage to a block of the video's colour (see contrast.ts).
   const flip =
-    plan.style === "saas" &&
-    (plan.scenes?.[index]?.skill === scene.skill ? contrastSlides(plan).has(index) : scene.contrast === true && canContrast(scene));
+    forceFlip ??
+    (plan.style === "saas" &&
+      (plan.scenes?.[index]?.skill === scene.skill ? contrastSlides(plan).has(index) : scene.contrast === true && canContrast(scene)));
   ({ scene, plan } = withPlaceholders(scene, plan));
   const base = brandPalette(plan.palette, plan.brand, schemeOf(plan));
-  const palette = flip ? contrastPalette(base) : base;
+  const palette = flip ? (inverse ? inversePalette(base) : contrastPalette(base)) : base;
   const beat = 60 / (plan.bpm ?? 120);
   const saas = plan.style === "saas";
   // Beat-locked motion: within each beat, animation is front-loaded so moves hit on the beat and
@@ -599,6 +639,31 @@ export function contrastPalette(p: Palette): Palette {
     primary: mixHex(p.secondary, text, dark ? 0.35 : 0.2),
     secondary: mixHex(p.accent, text, 0.4),
     accent: mixHex(p.secondary, text, 0.55),
+    text,
+  });
+}
+
+/**
+ * The inverse of the stage, for one half of a split contrast slide: a light style's half becomes
+ * the bold colour block with white type; a dark style's becomes a light tint of its colour with
+ * near-black type, so the two halves read as opposites either way.
+ */
+export function inversePalette(p: Palette): Palette {
+  if (p.light) return contrastPalette(p);
+  const block = /^#[0-9a-f]{6}$/i.test(p.primary) ? p.primary : "#5b5bf0";
+  const bg0 = mixHex(block, "#ffffff", 0.84);
+  const text = mixHex("#0b0b12", block, 0.12);
+  let primary = block;
+  for (let k = 0.08; k <= 0.6 && contrast(primary, bg0) < 3.2; k += 0.08) primary = mixHex(block, "#000000", k);
+  return legible({
+    ...p,
+    light: true,
+    bg0,
+    bg1: mixHex(bg0, "#ffffff", 0.45),
+    support: mixHex(bg0, text, 0.08),
+    primary,
+    secondary: mixHex(p.secondary, "#000000", 0.35),
+    accent: mixHex(p.accent, "#000000", 0.35),
     text,
   });
 }

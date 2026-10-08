@@ -2775,7 +2775,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
         : "cut",
       baseTransition: (TRANSITIONS as readonly string[]).includes(s.baseTransition as string) ? (s.baseTransition as Transition) : undefined,
       media: sanitizeMedia(s.media),
-      contrast: typeof s.contrast === "boolean" ? s.contrast : undefined,
+      contrast: typeof s.contrast === "boolean" || s.contrast === "left" || s.contrast === "right" ? s.contrast : undefined,
       locked: s.locked === true ? true : undefined,
       base: sanitizeBase(s.base),
       eyebrow: typeof s.eyebrow === "string" && s.eyebrow.trim() ? s.eyebrow.slice(0, 40) : undefined,
