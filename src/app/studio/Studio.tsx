@@ -2563,7 +2563,7 @@ export default function Studio() {
                   {cast.length ? "Edit characters" : "Design characters"}
                 </button>
               </div>
-              <p className="hint">{cast.length ? (castOn ? "The abstract character slides (Abstract People and Memphis Crowd styles) cast yours first, then fill crowds with generated people." : "The abstract character slides make up a new cast per video.") : "Design simple abstract characters to star in the abstract character slides (Abstract People and Memphis Crowd styles), or download them as PNGs."}</p>
+              <p className="hint">{cast.length ? (castOn ? "The abstract character slides (Abstract People and Memphis Crowd styles) cast yours first, then fill crowds with generated people. A character type you pick under the style (Blob, Stick figure…) redraws them in it, keeping their colours." : "The abstract character slides make up a new cast per video.") : "Design simple abstract characters to star in the abstract character slides (Abstract People and Memphis Crowd styles), or download them as PNGs."}</p>
             </details>
           )}
           {(style !== "trailer" || plan.product) && (

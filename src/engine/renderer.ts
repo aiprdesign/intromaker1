@@ -169,6 +169,7 @@ function drawScene(
     watermark: plan.shapeSet === "text" ? watermarkText(plan) : undefined,
     pointer: plan.pointer,
     cast: plan.cast,
+    characters: plan.characters,
     flat3d: plan.render3d === "flat",
     edit: opts.edit ? (l) => opts.edit!(index, l) : undefined,
   };

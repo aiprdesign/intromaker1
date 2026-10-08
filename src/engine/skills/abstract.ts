@@ -98,12 +98,18 @@ function makeBase(seed: number, p: Palette, kind: CharacterKind): AbsSpec {
 /** The character in a slide's `slot`: the video's own cast first (from the character designer), then generated people. */
 export function person(sc: SkillContext, slot: number, seed: number): AbsSpec {
   const own = sc.cast?.[slot];
+  // Characters you picked for the style win: your designed cast is drawn as that kind too (keeping
+  // its colours and features), and everyone else is generated in it.
+  const picked = sc.characters;
   // Your characters wear the intro's colours unless you gave them their own.
-  if (own) return matchColors(own, sc.palette, slot);
+  if (own) {
+    const c = matchColors(own, sc.palette, slot);
+    return picked ? { ...c, kind: picked === "abstract" ? undefined : picked } : c;
+  }
   // Generated people match the cast's lead in drawing style, else the style's own look…
-  const art = sc.cast?.[0]?.art ?? sc.look?.art ?? TOON_ART[sc.look?.toon ?? "flat"];
+  const art = (picked ? undefined : sc.cast?.[0]?.art) ?? sc.look?.art ?? TOON_ART[sc.look?.toon ?? "flat"];
   // …and the lead's kind (or the style's).
-  const kind = sc.cast?.length ? (sc.cast[0].kind ?? "abstract") : (sc.look?.people ?? "abstract");
+  const kind = picked ?? (sc.cast?.length ? (sc.cast[0].kind ?? "abstract") : (sc.look?.people ?? "abstract"));
   const c = makeCharacter(seed, sc.palette, kind);
   return art === "flat" ? c : { ...c, art };
 }

@@ -647,6 +647,8 @@ export interface SkillContext {
   pointer?: PointerStyle;
   /** Custom abstract characters, cast first (see VideoPlan.cast). */
   cast?: CastMember[];
+  /** Characters you picked for a Cartoon style (unset: the style's own); they win over a designed cast's kind. */
+  characters?: CharacterKind;
   /**
    * Set when the studio edits this slide's points on the paused preview: the slide draws its
    * overview (no zoom, lens or callouts) and reports where its editable points sit.
