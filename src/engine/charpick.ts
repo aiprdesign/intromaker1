@@ -47,7 +47,7 @@ export function themePick(prompt: string): CharacterPick | undefined {
   if (/\b(kids?|children|child|toddlers?|preschool|kindergarten|parents?|parenting|families|family|babysit(?:ter|ting)?|daycare|nursery)\b/.test(p)) return { template: "cartoon", characters: "blob" };
   if (/\b(classroom|teachers?|teaching|tutors?|tutoring|homework|lessons?|school|schools|pupils|study buddy|flashcards?)\b/.test(p)) return { template: "cartoon", characters: "stick" };
   if (/\b(hiring|recruit(?:ing|ment|ers?)?|human resources|hr|onboarding new (?:hires|employees)|employee (?:wellbeing|engagement|experience)|team building|company culture|diversity|inclusion|volunteers?|volunteering|non-?profits?|charity|charities|community groups?)\b/.test(p)) return { template: "memphis" };
-  if (/\b(home ?builders?|house ?builders?|custom homes?|new[- ]build homes?|real estate|realtors?|estate agents?|show ?homes?)\b/.test(p)) return { template: "cartoon" };
+  if (/\b(home ?builders?|house ?builders?|custom homes?|new[- ]build homes?|real estate|realtors?|estate agents?|show ?homes?)\b/.test(p)) return { template: /\b(cartoons?|animated|characters?)\b/.test(p) ? "cartoon" : "editorial" };
   if (/\b(retro|vintage|nostalgic|old[- ]school|classic diner|since 19\d\d|1920s|1930s|1950s)\b/.test(p)) return { template: "comic", characters: "classic" };
   return undefined;
 }

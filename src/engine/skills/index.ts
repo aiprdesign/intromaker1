@@ -5,6 +5,7 @@ import { charProSkills } from "./charpro";
 import { abstractSkills } from "./abstract";
 import { industrySkills } from "./industries";
 import { devices3dSkills } from "./devices3d";
+import { homes3dSkills } from "./homes3d";
 import { componentSkills } from "./components";
 import { endingSkills } from "./endings";
 import { editorialSkills } from "./editorial";
@@ -60,6 +61,7 @@ export const SKILLS: Skill[] = [
   ...abstractSkills,
   ...industrySkills,
   ...devices3dSkills,
+  ...homes3dSkills,
   ...productSkills,
   beatSkills[3],
   ...typeFxSkills,
@@ -108,6 +110,7 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Abstract characters", skills: abstractSkills },
   { name: "Industries", skills: industrySkills },
   { name: "3D devices", skills: devices3dSkills },
+  { name: "Homebuilders 3D", skills: homes3dSkills },
   { name: "Media & gallery", skills: [...productSkills, beatSkills[3], ...gallerySkills, ...cardSkills, ...componentSkills, ...mediaSkills] },
   { name: "Type & text", skills: [...typeFxSkills, ...typographySkills] },
   { name: "Epic screens", skills: [...epicSkills, ...iconicSkills] },

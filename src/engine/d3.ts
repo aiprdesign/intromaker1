@@ -297,6 +297,9 @@ uniform vec3 uSunCol;
 uniform vec3 uSky;
 uniform vec3 uGnd;
 uniform float uExposure;
+uniform vec3 uEmit;
+uniform float uClip;
+uniform vec4 uFog;
 uniform sampler2D tShadow;
 uniform float uShadowSoft;
 #ifdef MAP
@@ -338,6 +341,7 @@ vec3 env(vec3 R) {
 float hash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
 
 void main() {
+  if (vW.y > uClip) discard;
   vec3 N = normalize(vN);
   if (!gl_FrontFacing) N = -N;
   vec3 V = normalize(cameraPosition - vW);
@@ -359,6 +363,13 @@ void main() {
   vec2 tp = abs(k - vec2(0.5, 0.22)) - vec2(0.16, 0.13);
   float pad = 1.0 - smoothstep(-0.004, 0.004, length(max(tp, 0.0)) - 0.02);
   base = mix(base, base * 0.93, pad);
+#endif
+#ifdef SIDING
+  // Lap siding: a fine shadow line under each board.
+  base *= 1.0 - 0.12 * smoothstep(0.82, 1.0, fract(vW.y * 4.6));
+#endif
+#ifdef SHINGLE
+  base *= 1.0 - 0.14 * smoothstep(0.75, 1.0, fract(vW.y * 5.5)) - 0.05 * step(0.5, fract(floor(vW.y * 5.5) * 0.5 + vW.z * 1.4));
 #endif
 #ifdef GRASS
   float nz = hash(floor(vW.xz * 6.0)) * 0.5 + hash(floor(vW.xz * 1.3)) * 0.5;
@@ -400,6 +411,9 @@ void main() {
   gl_FragColor = vec4(0.0, 0.0, 0.0, a * uAlpha);
   return;
 #endif
+  col += uEmit;
+  // Haze with distance (outdoor scenes), towards the horizon's colour.
+  if (uFog.a > 0.0) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
   col *= uExposure;
   col = col / (1.0 + max(col - 0.85, 0.0) * 1.2);
   gl_FragColor = vec4(col * alpha, alpha);
@@ -425,8 +439,10 @@ export interface MatOpts {
   metal?: number;
   gloss?: number;
   alpha?: number;
-  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass";
+  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass" | "siding" | "shingle";
   color2?: string;
+  /** Light it gives off (a lit window), added to its shading. */
+  emit?: string | Num3;
   transparent?: boolean;
   doubleSided?: boolean;
 }
@@ -476,16 +492,19 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     uShadowProj: { value: light.projectionMatrix },
     tShadow: shadow.targetUniform as { value: unknown },
     uShadowSoft: { value: 2.4 },
+    uFog: { value: [1, 1, 1, 0] },
   };
   const blank = new Texture(gl, { image: new Uint8Array([0, 0, 0, 255]), width: 1, height: 1 });
   const mat = (o: MatOpts) => {
-    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : "";
+    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : o.kind === "siding" ? "#define SIDING\n" : o.kind === "shingle" ? "#define SHINGLE\n" : "";
     const uniforms: Record<string, { value: unknown }> = {
       ...env,
       uColor: { value: typeof o.color === "string" ? rgb(o.color) : o.color },
       uMetal: { value: o.metal ?? 0 },
       uGloss: { value: o.gloss ?? 0.4 },
       uAlpha: { value: o.alpha ?? 1 },
+      uEmit: { value: o.emit ? (typeof o.emit === "string" ? rgb(o.emit) : o.emit) : [0, 0, 0] },
+      uClip: { value: 1e4 },
     };
     if (o.kind === "screen") Object.assign(uniforms, { tMap: { value: blank }, uUv: { value: [1, 1, 0, 0] }, uGlow: { value: 1 }, uRound: { value: [0.04, 1.6, 0] } });
     if (o.kind === "floor") Object.assign(uniforms, { uBlob: { value: new Array(24).fill(0) }, uFloorAlpha: { value: 1 } });
@@ -520,6 +539,8 @@ export interface View {
   sky?: Num3;
   gnd?: Num3;
   exposure?: number;
+  /** Distance haze: colour and density (0: none). */
+  fog?: [number, number, number, number];
   /** Half-size of the shadow camera's view and where it centres. */
   shadowSize?: number;
   shadowAt?: Num3;
@@ -545,6 +566,7 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   if (v.sky) env.uSky.value = v.sky;
   if (v.gnd) env.uGnd.value = v.gnd;
   env.uExposure.value = v.exposure ?? 1;
+  env.uFog.value = v.fog ?? [1, 1, 1, 0];
   const size = v.shadowSize ?? 4;
   const c = v.shadowAt ?? v.target;
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });
@@ -575,4 +597,19 @@ export function setScreen(p: Program, tex: Texture, imgW: number, imgH: number, 
   p.uniforms.uUv.value = [sx, sy, (1 - sx) / 2, oy];
   p.uniforms.uGlow.value = glow;
   p.uniforms.uRound.value = [radius, aspect, 0];
+}
+
+/** Where a world point lands on the rendered view (pixels in a `w`×`h` frame), and whether it's in front of the camera. */
+export function project(W: World, p: Num3, w: number, h: number) {
+  const v = W.camera.viewMatrix as unknown as number[];
+  const P = W.camera.projectionMatrix as unknown as number[];
+  const mul = (m: number[], x: number, y: number, z: number, wv: number) => [
+    m[0] * x + m[4] * y + m[8] * z + m[12] * wv,
+    m[1] * x + m[5] * y + m[9] * z + m[13] * wv,
+    m[2] * x + m[6] * y + m[10] * z + m[14] * wv,
+    m[3] * x + m[7] * y + m[11] * z + m[15] * wv,
+  ];
+  const e = mul(v, p[0], p[1], p[2], 1);
+  const c = mul(P, e[0], e[1], e[2], e[3]);
+  return { x: (c[0] / c[3] * 0.5 + 0.5) * w, y: (1 - (c[1] / c[3] * 0.5 + 0.5)) * h, front: c[3] > 0 };
 }
