@@ -11,9 +11,9 @@
  * - d3-desk:    a desk in your colours from above: the laptop, a phone, a tablet, a mug, a plant.
  */
 import { Texture, Torus, type Program, type Transform } from "ogl";
-import { cove, project, quad, render, rgb, setCrop, setScreen, slab, cylinder, sphere, box, lathe, leaf, torus, world, type View, type World } from "../d3";
+import { band, cove, project, quad, render, rgb, setCrop, setScreen, slab, cylinder, sphere, box, lathe, leaf, torus, world, type View, type World } from "../d3";
 import { desktopUI, mobileUI } from "../uiscreens";
-import { getMedia, type Drawable } from "../media";
+import { getMedia, printableLogo, type Drawable } from "../media";
 import { textureOf, sizeOf } from "../gl";
 import { clamp, ease, hashString, lerp, mixHex, range } from "../math";
 import { saasBackground, saasFont } from "../saasfx";
@@ -1341,6 +1341,8 @@ interface DeskParts {
   mat: Program;
   folio: Program;
   leaves: Transform[];
+  print: Program;
+  printMesh: Transform;
 }
 
 function deskWorld(W: World): DeskParts {
@@ -1398,6 +1400,11 @@ function deskWorld(W: World): DeskParts {
     mug,
   );
   cup.position.set(2.55, 0, -0.7);
+  // The brand's logo printed on the side that faces the camera (see d3Desk; hidden without one).
+  const print = W.mat({ color: "#ffffff", kind: "decal" });
+  const printMesh = W.mesh(band(gl, 0.2447, 0.2524, 0.17, 0.47, 1.1, 2.44, 28), print, W.scene, false);
+  printMesh.position.set(2.55, 0, -0.7);
+  printMesh.visible = false;
   const handle = W.mesh(torus(gl, 0.13, 0.034, Math.PI * 1.25, 32, 14), mug);
   handle.position.set(2.55 + 0.25, 0.32, -0.7);
   handle.scale.set(0.9, 1.15, 1);
@@ -1441,7 +1448,52 @@ function deskWorld(W: World): DeskParts {
   seam.rotation.x = Math.PI / 2;
   const led = W.mesh(sphere(gl, 0.012, 10, 8), W.mat({ color: "#7be08f", emit: "#3fbf60" }), podG, false);
   led.position.set(0, -0.02, 0.1);
-  return { lap, phone, tab, mug, coaster: coasterM, pot: potM, top: surface, mat, folio: folioM, leaves };
+  return { lap, phone, tab, mug, coaster: coasterM, pot: potM, top: surface, mat, folio: folioM, leaves, print, printMesh };
+}
+
+const prints = new Map<string, HTMLCanvasElement>();
+/**
+ * The mug's print: the brand's logo when it prints cleanly (an SVG, or a cut-out PNG; see
+ * printableLogo), centred on a label-shaped canvas. On a light glaze it keeps its own colours; on
+ * a coloured mug it's screen-printed in one colour, white, with the logo's own light parts (a
+ * letter inside a badge) knocked out to the glaze, as branded mugs are. Null: no print.
+ */
+function mugPrint(sc: SkillContext, mugHex: string): HTMLCanvasElement | null {
+  const [r, g, b] = rgb(mugHex);
+  const lightMug = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.62;
+  // (Dark ink stays dark here: a one-colour print knocks out the logo's light parts instead.)
+  const logo = printableLogo(sc.brand?.logo, true);
+  if (!logo) return null;
+  const key = `${sc.brand?.logo}|${lightMug ? "c" : "w"}`;
+  let c = prints.get(key);
+  if (c) return c;
+  if (prints.size > 16) prints.clear();
+  const W = 512;
+  const H = 480;
+  c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const x = c.getContext("2d")!;
+  const { w: lw, h: lh } = sizeOf(logo);
+  // Contained, with a margin: a wide wordmark runs across, a square mark sits a little smaller.
+  const k = Math.min((W * 0.9) / lw, (H * (lw / lh > 2 ? 0.5 : 0.72)) / lh);
+  const dw = lw * k;
+  const dh = lh * k;
+  x.drawImage(logo, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  if (!lightMug) {
+    const d = x.getImageData(0, 0, W, H);
+    const px = d.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const lum = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
+      const ink = 1 - Math.min(1, Math.max(0, (lum - 0.78) / 0.14));
+      px[i] = px[i + 1] = 251;
+      px[i + 2] = 249;
+      px[i + 3] = Math.round(px[i + 3] * ink);
+    }
+    x.putImageData(d, 0, 0);
+  }
+  prints.set(key, c);
+  return c;
 }
 
 function d3Desk(sc: SkillContext) {
@@ -1468,7 +1520,11 @@ function d3Desk(sc: SkillContext) {
       P.mat.uniforms.uColor.value = rgb(light ? mixHex(palette.primary, "#ffffff", 0.45) : mixHex(palette.primary, "#05060a", 0.72));
       // The mug in whichever of the video's colours (or white glaze) stands out most from the desk.
       const far = (hex: string) => rgb(hex).reduce((a, v, i) => a + (v - rgb(deskHex)[i]) ** 2, 0);
-      P.mug.uniforms.uColor.value = rgb([palette.accent, palette.secondary, "#f3f1ec"].reduce((a, b) => (far(b) > far(a) * 1.15 ? b : a)));
+      const mugHex = [palette.accent, palette.secondary, "#f3f1ec"].reduce((a, b) => (far(b) > far(a) * 1.15 ? b : a));
+      P.mug.uniforms.uColor.value = rgb(mugHex);
+      const label = mugPrint(sc, mugHex);
+      P.printMesh.visible = !!label;
+      if (label) P.print.uniforms.tMap.value = textureOf(W.renderer, label);
       P.coaster.uniforms.uColor.value = rgb(light ? "#d9c3a5" : "#b08a64");
       P.pot.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#f4f1ec", light ? 0.75 : 0.6));
       for (const m of P.tab.metal) m.uniforms.uColor.value = rgb(light ? "#d9dce2" : "#8a8f99");

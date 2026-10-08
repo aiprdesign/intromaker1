@@ -313,6 +313,37 @@ export function lathe(gl: OGLRenderingContext, profile: [number, number][], seg 
 }
 
 /**
+ * A patch of a (slightly tapered) cylinder's side, radius `rBot` at `y0` to `rTop` at `y1`, from
+ * angle `a0` to `a1` (as in lathe: x = cos, z = sin). Its UVs read left to right seen from
+ * outside, so a picture wraps on like a label or a print.
+ */
+export function band(gl: OGLRenderingContext, rBot: number, rTop: number, y0: number, y1: number, a0: number, a1: number, seg = 24) {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const l = Math.hypot(y1 - y0, rBot - rTop) || 1;
+  const ny = (rBot - rTop) / l;
+  const nr = (y1 - y0) / l;
+  for (let i = 0; i <= seg; i++) {
+    const a = a0 + ((a1 - a0) * i) / seg;
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    for (const [r, y, v] of [[rBot, y0, 0], [rTop, y1, 1]] as const) {
+      pos.push(c * r, y, sn * r);
+      nor.push(c * nr, ny, sn * nr);
+      uv.push(1 - i / seg, v);
+    }
+  }
+  for (let i = 0; i < seg; i++) {
+    const p = i * 2;
+    idx.push(p, p + 2, p + 1, p + 1, p + 2, p + 3);
+  }
+  faceOut(pos, nor, idx);
+  return geo(gl, pos, nor, uv, idx);
+}
+
+/**
  * A torus in the xy plane (ring radius `R`, tube radius `r`), or the part of one swept through
  * `arc` radians from -arc/2 to +arc/2 about +x: a mug's handle.
  */

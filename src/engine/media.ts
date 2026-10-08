@@ -395,6 +395,36 @@ export function logoMaxWidth(ctx: CanvasRenderingContext2D, img: HTMLImageElemen
   return (img.naturalWidth * 2.5) / Math.max(1e-3, Math.hypot(m.a, m.b));
 }
 
+const printable = new Map<string, boolean>();
+/**
+ * The logo, cut out cleanly enough to print on an object (a mug in the 3D Desk): an SVG always;
+ * a PNG, JPG or GIF when it stands on a transparent background (or a plain white box, keyed out)
+ * and has the pixels for it. Null when it would print as a box, or hasn't loaded yet.
+ */
+export function printableLogo(src: string | undefined, lightStage: boolean): HTMLCanvasElement | HTMLImageElement | null {
+  const img = getImage(src);
+  if (!img?.naturalWidth) return null;
+  const out = logoAt(img, lightStage, 1024);
+  if (vectorLogos.has(img.src)) return out;
+  const key = `${img.src}|${lightStage}`;
+  let ok = printable.get(key);
+  if (ok === undefined) {
+    ok = false;
+    if (Math.min(img.naturalWidth, img.naturalHeight) >= 40 && typeof document !== "undefined") {
+      const c = document.createElement("canvas");
+      c.width = c.height = 64;
+      const g = c.getContext("2d", { willReadFrequently: true })!;
+      g.drawImage(out, 0, 0, 64, 64);
+      const px = g.getImageData(0, 0, 64, 64).data;
+      let clear = 0;
+      for (let i = 3; i < px.length; i += 4) if (px[i] < 24) clear++;
+      ok = clear > 64 * 64 * 0.08;
+    }
+    printable.set(key, ok);
+  }
+  return ok ? out : null;
+}
+
 /** Back-compat: the logo prepared at a generous size. */
 export function stageLogo(img: HTMLImageElement, lightStage: boolean) {
   return logoAt(img, lightStage, 1024);
