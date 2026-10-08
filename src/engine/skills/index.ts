@@ -120,6 +120,10 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
 
 /** Slides that show a picture or video of their own (`scene.media`), which can be changed per slide. */
 export const MEDIA_SKILLS = new Set<SkillId>([
+  "d3-popout",
+  "d3-macro",
+  "d3-split",
+  "d3-wall",
   "d3-laptop",
   "d3-phone",
   "d3-lineup",

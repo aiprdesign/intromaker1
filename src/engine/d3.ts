@@ -695,3 +695,11 @@ export function project(W: World, p: Num3, w: number, h: number) {
   const c = mul(P, e[0], e[1], e[2], e[3]);
   return { x: (c[0] / c[3] * 0.5 + 0.5) * w, y: (1 - (c[1] / c[3] * 0.5 + 0.5)) * h, front: c[3] > 0 };
 }
+
+/** Show a crop of a picture on a screen material: `rect` is [left, top, width, height] as fractions of the image. */
+export function setCrop(p: Program, tex: Texture, rect: [number, number, number, number], aspect: number, glow = 1, radius = 0.05) {
+  p.uniforms.tMap.value = tex;
+  p.uniforms.uUv.value = [rect[2], rect[3], rect[0], rect[1]];
+  p.uniforms.uGlow.value = glow;
+  p.uniforms.uRound.value = [radius, aspect, 0];
+}
