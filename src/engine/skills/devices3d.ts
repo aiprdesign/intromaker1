@@ -264,6 +264,7 @@ function lighting(sc: SkillContext): Partial<View> {
     sky: light ? [0.92, 0.93, 0.97] : rgb(mixHex("#c7cbd6", sc.palette.primary, 0.15)),
     gnd: light ? [0.55, 0.53, 0.52] : [0.25, 0.25, 0.3],
     exposure: light ? 1.0 : 1.08,
+    flat: !!sc.flat3d,
   };
 }
 

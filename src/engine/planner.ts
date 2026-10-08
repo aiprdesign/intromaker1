@@ -2740,6 +2740,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     cast: sanitizeCast(raw.cast),
     characters: (KINDS as readonly string[]).includes(raw.characters as string) ? (raw.characters as VideoPlan["characters"]) : undefined,
     setting: (SCENES as readonly string[]).includes(raw.setting as string) ? raw.setting : undefined,
+    render3d: raw.render3d === "flat" ? "flat" : undefined,
     shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) && raw.shapeSet !== "geometric" ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,
     textFx: (TEXT_FX as readonly string[]).includes(raw.textFx as string) ? (raw.textFx as VideoPlan["textFx"]) : undefined,

@@ -484,6 +484,8 @@ export interface VideoPlan {
   cast?: CastMember[];
   /** The characters a Cartoon style tells the story with (unset: the style's own). */
   characters?: CharacterKind;
+  /** How the 3D slides are drawn: real 3D (unset) or flat, as a 2D illustration. */
+  render3d?: "flat";
   /** Where a flat Cartoon style's characters are (an office, a hospital…), from the intro's theme (see scenes.ts). */
   setting?: "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe" | "kitchen" | "bedroom" | "bathroom" | "house";
 }
@@ -611,6 +613,8 @@ export interface SkillContext {
   globalT?: number;
   /** Set while rendering a 3D-stage content layer: the stage (background) is drawn separately. */
   noStage?: boolean;
+  /** Draw 3D slides flat, as 2D illustrations (VideoPlan.render3d). */
+  flat3d?: boolean;
   /** Product concept id (see concepts.ts) for on-brand icon choices. */
   concept?: string;
   /** A physical product film: product photos are shown cut out of their white backgrounds. */

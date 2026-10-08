@@ -44,6 +44,11 @@ function sky(sc: SkillContext, horizon = 0.62) {
   g.addColorStop(1, "#f6d7b0");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
+  // Flat (2D) views look straight on, so the lawn runs on under the horizon.
+  if (sc.flat3d) {
+    ctx.fillStyle = "#78ad55";
+    ctx.fillRect(0, h * horizon, w, h * (1 - horizon));
+  }
 }
 
 const GOLDEN: Partial<View> = {
@@ -242,6 +247,15 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     const tran = side ? box(gl, 0.14, 0.05, ww) : box(gl, ww, 0.05, 0.14);
     put(W, mull, mats.trim, walls, x, y, z, false);
     put(W, tran, mats.trim, walls, x, y + hh * 0.1, z, false);
+    // A sill under it, and on the front, shutters either side.
+    if (side) put(W, box(gl, 0.22, 0.08, ww + 0.4), mats.trim, walls, x - 0.06, y - hh / 2 - 0.16, z, false);
+    else {
+      put(W, box(gl, ww + 0.44, 0.08, 0.22), mats.trim, walls, x, y - hh / 2 - 0.16, z + 0.08, false);
+      for (const sx of [-1, 1]) {
+        put(W, box(gl, 0.38, hh + 0.2, 0.06), mats.door, walls, x + sx * (ww / 2 + 0.36), y, z + 0.02, false);
+        for (let k = -2; k <= 2; k++) put(W, box(gl, 0.3, 0.025, 0.07), mats.trim, walls, x + sx * (ww / 2 + 0.36), y + k * (hh / 5), z + 0.04, false);
+      }
+    }
   };
   win(-1.65, b + 4.15, 1.2, 1.5, fz + 0.03);
   win(1.55, b + 4.15, 1.2, 1.5, fz + 0.03);
@@ -253,6 +267,21 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   put(W, box(gl, 1.3, 2.55, 0.1), mats.trim, walls, 1.35, b + 1.28, fz + 0.03);
   put(W, box(gl, 1.05, 2.3, 0.12), mats.door, walls, 1.35, b + 1.15, fz + 0.05);
   put(W, box(gl, 0.08, 0.08, 0.06), W.mat({ color: "#d9b45a", metal: 0.9, gloss: 0.8 }), walls, 1.7, b + 1.1, fz + 0.13, false);
+  for (const [py, ph] of [
+    [b + 1.65, 0.75],
+    [b + 0.65, 0.75],
+  ]) for (const px of [1.12, 1.58]) put(W, box(gl, 0.34, ph, 0.03), W.mat({ color: "#000000", alpha: 0.12, transparent: true }), walls, px, py, fz + 0.115, false);
+  const lamp = W.mat({ color: "#2a2c31", metal: 0.6, gloss: 0.6 });
+  const lampGlass = W.mat({ color: "#ffe2a8", gloss: 0.4, emit: [0.9, 0.62, 0.3] });
+  for (const lx of [0.55, 2.15, gx - 1.75, gx + 1.75]) {
+    const ly = lx > 3 ? b + 2.0 : b + 1.75;
+    const lz = lx > 3 ? gz + 0.1 : fz + 0.1;
+    put(W, box(gl, 0.2, 0.36, 0.14), lamp, walls, lx, ly, lz, false);
+    put(W, box(gl, 0.13, 0.24, 0.15), lampGlass, walls, lx, ly - 0.02, lz + 0.01, false);
+  }
+  put(W, box(gl, 0.5, 0.18, 0.04), mats.trim, walls, 2.2, b + 2.35, fz + 0.06, false);
+  // Garage door windows along the top panel.
+  for (let i = 0; i < 4; i++) put(W, box(gl, 0.55, 0.28, 0.04), mats.glass, walls, gx - 1.05 + i * 0.7, b + 2.0, gz + 0.1, false);
   const porch = node(walls);
   put(W, box(gl, 2.8, 0.2, 1.6), mats.trim, porch, 1.35, b + 2.95, fz + 0.8);
   put(W, box(gl, 2.9, 0.06, 1.7), mats.roof, porch, 1.35, b + 3.08, fz + 0.8);
@@ -271,6 +300,16 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   put(W, gable(gl, GAR.w + 0.6, 1.4, GAR.d + 0.6), mats.roof, roof, gx, b + GAR.h, -(MAIN.d - GAR.d) / 2);
   put(W, box(gl, GAR.w + 0.7, 0.1, GAR.d + 0.7), mats.trim, roof, gx, b + GAR.h + 0.02, -(MAIN.d - GAR.d) / 2, false);
   put(W, box(gl, 0.75, 2.6, 0.75), mats.stone, roof, -2.1, b + MAIN.h + 1.2, -1.2);
+  put(W, box(gl, 0.95, 0.12, 0.95), mats.trim, roof, -2.1, b + MAIN.h + 2.55, -1.2, false);
+  // Gutters along the eaves, downspouts at the corners, a ridge cap.
+  const gut = W.mat({ color: "#f1efea", metal: 0.3, gloss: 0.5 });
+  for (const sx of [-1, 1]) {
+    put(W, box(gl, 0.14, 0.14, MAIN.d + 0.7), gut, roof, sx * ((MAIN.w + 0.8) / 2 + 0.02), b + MAIN.h - 0.04, 0, false);
+    const ds = W.mesh(cylinder(gl, 0.05, 0.05, MAIN.h, 10), gut, roof, false);
+    ds.position.set(sx * (MAIN.w / 2 + 0.12), b + MAIN.h / 2, MAIN.d / 2 - 0.1);
+  }
+  put(W, box(gl, 0.22, 0.12, MAIN.d + 0.72), mats.roof, roof, 0, b + MAIN.h + 2.5, 0, false);
+  put(W, box(gl, 0.2, 0.1, GAR.d + 0.62), mats.roof, roof, gx, b + GAR.h + 1.4, -(MAIN.d - GAR.d) / 2, false);
   // Solar panels on the garage-side slope, an outdoor unit, an insulation cut-away (shown on cue).
   const solar = node(roof);
   const slope = Math.atan(2.5 / ((MAIN.w + 0.8) / 2));
@@ -300,6 +339,16 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     s.position.set(-2.7 + i * 0.85, 0.4, fz + 0.75);
     s.scale.set(1, 0.75, 0.9);
   }
+  // Flower beds along the front (mulch and blooms), a mailbox at the curb.
+  const mulch = W.mat({ color: "#5a3e2b", gloss: 0.1 });
+  put(W, box(gl, 3.6, 0.06, 1.0), mulch, land, -1.5, 0.03, fz + 0.85, false);
+  const blooms = [W.mat({ color: "#f4f1ea", gloss: 0.3 }), W.mat({ color: "#e8a3b5", gloss: 0.3 }), W.mat({ color: "#f2c14e", gloss: 0.3 })];
+  for (let i = 0; i < 9; i++) {
+    const f = W.mesh(sphere(gl, 0.12, 8, 6), blooms[i % 3], land, false);
+    f.position.set(-3.1 + i * 0.38, 0.75 + (i % 2) * 0.08, fz + 1.2);
+  }
+  put(W, box(gl, 0.1, 1.1, 0.1), mats.trim, land, 4.0, 0.55, 9.3);
+  put(W, box(gl, 0.28, 0.3, 0.5), W.mat({ color: "#2a2c31", metal: 0.5, gloss: 0.6 }), land, 4.0, 1.2, 9.3);
   tree(W, land, -8.6, 4.2, 1.15);
   tree(W, land, -7.6, -6.5, 0.95);
   return { root, slab: slabT, frame: frameT, walls, roof, land, solar, hvac, insul, mats, rising: [mats.siding, mats.stone, mats.trim, mats.glass, mats.garage, mats.door] };
@@ -466,7 +515,7 @@ function homeHero(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const r = 23 * F;
     const eye: Num3 = [1.8 + Math.sin(a) * r, lerp(3.4, 2.6, k), Math.cos(a) * r + 1];
-    return render(W, { ...GOLDEN, eye, target: [1.6, 3.1, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.6, 3.1, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // Feature captions, elegant, one after another at the lower left.
@@ -573,7 +622,7 @@ function homeAerial(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const eye: Num3 = [lerp(-58, 22, k), lerp(58, 46, k) * F, lerp(74, 66, k) * F];
     const target: Num3 = [lerp(-22, 26, k), 0, lerp(10, 6, k)];
-    const out = render(W, { ...GOLDEN, eye, target, fov: 36, shadowSize: 70, shadowAt: [eye[0] + 14, 0, 18], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target, fov: 36, shadowSize: 70, shadowAt: [eye[0] + 14, 0, 18], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
     anchors = parts.spots.map((p) => project(W, p, w, h));
     return out;
   });
@@ -645,7 +694,7 @@ function homeBuild3d(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const r = 24 * F;
     const eye: Num3 = [1.8 + Math.sin(a) * r, lerp(9, 6, kk), Math.cos(a) * r];
-    return render(W, { ...GOLDEN, eye, target: [1.6, 2.4, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.6, 2.4, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // The steps, as a checklist at the right (a row on narrow frames).
@@ -755,7 +804,7 @@ function homePlan(sc0: SkillContext) {
     const spin = range(t, 2.5, d) * 0.35;
     const r = lerp(0.01, 15, tilt) * F;
     const eye: Num3 = [Math.sin(0.5 + spin) * r, lerp(23, 13, tilt) * F, Math.cos(0.5 + spin) * r];
-    const out = render(W, { ...GOLDEN, sun: [0.5, 0.75, 0.45], eye, target: [0, 0, 0], fov: 34, shadowSize: 10, shadowAt: [0, 0, 0] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, sun: [0.5, 0.75, 0.45], eye, target: [0, 0, 0], fov: 34, shadowSize: 10, shadowAt: [0, 0, 0] }, w, h);
     anchors = parts.rooms.map((r0) => project(W, r0.at, w, h));
     labels = parts.rooms.map((r0, i) => names[i] ?? r0.name);
     return out;
@@ -805,7 +854,7 @@ function homeEnergy(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const r = 22 * F;
     const eye: Num3 = [1 + Math.sin(a) * r, lerp(9.5, 7.5, k), Math.cos(a) * r];
-    const out = render(W, { ...GOLDEN, sun: [0.55, 0.6, 0.6], sunCol: [1, 0.93, 0.8], eye, target: [0, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, sun: [0.55, 0.6, 0.6], sunCol: [1, 0.93, 0.8], eye, target: [0, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
     anchors = spots.map((p) => project(W, p, w, h));
     return out;
   });
@@ -847,7 +896,7 @@ function homeChoice(sc0: SkillContext) {
     const k = range(t, 0, d);
     const F = fitBack(sc, top);
     const eye: Num3 = [lerp(9, 6, k) * F, lerp(3.2, 3.6, k), lerp(19, 16, k) * F];
-    return render(W, { ...GOLDEN, eye, target: [1.6, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.6, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // The options as swatch chips along the bottom.
@@ -925,7 +974,7 @@ function homeJourney(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const eye: Num3 = [lerp(5, 2.4, k), lerp(4.2, 3.0, k), lerp(32, 18, k) * F];
     const target: Num3 = [1.4, lerp(2.6, 2.0, k), lerp(0, 3, k)];
-    const out = render(W, { ...GOLDEN, eye, target, fov: 34, shadowSize: 16, shadowAt: [1.5, 0, 4], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target, fov: 34, shadowSize: 16, shadowAt: [1.5, 0, 4], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
     anchors = parts.postAt.map((p) => project(W, p, w, h));
     return out;
   });

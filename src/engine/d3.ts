@@ -332,6 +332,7 @@ uniform float uExposure;
 uniform vec3 uEmit;
 uniform float uClip;
 uniform vec4 uFog;
+uniform float uFlat;
 uniform sampler2D tShadow;
 uniform float uShadowSoft;
 #ifdef MAP
@@ -418,6 +419,8 @@ void main() {
   vec3 F0 = mix(vec3(0.04), base, metal);
   vec3 F = F0 + (1.0 - F0) * fres;
   vec3 col = diff * (1.0 - metal * 0.85) + env(R) * F * mix(0.25, 1.0, gloss) + uSunCol * spec * sh * mix(vec3(1.0), base, metal * 0.5);
+  // Flat (2D) look: the base colour in two tones, light and shade, no reflections or haze.
+  if (uFlat > 0.5) col = base * (ndl * sh > 0.3 ? 1.0 : 0.82) * (N.y > 0.7 ? 1.04 : 1.0);
   float alpha = uAlpha;
 #ifdef MAP
   // A screen: the picture glows (cover-fitted, scrolling), behind glass with a corner radius.
@@ -445,7 +448,7 @@ void main() {
 #endif
   col += uEmit;
   // Haze with distance (outdoor scenes), towards the horizon's colour.
-  if (uFog.a > 0.0) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
+  if (uFog.a > 0.0 && uFlat < 0.5) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
   col *= uExposure;
   col = col / (1.0 + max(col - 0.85, 0.0) * 1.2);
   gl_FragColor = vec4(col * alpha, alpha);
@@ -525,6 +528,7 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     tShadow: shadow.targetUniform as { value: unknown },
     uShadowSoft: { value: 2.4 },
     uFog: { value: [1, 1, 1, 0] },
+    uFlat: { value: 0 },
   };
   const blank = new Texture(gl, { image: new Uint8Array([0, 0, 0, 255]), width: 1, height: 1 });
   const mat = (o: MatOpts) => {
@@ -571,6 +575,8 @@ export interface View {
   sky?: Num3;
   gnd?: Num3;
   exposure?: number;
+  /** Draw it flat, as a 2D illustration: a straight-on (orthographic) camera and two-tone colour. */
+  flat?: boolean;
   /** Distance haze: colour and density (0: none). */
   fog?: [number, number, number, number];
   /** Half-size of the shadow camera's view and where it centres. */
@@ -587,7 +593,12 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   const cw = Math.max(1, Math.round(w));
   const ch = Math.max(1, Math.round(h));
   if (renderer.gl.canvas.width !== cw || renderer.gl.canvas.height !== ch) renderer.setSize(cw, ch);
-  camera.perspective({ fov: v.fov ?? 30, aspect: cw / ch });
+  if (v.flat) {
+    const dist = Math.hypot(v.eye[0] - v.target[0], v.eye[1] - v.target[1], v.eye[2] - v.target[2]);
+    const hh = dist * Math.tan((((v.fov ?? 30) / 2) * Math.PI) / 180);
+    const hw = hh * (cw / ch);
+    camera.orthographic({ left: -hw, right: hw, bottom: -hh, top: hh, near: 0.05, far: 400 });
+  } else camera.perspective({ fov: v.fov ?? 30, aspect: cw / ch });
   camera.position.set(...v.eye);
   camera.lookAt(v.target);
   const s = v.sun ?? [0.45, 0.85, 0.5];
@@ -599,6 +610,7 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   if (v.gnd) env.uGnd.value = v.gnd;
   env.uExposure.value = v.exposure ?? 1;
   env.uFog.value = v.fog ?? [1, 1, 1, 0];
+  env.uFlat.value = v.flat ? 1 : 0;
   const size = v.shadowSize ?? 4;
   const c = v.shadowAt ?? v.target;
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });

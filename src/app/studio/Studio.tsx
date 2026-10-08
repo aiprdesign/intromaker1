@@ -314,6 +314,26 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.motionBlur !== false) !== motionBlur) setPlan((p) => ({ ...p, motionBlur: motionBlur ? undefined : false }));
   }, [plan, motionBlur]);
+  // 3D slides: real 3D (default) or drawn flat as 2D illustrations; remembered.
+  const [flat3d, setFlat3d] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.render3d") === "flat") setFlat3d(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseFlat3d = (on: boolean) => {
+    setFlat3d(on);
+    try {
+      localStorage.setItem("intromaker.render3d", on ? "flat" : "3d");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.render3d === "flat") !== flat3d) setPlan((p) => ({ ...p, render3d: flat3d ? "flat" : undefined }));
+  }, [plan, flat3d]);
   // Contrast slides (a bold colour-block text beat every few slides): on by default; remembered.
   const [contrastOn, setContrastOn] = useState(true);
   useEffect(() => {
@@ -2469,6 +2489,18 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Every exported frame pin-sharp, even mid-move."}</p>
+          <label className="field-label">
+            3D slides <span className="tpl-desc">{flat3d ? "Flat 2D" : "Real 3D"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={!flat3d ? "active" : ""} onClick={() => chooseFlat3d(false)}>
+              Real 3D
+            </button>
+            <button className={flat3d ? "active" : ""} onClick={() => chooseFlat3d(true)}>
+              Flat 2D
+            </button>
+          </div>
+          <p className="hint">{flat3d ? "Devices, homes and scenes drawn as clean flat illustrations, straight on." : "Modelled devices and homes with real light, shadows and a moving camera."}</p>
           <label className="field-label">
             Contrast slides <span className="tpl-desc">{contrastOn ? "On" : "Off"}</span>
           </label>
