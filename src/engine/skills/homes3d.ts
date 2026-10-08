@@ -1884,7 +1884,8 @@ function welcomeWorld(W: World) {
   const parts = homeWorld(W);
   const fam = node(W.scene);
   const family = FAMILY.map((L) => person3d(W, fam, L));
-  family[1].talks = true;
+  // At the door, dad says the welcome (in his own voice).
+  family[0].talks = true;
   const xs = [0.55, 1.9, 1.25];
   family.forEach((P, i) => P.root.position.set(xs[i], 0.05, i === 2 ? 6.9 : 6.3));
   const dog = dog3d(W, fam, "#c98f4f", "#7a4f2a", "#7c5cff");

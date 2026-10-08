@@ -90,7 +90,7 @@ export interface Pose {
   lean?: number;
   mouth?: "smile" | "grin" | "open" | "frown" | "o";
   /** Speaks the story: with a voice-over playing, the mouth follows the narrator. */
-  talk?: boolean;
+  talk?: boolean | number;
   /** 0 open … 1 closed. */
   blink?: number;
   /** Eyes left (−1) to right (1). */
@@ -388,7 +388,7 @@ function drawCharacterRaw(ctx: CanvasRenderingContext2D, x: number, footY: numbe
   ctx.strokeStyle = "#3a1d1d";
   ctx.fillStyle = "#4a1f24";
   ctx.lineWidth = headR * 0.075;
-  const spoke = !!pose.talk && drawTalk(ctx, x, my + headR * 0.04, headR, "#4a1f24", "#3a1d1d");
+  const spoke = pose.talk !== undefined && pose.talk !== false && drawTalk(ctx, x, my + headR * 0.04, headR, "#4a1f24", "#3a1d1d", pose.talk);
   ctx.beginPath();
   switch (spoke ? "none" : pose.mouth ?? "smile") {
     case "none":

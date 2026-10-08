@@ -347,7 +347,79 @@ export interface VoiceCue {
   /** Film time the clip starts. */
   start: number;
   clip: Clip;
+  /** Which of the slide's characters says it (0 = the first speaker). */
+  speaker: number;
 }
+
+/* ───────── character voices ───────── */
+
+/** Who voices each part of the story, by slide: the voice slots (1+ = character voices) and genders. */
+const SPEAKERS: Partial<Record<string, { slots: number[]; gender?: ("f" | "m")[] }>> = {
+  "char-hello": { slots: [1] },
+  "abs-hello": { slots: [1] },
+  "pro-walk": { slots: [1] },
+  "pro-unveil": { slots: [1] },
+  "pro-highfive": { slots: [1] },
+  "char-presenter": { slots: [2] },
+  "pro-explainer": { slots: [2] },
+  "char-team": { slots: [3] },
+  // Conversations: the line's sentences alternate between the two characters.
+  "abs-chat": { slots: [1, 2] },
+  "pro-duo": { slots: [1, 2] },
+  // The 3D family: mum inside, dad at the door.
+  "home-walkthrough": { slots: [1], gender: ["f"] },
+  "home-family": { slots: [1], gender: ["f"] },
+  "home-welcome": { slots: [1], gender: ["m"] },
+};
+
+const GENDER: Record<string, "f" | "m"> = {
+  af_heart: "f", af_bella: "f", af_nicole: "f", am_michael: "m", am_fenrir: "m", am_puck: "m", bf_emma: "f", bm_george: "m",
+  coral: "f", ash: "m", sage: "f", nova: "f", onyx: "m", alloy: "m", echo: "m", fable: "m", shimmer: "f", verse: "m", ballad: "m",
+  "21m00Tcm4TlvDq8ikWAM": "f", pNInz6obpgDQGcFmaJgB: "m", EXAVITQu4vr4xnSDxMaL: "f", ErXwobaYiN019PkySvjV: "m", TxGEqnHWrfWFTfGW9XjX: "m", MF3mGyEYCl7XYWbV9V6O: "f",
+};
+
+/**
+ * The voice for character voice `slot` (0 is the narrator, the voice you chose): other voices from
+ * the same source, contrasting with the narrator first; a gender when the character has one.
+ */
+export function characterVoice(v: Pick<VoiceSettings, "source" | "voice">, slot: number, gender?: "f" | "m") {
+  if (slot <= 0 || v.source === "upload") return v.voice;
+  const pool = (VOICES[v.source] ?? []).map((o) => o.id).filter((id) => id !== v.voice);
+  if (!pool.length) return v.voice;
+  const mine = GENDER[v.voice];
+  if (gender) {
+    if (mine === gender && slot === 1 && !pool.some((id) => GENDER[id] === gender)) return v.voice;
+    const same = pool.filter((id) => GENDER[id] === gender);
+    if (same.length) return same[(slot - 1) % same.length];
+  }
+  // Contrast first, then by turns: the other gender, the same, the other… (a conversation hears two kinds of voice).
+  const other = pool.filter((id) => GENDER[id] && GENDER[id] !== mine);
+  const rest = pool.filter((id) => !other.includes(id));
+  const order: string[] = [];
+  for (let i = 0; i < Math.max(other.length, rest.length); i++) {
+    if (other[i]) order.push(other[i]);
+    if (rest[i]) order.push(rest[i]);
+  }
+  return order[(slot - 1) % order.length];
+}
+
+/** Sentences of a line (for conversations, said by turns). */
+const sentences = (text: string) => (text.match(/[^.!?]+[.!?]*/g) ?? [text]).map((x) => x.trim()).filter(Boolean);
+
+/** A scene's line as spoken: one or more parts, each with its voice and the character who says it. */
+export function voiceParts(scene: Pick<Scene, "skill" | "vo">, v: VoiceSettings): { text: string; voice: string; speaker: number }[] {
+  if (!scene.vo) return [];
+  const spec = v.cast === false ? undefined : SPEAKERS[scene.skill];
+  if (!spec) return [{ text: scene.vo, voice: v.voice, speaker: 0 }];
+  const parts = spec.slots.length > 1 ? sentences(scene.vo) : [scene.vo];
+  return parts.map((text, i) => {
+    const k = i % spec.slots.length;
+    return { text, voice: characterVoice(v, spec.slots[k], spec.gender?.[k]), speaker: k };
+  });
+}
+
+/** The clip key for a part of a line, in its voice. */
+export const partKey = (v: VoiceSettings, part: { text: string; voice: string }) => clipKey({ ...v, voice: part.voice }, part.text);
 
 /** When a scene's line starts: just after the cut, or right after the logo hits on the reveal. */
 export function voiceLead(scene: Pick<Scene, "role" | "duration">, beat: number) {
@@ -360,14 +432,20 @@ export function voiceTimeline(plan: Pick<VideoPlan, "scenes" | "bpm" | "voiceove
   if (!v?.enabled) return [];
   if (v.source === "upload") {
     const clip = getClip(UPLOAD_KEY);
-    return clip ? [{ scene: 0, start: Math.max(0, v.offset ?? 0), clip }] : [];
+    return clip ? [{ scene: 0, start: Math.max(0, v.offset ?? 0), clip, speaker: 0 }] : [];
   }
   const beat = 60 / (plan.bpm || 120);
   const out: VoiceCue[] = [];
   let acc = 0;
   plan.scenes.forEach((s, i) => {
-    const clip = s.vo ? getClip(clipKey(v, s.vo)) : undefined;
-    if (clip) out.push({ scene: i, start: acc + voiceLead(s, beat), clip });
+    // A line's parts play one after another (a conversation takes turns).
+    let at = acc + voiceLead(s, beat);
+    for (const part of voiceParts(s, v)) {
+      const clip = getClip(partKey(v, part));
+      if (!clip) break;
+      out.push({ scene: i, start: at, clip, speaker: part.speaker });
+      at += clip.duration + 0.12;
+    }
     acc += s.duration;
   });
   return out;
@@ -383,9 +461,9 @@ export function fitScenesToVoice(plan: VideoPlan): VideoPlan {
   const beat = 60 / (plan.bpm || 120);
   let changed = false;
   const scenes = plan.scenes.map((s) => {
-    const clip = s.vo ? getClip(clipKey(v, s.vo)) : undefined;
-    if (!clip) return s;
-    const need = voiceLead(s, beat) + clip.duration + 0.35;
+    const clips = voiceParts(s, v).map((p) => getClip(partKey(v, p)));
+    if (!clips.length || clips.some((c) => !c)) return s;
+    const need = voiceLead(s, beat) + clips.reduce((a, c) => a + c!.duration + 0.12, 0) + 0.23;
     if (need <= s.duration) return s;
     changed = true;
     return { ...s, duration: Math.min(8, Math.ceil(need / beat) * beat) };
@@ -436,7 +514,7 @@ export function speechAt(plan: Pick<VideoPlan, "scenes" | "bpm" | "voiceover">, 
       const k = (lt - word.t0) / Math.max(0.01, word.t1 - word.t0);
       shape = visemeOf(letters[Math.min(letters.length - 1, Math.floor(k * letters.length))]);
     }
-    return { open: word ? open : open * 0.3, shape };
+    return { open: word ? open : open * 0.3, shape, speaker: cue.speaker };
   }
   return null;
 }

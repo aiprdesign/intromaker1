@@ -169,6 +169,12 @@ export default function VoicePanel({
             </>
           )}
 
+          {voice.source !== "upload" && (
+            <label className="check-row" title="Speaking characters (a mascot, a host, the two in a conversation, the family in the home slides) get voices of their own and lip-sync to them; the narrator keeps the voice above.">
+              <input type="checkbox" checked={voice.cast !== false} onChange={(e) => set({ cast: e.target.checked })} />
+              Character voices (a voice per speaking character)
+            </label>
+          )}
           <label className="check-row">
             <input type="checkbox" checked={voice.captions} onChange={(e) => set({ captions: e.target.checked })} disabled={voice.source === "upload"} />
             Word-by-word captions

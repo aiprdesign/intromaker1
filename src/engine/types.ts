@@ -433,6 +433,8 @@ export interface VoiceSettings {
   model?: string;
   /** Uploaded narration: where it starts in the film (seconds). */
   offset?: number;
+  /** Character voices: speaking characters get voices of their own (the narrator keeps this one). Unset: on. */
+  cast?: boolean;
   /** Caption look: frosted pill (default), pop (bold outlined words springing in), box (highlight box on the spoken word) or karaoke (the line fills as it's said). */
   captionStyle?: "frosted" | "pop" | "box" | "karaoke";
 }

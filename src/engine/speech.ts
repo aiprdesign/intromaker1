@@ -12,7 +12,12 @@ export interface Speech {
   open: number;
   /** The shape, from the letter being said. */
   shape: Viseme;
+  /** Which of the slide's characters is speaking (0 = the first speaker). */
+  speaker?: number;
 }
+
+/** The speech for character `who` (any speaker when undefined): null while someone else talks. */
+export const speechFor = (who?: number) => (current && (who === undefined || current.speaker === undefined || current.speaker === who) ? current : null);
 
 let current: Speech | null = null;
 export const setSpeech = (s: Speech | null) => void (current = s);

@@ -22,7 +22,7 @@
  * Every frame is a pure function of time (preview, seek and export match) and nothing flashes.
  */
 import { clamp, ease, lerp, mixHex, noise1, range, rgba, TAU } from "../math";
-import { speechNow } from "../speech";
+import { speechFor, speechNow } from "../speech";
 import { solid } from "./solid";
 import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
@@ -879,9 +879,13 @@ export function saccade(t: number, seed = 0) {
 }
 
 /** A talking mouth: syllable-like openings while `on` (0..1). */
-export const talking = (t: number, on: number) => {
-  // With a voice-over playing, the speaker's mouth follows the narrator: open with the voice,
-  // closed on m, b and p, a little narrower on e and round sounds.
+export const talking = (t: number, on: number, who?: number) => {
+  // With a voice-over playing, the speaker's mouth follows their voice: open with it, closed on
+  // m, b and p, a little narrower on e and round sounds (in a conversation, only on their turn).
+  if (who !== undefined && speechNow()) {
+    const mine = speechFor(who);
+    return mine ? (mine.shape === "m" || mine.shape === "rest" ? 0.04 : clamp(mine.open * (mine.shape === "e" ? 0.75 : mine.shape === "o" ? 0.85 : 1))) : 0;
+  }
   const sp = speechNow();
   if (sp && on > 0.3) return on * (sp.shape === "m" || sp.shape === "rest" ? 0.04 : clamp(sp.open * (sp.shape === "e" ? 0.75 : sp.shape === "o" ? 0.85 : 1)));
   return on * clamp(0.15 + 0.85 * Math.abs(Math.sin(t * 11.3) * Math.sin(t * 4.1 + 1)));
@@ -1100,7 +1104,7 @@ function proDuo(sc: SkillContext) {
         lift: idle.lift,
         lean: idle.lean + s * 0.02,
         sway: idle.sway,
-        mouth: talking(t + i, speaking ? 1 : 0),
+        mouth: speechNow() ? talking(t, 1, i) : talking(t + i, speaking ? 1 : 0),
         smile: listening ? 0.6 : 0.4,
         blink: blinkAt(t, i * 1.9),
         lookX: s * 0.9,

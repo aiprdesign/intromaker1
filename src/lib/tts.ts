@@ -10,7 +10,7 @@
  * Every clip is decoded to mono samples and stored in the engine's clip store, where the score,
  * the captions and the export pick it up.
  */
-import { clipKey, estimateWords, fitScenesToVoice, getClip, LOCAL_VOICE, putClip, speakable, UPLOAD_KEY, wordsFromAlignment, type Clip } from "@/engine/voice";
+import { estimateWords, fitScenesToVoice, getClip, LOCAL_VOICE, partKey, putClip, speakable, UPLOAD_KEY, voiceParts, wordsFromAlignment, type Clip } from "@/engine/voice";
 import type { VideoPlan, VoiceSettings } from "@/engine/types";
 
 export interface VoiceKeys {
@@ -134,12 +134,13 @@ export async function synthesize(text: string, v: VoiceSettings, keys: VoiceKeys
 export async function generateVoiceover(plan: VideoPlan, keys: VoiceKeys, onProgress?: (msg: string) => void): Promise<VideoPlan> {
   const v = plan.voiceover;
   if (!v?.enabled || v.source === "upload") return plan;
-  const todo = plan.scenes.filter((s) => s.vo && !getClip(clipKey(v, s.vo)));
+  // Every part of every line, in its own voice (characters can have voices of their own).
+  const todo = plan.scenes.flatMap((s) => voiceParts(s, v)).filter((p, i, all) => !getClip(partKey(v, p)) && all.findIndex((q) => partKey(v, q) === partKey(v, p)) === i);
   let done = 0;
-  for (const s of todo) {
+  for (const p of todo) {
     onProgress?.(`Recording line ${done + 1} of ${todo.length}…`);
-    const clip = await synthesize(s.vo!, v, keys, onProgress);
-    putClip(clipKey(v, s.vo!), clip);
+    const clip = await synthesize(p.text, { ...v, voice: p.voice }, keys, onProgress);
+    putClip(partKey(v, p), clip);
     done++;
   }
   return fitScenesToVoice(plan);
@@ -157,5 +158,5 @@ export async function loadRecording(file: File) {
 export function missingLines(plan: VideoPlan) {
   const v = plan.voiceover;
   if (!v?.enabled || v.source === "upload") return 0;
-  return plan.scenes.filter((s) => s.vo && !getClip(clipKey(v, s.vo))).length;
+  return plan.scenes.flatMap((s) => voiceParts(s, v)).filter((p) => !getClip(partKey(v, p))).length;
 }

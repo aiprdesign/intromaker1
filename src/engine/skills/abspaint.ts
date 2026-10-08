@@ -4,7 +4,7 @@
  * minimal face, tapered limbs, and the figure's ground shadow and squash.
  */
 import { clamp, mixHex, TAU } from "../math";
-import { speechNow } from "../speech";
+import { speechFor } from "../speech";
 import type { ArtStyle, CastMember } from "../types";
 import type { AbsPose } from "./abstract";
 
@@ -325,15 +325,15 @@ export function drawFace(ctx: CanvasRenderingContext2D, x: number, headY: number
     ctx.quadraticCurveTo(x + lk * 1.2 + hr * 0.1, headY + hr * 0.32, x + lk * 1.2 - hr * 0.02, headY + hr * 0.36);
     ctx.stroke();
   }
-  if (!(pose.talk && drawTalk(ctx, x + lk, headY + hr * 0.55, hr))) drawMouth(ctx, x + lk, headY + hr * 0.55, hr, pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile"));
+  if (!(pose.talk !== undefined && pose.talk !== false && drawTalk(ctx, x + lk, headY + hr * 0.55, hr, undefined, undefined, pose.talk))) drawMouth(ctx, x + lk, headY + hr * 0.55, hr, pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile"));
 }
 
 /**
  * A speaking mouth centred at (x, my) for a head of radius `hr`, shaped by the narrator's speech:
  * open for a, wide for e, round for o, closed for m, b and p. True when it drew.
  */
-export function drawTalk(ctx: CanvasRenderingContext2D, x: number, my: number, hr: number, fill = "#3a1220", line = INK): boolean {
-  const sp = speechNow();
+export function drawTalk(ctx: CanvasRenderingContext2D, x: number, my: number, hr: number, fill = "#3a1220", line = INK, who?: number | boolean): boolean {
+  const sp = speechFor(typeof who === "number" ? who : undefined);
   if (!sp) return false;
   const o = clamp(sp.open);
   ctx.save();

@@ -2725,6 +2725,8 @@ function sanitizeVoice(v: unknown): VideoPlan["voiceover"] {
     captions: r.captions !== false,
     model: typeof r.model === "string" && /^[\w.:/-]{1,64}$/.test(r.model) ? r.model : undefined,
     offset: Number(r.offset) > 0 ? Math.min(60, Number(r.offset)) : undefined,
+    cast: r.cast === false ? false : undefined,
+    captionStyle: r.captionStyle === "pop" || r.captionStyle === "box" || r.captionStyle === "karaoke" || r.captionStyle === "frosted" ? r.captionStyle : undefined,
   };
 }
 

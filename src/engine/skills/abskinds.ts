@@ -383,7 +383,7 @@ export function drawBlob(ctx: CanvasRenderingContext2D, x: number, groundY: numb
     ctx.lineTo(x + sp - er * 1.4, eyeY);
     ctx.stroke();
   }
-  if (!(pose.talk && drawTalk(ctx, x + lk, eyeY + er * 2.1, er * 1.9))) drawMouth(ctx, x + lk, eyeY + er * 2.1, er * 1.9, pose.mouth ?? "smile");
+  if (!(pose.talk !== undefined && pose.talk !== false && drawTalk(ctx, x + lk, eyeY + er * 2.1, er * 1.9, undefined, undefined, pose.talk))) drawMouth(ctx, x + lk, eyeY + er * 2.1, er * 1.9, pose.mouth ?? "smile");
   ctx.restore();
   const headR = bw * 0.42;
   return { head: { x, y: eyeY, r: headR }, top: topY - (c.hair === "none" ? 0 : s * 0.4), ...hands(x, pose.flip, l, r) };
@@ -491,7 +491,7 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
   }
   const my = headY + hr * 0.38;
   const mx = x + lk;
-  const spoke = pose.talk && drawTalk(ctx, mx, my, hr, lc, lc);
+  const spoke = pose.talk !== undefined && pose.talk !== false && drawTalk(ctx, mx, my, hr, lc, lc, pose.talk);
   ctx.beginPath();
   switch (spoke ? "none" : pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile")) {
     case "none":
@@ -704,7 +704,7 @@ export function drawClassic(ctx: CanvasRenderingContext2D, x: number, groundY: n
   const mouth = pose.mouth ?? "smile";
   ctx.strokeStyle = INK;
   ctx.lineWidth = Math.max(1.5, hr * 0.06);
-  if (pose.talk && drawTalk(ctx, x + lk, my, hr * 1.2)) {
+  if (pose.talk !== undefined && pose.talk !== false && drawTalk(ctx, x + lk, my, hr * 1.2, undefined, undefined, pose.talk)) {
     // (Speaking the story: the mouth follows the narrator.)
   } else if (mouth === "open") {
     ctx.beginPath();
