@@ -2331,7 +2331,7 @@ export default function Studio() {
                 className="select"
                 value={story}
                 onChange={(e) => void applyStory(e.target.value as "auto" | Angle)}
-                title="How the video tells it. Problem → solution opens on the problems (the site's own, or ones written from its services or features), then shows how each is solved."
+                title="How the video tells it. Problem → solution opens on the problems (the site's own, or ones written from its services or features), then shows how they're solved."
               >
                 <option value="auto">Auto (director&apos;s pick)</option>
                 {ANGLES.map((a) => (
@@ -2463,7 +2463,7 @@ export default function Studio() {
               <span className="field-label inline">Transitions</span> <span className="tpl-desc">{transFx ? TRANSITION_NAMES[transFx] : "Style default"}</span>
             </summary>
             <TransitionStylePicker plan={plan} value={transFx} onChange={chooseTransFx} />
-            <p className="hint">{transFx ? `${TRANSITION_NAMES[transFx]} between every slide. Change one slide's under that slide.` : "The director's mix of transitions. Pick one to use it between every slide."}</p>
+            <p className="hint">{transFx ? `${TRANSITION_NAMES[transFx]} between the slides. Change one slide's under that slide.` : "The director's mix of transitions. Pick one to use it between the slides."}</p>
           </details>
           <label className="field-label">
             Text glow <span className="tpl-desc">{glow ? "On" : "Off"}</span>
@@ -2488,7 +2488,7 @@ export default function Studio() {
               Off
             </button>
           </div>
-          <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Every exported frame pin-sharp, even mid-move."}</p>
+          <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Exported frames stay pin-sharp, even mid-move."}</p>
           <label className="field-label">
             3D slides <span className="tpl-desc">{flat3d ? "Flat 2D" : "Real 3D"}</span>
           </label>
@@ -2545,7 +2545,7 @@ export default function Studio() {
                   {cast.length ? "Edit characters" : "Design characters"}
                 </button>
               </div>
-              <p className="hint">{cast.length ? (castOn ? "The abstract character slides (Abstract People and Memphis Crowd styles) cast yours first, then fill crowds with generated people." : "The abstract character slides make up a new cast for each video.") : "Design simple abstract characters to star in the abstract character slides (Abstract People and Memphis Crowd styles), or download them as PNGs."}</p>
+              <p className="hint">{cast.length ? (castOn ? "The abstract character slides (Abstract People and Memphis Crowd styles) cast yours first, then fill crowds with generated people." : "The abstract character slides make up a new cast per video.") : "Design simple abstract characters to star in the abstract character slides (Abstract People and Memphis Crowd styles), or download them as PNGs."}</p>
             </details>
           )}
           {(style !== "trailer" || plan.product) && (
@@ -2555,7 +2555,7 @@ export default function Studio() {
                   <span className="field-label inline">Background shapes</span> <span className="tpl-desc">{shapes === "off" ? "Off" : SHAPE_SET_INFO[shapes].name}</span>
                 </summary>
                 <ShapesPicker value={shapes} onChange={chooseShapes} watermark={watermark} onWatermark={chooseWatermark} plan={{ palette: plan.palette, font: plan.font, seed: plan.seed, bpm: plan.bpm, brand: plan.brand, look: plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look }} />
-                <p className="hint">{shapes === "off" ? "A clean stage with no floating shapes." : shapes === "text" ? "Your line in big, faint rows drifting behind every slide." : "They drift around the edges and pulse with the beat."}</p>
+                <p className="hint">{shapes === "off" ? "A clean stage with no floating shapes." : shapes === "text" ? "Your line in big, faint rows drifting behind the slides." : "They drift around the edges and pulse with the beat."}</p>
               </details>
             </>
           )}

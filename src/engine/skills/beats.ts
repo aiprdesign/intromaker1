@@ -4,7 +4,7 @@
  * generic, claim-free copy (no numbers, no promises).
  *
  * - persona-switch: "Who it's for". Audience chips (Designers / Developers / Marketers) light up in
- *                   turn and a card swaps to show what each one gets, with a little UI of its own.
+ *                   turn and a card swaps to show what that audience gets, with a little UI of its own.
  * - phone-tour:     The product on a phone: the screen scrolls, fingertips tap, a notification
  *                   drops in and callouts pop out beside the taps. Mobile apps; vertical videos.
  * - drop-zone:      File in, result out: a file is dragged into a drop zone, a progress bar runs
@@ -785,7 +785,7 @@ export const beatSkills: Skill[] = [
   {
     id: "persona-switch",
     name: "Who It's For",
-    tagline: "Audience chips light up in turn (Designers, Developers, Marketers) and a card swaps to show what each one gets, with a little UI of their own.",
+    tagline: "Audience chips light up in turn (Designers, Developers, Marketers) and a card swaps to show what that audience gets, with a little UI of their own.",
     bestFor: "Who the product is for: 2–4 audiences (items 'Who — what they get'). Products used by several roles or teams.",
     sample: { text: "Built for *your team*", items: PERSONAS },
     itemsHint: "2–4 audiences: 'Who — what they get'",
@@ -795,7 +795,7 @@ export const beatSkills: Skill[] = [
   {
     id: "phone-tour",
     name: "Phone Tour",
-    tagline: "The product on a phone: the screen scrolls, fingertips tap, a notification drops in and callouts pop out beside each tap.",
+    tagline: "The product on a phone: the screen scrolls, fingertips tap, a notification drops in and callouts pop out beside the taps.",
     bestFor: "Mobile apps and on-the-go products, and vertical videos. Items: up to 3 short callouts; subtext: a notification ('Title — detail').",
     sample: { text: "Your work, *in your pocket*", subtext: "New update — Your summary is ready", items: PHONE_CALLOUTS },
     itemsHint: "Up to 3 short callouts",
@@ -815,7 +815,7 @@ export const beatSkills: Skill[] = [
   {
     id: "unbox",
     name: "What's in the Box",
-    tagline: "The box opens with a glow and its contents rise out of it one by one, each as an icon tile with its name.",
+    tagline: "The box opens with a glow and its contents rise out of it one by one as icon tiles with their names.",
     bestFor: "Physical products: what comes in the package (items: 2–5 short names).",
     sample: { text: "What's in the *box*", items: BOX_ITEMS },
     itemsHint: "2–5 things in the box",

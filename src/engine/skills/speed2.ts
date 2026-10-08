@@ -7,7 +7,7 @@
  * - Jump Cut: each word in three hard camera jumps (wide, medium, close-up in outline).
  * - Letter Rush: letters fly in from the frame's edges and snap into the word, then burst past the camera.
  * - Stamp Rush: the features are stamped around the frame one per tick, then the line stamps in.
- * - Rally: words ping-pong between two paddles, squashing on each hit, until the line is served.
+ * - Rally: words ping-pong between two paddles, squashing on the hits, until the line is served.
  * - Spiral In: words spiral in from the edge of the frame and out past the camera.
  * - Speed Gauge: a needle whips round a dial, a feature in the readout on each step, to the redline.
  * - Domino: letters tip over in a chain as the next word's letters stand up behind them.
@@ -966,7 +966,7 @@ export const speedMoreSkills: Skill[] = [
   {
     id: "jump-cut",
     name: "Jump Cut",
-    tagline: "Each feature in three hard camera jumps, wide, medium and a close-up in outline, inside snapping viewfinder corners, then the line punches in.",
+    tagline: "The features in three hard camera jumps apiece, wide, medium and a close-up in outline, inside snapping viewfinder corners, then the line punches in.",
     bestFor: "Punchy hooks: 2–4 one-word features (items) hit in jump cuts before the headline. Loud launches and promos.",
     sample: { text: "The *details* count", items: ["Plan", "Draft", "Launch"] },
     itemsHint: "2–4 one-word features",
@@ -976,7 +976,7 @@ export const speedMoreSkills: Skill[] = [
   {
     id: "letter-rush",
     name: "Letter Rush",
-    tagline: "Letters fly in from the edges of the frame and snap into each feature, burst past the camera on the next, and the line's letters rush into place.",
+    tagline: "Letters fly in from the edges of the frame and snap into a feature, burst past the camera on the next, and the line's letters rush into place.",
     bestFor: "Energy with craft: 3–5 short features (items) assembled letter by letter before the headline.",
     sample: { text: "Made to *move*", items: ["Plan", "Build", "Ship"] },
     itemsHint: "3–5 short features",
@@ -986,7 +986,7 @@ export const speedMoreSkills: Skill[] = [
   {
     id: "stamp-rush",
     name: "Stamp Rush",
-    tagline: "The features are stamped round the frame one per tick, each with a kick, then the line stamps down in the middle.",
+    tagline: "The features are stamped round the frame one per tick, with a kick apiece, then the line stamps down in the middle.",
     bestFor: "Workflows and checklists: 3–6 short steps or features (items) stamped before the headline.",
     sample: { text: "Signed, sealed, *shipped*", items: ["Draft", "Review", "Share", "Done"] },
     itemsHint: "3–6 short features",
@@ -996,7 +996,7 @@ export const speedMoreSkills: Skill[] = [
   {
     id: "rally",
     name: "Rally",
-    tagline: "The features ping-pong between two brand-colour paddles, squashing on each hit, until the line is served into the middle.",
+    tagline: "The features ping-pong between two brand-colour paddles, squashing on the hits, until the line is served into the middle.",
     bestFor: "Back-and-forth stories (teams, chat, review, handoff): 3–6 short features (items) rallied before the headline.",
     sample: { text: "Back and forth, *together*", items: ["Ask", "Answer", "Review", "Merge"] },
     itemsHint: "3–6 short features",
@@ -1016,7 +1016,7 @@ export const speedMoreSkills: Skill[] = [
   {
     id: "speed-gauge",
     name: "Speed Gauge",
-    tagline: "A needle whips round a dial step by step, a feature in the readout at each step, hits the redline, and the line lands below.",
+    tagline: "A needle whips round a dial step by step, a feature in the readout per step, hits the redline, and the line lands below.",
     bestFor: "Momentum and progress stories: 3–6 short features or steps (items) on the readout. The dial has no numbers, so it makes no claims.",
     sample: { text: "Shift *up a gear*", items: ["Load", "Sync", "Search", "Deploy"] },
     itemsHint: "3–6 short features",
@@ -1026,7 +1026,7 @@ export const speedMoreSkills: Skill[] = [
   {
     id: "domino",
     name: "Domino",
-    tagline: "Each feature's letters stand up in a chain and tip over like dominoes as the next word rises, until the line stands up and holds.",
+    tagline: "The features' letters stand up in a chain and tip over like dominoes as the next word rises, until the line stands up and holds.",
     bestFor: "Chain reactions and workflows: 3–5 short features (items), one triggering the next, before the headline.",
     sample: { text: "One step *leads to the next*", items: ["Trigger", "Route", "Notify"] },
     itemsHint: "3–5 short features",
@@ -1046,7 +1046,7 @@ export const speedMoreSkills: Skill[] = [
   {
     id: "stretch-snap",
     name: "Stretch Snap",
-    tagline: "Each feature is yanked sideways into a thin streak and the next snaps in on a spring, until the line snaps into place.",
+    tagline: "The features are yanked sideways into a thin streak and the next snaps in on a spring, until the line snaps into place.",
     bestFor: "Playful, elastic energy: 3–6 short features (items) snapping before the headline. Consumer and creative tools.",
     sample: { text: "Snap *into place*", items: ["Drag", "Drop", "Done"] },
     itemsHint: "3–6 short features",

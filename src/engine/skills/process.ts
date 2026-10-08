@@ -938,7 +938,7 @@ export const processSkills: Skill[] = [
   {
     id: "process-chevrons",
     name: "Process Arrows",
-    tagline: "Business-process chevrons in a row fill with the brand gradient one by one, each with its icon, as the step's name and detail rise in under it.",
+    tagline: "Business-process chevrons in a row fill with the brand gradient one by one, with their icons, as the step's name and detail rise in under it.",
     bestFor: "A business process or how the company works with clients: 3–5 stages in order (items 'Stage — short detail'). Agencies, services, consulting, onboarding.",
     sample: { text: "How we *work*", items: FLOW },
     itemsHint: "3–5 stages: 'Stage — short detail'",
@@ -958,8 +958,8 @@ export const processSkills: Skill[] = [
   {
     id: "step-stairs",
     name: "Step Ladder",
-    tagline: "A 3D staircase rises from the floor; a marker hops up it stair by stair, each stair numbered and named, and a flag lands on the top step.",
-    bestFor: "Stages of growth or a path to a goal: 2–5 steps that build on each other (items 'Step — short detail'). Onboarding, plans and tiers, roadmaps.",
+    tagline: "A 3D staircase rises from the floor; a marker hops up it stair by stair, the stairs numbered and named, and a flag lands on the top step.",
+    bestFor: "Stages of growth or a path to a goal: 2–5 steps that build on one another (items 'Step — short detail'). Onboarding, plans and tiers, roadmaps.",
     sample: { text: "Step by *step*", items: STAIRS },
     itemsHint: "2–5 steps that build up: 'Step — short detail'",
     render: stepStairs,
@@ -968,7 +968,7 @@ export const processSkills: Skill[] = [
   {
     id: "services",
     name: "Services",
-    tagline: "A large circle shows the current service's icon, big, beside the list of services; the highlight moves down the list and the icon swaps for each one.",
+    tagline: "A large circle shows the current service's icon, big, beside the list of services; the highlight moves down the list and the icon swaps to match.",
     bestFor: "What a company offers: 2–6 services (items 'Service — short description'). Agencies, studios, consultancies, local businesses and service teams.",
     sample: { text: "What we *do*", items: SERVICES },
     itemsHint: "2–6 services: 'Service — short description'",

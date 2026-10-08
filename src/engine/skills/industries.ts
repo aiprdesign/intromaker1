@@ -834,7 +834,7 @@ export const industrySkills: Skill[] = [
   {
     id: "ind-care",
     name: "Care Visit",
-    tagline: "In a clinic room a caregiver goes down a clipboard checklist with a patient, ticking off each point.",
+    tagline: "In a clinic room a caregiver goes down a clipboard checklist with a patient, ticking off the points.",
     bestFor: "Health care, clinics, dental, therapy and care services: 2–4 short steps of a visit (no health claims).",
     sample: { text: "Your visit, *step by step*", items: ["Book a visit", "Meet your team", "Follow-up notes"] },
     itemsHint: "2–4 short steps",
@@ -884,7 +884,7 @@ export const industrySkills: Skill[] = [
   {
     id: "ind-route",
     name: "Delivery Route",
-    tagline: "A van in your colours drives down a city street, stopping at a pin for each point.",
+    tagline: "A van in your colours drives down a city street, stopping at pins for the points.",
     bestFor: "Delivery, logistics, moving, local services and travel: 2–4 stops or steps.",
     sample: { text: "On the *way*", items: ROUTE_POINTS },
     itemsHint: "2–4 stops or steps",

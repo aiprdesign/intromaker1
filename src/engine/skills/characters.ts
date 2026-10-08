@@ -4,8 +4,8 @@
  * staged six ways:
  *
  * - char-hello:     a mascot pops up, waves and says the headline in a speech bubble.
- * - char-presenter: a presenter beside a board points at each point as it ticks in.
- * - char-team:      a small team pops up in a row; each in turn waves and says one point.
+ * - char-presenter: a presenter beside a board points at the points as they tick in.
+ * - char-team:      a small team pops up in a row; one by one they wave and say a point.
  * - char-aha:       a worried character thinks about the problem, a light bulb comes on, and it
  *                   jumps for joy as the answer (the headline) appears.
  * - char-desk:      a character at a laptop types while updates (the points) pop up beside it,
@@ -730,7 +730,7 @@ function charHello(sc: SkillContext) {
 
 /* ───────────────────────── Presenter ───────────────────────── */
 
-const POINTS = ["Plan — Set goals in minutes", "Share — Keep everyone in the loop", "Track — See progress at a glance", "Celebrate — Ship and say thanks"];
+const POINTS = ["Plan — Set goals in minutes", "Share — Keep your team in the loop", "Track — See progress at a glance", "Celebrate — Ship and say thanks"];
 
 export function pointTimes(scene: Scene, n: number, start = 0.8) {
   const slot = clamp((scene.duration - start - 1) / Math.max(1, n), 0.6, 1.6);
@@ -1219,7 +1219,7 @@ export const characterSkills: Skill[] = [
   {
     id: "char-presenter",
     name: "Presenter",
-    tagline: "A cartoon presenter beside a board points at each point as it ticks in.",
+    tagline: "A cartoon presenter beside a board points at the points as they tick in.",
     bestFor: "Explaining 3–4 features or benefits in a friendly, human way ('Point — short detail').",
     sample: { text: "Here's how it *works*", items: POINTS },
     itemsHint: "3–4 points: 'Point — short detail'",
@@ -1229,8 +1229,8 @@ export const characterSkills: Skill[] = [
   {
     id: "char-team",
     name: "Team Hello",
-    tagline: "A small cartoon team pops up in a row; each in turn waves and says one point in a speech bubble.",
-    bestFor: "Team, community, support or 'why people like it' beats: 2–4 short points (2–4 words each).",
+    tagline: "A small cartoon team pops up in a row; one by one they wave and say a point in a speech bubble.",
+    bestFor: "Team, community, support or 'why people like it' beats: 2–4 short points of 2–4 words.",
     sample: { text: "Made for *people*", items: TEAM },
     itemsHint: "2–4 short points",
     render: charTeam,

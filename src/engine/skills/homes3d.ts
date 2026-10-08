@@ -1112,7 +1112,7 @@ export const homes3dSkills: Skill[] = [
   {
     id: "home-build3d",
     name: "Home Build 3D",
-    tagline: "The home is built in 3D in front of you: slab, framing, walls and windows, the roof, then the garden, as each step ticks off.",
+    tagline: "The home is built in 3D in front of you: slab, framing, walls and windows, the roof, then the garden, as the steps tick off.",
     bestFor: "Homebuilders and construction: 2–5 steps of the build.",
     sample: { text: "Built from the *ground up*", items: BUILD_POINTS },
     itemsHint: "2–5 build steps",
@@ -1152,7 +1152,7 @@ export const homes3dSkills: Skill[] = [
   {
     id: "home-journey",
     name: "Path Home",
-    tagline: "The camera walks up the path to the front door at golden hour, past a sign for each step of buying a home.",
+    tagline: "The camera walks up the path to the front door at golden hour, past signs for the steps of buying a home.",
     bestFor: "The buying process, financing steps or 'how it works' for home buyers: 2–4 short steps.",
     sample: { text: "Your path *home*", items: JOURNEY_POINTS },
     itemsHint: "2–4 short steps",

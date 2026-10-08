@@ -1202,7 +1202,7 @@ export const launchSkills: Skill[] = [
   {
     id: "keycaps",
     name: "Keycaps",
-    tagline: "Shortcuts pressed on big keycaps, one after another, with the action each one runs springing up underneath and a cheat-sheet row of the shortcuts below.",
+    tagline: "Shortcuts pressed on big keycaps, one after another, with the action it runs springing up underneath and a cheat-sheet row of the shortcuts below.",
     bestFor: "Keyboard-first and power-user products: 2–4 shortcuts as items ('⌘ K — Open the command menu', or just the action).",
     sample: { text: "Do it from the *keyboard*", items: ["⌘ K — Open the command menu", "C — Create a task", "⌘ ↵ — Send it"] },
     itemsHint: "2–4 shortcuts: '⌘ K — Action' or just the action",
@@ -1222,7 +1222,7 @@ export const launchSkills: Skill[] = [
   {
     id: "toggle-list",
     name: "Toggle List",
-    tagline: "A settings panel whose switches a cursor turns on one by one, each track filling with the brand colour, then 'Settings saved'.",
+    tagline: "A settings panel whose switches a cursor turns on one by one, the tracks filling with the brand colour, then 'Settings saved'.",
     bestFor: "Options, controls and preferences: 3–5 short features (items) switched on. Configurable products.",
     sample: { text: "Make it *yours*", items: ["Smart reminders", "Shared workspaces", "Weekly summaries", "Dark mode"] },
     itemsHint: "3–5 short features or settings",
@@ -1241,7 +1241,7 @@ export const launchSkills: Skill[] = [
   {
     id: "exploded-ui",
     name: "Exploded UI",
-    tagline: "The screenshot tilts into 3D and separates into floating layers, each labelled, then collapses back into the flat page.",
+    tagline: "The screenshot tilts into 3D and separates into floating, labelled layers, then collapses back into the flat page.",
     bestFor: "A product-film 'how it's built' moment: 2–3 labels for the layers (items). Uses the screenshot.",
     sample: { text: "Layer by layer, *considered*", items: ["Navigation", "Your workspace", "Live updates"] },
     itemsHint: "2–3 short layer labels",

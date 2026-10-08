@@ -17,7 +17,7 @@
  * - logo-dots:   a grid of dots in the logo's own colours pops in a wave from the centre, then the
  *                dots merge into the solid logo.
  * - logo-type:   a caret blinks, the logo pops in beside it and the name types itself out.
- * - logo-shapes: a circle, a square and a triangle fly in, orbit each other and collapse into the
+ * - logo-shapes: a circle, a square and a triangle fly in, orbit one another and collapse into the
  *                logo with a ring ripple.
  *
  * Flat colour, generous space, one idea per sting: no light rays, no flashes, no shaking. Every
@@ -776,7 +776,7 @@ export const logoCleanSkills: Skill[] = [
   { id: "logo-slices", name: "Slice Build", tagline: "Horizontal slices of the logo slide in from alternate sides with brand-colour trails and lock together over a thin rule.", bestFor: BEST, sample: SAMPLE, render: logoSlices, sfx: cleanSfx },
   { id: "logo-dots", name: "Dot Grid", tagline: "A grid of dots in the logo's own colours pops in a wave from the centre, then the dots merge into the solid logo.", bestFor: BEST, sample: SAMPLE, render: logoDots, sfx: cleanSfx },
   { id: "logo-type", name: "Type Lock-up", tagline: "A caret blinks, the logo pops in beside it and the name types itself out next to it, the tagline settling underneath.", bestFor: BEST, sample: SAMPLE, render: logoType, sfx: typeSfx },
-  { id: "logo-shapes", name: "Shape Assemble", tagline: "A circle, a square and a triangle in the brand colours fly in, orbit each other and collapse into the logo with a ring ripple.", bestFor: BEST, sample: SAMPLE, render: logoShapes, sfx: cleanSfx },
+  { id: "logo-shapes", name: "Shape Assemble", tagline: "A circle, a square and a triangle in the brand colours fly in, orbit one another and collapse into the logo with a ring ripple.", bestFor: BEST, sample: SAMPLE, render: logoShapes, sfx: cleanSfx },
 ];
 
 export const LOGO_CLEAN_IDS = new Set<SkillId>(logoCleanSkills.map((s) => s.id));

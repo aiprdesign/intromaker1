@@ -977,7 +977,7 @@ export const epicProcessSkills: Skill[] = [
   {
     id: "step-portals",
     name: "Step Portals",
-    tagline: "The camera flies through glowing rings, one per step, with light streaks as it moves; each step is named large inside its ring as the camera arrives.",
+    tagline: "The camera flies through glowing rings, one per step, with light streaks as it moves; the step is named large inside its ring as the camera arrives.",
     bestFor: "An epic how-it-works or process: 3–5 steps ('Step — short detail'). Launch and trailer-like videos, bold styles.",
     sample: { text: "From idea to *launch*", items: FLOW },
     itemsHint: "3–5 steps: 'Step — short detail'",
@@ -987,7 +987,7 @@ export const epicProcessSkills: Skill[] = [
   {
     id: "light-trail",
     name: "Light Trail",
-    tagline: "A comet races along a sweeping path and ignites each step with a burst of light; the step it reaches is named large beside its orb.",
+    tagline: "A comet races along a sweeping path and ignites the steps with bursts of light; the step it reaches is named large beside its orb.",
     bestFor: "A journey or onboarding path: 3–5 steps ('Step — short detail'). Energetic launch videos.",
     sample: { text: "Your path to *launch*", items: TRAIL },
     itemsHint: "3–5 steps: 'Step — short detail'",
@@ -997,7 +997,7 @@ export const epicProcessSkills: Skill[] = [
   {
     id: "step-cards",
     name: "Flip Cards",
-    tagline: "Big numbered cards flip over one by one to reveal each step's icon, name and detail, a glint sweeping across as they land; the current card stands forward.",
+    tagline: "Big numbered cards flip over one by one to reveal the step's icon, name and detail, a glint sweeping across as they land; the current card stands forward.",
     bestFor: "A short process or plan: 2–4 steps ('Step — short detail'). Clear, tactile how-it-works.",
     sample: { text: "Getting *started*", items: CARDS },
     itemsHint: "2–4 steps: 'Step — short detail'",
@@ -1017,7 +1017,7 @@ export const epicProcessSkills: Skill[] = [
   {
     id: "service-carousel",
     name: "Service Carousel",
-    tagline: "A 3D cover-flow of service cards under spotlights glides to each service in turn, the current card large and facing the camera.",
+    tagline: "A 3D cover-flow of service cards under spotlights glides from service to service, the current card large and facing the camera.",
     bestFor: "Services or products to browse: 2–6 ('Service — short description'). Agencies, studios, product lines.",
     sample: { text: "Our *services*", items: SERVICES },
     itemsHint: "2–6 services: 'Service — short description'",

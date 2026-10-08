@@ -203,6 +203,10 @@ console.log("No bare claim words on slides");
   const loud = /\b(?:faster|full speed|secure|tested|approved|certified|fast|safe|reliable|proven)\b/i;
   const bad = SKILLS.filter((k) => loud.test(k.sample.text) || (k.sample.items ?? []).some((x) => isClaimWord(x) || loud.test(x))).map((k) => k.id);
   check(!bad.length, `slide samples make no claims${bad.length ? ` (${bad.join(", ")})` : ""}`);
+  // No absolute words in what the studio shows about a slide: its name, description, guidance and sample.
+  const absolute = /\b(?:every|everything|everyone|everywhere|always|never|each|all)\b/i;
+  const abs = SKILLS.filter((k) => [k.name, k.tagline, k.bestFor, k.sample.text, k.sample.subtext ?? "", ...(k.sample.items ?? [])].some((x) => absolute.test(x))).map((k) => k.id);
+  check(!abs.length, `slide names, descriptions and samples use no absolute words${abs.length ? ` (${abs.join(", ")})` : ""}`);
 }
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll copy checks passed");

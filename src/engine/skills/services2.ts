@@ -4,7 +4,7 @@ import { lightSweep } from "../fx";
  * time, large, so the viewer always knows which one is being told. Items read
  * "Service — short description".
  *
- * - service-cube:      a big 3D cube turns a quarter turn for each service, the service on the face
+ * - service-cube:      a big 3D cube turns a quarter turn per service, the service on the face
  *                      that comes round; its name is told large beside it.
  * - service-bloom:     services open out like petals round the brand; the current petal stretches
  *                      out and glows, and its name is told large beside the flower.
@@ -811,7 +811,7 @@ export const creativeServiceSkills: Skill[] = [
   {
     id: "service-cube",
     name: "Service Cube",
-    tagline: "A big 3D cube turns a quarter turn for each service, the service on the face that comes round; its name is told large beside it.",
+    tagline: "A big 3D cube turns a quarter turn per service, the service on the face that comes round; its name is told large beside it.",
     bestFor: "What a company offers, with a bold 3D move: 2–6 services ('Service — short description').",
     sample: { text: "What we *offer*", items: SERVICES },
     itemsHint: "2–6 services: 'Service — short description'",
@@ -861,7 +861,7 @@ export const creativeServiceSkills: Skill[] = [
   {
     id: "service-spotlight",
     name: "Service Spotlight",
-    tagline: "A dark stage with the services on plinths; a spotlight swings to each in turn, the lit one rises and glows, and its name is told large in capitals under the stage.",
+    tagline: "A dark stage with the services on plinths; a spotlight swings from one to the next, the lit one rises and glows, and its name is told large in capitals under the stage.",
     bestFor: "A theatrical reveal of services: 2–5 ('Service — short description'). Agencies, studios, events, premium brands.",
     sample: { text: "In the *spotlight*", items: SERVICES.slice(0, 4) },
     itemsHint: "2–5 services: 'Service — short description'",

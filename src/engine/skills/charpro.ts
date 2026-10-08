@@ -960,7 +960,7 @@ function proWalk(sc: SkillContext) {
   ctx.restore();
 }
 
-const PRO_POINTS = ["Plan — Goals everyone can see", "Collaborate — Work together in one place", "Track — Progress at a glance", "Launch — Ship with confidence"];
+const PRO_POINTS = ["Plan — Goals your team can see", "Collaborate — Work together in one place", "Track — Progress at a glance", "Launch — Ship with confidence"];
 
 function proExplainer(sc: SkillContext) {
   const { ctx, w, t, u, palette, scene } = sc;
@@ -1055,7 +1055,7 @@ function proExplainer(sc: SkillContext) {
   ctx.restore();
 }
 
-const DIALOG = ["How do you keep the team in sync?", "One shared board for everything", "And the updates?", "They come to you, in one place"];
+const DIALOG = ["How do you keep the team in sync?", "One shared board for the team", "And the updates?", "They come to you, in one place"];
 
 function proDuo(sc: SkillContext) {
   const { ctx, w, t, u, palette, scene } = sc;
@@ -1417,7 +1417,7 @@ export const charProSkills: Skill[] = [
   {
     id: "pro-explainer",
     name: "Explainer",
-    tagline: "A presenter beside a floating card points at each point as it appears, talking and nodding.",
+    tagline: "A presenter beside a floating card points at the points as they appear, talking and nodding.",
     bestFor: "Explaining 3–4 features or steps like a narrated explainer ('Point — short detail').",
     sample: { text: "Here's how it *works*", items: PRO_POINTS },
     itemsHint: "3–4 points: 'Point — short detail'",
