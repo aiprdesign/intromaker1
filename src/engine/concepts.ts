@@ -197,7 +197,7 @@ export const CONCEPTS: Concept[] = [
     eyebrows: { features: "Sell more", cards: "Results" },
     featuresTitle: "Tools to *run your store*",
     cta: ["Start *selling*", "Open your *store*", "Sell with *{name}*"],
-    template: "pop",
+    template: "enterprise",
     swap: "Your orders, listed|shipped|tracked",
     starter: ["Online store", "Checkout", "Order tracking", "Inventory"],
   },

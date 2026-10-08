@@ -601,7 +601,9 @@ export function isSaasPrompt(prompt: string) {
   // (Plurals count: "deploy your apps" is a product. Saying "SaaS" or "product launch" outright
   // wins over trailer words, so "an epic SaaS launch" is an epic SaaS film, not a movie trailer.)
   const product = /\b(saas|apps?|platforms?|software|startups?|products?|dashboards?|b2b|apis?|crm|tools?|workspaces?|launch video|explainer|demo|systems?|teams|assistants?|automations?|analytics|management|tracking|trackers?|planners?|scheduling|bookkeeping|invoicing|roadmaps?|sprints?|kanban|workflows?)\b/.test(l) ||
-    Math.max(...CONCEPTS.map((c) => (l.match(c.keywords) ?? []).length)) >= 2;
+    Math.max(...CONCEPTS.map((c) => (l.match(c.keywords) ?? []).length)) >= 2 ||
+    // A business described ("Cartly, an online store for…", "a family dental clinic") is an intro too.
+    /\b(stores?|shops?|online|e-?commerce|clinics?|firms?|agenc(?:y|ies)|compan(?:y|ies)|services?|caf[eé]s?|restaurants?|bakery|bakeries|business(?:es)?|marketplaces?|consultan(?:cy|ts?)|consulting|boutiques?|salons?|practices?|studios? for|solutions|enterprises?|corporate)\b/.test(l);
   const outright = /\b(saas|product launch|launch video|explainer|b2b)\b/.test(l);
   if (FILM_CUE.test(l) && !outright) return false;
   return product && (outright || !/\b(epic|trailer|cinematic|game|gaming|movie|film|hype|festival|documentary)\b/.test(l));

@@ -36,6 +36,7 @@ import { applyTemplate, DEFAULT_TEMPLATE, TEMPLATE_MAP } from "@/engine/template
 import { applyTrailerStyle, detectTrailerStyle, TRAILER_STYLE_MAP } from "@/engine/trailers";
 import TrailerStylePicker from "@/components/TrailerStylePicker";
 import { CONCEPT_MAP } from "@/engine/concepts";
+import { purposeStyle } from "@/engine/stylepick";
 import Player from "@/components/Player";
 import { BuildProgress, ImportFailure, type SiteCheck } from "@/components/BuildOverlay";
 import VoicePanel, { loadVoiceSettings } from "@/components/VoicePanel";
@@ -497,7 +498,11 @@ export default function Studio() {
     }
   }, []);
   const subjectOf = (s: SiteData | null | undefined, p: string) => (s ? `site:${s.url}` : `prompt:${p.trim().toLowerCase()}`);
+  // A style picked since the last Generate is meant for the next film, whatever the prompt box says
+  // by then (picked first and typed after, or the prompt edited since).
+  const pickedPendingRef = useRef(false);
   const markPicked = () => {
+    pickedPendingRef.current = true;
     // The film being worked on: the website, else what's in the prompt box (a style picked before
     // pressing Generate on a new prompt is meant for that film).
     const key = subjectOf(site, prompt || promptRef.current);
@@ -510,6 +515,17 @@ export default function Studio() {
   };
   /** A new film (another website or prompt): back to Auto, so it gets the best style for itself. */
   const autoForNewFilm = (s: SiteData | null | undefined, p: string) => {
+    if (pickedPendingRef.current) {
+      // The pick goes with this film (and its remakes).
+      pickedPendingRef.current = false;
+      pickedForRef.current = subjectOf(s, p);
+      try {
+        localStorage.setItem("intromaker.style.for", pickedForRef.current);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
     if (pickedForRef.current === subjectOf(s, p)) return;
     pickedForRef.current = null;
     try {
@@ -557,9 +573,7 @@ export default function Studio() {
               ? p.template
               : "drop"
             : "studio"
-          : p.concept
-            ? CONCEPT_MAP[p.concept]?.template
-            : undefined
+          : purposeStyle(p.concept, [promptRef.current, site?.name, site?.tagline, site?.description, ...(site?.headlines ?? []).slice(0, 6)].filter(Boolean).join(" "))
         : undefined;
     return id && TEMPLATE_MAP[id] ? id : undefined;
   };
@@ -2401,11 +2415,14 @@ export default function Studio() {
                   <span>
                     Detected: <strong>{CONCEPT_MAP[plan.concept].name}</strong>. The story arc, chapters, CTA and icons are adapted.
                   </span>
-                  {!autoStyle && TEMPLATE_MAP[CONCEPT_MAP[plan.concept].template] && template !== CONCEPT_MAP[plan.concept].template && (
-                    <button className="btn btn-ghost sm" onClick={() => chooseTemplate(CONCEPT_MAP[plan.concept!].template)}>
-                      Use suggested style: {TEMPLATE_MAP[CONCEPT_MAP[plan.concept].template].name}
-                    </button>
-                  )}
+                  {(() => {
+                    const sug = suggestedFor(plan);
+                    return !autoStyle && sug && template !== sug ? (
+                      <button className="btn btn-ghost sm" onClick={() => chooseTemplate(sug)}>
+                        Use suggested style: {TEMPLATE_MAP[sug].name}
+                      </button>
+                    ) : null;
+                  })()}
                 </div>
               )}
               <button
@@ -2413,6 +2430,7 @@ export default function Studio() {
                 aria-pressed={autoStyle}
                 onClick={() => {
                   setAuto(true);
+                  pickedPendingRef.current = false;
                   const id = suggestedFor(plan);
                   if (id) chooseTemplate(id, true);
                 }}
