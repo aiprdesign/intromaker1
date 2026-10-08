@@ -1339,6 +1339,7 @@ interface DeskParts {
   pot: Program;
   top: Program;
   mat: Program;
+  folio: Program;
 }
 
 function deskWorld(W: World): DeskParts {
@@ -1356,7 +1357,7 @@ function deskWorld(W: World): DeskParts {
   const matG = group(W);
   matG.rotation.set(-Math.PI / 2, 0, 0.18);
   matG.position.set(-0.25, 0.0, -0.05);
-  const mat = W.mat({ color: "#2b2f38", gloss: 0.12 });
+  const mat = W.mat({ color: "#2b2f38", gloss: 0.12, kind: "felt" });
   W.mesh(pad.front, mat, matG, false);
   W.mesh(pad.body, mat, matG, false);
   const lap = laptop(W);
@@ -1370,7 +1371,15 @@ function deskWorld(W: World): DeskParts {
   const tab = slate(W, TAB, false);
   tab.root.rotation.set(-Math.PI / 2, 0, 0.28);
   tab.root.scale.set(0.66, 0.66, 0.66);
-  tab.root.position.set(-2.95, (TAB.t / 2) * 0.66, 0.75);
+  tab.root.position.set(-2.95, (TAB.t / 2 + 0.05) * 0.66, 0.75);
+  // In a soft folio case in the brand's colour, a little larger than the tablet.
+  const folioM = W.mat({ color: "#3a3f4a", gloss: 0.3 });
+  const fs = slab(gl, TAB.w + 0.1, TAB.h + 0.1, 0.06, 0.17, 0.025);
+  const fg = group(W, tab.root);
+  fg.position.z = -TAB.t / 2 - 0.03;
+  W.mesh(fs.front, folioM, fg);
+  W.mesh(fs.body, folioM, fg);
+  W.mesh(fs.back, folioM, fg);
   const penMat = W.mat({ color: "#f2f3f6", gloss: 0.7 });
   const pen = W.mesh(cylinder(gl, 0.028, 0.028, 1.05, 20), penMat);
   pen.rotation.set(0, 0.4, Math.PI / 2);
@@ -1382,7 +1391,7 @@ function deskWorld(W: World): DeskParts {
   const coasterM = W.mat({ color: "#c9a27a", gloss: 0.15 });
   const coaster = W.mesh(lathe(gl, [[0, 0], [0.37, 0], [0.4, 0.015], [0.4, 0.03], [0.37, 0.045], [0, 0.045]], 48), coasterM);
   coaster.position.set(2.55, 0, -0.7);
-  const mug = W.mat({ color: "#7c5cff", gloss: 0.78 });
+  const mug = W.mat({ color: "#7c5cff", gloss: 0.78, kind: "ceramic" });
   const cup = W.mesh(
     lathe(gl, [[0, 0.045], [0.2, 0.045], [0.225, 0.07], [0.24, 0.16], [0.25, 0.5], [0.252, 0.555], [0.245, 0.575], [0.232, 0.575], [0.224, 0.555], [0.215, 0.18], [0.19, 0.1], [0, 0.1]], 56),
     mug,
@@ -1391,19 +1400,20 @@ function deskWorld(W: World): DeskParts {
   const handle = W.mesh(torus(gl, 0.13, 0.034, Math.PI * 1.25, 32, 14), mug);
   handle.position.set(2.55 + 0.25, 0.32, -0.7);
   handle.scale.set(0.9, 1.15, 1);
-  const coffee = W.mesh(cylinder(gl, 0.22, 0.22, 0.01, 48), W.mat({ color: "#5b3a26", gloss: 0.85 }), W.scene, false);
+  const coffee = W.mesh(cylinder(gl, 0.222, 0.222, 0.01, 48), W.mat({ color: "#5b3a26", gloss: 0.8, kind: "coffee" }), W.scene, false);
   coffee.position.set(2.55, 0.47, -0.7);
-  const crema = W.mesh(cylinder(gl, 0.15, 0.15, 0.012, 40), W.mat({ color: "#a8754d", gloss: 0.6 }), W.scene, false);
-  crema.position.set(2.53, 0.472, -0.69);
   // A potted plant: a glazed pot with a rolled rim, dark soil, and arching leaves in two greens.
-  const potM = W.mat({ color: "#e8e2d8", gloss: 0.55 });
+  const potM = W.mat({ color: "#e8e2d8", gloss: 0.55, kind: "ceramic" });
+  // (On a matching saucer.)
+  const saucer = W.mesh(lathe(gl, [[0, 0], [0.34, 0], [0.42, 0.05], [0.415, 0.068], [0.4, 0.068], [0.34, 0.028], [0, 0.028]], 48), potM);
+  saucer.position.set(-3.1, 0, -1.2);
   const pot = W.mesh(lathe(gl, [[0, 0], [0.24, 0], [0.27, 0.03], [0.33, 0.5], [0.37, 0.52], [0.38, 0.57], [0.36, 0.6], [0.32, 0.6], [0.31, 0.56]], 48), potM);
-  pot.position.set(-3.1, 0, -1.2);
+  pot.position.set(-3.1, 0.028, -1.2);
   const soil = W.mesh(cylinder(gl, 0.315, 0.315, 0.02, 40), W.mat({ color: "#3a2a20", gloss: 0.05 }), W.scene, false);
-  soil.position.set(-3.1, 0.54, -1.2);
-  const greens = [W.mat({ color: "#3f8f4e", gloss: 0.55 }), W.mat({ color: "#5fae5a", gloss: 0.55 }), W.mat({ color: "#2f7a45", gloss: 0.5 })];
+  soil.position.set(-3.1, 0.568, -1.2);
+  const greens = [W.mat({ color: "#2f7d43", color2: "#7fc464", gloss: 0.6, kind: "leaf" }), W.mat({ color: "#3e9550", color2: "#9ad37a", gloss: 0.6, kind: "leaf" }), W.mat({ color: "#24683a", color2: "#6bb55a", gloss: 0.55, kind: "leaf" })];
   const plant = group(W);
-  plant.position.set(-3.1, 0.54, -1.2);
+  plant.position.set(-3.1, 0.568, -1.2);
   const N = 11;
   for (let i = 0; i < N; i++) {
     const inner = i < 4;
@@ -1414,7 +1424,7 @@ function deskWorld(W: World): DeskParts {
     l.rotation.x = -(inner ? 0.12 + (i % 2) * 0.1 : 0.42 + ((i * 13) % 4) * 0.08);
     l.position.set(0, 0, 0);
   }
-  return { lap, phone, tab, mug, coaster: coasterM, pot: potM, top: surface, mat };
+  return { lap, phone, tab, mug, coaster: coasterM, pot: potM, top: surface, mat, folio: folioM };
 }
 
 function d3Desk(sc: SkillContext) {
@@ -1445,6 +1455,7 @@ function d3Desk(sc: SkillContext) {
       P.coaster.uniforms.uColor.value = rgb(light ? "#d9c3a5" : "#b08a64");
       P.pot.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#f4f1ec", light ? 0.75 : 0.6));
       for (const m of P.tab.metal) m.uniforms.uColor.value = rgb(light ? "#d9dce2" : "#8a8f99");
+      P.folio.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#101218", light ? 0.25 : 0.45));
       paint(W, P.tab.screen, tabShot, TAB.scrW / TAB.scrH, ease.inOutCubic(range(t, 1.4, d - 0.4)), range(t, 0.3, 0.9), 0.04);
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, ease.inOutCubic(range(t, 1.2, d - 0.4)), range(t, 0.1, 0.7), 0.02);
       paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.075);

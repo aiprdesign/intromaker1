@@ -517,7 +517,7 @@ uniform vec3 uRound;
 uniform vec4 uBlob[6];
 uniform float uFloorAlpha;
 #endif
-#ifdef GRASS
+#if defined(GRASS) || defined(LEAF)
 uniform vec3 uColor2;
 #endif
 #ifdef DECAL
@@ -613,6 +613,35 @@ void main() {
   float mortar = step(0.06, fr.x) * step(fr.x, 0.94) * step(0.08, fr.y) * step(fr.y, 0.92);
   base *= mix(0.72, 0.9 + hash(cell) * 0.22, mortar);
 #endif
+#ifdef LEAF
+  // A leaf (u across the blade, v from base to tip): a paler midrib, fine side veins sweeping up
+  // to the edge, a lighter tip and a slightly darker rim.
+  float side = abs(vUv.x - 0.5) * 2.0;
+  base = mix(uColor, uColor2, smoothstep(0.1, 1.0, vUv.y) * 0.7);
+  base = mix(base, base * 1.32 + 0.035, 1.0 - smoothstep(0.02, 0.09, side));
+  float vein = fract(vUv.y * 9.0 - side * 1.6);
+  base *= 1.0 - 0.09 * smoothstep(0.86, 1.0, vein) * smoothstep(0.1, 0.25, side) * (1.0 - smoothstep(0.85, 1.0, side));
+  base *= 1.0 - 0.16 * smoothstep(0.8, 1.0, side);
+#endif
+#ifdef CERAMIC
+  // Glazed ceramic: tiny speckles in the glaze, and the glaze thinning towards the foot.
+  base *= 1.0 - 0.07 * step(0.988, hash(floor(vW.xz * 140.0 + vW.y * 97.0)));
+  base *= mix(0.86, 1.0, smoothstep(0.0, 0.14, vUv.y));
+#endif
+#ifdef COFFEE
+  // A coffee's surface, seen from above: dark in the middle, a ring of crema with a soft swirl.
+  vec2 cq = vUv - 0.5;
+  float cr = length(cq) * 2.0;
+  float swirl = 0.5 + 0.5 * sin(atan(cq.y, cq.x) * 3.0 + cr * 10.0);
+  base = mix(vec3(0.2, 0.11, 0.06), vec3(0.72, 0.5, 0.33), clamp(smoothstep(0.45, 0.95, cr) * 0.85 + swirl * 0.3 * smoothstep(0.15, 0.7, cr), 0.0, 1.0));
+#endif
+#ifdef FELT
+  // Felt: a fine fibrous grain and a stitched border just inside the edge.
+  base *= 0.93 + 0.07 * hash(floor(vW.xz * 260.0));
+  float edgeD = min(min(vUv.x, 1.0 - vUv.x) * 1.5, min(vUv.y, 1.0 - vUv.y));
+  float stitch = smoothstep(0.016, 0.02, edgeD) * (1.0 - smoothstep(0.026, 0.03, edgeD)) * step(0.45, fract((vUv.x + vUv.y) * 90.0));
+  base = mix(base, base * 1.45 + 0.05, stitch * 0.8);
+#endif
   float sh = shadowAt();
   // Soft contact darkening where surfaces meet the ground (a cheap ambient occlusion).
   if (uAO > 0.0) base *= mix(1.0 - uAO * (1.0 - smoothstep(0.5, 0.9, N.y)), 1.0, smoothstep(0.0, 0.9, vW.y));
@@ -629,6 +658,10 @@ void main() {
   vec3 F0 = mix(vec3(0.04), base, metal);
   vec3 F = F0 + (1.0 - F0) * fres;
   vec3 col = diff * (1.0 - metal * 0.85) + env(R) * F * mix(0.25, 1.0, gloss) + uSunCol * spec * sh * mix(vec3(1.0), base, metal * 0.5);
+#ifdef LEAF
+  // Light through the leaf: lit from behind, it glows a brighter green.
+  col += mix(uColor2, vec3(0.75, 1.0, 0.45), 0.35) * uSunCol * pow(max(dot(-N, uSun), 0.0), 1.5) * 0.45 * sh;
+#endif
   // Flat (2D) look: the base colour in two tones, light and shade, no reflections or haze.
   if (uFlat > 0.5) col = base * (ndl * sh > 0.3 ? 1.0 : 0.82) * (N.y > 0.7 ? 1.04 : 1.0);
   float alpha = uAlpha;
@@ -705,7 +738,7 @@ export interface MatOpts {
   metal?: number;
   gloss?: number;
   alpha?: number;
-  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass" | "siding" | "shingle" | "backdrop" | "decal" | "stone";
+  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass" | "siding" | "shingle" | "backdrop" | "decal" | "stone" | "leaf" | "ceramic" | "coffee" | "felt";
   color2?: string;
   /** Light it gives off (a lit window), added to its shading. */
   emit?: string | Num3;
@@ -768,7 +801,7 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
   };
   const blank = new Texture(gl, { image: new Uint8Array([0, 0, 0, 255]), width: 1, height: 1 });
   const mat = (o: MatOpts) => {
-    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : o.kind === "siding" ? "#define SIDING\n" : o.kind === "shingle" ? "#define SHINGLE\n" : o.kind === "backdrop" ? "#define BACKDROP\n" : o.kind === "decal" ? "#define DECAL\n" : o.kind === "stone" ? "#define STONE\n" : "";
+    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : o.kind === "siding" ? "#define SIDING\n" : o.kind === "shingle" ? "#define SHINGLE\n" : o.kind === "backdrop" ? "#define BACKDROP\n" : o.kind === "decal" ? "#define DECAL\n" : o.kind === "stone" ? "#define STONE\n" : o.kind === "leaf" ? "#define LEAF\n" : o.kind === "ceramic" ? "#define CERAMIC\n" : o.kind === "coffee" ? "#define COFFEE\n" : o.kind === "felt" ? "#define FELT\n" : "";
     const uniforms: Record<string, { value: unknown }> = {
       ...env,
       uColor: { value: typeof o.color === "string" ? rgb(o.color) : o.color },
@@ -780,7 +813,7 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     };
     if (o.kind === "screen") Object.assign(uniforms, { tMap: { value: blank }, uUv: { value: [1, 1, 0, 0] }, uGlow: { value: 1 }, uRound: { value: [0.04, 1.6, 0] } });
     if (o.kind === "floor") Object.assign(uniforms, { uBlob: { value: new Array(24).fill(0) }, uFloorAlpha: { value: 1 } });
-    if (o.kind === "grass") uniforms.uColor2 = { value: rgb(o.color2 ?? "#5a9e48") };
+    if (o.kind === "grass" || o.kind === "leaf") uniforms.uColor2 = { value: rgb(o.color2 ?? (o.kind === "leaf" ? "#8cc56a" : "#5a9e48")) };
     if (o.kind === "decal") uniforms.tMap = { value: blank };
     if (o.kind === "backdrop") Object.assign(uniforms, { uGlowA: { value: [1, 1, 1] }, uGlowB: { value: [1, 1, 1] } });
     const transparent = o.transparent ?? (o.kind === "floor" || o.kind === "screen" || o.kind === "decal" || (o.alpha ?? 1) < 1);
