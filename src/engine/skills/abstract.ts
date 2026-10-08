@@ -137,6 +137,8 @@ export interface AbsPose {
   lift?: number;
   lean?: number;
   mouth?: "smile" | "open" | "flat" | "o";
+  /** The feeling the face shows (eyes and brows): unset follows the mouth (open → happy, o → surprised). */
+  mood?: "calm" | "happy" | "joy" | "surprised" | "thinking";
   blink?: number;
   look?: number;
   /** Mirror (face left). */
@@ -508,6 +510,7 @@ function absHello(sc: SkillContext) {
     lift: id.lift,
     squash: b.squash + id.squash,
     mouth: wk > 0.3 ? "open" : "smile",
+    mood: wk > 0.3 ? "joy" : "happy",
     blink: blinkAt(t, 0.5),
     look: portrait ? 0 : 0.6,
   });
@@ -783,6 +786,7 @@ function absCheer(sc: SkillContext) {
       lift: jump,
       squash: b.squash - land,
       mouth: "open",
+      mood: "joy",
       blink: blinkAt(t, i),
       flip: i % 2 === 1,
     });

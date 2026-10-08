@@ -193,6 +193,33 @@ export function cylinder(gl: OGLRenderingContext, rTop: number, rBot: number, h:
   return geo(gl, pos, nor, uv, idx);
 }
 
+/**
+ * The front of a sphere (radius `r`) within a half-width `w` of its centre, facing +z, with UVs
+ * laid flat over the square: a face, printed on a head (see the people in homes3d.ts).
+ */
+export function sphereCap(gl: OGLRenderingContext, r: number, w: number, seg = 18) {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  for (let j = 0; j <= seg; j++)
+    for (let i = 0; i <= seg; i++) {
+      const x = -w + (2 * w * i) / seg;
+      const y = -w + (2 * w * j) / seg;
+      const z = Math.sqrt(Math.max(0, r * r - x * x - y * y));
+      pos.push(x, y, z);
+      nor.push(x / r, y / r, z / r);
+      uv.push(i / seg, j / seg);
+    }
+  for (let j = 0; j < seg; j++)
+    for (let i = 0; i < seg; i++) {
+      const a = j * (seg + 1) + i;
+      const c = a + seg + 1;
+      idx.push(a, a + 1, c + 1, a, c + 1, c);
+    }
+  return geo(gl, pos, nor, uv, idx);
+}
+
 /** A UV sphere (or a squashed one, for bushes and tree crowns). */
 export function sphere(gl: OGLRenderingContext, r: number, seg = 24, rings = 16) {
   const pos: number[] = [];

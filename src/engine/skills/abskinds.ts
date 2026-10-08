@@ -17,7 +17,7 @@
 import { clamp, lerp, mixHex, TAU } from "../math";
 import type { CastMember } from "../types";
 import type { AbsPose, AbsRig } from "./abstract";
-import { beginFigure, drawFace, drawHeadHair, drawMouth, hairTop, INK, painter, sitLeg, taperPath, type Painter } from "./abspaint";
+import { beginFigure, brow, drawFace, drawHeadHair, drawMouth, feelOf, hairTop, INK, joyEye, painter, sitLeg, taperPath, type Painter } from "./abspaint";
 
 type Pt = { x: number; y: number };
 
@@ -325,8 +325,14 @@ export function drawBlob(ctx: CanvasRenderingContext2D, x: number, groundY: numb
   const sp = bw * 0.19;
   const lk = (pose.look ?? 0) * er * 0.35;
   const blink = clamp(pose.blink ?? 0);
+  const feel = feelOf(pose);
   for (const k of [-1, 1]) {
     const ex = x + k * sp;
+    brow(ctx, ex + lk, eyeY - er * 0.25, er * 0.75, k, feel, INK, Math.max(1.5, er * 0.3));
+    if (feel === "joy" && blink < 0.6) {
+      joyEye(ctx, ex + lk, eyeY, er * 0.7, INK, Math.max(1.8, er * 0.32));
+      continue;
+    }
     if (c.eyes === "lines" || blink > 0.6) {
       ctx.strokeStyle = INK;
       ctx.lineWidth = Math.max(1.5, er * 0.3);
@@ -466,23 +472,27 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
   ctx.strokeStyle = lc;
   ctx.lineCap = "round";
   ctx.lineWidth = lw * 0.75;
+  const feel = feelOf(pose);
   for (const k of [-1, 1]) {
     const ex = x + k * hr * 0.34 + lk;
-    if (blink > 0.6) {
+    brow(ctx, ex, ey, hr * 0.12, k, feel, lc, lw * 0.75);
+    if (feel === "joy" && blink < 0.6) joyEye(ctx, ex, ey, hr * 0.12, lc, lw * 0.75);
+    else if (blink > 0.6) {
       ctx.beginPath();
       ctx.moveTo(ex - hr * 0.1, ey);
       ctx.lineTo(ex + hr * 0.1, ey);
       ctx.stroke();
     } else {
+      const big = feel === "surprised" ? 1.35 : 1;
       ctx.beginPath();
-      ctx.ellipse(ex, ey, hr * 0.085, hr * 0.11 * (1 - blink), 0, 0, TAU);
+      ctx.ellipse(ex, ey, hr * 0.085 * big, hr * 0.11 * big * (1 - blink), 0, 0, TAU);
       ctx.fill();
     }
   }
   const my = headY + hr * 0.38;
   const mx = x + lk;
   ctx.beginPath();
-  switch (pose.mouth ?? "smile") {
+  switch (pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile")) {
     case "open":
       ctx.moveTo(mx - hr * 0.28, my - hr * 0.04);
       ctx.quadraticCurveTo(mx, my + hr * 0.4, mx + hr * 0.28, my - hr * 0.04);

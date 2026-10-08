@@ -215,16 +215,68 @@ export function drawHeadHair(ctx: CanvasRenderingContext2D, P: Painter, x: numbe
   }
 }
 
-/** The minimal face: eyes (dots, lines or ovals), glasses, cheeks, nose and mouth, on a head of radius `hr`. */
+/** The feeling a face shows: the pose's own, else read from the mouth. */
+export function feelOf(pose: AbsPose): NonNullable<AbsPose["mood"]> {
+  return pose.mood ?? (pose.mouth === "open" ? "happy" : pose.mouth === "o" ? "surprised" : "calm");
+}
+
+/** Happy closed eyes: a little upturned arc at (ex, ey), `w` wide. */
+export function joyEye(ctx: CanvasRenderingContext2D, ex: number, ey: number, w: number, color: string, lw: number) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(ex - w, ey + w * 0.35);
+  ctx.quadraticCurveTo(ex, ey - w * 0.95, ex + w, ey + w * 0.35);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A brow over an eye at (ex, ey) (`side` −1 left, 1 right), shaped by the feeling; none when calm. */
+export function brow(ctx: CanvasRenderingContext2D, ex: number, ey: number, w: number, side: number, feel: NonNullable<AbsPose["mood"]>, color: string, lw: number) {
+  if (feel === "calm") return;
+  const lift = feel === "surprised" ? 1.0 : feel === "joy" ? 0.75 : feel === "thinking" ? (side > 0 ? 0.95 : 0.45) : 0.55;
+  const y = ey - w * (1.1 + lift);
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw * 0.85;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(ex - w * 0.9, y + w * 0.25);
+  ctx.quadraticCurveTo(ex, y - w * (feel === "surprised" ? 0.45 : 0.3), ex + w * 0.9, y + w * (feel === "thinking" && side > 0 ? -0.1 : 0.25));
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A catch-light: the small white glint that brings an eye to life. */
+export function glint(ctx: CanvasRenderingContext2D, ex: number, ey: number, r: number) {
+  if (r < 1.2) return;
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath();
+  ctx.arc(ex - r * 0.9, ey - r * 1.1, r, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** The minimal face: eyes (dots, lines or ovals) that show a feeling, brows, glasses, cheeks, nose and mouth, on a head of radius `hr`. */
 export function drawFace(ctx: CanvasRenderingContext2D, x: number, headY: number, hr: number, c: CastMember, pose: AbsPose) {
-  const lk = (pose.look ?? 0) * hr * 0.15;
-  const ey = headY + hr * 0.08;
+  const feel = feelOf(pose);
+  const lk = (pose.look ?? 0) * hr * 0.15 + (feel === "thinking" ? hr * 0.06 : 0);
+  const ey = headY + hr * 0.08 - (feel === "thinking" ? hr * 0.05 : 0);
   const blink = clamp(pose.blink ?? 0);
+  const big = feel === "surprised" ? 1.35 : 1;
   ctx.fillStyle = INK;
   ctx.strokeStyle = INK;
   ctx.lineWidth = Math.max(1.5, hr * 0.1);
   for (const s of [-1, 1]) {
     const ex = x + s * hr * 0.38 + lk;
+    brow(ctx, ex, ey, hr * 0.13 * big, s, feel, INK, Math.max(1.5, hr * 0.09));
+    if (feel === "joy" && blink < 0.6) {
+      joyEye(ctx, ex, ey, hr * 0.13, INK, Math.max(1.5, hr * 0.1));
+      continue;
+    }
     if (c.eyes === "lines" || blink > 0.6) {
       ctx.beginPath();
       ctx.moveTo(ex - hr * 0.12, ey);
@@ -232,12 +284,16 @@ export function drawFace(ctx: CanvasRenderingContext2D, x: number, headY: number
       ctx.stroke();
     } else if (c.eyes === "ovals") {
       ctx.beginPath();
-      ctx.ellipse(ex, ey, hr * 0.09, hr * 0.15 * (1 - blink), 0, 0, TAU);
+      ctx.ellipse(ex, ey, hr * 0.09 * big, hr * 0.15 * big * (1 - blink), 0, 0, TAU);
       ctx.fill();
+      glint(ctx, ex + hr * 0.03, ey, hr * 0.035 * big);
+      ctx.fillStyle = INK;
     } else {
       ctx.beginPath();
-      ctx.arc(ex, ey, hr * 0.1 * (1 - blink * 0.8), 0, TAU);
+      ctx.arc(ex, ey, hr * 0.1 * big * (1 - blink * 0.8), 0, TAU);
       ctx.fill();
+      glint(ctx, ex + hr * 0.03, ey, hr * 0.032 * big);
+      ctx.fillStyle = INK;
     }
   }
   if (c.glasses) {
@@ -268,7 +324,7 @@ export function drawFace(ctx: CanvasRenderingContext2D, x: number, headY: number
     ctx.quadraticCurveTo(x + lk * 1.2 + hr * 0.1, headY + hr * 0.32, x + lk * 1.2 - hr * 0.02, headY + hr * 0.36);
     ctx.stroke();
   }
-  drawMouth(ctx, x + lk, headY + hr * 0.55, hr, pose.mouth ?? "smile");
+  drawMouth(ctx, x + lk, headY + hr * 0.55, hr, pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile"));
 }
 
 /** A simple mouth centred at (x, my) for a head of radius `hr`. */
