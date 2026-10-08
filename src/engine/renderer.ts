@@ -3,7 +3,8 @@ import { companionFamily, drawCompanion, wantsCompanion } from "./skills/compani
 import { clamp, ease, lerp, mixHex, noise1, range, rgba, rng } from "./math";
 import { tokens } from "./grid";
 import { styleOf } from "./music";
-import { captionAt } from "./voice";
+import { captionAt, speechAt } from "./voice";
+import { setSpeech } from "./speech";
 import { PALETTES } from "./palettes";
 import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
@@ -77,6 +78,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   product?: boolean;
   cast?: VideoPlan["cast"];
   characters?: VideoPlan["characters"];
+  voiceover?: VideoPlan["voiceover"];
   render3d?: VideoPlan["render3d"];
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
@@ -454,6 +456,8 @@ export function renderScene(
   context: { prev?: { scene: Scene; index: number }; extendSelf?: boolean; music?: MusicPulse } = {},
 ) {
   const palette = brandPalette(plan.palette, plan.brand, schemeOf(plan));
+  // Lip-sync: what the narrator's mouth is doing now, for characters who speak the story.
+  setSpeech(plan.voiceover?.enabled && plan.scenes ? speechAt({ scenes: plan.scenes, bpm: plan.bpm ?? 120, voiceover: plan.voiceover }, globalT) : null);
   setBrandFont(brandFontReady(plan.brand?.font) ? plan.brand!.font! : null);
   // Trailers pair their title face with a contrasting subtitle face.
   setSubFamily(pairedSubFamily(plan.font, plan.style));

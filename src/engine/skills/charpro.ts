@@ -22,6 +22,7 @@
  * Every frame is a pure function of time (preview, seek and export match) and nothing flashes.
  */
 import { clamp, ease, lerp, mixHex, noise1, range, rgba, TAU } from "../math";
+import { speechNow } from "../speech";
 import { solid } from "./solid";
 import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
@@ -878,7 +879,13 @@ export function saccade(t: number, seed = 0) {
 }
 
 /** A talking mouth: syllable-like openings while `on` (0..1). */
-export const talking = (t: number, on: number) => on * clamp(0.15 + 0.85 * Math.abs(Math.sin(t * 11.3) * Math.sin(t * 4.1 + 1)));
+export const talking = (t: number, on: number) => {
+  // With a voice-over playing, the speaker's mouth follows the narrator: open with the voice,
+  // closed on m, b and p, a little narrower on e and round sounds.
+  const sp = speechNow();
+  if (sp && on > 0.3) return on * (sp.shape === "m" || sp.shape === "rest" ? 0.04 : clamp(sp.open * (sp.shape === "e" ? 0.75 : sp.shape === "o" ? 0.85 : 1)));
+  return on * clamp(0.15 + 0.85 * Math.abs(Math.sin(t * 11.3) * Math.sin(t * 4.1 + 1)));
+};
 
 /** Shoulder angle that points an arm from `sh` at a target. */
 export const aimAt = (sh: { x: number; y: number }, tx: number, ty: number) => Math.atan2(tx - sh.x, ty - sh.y);

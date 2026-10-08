@@ -8,6 +8,7 @@
  */
 import { revealHit } from "./arrange";
 import type { Scene, VideoPlan, VoiceSettings, VoiceSource } from "./types";
+import { visemeOf, type Speech, type Viseme } from "./speech";
 
 export type { VoiceSettings, VoiceSource };
 
@@ -390,6 +391,54 @@ export function fitScenesToVoice(plan: VideoPlan): VideoPlan {
     return { ...s, duration: Math.min(8, Math.ceil(need / beat) * beat) };
   });
   return changed ? { ...plan, scenes } : plan;
+}
+
+/** A clip's loudness envelope (100 per second) and its loud reference level, for lip-sync. */
+const envelopes = new WeakMap<Clip, { env: Float32Array; ref: number }>();
+function envelopeOf(clip: Clip) {
+  let e = envelopes.get(clip);
+  if (e) return e;
+  const hop = Math.max(1, Math.round(clip.rate / 100));
+  const n = Math.ceil(clip.samples.length / hop);
+  const env = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    let k = 0;
+    for (let j = Math.max(0, (i - 1) * hop); j < Math.min(clip.samples.length, (i + 1) * hop); j += 2) {
+      sum += clip.samples[j] * clip.samples[j];
+      k++;
+    }
+    env[i] = k ? Math.sqrt(sum / k) : 0;
+  }
+  const sorted = Array.from(env).filter((v) => v > 1e-4).sort((a, b) => a - b);
+  const ref = sorted.length ? sorted[Math.floor(sorted.length * 0.85)] : 1;
+  envelopes.set(clip, (e = { env, ref: Math.max(1e-4, ref) }));
+  return e;
+}
+
+/**
+ * The narrator's mouth at film time `t`: how open (from the voice's loudness) and its shape (from
+ * the letter being said in the current word). Null when no line is playing.
+ */
+export function speechAt(plan: Pick<VideoPlan, "scenes" | "bpm" | "voiceover">, t: number): Speech | null {
+  if (!plan.voiceover?.enabled) return null;
+  for (const cue of voiceTimeline(plan)) {
+    const lt = t - cue.start;
+    if (lt < 0 || lt > cue.clip.duration) continue;
+    const { env, ref } = envelopeOf(cue.clip);
+    const i = Math.min(env.length - 1, Math.max(0, Math.floor(lt * 100)));
+    const loud = (env[i] + env[Math.min(env.length - 1, i + 1)]) / 2;
+    const open = Math.min(1, Math.max(0, (loud / ref - 0.1) * 1.15));
+    const word = cue.clip.words.find((w) => lt >= w.t0 && lt <= w.t1);
+    let shape: Viseme = "rest";
+    if (word) {
+      const letters = word.w.toLowerCase().replace(/[^a-z]/g, "");
+      const k = (lt - word.t0) / Math.max(0.01, word.t1 - word.t0);
+      shape = visemeOf(letters[Math.min(letters.length - 1, Math.floor(k * letters.length))]);
+    }
+    return { open: word ? open : open * 0.3, shape };
+  }
+  return null;
 }
 
 /** The caption phrase on screen at film time `t`: up to ~6 words, with the word being spoken. */

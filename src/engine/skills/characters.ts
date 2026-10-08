@@ -18,6 +18,7 @@
  * export match), and nothing flashes.
  */
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
+import { drawTalk } from "./abspaint";
 import { solid } from "./solid";
 import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, fitTextLines, subFont } from "../text";
@@ -88,6 +89,8 @@ export interface Pose {
   /** Whole-body tilt (radians). */
   lean?: number;
   mouth?: "smile" | "grin" | "open" | "frown" | "o";
+  /** Speaks the story: with a voice-over playing, the mouth follows the narrator. */
+  talk?: boolean;
   /** 0 open … 1 closed. */
   blink?: number;
   /** Eyes left (−1) to right (1). */
@@ -385,8 +388,11 @@ function drawCharacterRaw(ctx: CanvasRenderingContext2D, x: number, footY: numbe
   ctx.strokeStyle = "#3a1d1d";
   ctx.fillStyle = "#4a1f24";
   ctx.lineWidth = headR * 0.075;
+  const spoke = !!pose.talk && drawTalk(ctx, x, my + headR * 0.04, headR, "#4a1f24", "#3a1d1d");
   ctx.beginPath();
-  switch (pose.mouth ?? "smile") {
+  switch (spoke ? "none" : pose.mouth ?? "smile") {
+    case "none":
+      break;
     case "grin":
       ctx.moveTo(x - mw, my - headR * 0.04);
       ctx.quadraticCurveTo(x, my + headR * 0.42, x + mw, my - headR * 0.04);
@@ -699,6 +705,7 @@ function charHello(sc: SkillContext) {
     armR: wv.arm,
     foreR: wv.fore,
     mouth: wk > 0.2 ? "grin" : "smile",
+    talk: true,
     blink: blinkAt(t),
     look: portrait ? 0 : 0.6,
     brows: 0.6,
@@ -822,6 +829,7 @@ function charPresenter(sc: SkillContext) {
     armR: clamp(armR, 0.1, 2.9),
     foreR: -0.05,
     mouth: cur >= 0 && (t - T[cur]) % 1 < 0.45 ? "open" : "smile",
+    talk: true,
     blink: blinkAt(t, 1),
     look: 0.8,
     brows: 0.3,
@@ -869,6 +877,7 @@ function charTeam(sc: SkillContext) {
       armR: side < 0 ? wv.arm : 0.22,
       foreR: side < 0 ? wv.fore : 0.15,
       mouth: talking ? "grin" : "smile",
+      talk: talking,
       blink: blinkAt(t, i * 1.7),
       look: cur >= 0 && !talking ? Math.sign(gapX * (cur - i)) * 0.8 : 0,
       brows: talking ? 0.7 : 0.2,

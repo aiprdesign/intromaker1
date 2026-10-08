@@ -26,6 +26,7 @@ import { fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
 import { pointTimes } from "./characters";
+import { speechNow, type Viseme } from "../speech";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 const plain = (s: string) => s.replace(/\*/g, "").trim();
@@ -1161,6 +1162,8 @@ interface Person3 {
   face: Program;
   mood: Mood;
   W: World;
+  /** Speaks the story: lip-syncs to the voice-over. */
+  talks?: boolean;
 }
 interface PersonLook {
   h: number;
@@ -1182,7 +1185,7 @@ interface PersonLook {
  * A face, drawn flat for printing on a head: dark oval eyes with a catch-light, soft brows, rosy
  * cheeks and a mouth, in the mood asked for (or blinking). The square spans the face's front.
  */
-function drawFace(mood: Mood, blink: boolean) {
+function drawFace(mood: Mood, blink: boolean, talk?: { shape: Viseme; level: number }) {
   const c = document.createElement("canvas");
   c.width = c.height = 256;
   const g = c.getContext("2d")!;
@@ -1241,7 +1244,41 @@ function drawFace(mood: Mood, blink: boolean) {
   }
   // Mouth.
   const my = 182;
-  if (mood === "smile") {
+  if (talk) {
+    // Speaking: the shape of the sound being said, opening with the voice (levels 1–3).
+    const lv = talk.level / 3;
+    g.fillStyle = "#6a2430";
+    g.beginPath();
+    if (talk.shape === "m" || talk.shape === "rest") {
+      g.strokeStyle = "#7a2e35";
+      g.lineWidth = 8;
+      g.moveTo(128 - 24, my - 6);
+      g.quadraticCurveTo(128, my + 6, 128 + 24, my - 6);
+      g.stroke();
+    } else if (talk.shape === "o") {
+      g.ellipse(128, my, 11 + lv * 5, 10 + lv * 16, 0, 0, Math.PI * 2);
+      g.fill();
+    } else {
+      const w = talk.shape === "e" ? 34 : 28;
+      const hh = talk.shape === "e" ? 6 + lv * 16 : 9 + lv * 30;
+      g.moveTo(128 - w, my - 10);
+      g.quadraticCurveTo(128, my - 15, 128 + w, my - 10);
+      g.quadraticCurveTo(128 + w * 0.85, my - 10 + hh, 128, my - 10 + hh * 1.05);
+      g.quadraticCurveTo(128 - w * 0.85, my - 10 + hh, 128 - w, my - 10);
+      g.fill();
+      g.save();
+      g.clip();
+      g.fillStyle = "#ffffff";
+      g.fillRect(128 - w, my - 18, w * 2, 8);
+      if (hh > 18) {
+        g.fillStyle = "#e8737a";
+        g.beginPath();
+        g.ellipse(128, my - 10 + hh, w * 0.5, hh * 0.35, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.restore();
+    }
+  } else if (mood === "smile") {
     g.strokeStyle = "#7a2e35";
     g.lineWidth = 8.5;
     g.beginPath();
@@ -1278,14 +1315,14 @@ function drawFace(mood: Mood, blink: boolean) {
 
 /** The faces' pictures, one per mood and blink, per world. */
 const facesByWorld = new WeakMap<World, Map<string, Texture>>();
-function faceTex(W: World, mood: Mood, blink: boolean) {
+function faceTex(W: World, mood: Mood, blink: boolean, talk?: { shape: Viseme; level: number }) {
   let m = facesByWorld.get(W);
   if (!m) facesByWorld.set(W, (m = new Map()));
-  const key = `${mood}|${blink}`;
+  const key = `${mood}|${blink}|${talk ? talk.shape + talk.level : ""}`;
   let tx = m.get(key);
   if (!tx) {
     const gl = W.gl;
-    m.set(key, (tx = new Texture(gl, { image: drawFace(mood, blink), generateMipmaps: true, minFilter: gl.LINEAR_MIPMAP_LINEAR, magFilter: gl.LINEAR })));
+    m.set(key, (tx = new Texture(gl, { image: drawFace(mood, blink, talk), generateMipmaps: true, minFilter: gl.LINEAR_MIPMAP_LINEAR, magFilter: gl.LINEAR })));
   }
   return tx;
 }
@@ -1295,7 +1332,10 @@ function express(P: Person3, t: number, phase: number, mood: Mood = P.mood) {
   const blink = mood !== "joy" && mood !== "laugh" && (t + phase * 1.37) % 3.4 < 0.12;
   // Laughing comes in bursts: the mouth opens and closes.
   const m: Mood = mood === "laugh" ? (Math.sin(t * 11 + phase) > -0.2 ? "laugh" : "joy") : mood;
-  P.face.uniforms.tMap.value = faceTex(P.W, m, blink);
+  // A speaker of the story lip-syncs to the voice-over while it plays.
+  const sp = P.talks ? speechNow() : null;
+  const talk = sp ? { shape: sp.open < 0.08 ? ("m" as Viseme) : sp.shape, level: Math.max(1, Math.min(3, Math.round(sp.open * 3))) } : undefined;
+  P.face.uniforms.tMap.value = faceTex(P.W, m === "joy" && talk ? "happy" : m, blink, talk);
 }
 
 /** A rounded limb: a tapered tube from the node down `len`, with round ends (a capsule). */
@@ -1456,6 +1496,9 @@ function happy(P: Person3, t: number, phase: number, wave = 0, mood?: Mood) {
   P.elbowR.rotation.x = lerp(-0.2, -0.05, wave);
   P.elbowR.rotation.z = lerp(0, 0.45 + Math.sin(t * 9 + phase) * 0.5, wave);
   express(P, t, phase, mood ?? (wave > 0.5 ? "joy" : P.mood));
+  // A speaker nods a little with the emphasis of the voice.
+  const sp = P.talks ? speechNow() : null;
+  if (sp) P.head.rotation.x -= sp.open * 0.07;
 }
 
 interface Dog3 {
@@ -1688,6 +1731,7 @@ function interiorWorld(W: World): InteriorParts {
   tree(W, W.scene, 17, -9, 1.3);
   // The family at home: dad on the sofa, mum beside it, their child on the rug with the dog.
   const family = FAMILY.map((L) => person3d(W, W.scene, L));
+  family[1].talks = true;
   sitDown(family[0], 0.68);
   family[0].root.position.set(-5.6, family[0].root.position.y, -2.95);
   family[1].root.position.set(-3.2, 0.2, -2.2);
@@ -1840,6 +1884,7 @@ function welcomeWorld(W: World) {
   const parts = homeWorld(W);
   const fam = node(W.scene);
   const family = FAMILY.map((L) => person3d(W, fam, L));
+  family[1].talks = true;
   const xs = [0.55, 1.9, 1.25];
   family.forEach((P, i) => P.root.position.set(xs[i], 0.05, i === 2 ? 6.9 : 6.3));
   const dog = dog3d(W, fam, "#c98f4f", "#7a4f2a", "#7c5cff");

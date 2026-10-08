@@ -139,6 +139,8 @@ export interface AbsPose {
   mouth?: "smile" | "open" | "flat" | "o";
   /** The feeling the face shows (eyes and brows): unset follows the mouth (open → happy, o → surprised). */
   mood?: "calm" | "happy" | "joy" | "surprised" | "thinking";
+  /** This character speaks the story: with a voice-over playing, the mouth follows the narrator. */
+  talk?: boolean;
   blink?: number;
   look?: number;
   /** Mirror (face left). */
@@ -511,6 +513,7 @@ function absHello(sc: SkillContext) {
     squash: b.squash + id.squash,
     mouth: wk > 0.3 ? "open" : "smile",
     mood: wk > 0.3 ? "joy" : "happy",
+    talk: true,
     blink: blinkAt(t, 0.5),
     look: portrait ? 0 : 0.6,
   });
@@ -740,6 +743,7 @@ function absChat(sc: SkillContext) {
       lift: id.lift + (speaking ? Math.max(0, Math.sin(t * 6)) * 0.01 : 0),
       squash: b.squash + id.squash,
       mouth: speaking ? (Math.sin(t * 12) > 0 ? "open" : "o") : "smile",
+      talk: speaking,
       blink: blinkAt(t, i * 1.6),
       look: i === 0 ? 0.9 : -0.9,
     });

@@ -17,7 +17,7 @@
 import { clamp, lerp, mixHex, TAU } from "../math";
 import type { CastMember } from "../types";
 import type { AbsPose, AbsRig } from "./abstract";
-import { beginFigure, brow, drawFace, drawHeadHair, drawMouth, feelOf, hairTop, INK, joyEye, painter, sitLeg, taperPath, type Painter } from "./abspaint";
+import { beginFigure, brow, drawFace, drawTalk, drawHeadHair, drawMouth, feelOf, hairTop, INK, joyEye, painter, sitLeg, taperPath, type Painter } from "./abspaint";
 
 type Pt = { x: number; y: number };
 
@@ -383,7 +383,7 @@ export function drawBlob(ctx: CanvasRenderingContext2D, x: number, groundY: numb
     ctx.lineTo(x + sp - er * 1.4, eyeY);
     ctx.stroke();
   }
-  drawMouth(ctx, x + lk, eyeY + er * 2.1, er * 1.9, pose.mouth ?? "smile");
+  if (!(pose.talk && drawTalk(ctx, x + lk, eyeY + er * 2.1, er * 1.9))) drawMouth(ctx, x + lk, eyeY + er * 2.1, er * 1.9, pose.mouth ?? "smile");
   ctx.restore();
   const headR = bw * 0.42;
   return { head: { x, y: eyeY, r: headR }, top: topY - (c.hair === "none" ? 0 : s * 0.4), ...hands(x, pose.flip, l, r) };
@@ -491,8 +491,11 @@ export function drawStick(ctx: CanvasRenderingContext2D, x: number, groundY: num
   }
   const my = headY + hr * 0.38;
   const mx = x + lk;
+  const spoke = pose.talk && drawTalk(ctx, mx, my, hr, lc, lc);
   ctx.beginPath();
-  switch (pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile")) {
+  switch (spoke ? "none" : pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile")) {
+    case "none":
+      break;
     case "open":
       ctx.moveTo(mx - hr * 0.28, my - hr * 0.04);
       ctx.quadraticCurveTo(mx, my + hr * 0.4, mx + hr * 0.28, my - hr * 0.04);
@@ -701,7 +704,9 @@ export function drawClassic(ctx: CanvasRenderingContext2D, x: number, groundY: n
   const mouth = pose.mouth ?? "smile";
   ctx.strokeStyle = INK;
   ctx.lineWidth = Math.max(1.5, hr * 0.06);
-  if (mouth === "open") {
+  if (pose.talk && drawTalk(ctx, x + lk, my, hr * 1.2)) {
+    // (Speaking the story: the mouth follows the narrator.)
+  } else if (mouth === "open") {
     ctx.beginPath();
     ctx.moveTo(x - hr * 0.38 + lk, my - hr * 0.04);
     ctx.quadraticCurveTo(x + lk, my + hr * 0.55, x + hr * 0.38 + lk, my - hr * 0.04);

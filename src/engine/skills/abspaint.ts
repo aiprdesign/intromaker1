@@ -4,6 +4,7 @@
  * minimal face, tapered limbs, and the figure's ground shadow and squash.
  */
 import { clamp, mixHex, TAU } from "../math";
+import { speechNow } from "../speech";
 import type { ArtStyle, CastMember } from "../types";
 import type { AbsPose } from "./abstract";
 
@@ -324,7 +325,51 @@ export function drawFace(ctx: CanvasRenderingContext2D, x: number, headY: number
     ctx.quadraticCurveTo(x + lk * 1.2 + hr * 0.1, headY + hr * 0.32, x + lk * 1.2 - hr * 0.02, headY + hr * 0.36);
     ctx.stroke();
   }
-  drawMouth(ctx, x + lk, headY + hr * 0.55, hr, pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile"));
+  if (!(pose.talk && drawTalk(ctx, x + lk, headY + hr * 0.55, hr))) drawMouth(ctx, x + lk, headY + hr * 0.55, hr, pose.mouth ?? (feel === "surprised" ? "o" : feel === "joy" ? "open" : "smile"));
+}
+
+/**
+ * A speaking mouth centred at (x, my) for a head of radius `hr`, shaped by the narrator's speech:
+ * open for a, wide for e, round for o, closed for m, b and p. True when it drew.
+ */
+export function drawTalk(ctx: CanvasRenderingContext2D, x: number, my: number, hr: number, fill = "#3a1220", line = INK): boolean {
+  const sp = speechNow();
+  if (!sp) return false;
+  const o = clamp(sp.open);
+  ctx.save();
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = line;
+  ctx.lineWidth = Math.max(1.5, hr * 0.09);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  if (sp.shape === "m" || sp.shape === "rest" || o < 0.08) {
+    // Lips together, a soft smile.
+    ctx.moveTo(x - hr * 0.2, my);
+    ctx.quadraticCurveTo(x, my + hr * 0.12, x + hr * 0.2, my);
+    ctx.stroke();
+  } else if (sp.shape === "o") {
+    ctx.ellipse(x, my + hr * 0.06, hr * (0.08 + 0.04 * o), hr * (0.07 + 0.13 * o), 0, 0, TAU);
+    ctx.fill();
+  } else {
+    const wide = sp.shape === "e" ? 0.27 : 0.23;
+    const tall = sp.shape === "e" ? 0.04 + 0.14 * o : 0.07 + 0.28 * o;
+    ctx.moveTo(x - hr * wide, my - hr * 0.02);
+    ctx.quadraticCurveTo(x, my - hr * 0.06, x + hr * wide, my - hr * 0.02);
+    ctx.quadraticCurveTo(x + hr * wide * 0.85, my + hr * tall, x, my + hr * tall * 1.1);
+    ctx.quadraticCurveTo(x - hr * wide * 0.85, my + hr * tall, x - hr * wide, my - hr * 0.02);
+    ctx.fill();
+    if (tall > 0.12) {
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = "#e8737a";
+      ctx.beginPath();
+      ctx.ellipse(x, my + hr * tall * 1.05, hr * wide * 0.55, hr * tall * 0.45, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+  return true;
 }
 
 /** A simple mouth centred at (x, my) for a head of radius `hr`. */
