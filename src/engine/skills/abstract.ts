@@ -19,6 +19,7 @@
  * - abs-cheer:    a crowd jumps and cheers around the call-to-action button.
  */
 import { BODIES, HAIR_STYLES, HAIRS, introColors, matchColors, NEUTRALS, PLAYFUL_SKINS, SKINS } from "../cast";
+import { solid } from "./solid";
 import { clamp, ease, hashString, lerp, mixHex, rgba, rng, TAU } from "../math";
 import { saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
@@ -138,7 +139,12 @@ export interface AbsRig {
 }
 
 /** Draw a generated character standing on `groundY` at `x`, `H` tall (a unit; shapes vary). */
+/** Draw the character; while fading it fades as one solid piece (see solid.ts). */
 export function drawAbstract(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: AbsSpec, pose: AbsPose): AbsRig {
+  return solid(ctx, (c2) => drawAbstractRaw(c2, x, groundY, H, c, pose));
+}
+
+function drawAbstractRaw(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, c: AbsSpec, pose: AbsPose): AbsRig {
   // The other kinds of character (abskinds.ts) take the same design and pose.
   if (c.kind && c.kind !== "abstract") return KIND_DRAW[c.kind](ctx, x, groundY, H, c, pose);
   const legLen = c.legLen * H;

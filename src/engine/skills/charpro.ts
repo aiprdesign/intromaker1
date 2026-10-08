@@ -22,6 +22,7 @@
  * Every frame is a pure function of time (preview, seek and export match) and nothing flashes.
  */
 import { clamp, ease, lerp, mixHex, noise1, range, rgba, TAU } from "../math";
+import { solid } from "./solid";
 import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -221,7 +222,12 @@ function drawHand(ctx: CanvasRenderingContext2D, wx: number, wy: number, a: numb
  * Draw an advanced character with its feet on `groundY` at `x`, `H` tall (crown to sole when
  * standing). Returns its head, hands and shoulders, for bubbles, props and pointing.
  */
+/** Draw the character; while fading it fades as one solid piece (see solid.ts). */
 export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, look: ProLook, pose: ProPose): ProRig {
+  return solid(ctx, (c2) => drawProRaw(c2, x, groundY, H, look, pose));
+}
+
+function drawProRaw(ctx: CanvasRenderingContext2D, x: number, groundY: number, H: number, look: ProLook, pose: ProPose): ProRig {
   const f = clamp(pose.facing, -1, 1);
   const af = Math.abs(f);
   const fs = f >= 0 ? 1 : -1;
@@ -392,11 +398,13 @@ export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: numbe
   // Hair behind the head.
   ctx.fillStyle = shade(look.hair, 0.1);
   if (look.hairStyle === "long") {
+    // Rounded over the crown (no square corners), falling to the shoulders.
+    const lx = headX + f * headR * 0.1;
     ctx.beginPath();
-    ctx.moveTo(headX - headR * 1.12 + f * headR * 0.1, headY - headR * 0.2);
-    ctx.bezierCurveTo(headX - headR * 1.3, headY + headR * 1.4, headX - headR * 1.05, headY + headR * 2.3, headX - headR * 0.6, headY + headR * 2.35);
-    ctx.lineTo(headX + headR * 0.6, headY + headR * 2.35);
-    ctx.bezierCurveTo(headX + headR * 1.05, headY + headR * 2.3, headX + headR * 1.3, headY + headR * 1.4, headX + headR * 1.12 + f * headR * 0.1, headY - headR * 0.2);
+    ctx.arc(lx, headY + headR * 0.02, headR * 1.03, Math.PI, 0);
+    ctx.bezierCurveTo(headX + headR * 1.32, headY + headR * 1.4, headX + headR * 1.05, headY + headR * 2.3, headX + headR * 0.6, headY + headR * 2.35);
+    ctx.lineTo(headX - headR * 0.6, headY + headR * 2.35);
+    ctx.bezierCurveTo(headX - headR * 1.05, headY + headR * 2.3, headX - headR * 1.3, headY + headR * 1.4, lx - headR * 1.03, headY + headR * 0.02);
     ctx.closePath();
     ctx.fill();
   } else if (look.hairStyle === "bob") {
@@ -587,7 +595,7 @@ export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: numbe
   ctx.closePath();
   ctx.fill();
   if (look.hairStyle !== "buzz") {
-    ctx.fillStyle = shade(look.skin, 0.2);
+    ctx.fillStyle = shade(look.skin, 0.09);
     ctx.beginPath();
     ctx.moveTo(-R * 1.1, -R * 0.3);
     ctx.quadraticCurveTo(-R * 0.6, -R * 0.36, -R * 0.15 + fx * 0.4, -R * 0.22);
@@ -786,16 +794,36 @@ export function drawPro(ctx: CanvasRenderingContext2D, x: number, groundY: numbe
     }
     ctx.closePath();
     ctx.fill();
-    // Highlight streak along the crown.
+    // Highlight streak along the crown, kept inside the hair (never floating above it).
+    ctx.save();
+    ctx.clip();
     ctx.strokeStyle = rgba(light(look.hair, 0.4), 0.55);
     ctx.lineWidth = R * 0.1;
     ctx.beginPath();
-    ctx.arc(hx - R * 0.1, -R * 0.1, R * 0.92, Math.PI * 1.18, Math.PI * 1.42);
+    ctx.arc(hx - R * 0.1, -R * 0.05, R * 0.82, Math.PI * 1.18, Math.PI * 1.42);
     ctx.stroke();
     ctx.lineWidth = R * 0.05;
     ctx.beginPath();
-    ctx.arc(hx - R * 0.1, -R * 0.1, R * 0.92, Math.PI * 1.48, Math.PI * 1.56);
+    ctx.arc(hx - R * 0.1, -R * 0.05, R * 0.82, Math.PI * 1.48, Math.PI * 1.56);
     ctx.stroke();
+    ctx.restore();
+    // Turned to the side, the hair covers the back of the head down to the nape (not a bowl on top).
+    if (af > 0.02) {
+      const bs = -fs;
+      const b = lerp(1.15, 0.18, af);
+      ctx.save();
+      face();
+      ctx.clip();
+      ctx.fillStyle = look.hair;
+      ctx.beginPath();
+      ctx.moveTo(hx + bs * R * b, -R * 1.4);
+      ctx.bezierCurveTo(hx + bs * R * (b - 0.05), -R * 0.6, hx + bs * R * (b + 0.05), R * 0.15, hx + bs * R * (b + 0.4), R * 0.8);
+      ctx.lineTo(bs * R * 2.5, R * 1.4);
+      ctx.lineTo(bs * R * 2.5, -R * 1.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
   }
   ctx.restore();
 

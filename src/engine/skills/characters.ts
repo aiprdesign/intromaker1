@@ -18,6 +18,7 @@
  * export match), and nothing flashes.
  */
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
+import { solid } from "./solid";
 import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, fitTextLines, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -136,7 +137,12 @@ export const blinkAt = (t: number, seed = 0) => {
  * Draw a character standing with its feet at (x, footY), `H` tall. Returns where its head and
  * hands are, for speech bubbles, thought clouds and props.
  */
+/** Draw the character; while fading it fades as one solid piece (see solid.ts). */
 export function drawCharacter(ctx: CanvasRenderingContext2D, x: number, footY: number, H: number, look: CharLook, pose: Pose) {
+  return solid(ctx, (c2) => drawCharacterRaw(c2, x, footY, H, look, pose));
+}
+
+function drawCharacterRaw(ctx: CanvasRenderingContext2D, x: number, footY: number, H: number, look: CharLook, pose: Pose) {
   const headR = H * 0.165;
   const legLen = H * 0.3;
   const torsoH = H * 0.3;

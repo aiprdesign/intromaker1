@@ -584,7 +584,11 @@ export default function Studio() {
       /* ignore */
     }
     const kind = v === "auto" ? characterPick(planRef.current)?.characters : v === "own" ? undefined : v;
-    setPlan((p) => (p.style === "saas" && p.template ? applyBackground(applyTemplate({ ...p, characters: kind }, p.template, { palette: palette !== "auto" ? palette : undefined }), bgRef.current) : p));
+    // (The style showing in the panel is the one to restyle, even if the video hasn't recorded it.)
+    setPlan((p) => {
+      const tid = templateRef.current || p.template;
+      return p.style === "saas" && tid ? applyBackground(applyTemplate({ ...p, characters: kind }, tid, { palette: palette !== "auto" ? palette : undefined }), bgRef.current) : { ...p, characters: kind };
+    });
     setVersion((n) => n + 1);
   };
   /** The trailer style matched to this film's product (what Auto uses). */
