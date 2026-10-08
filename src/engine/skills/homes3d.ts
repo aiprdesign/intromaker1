@@ -1153,6 +1153,9 @@ interface Person3 {
   kneeL: Transform;
   kneeR: Transform;
   head: Transform;
+  elbowL: Transform;
+  elbowR: Transform;
+  torso: Transform;
   h: number;
   /** The printed face (its picture changes with the mood). */
   face: Program;
@@ -1169,6 +1172,10 @@ interface PersonLook {
   shoes?: string;
   child?: boolean;
   mood?: Mood;
+  /** A dress (a soft flared skirt to the knee) instead of trousers. */
+  dress?: boolean;
+  /** Hair tied back in a ponytail. */
+  ponytail?: boolean;
 }
 
 /**
@@ -1291,83 +1298,133 @@ function express(P: Person3, t: number, phase: number, mood: Mood = P.mood) {
   P.face.uniforms.tMap.value = faceTex(P.W, m, blink);
 }
 
+/** A rounded limb: a tapered tube from the node down `len`, with round ends (a capsule). */
+function limb(W: World, parent: Transform, r0: number, r1: number, len: number, m: Program) {
+  const { gl } = W;
+  W.mesh(cylinder(gl, r0, r1, len, 16), m, parent).position.y = -len / 2;
+  W.mesh(sphere(gl, r0, 14, 10), m, parent);
+  W.mesh(sphere(gl, r1, 14, 10), m, parent).position.y = -len;
+}
+
 /**
- * A friendly abstract person in 3D (faces +z): a rounded pill of a body, a big round head with a
- * printed, expressive face, and jointed hips, knees and shoulders so they can sit and wave.
+ * A friendly abstract person in 3D (faces +z), like a polished toy: a soft bean of a body, chunky
+ * rounded limbs with elbows and knees, mitten hands, sneakers with white soles, a collar, styled
+ * hair and a big round head with a printed, expressive face.
  */
 function person3d(W: World, parent: Transform, L: PersonLook): Person3 {
   const { gl } = W;
   const h = L.h;
   const root = node(parent);
-  const legLen = h * (L.child ? 0.38 : 0.44);
+  const legLen = h * (L.child ? 0.36 : 0.43);
   const thigh = legLen * 0.5;
   const shin = legLen * 0.5;
-  const torsoH = h * (L.child ? 0.28 : 0.3);
-  const torsoR = h * (L.child ? 0.125 : 0.11);
-  const headR = h * (L.child ? 0.115 : 0.085);
-  const r = h * 0.042;
+  const torsoH = h * (L.child ? 0.29 : 0.31);
+  const torsoR = h * (L.child ? 0.13 : 0.115);
+  const headR = h * (L.child ? 0.12 : 0.088);
+  const r = h * (L.child ? 0.05 : 0.046);
   const shirt = mc(W, L.shirt, 0.3);
+  const shirtLight = mc(W, mixHex(L.shirt, "#ffffff", 0.35), 0.3);
   const pants = mc(W, L.pants, 0.25);
-  const skin = mc(W, L.skin, 0.35);
-  const hair = mc(W, L.hair, 0.45);
-  const shoes = mc(W, L.shoes ?? "#2b2a30", 0.55);
+  const skin = mc(W, L.skin, 0.38);
+  const hair = mc(W, L.hair, 0.5);
+  const shoes = mc(W, L.shoes ?? "#33313a", 0.55);
+  const sole = mc(W, "#f4f2ee", 0.3);
   const legs = [-1, 1].map((sd) => {
     const hip = node(root);
-    hip.position.set(sd * torsoR * 0.46, legLen, 0);
-    W.mesh(cylinder(gl, r * 1.15, r * 1.0, thigh, 14), pants, hip).position.y = -thigh / 2;
+    hip.position.set(sd * torsoR * 0.44, legLen, 0);
+    limb(W, hip, r * 1.12, r * 0.98, thigh, L.dress ? skin : pants);
     const knee = node(hip);
     knee.position.y = -thigh;
-    W.mesh(sphere(gl, r * 1.02, 12, 8), pants, knee);
-    W.mesh(cylinder(gl, r, r * 0.88, shin, 14), pants, knee).position.y = -shin / 2;
-    // A rounded shoe.
-    const shoe = W.mesh(sphere(gl, r * 1.25, 14, 10), shoes, knee);
-    shoe.position.set(0, -shin + r * 0.35, r * 0.75);
-    shoe.scale.set(1, 0.62, 1.55);
+    limb(W, knee, r * 0.98, r * 0.86, shin - r * 0.5, L.dress ? skin : pants);
+    // A sneaker: a rounded upper on a white sole.
+    const shoe = W.mesh(sphere(gl, r * 1.3, 16, 12), shoes, knee);
+    shoe.position.set(0, -shin + r * 0.45, r * 0.7);
+    shoe.scale.set(1, 0.68, 1.6);
+    const so = W.mesh(cylinder(gl, r * 1.2, r * 1.25, r * 0.3, 18), sole, knee);
+    so.position.set(0, -shin + r * 0.08, r * 0.7);
+    so.scale.set(1, 1, 1.55);
     return { hip, knee };
   });
-  // The body: a soft pill, wider at the hips, rounded shoulders, a waist in the trousers' colour.
-  const waist = W.mesh(sphere(gl, torsoR * 0.98, 20, 12), pants, root);
-  waist.position.y = legLen + torsoR * 0.12;
-  waist.scale.set(1, 0.55, 0.86);
-  W.mesh(cylinder(gl, torsoR * 0.9, torsoR, torsoH, 22), shirt, root).position.y = legLen + torsoH / 2;
-  const top = W.mesh(sphere(gl, torsoR * 0.9, 22, 12), shirt, root);
-  top.position.y = legLen + torsoH;
-  top.scale.set(1, 0.5, 0.86);
-  // The head: big and round, with hair and a printed face.
-  const head = node(root);
-  head.position.y = legLen + torsoH + headR * 1.18;
-  W.mesh(cylinder(gl, headR * 0.36, headR * 0.4, headR * 0.6, 12), skin, head).position.y = -headR * 0.95;
-  W.mesh(sphere(gl, headR, 28, 20), skin, head);
+  // The body: a soft bean (breathing gently), the hips in the trousers' colour or a flared dress.
+  const torso = node(root);
+  torso.position.y = legLen;
+  if (L.dress) {
+    const skirt = W.mesh(cylinder(gl, torsoR * 0.92, torsoR * 1.45, thigh * 1.25, 24), shirt, torso);
+    skirt.position.y = -thigh * 0.5;
+  } else {
+    const hips = W.mesh(sphere(gl, torsoR * 0.98, 22, 14), pants, torso);
+    hips.position.y = torsoR * 0.1;
+    hips.scale.set(1, 0.6, 0.86);
+  }
+  const bean = W.mesh(sphere(gl, torsoR, 28, 20), shirt, torso);
+  bean.position.y = torsoH * 0.52;
+  bean.scale.set(1, (torsoH * 0.56) / torsoR, 0.84);
+  // A collar and the neck.
+  const collar = W.mesh(cylinder(gl, torsoR * 0.42, torsoR * 0.5, torsoR * 0.14, 20), shirtLight, torso);
+  collar.position.y = torsoH * 1.02;
+  W.mesh(cylinder(gl, headR * 0.34, headR * 0.38, headR * 0.5, 14), skin, torso).position.y = torsoH * 1.08;
+  // The head: big and round, with ears, hair and a printed face.
+  const head = node(torso);
+  head.position.y = torsoH + headR * 1.12;
+  W.mesh(sphere(gl, headR, 30, 22), skin, head);
   for (const sd of [-1, 1]) {
-    const ear = W.mesh(sphere(gl, headR * 0.2, 10, 8), skin, head);
-    ear.position.set(sd * headR * 0.98, -headR * 0.05, 0);
-    ear.scale.set(0.6, 1, 0.8);
+    const ear = W.mesh(sphere(gl, headR * 0.2, 12, 8), skin, head);
+    ear.position.set(sd * headR * 0.97, -headR * 0.06, 0);
+    ear.scale.set(0.55, 1, 0.8);
   }
-  const cap = W.mesh(sphere(gl, headR * 1.06, 24, 16), hair, head);
-  cap.position.set(0, headR * (L.style === "curly" ? 0.26 : 0.24), -headR * 0.12);
-  cap.scale.set(L.style === "curly" ? 1.16 : 1.03, L.style === "curly" ? 0.96 : 0.8, 1.02);
+  const cap = W.mesh(sphere(gl, headR * 1.06, 26, 18), hair, head);
+  cap.position.set(0, headR * 0.24, -headR * 0.12);
+  cap.scale.set(1.03, 0.8, 1.02);
+  if (L.style === "short") {
+    // A side-swept fringe.
+    const fr = W.mesh(sphere(gl, headR * 0.5, 16, 12), hair, head);
+    fr.position.set(-headR * 0.32, headR * 0.62, headR * 0.55);
+    fr.scale.set(1.4, 0.55, 0.8);
+  }
   if (L.style === "long") {
-    const back = W.mesh(sphere(gl, headR * 1.02, 20, 14), hair, head);
-    back.position.set(0, -headR * 0.35, -headR * 0.28);
-    back.scale.set(1.02, 1.25, 0.75);
+    const back = W.mesh(sphere(gl, headR * 1.02, 22, 16), hair, head);
+    back.position.set(0, -headR * 0.3, -headR * 0.3);
+    back.scale.set(1.04, 1.3, 0.72);
+    for (const sd of [-1, 1]) {
+      const lock = W.mesh(sphere(gl, headR * 0.42, 14, 10), hair, head);
+      lock.position.set(sd * headR * 0.86, -headR * 0.42, headR * 0.05);
+      lock.scale.set(0.55, 1.5, 0.7);
+    }
   }
+  if (L.ponytail)
+    [0.42, 0.34, 0.26].forEach((rr, i) => W.mesh(sphere(gl, headR * rr, 14, 10), hair, head).position.set(0, headR * (0.45 - i * 0.42), -headR * (1.02 + i * 0.12)));
   if (L.style === "bun") W.mesh(sphere(gl, headR * 0.42, 14, 10), hair, head).position.set(0, headR * 0.98, -headR * 0.5);
+  if (L.style === "curly") {
+    // Curls: a cluster of little balls over the top.
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * TAU;
+      const ring = i % 2 ? 0.62 : 0.92;
+      const c = W.mesh(sphere(gl, headR * 0.34, 12, 9), hair, head);
+      c.position.set(Math.cos(a) * headR * ring, headR * (0.55 + (i % 3) * 0.12), Math.sin(a) * headR * ring - headR * 0.12);
+    }
+  }
   const face = W.mat({ color: "#ffffff", kind: "decal" });
   W.mesh(sphereCap(gl, headR * 1.006, headR * 0.74), face, head, false);
-  // Arms: a sleeve, an elbow, a forearm and a round hand.
-  const armLen = h * (L.child ? 0.3 : 0.34);
+  // Arms: a sleeve to the elbow, then the forearm and a mitten hand with a thumb.
+  const armLen = h * (L.child ? 0.3 : 0.33);
+  const upper = armLen * 0.48;
+  const fore = armLen * 0.52;
   const arms = [-1, 1].map((sd) => {
-    const sh = node(root);
-    sh.position.set(sd * torsoR * 1.0, legLen + torsoH * 0.9, 0);
-    W.mesh(sphere(gl, r * 1.05, 12, 8), shirt, sh);
-    W.mesh(cylinder(gl, r * 1.0, r * 0.88, armLen * 0.5, 14), shirt, sh).position.y = -armLen * 0.25;
-    W.mesh(sphere(gl, r * 0.86, 12, 8), skin, sh).position.y = -armLen * 0.5;
-    W.mesh(cylinder(gl, r * 0.84, r * 0.72, armLen * 0.5, 14), skin, sh).position.y = -armLen * 0.75;
-    W.mesh(sphere(gl, r * 1.12, 12, 10), skin, sh).position.y = -armLen;
-    sh.rotation.z = sd * 0.08;
-    return sh;
+    const sh = node(torso);
+    sh.position.set(sd * torsoR * 0.98, torsoH * 0.9, 0);
+    limb(W, sh, r * 1.0, r * 0.9, upper, shirt);
+    const el = node(sh);
+    el.position.y = -upper;
+    limb(W, el, r * 0.82, r * 0.74, fore - r, skin);
+    const hand = W.mesh(sphere(gl, r * 1.12, 14, 10), skin, el);
+    hand.position.y = -fore;
+    hand.scale.set(0.9, 1.1, 0.75);
+    W.mesh(sphere(gl, r * 0.42, 10, 8), skin, el).position.set(-sd * r * 0.2, -fore + r * 0.35, r * 0.75);
+    sh.rotation.z = sd * 0.1;
+    el.rotation.x = -0.18;
+    return { sh, el };
   });
-  const P: Person3 = { root, armL: arms[0], armR: arms[1], hipL: legs[0].hip, hipR: legs[1].hip, kneeL: legs[0].knee, kneeR: legs[1].knee, head, h, face, mood: L.mood ?? "happy", W };
+  const P: Person3 = { root, armL: arms[0].sh, armR: arms[1].sh, elbowL: arms[0].el, elbowR: arms[1].el, hipL: legs[0].hip, hipR: legs[1].hip, kneeL: legs[0].knee, kneeR: legs[1].knee, head, torso, h, face, mood: L.mood ?? "happy", W };
   express(P, 0, 0);
   return P;
 }
@@ -1381,15 +1438,23 @@ function sitDown(P: Person3, seatY: number) {
 }
 
 /**
- * A happy idle: a little bounce and sway, a blink now and then; `wave` raises the right arm and
- * waves it, overjoyed. `mood` sets the face (the person's own by default).
+ * A happy idle: breathing, a little weight shift and nod, arms relaxed with soft elbows, a blink
+ * now and then; `wave` raises the right arm and waves from the elbow, overjoyed. `mood` sets the
+ * face (the person's own by default).
  */
 function happy(P: Person3, t: number, phase: number, wave = 0, mood?: Mood) {
+  const breathe = Math.sin(t * 2.1 + phase);
+  P.torso.scale.set(1 + breathe * 0.008, 1 + breathe * 0.012, 1 + breathe * 0.008);
+  P.torso.rotation.z = Math.sin(t * 0.8 + phase) * 0.03;
   P.head.rotation.z = Math.sin(t * 1.6 + phase) * 0.07;
-  P.head.rotation.y = Math.sin(t * 0.9 + phase) * 0.14;
-  P.head.rotation.x = -0.05 + Math.sin(t * 1.2 + phase) * 0.04;
-  P.armL.rotation.z = -0.1 - Math.sin(t * 1.3 + phase) * 0.05;
-  P.armR.rotation.z = lerp(0.1 + Math.sin(t * 1.3 + phase) * 0.05, 2.7 + Math.sin(t * 9 + phase) * 0.28, wave);
+  P.head.rotation.y = Math.sin(t * 0.9 + phase) * 0.16;
+  P.head.rotation.x = -0.04 + Math.sin(t * 1.25 + phase) * 0.05;
+  P.armL.rotation.z = -0.12 - Math.sin(t * 1.3 + phase) * 0.05;
+  P.elbowL.rotation.x = -0.2 - Math.sin(t * 1.1 + phase) * 0.06;
+  // The wave: the arm up and out, the forearm swinging side to side from the elbow.
+  P.armR.rotation.z = lerp(0.12 + Math.sin(t * 1.3 + phase) * 0.05, 2.55, wave);
+  P.elbowR.rotation.x = lerp(-0.2, -0.05, wave);
+  P.elbowR.rotation.z = lerp(0, 0.45 + Math.sin(t * 9 + phase) * 0.5, wave);
   express(P, t, phase, mood ?? (wave > 0.5 ? "joy" : P.mood));
 }
 
@@ -1399,51 +1464,61 @@ interface Dog3 {
   head: Transform;
 }
 
-/** A happy dog in 3D (faces +x): floppy ears, a tongue out and a tail that wags. */
+/** A happy dog in 3D (faces +x): a smooth body, droopy ears, a shiny nose, tongue out, a fluffy tail that wags. */
 function dog3d(W: World, parent: Transform, coat: string, ears: string, collar: string): Dog3 {
   const { gl } = W;
   const root = node(parent);
-  const fur = mc(W, coat, 0.3);
+  const fur = mc(W, coat, 0.32);
   const fur2 = mc(W, ears, 0.3);
-  const dark = mc(W, "#1f1a18", 0.7);
-  const body = W.mesh(sphere(gl, 0.26, 20, 14), fur, root);
-  body.position.set(0, 0.44, 0);
-  body.scale.set(1.35, 0.82, 0.78);
-  W.mesh(sphere(gl, 0.2, 16, 12), fur, root).position.set(0.24, 0.5, 0);
-  const neck = W.mesh(cylinder(gl, 0.13, 0.13, 0.05, 18), mc(W, collar, 0.5), root);
-  neck.position.set(0.36, 0.62, 0);
+  const belly = mc(W, mixHex(coat, "#ffffff", 0.45), 0.3);
+  const dark = mc(W, "#1f1a18", 0.85);
+  // The body: one smooth bean from chest to rump, a lighter chest.
+  const body = W.mesh(sphere(gl, 0.27, 24, 16), fur, root);
+  body.position.set(-0.02, 0.45, 0);
+  body.scale.set(1.45, 0.86, 0.8);
+  const chest = W.mesh(sphere(gl, 0.17, 18, 12), belly, root);
+  chest.position.set(0.26, 0.44, 0);
+  chest.scale.set(0.8, 1.1, 0.95);
+  const neck = W.mesh(cylinder(gl, 0.125, 0.125, 0.05, 20), mc(W, collar, 0.5), root);
+  neck.position.set(0.33, 0.62, 0);
   neck.rotation.z = -0.9;
+  W.mesh(sphere(gl, 0.03, 10, 8), mc(W, "#f2c14e", 0.8), root).position.set(0.42, 0.55, 0);
   const head = node(root);
-  head.position.set(0.42, 0.74, 0);
-  W.mesh(sphere(gl, 0.16, 18, 14), fur, head);
-  const snout = W.mesh(sphere(gl, 0.09, 14, 10), fur, head);
+  head.position.set(0.42, 0.75, 0);
+  const skull = W.mesh(sphere(gl, 0.165, 22, 16), fur, head);
+  skull.scale.set(1, 0.95, 0.95);
+  const snout = W.mesh(sphere(gl, 0.095, 16, 12), belly, head);
   snout.position.set(0.14, -0.05, 0);
-  snout.scale.set(1.35, 0.8, 0.95);
-  W.mesh(sphere(gl, 0.035, 10, 8), dark, head).position.set(0.26, -0.02, 0);
+  snout.scale.set(1.35, 0.78, 0.95);
+  W.mesh(sphere(gl, 0.04, 12, 10), dark, head).position.set(0.265, -0.015, 0);
   for (const sd of [-1, 1]) {
-    W.mesh(sphere(gl, 0.03, 10, 8), dark, head).position.set(0.11, 0.05, sd * 0.08);
-    W.mesh(sphere(gl, 0.009, 6, 4), mc(W, "#ffffff", 0.6), head).position.set(0.135, 0.065, sd * 0.085);
-    const ear = W.mesh(sphere(gl, 0.08, 12, 10), fur2, head);
-    ear.position.set(-0.02, -0.02, sd * 0.15);
-    ear.scale.set(0.55, 1.35, 0.35);
-    ear.rotation.x = sd * 0.25;
+    W.mesh(sphere(gl, 0.032, 12, 10), dark, head).position.set(0.11, 0.05, sd * 0.085);
+    W.mesh(sphere(gl, 0.01, 6, 4), mc(W, "#ffffff", 0.6), head).position.set(0.137, 0.066, sd * 0.09);
+    // Droopy ears hanging by the cheeks.
+    const ear = W.mesh(sphere(gl, 0.085, 14, 10), fur2, head);
+    ear.position.set(-0.03, -0.06, sd * 0.155);
+    ear.scale.set(0.6, 1.45, 0.32);
+    ear.rotation.x = sd * 0.18;
   }
-  const tongue = put(W, box(gl, 0.06, 0.012, 0.05), mc(W, "#e8737a", 0.5), head, 0.18, -0.11, 0);
-  tongue.rotation.z = -0.5;
+  const tongue = W.mesh(sphere(gl, 0.04, 10, 8), mc(W, "#e8737a", 0.5), head);
+  tongue.position.set(0.17, -0.12, 0);
+  tongue.scale.set(0.9, 0.35, 0.8);
   for (const [x, z] of [
     [0.22, 0.11],
     [0.22, -0.11],
-    [-0.22, 0.11],
-    [-0.22, -0.11],
+    [-0.24, 0.11],
+    [-0.24, -0.11],
   ]) {
-    W.mesh(cylinder(gl, 0.05, 0.045, 0.32, 10), fur, root).position.set(x, 0.17, z);
-    W.mesh(sphere(gl, 0.055, 10, 8), fur, root).position.set(x + 0.02, 0.03, z);
+    const leg = node(root);
+    leg.position.set(x, 0.36, z);
+    limb(W, leg, 0.06, 0.05, 0.3, fur);
+    const paw = W.mesh(sphere(gl, 0.06, 12, 8), belly, leg);
+    paw.position.set(0.02, -0.32, 0);
+    paw.scale.set(1.25, 0.6, 1);
   }
   const tail = node(root);
-  tail.position.set(-0.36, 0.52, 0);
-  const tm = W.mesh(cylinder(gl, 0.02, 0.04, 0.3, 10), fur, tail);
-  tm.position.set(-0.06, 0.12, 0);
-  tm.rotation.z = 0.55;
+  tail.position.set(-0.4, 0.55, 0);
+  [0.05, 0.045, 0.04, 0.034].forEach((rr, i) => W.mesh(sphere(gl, rr, 10, 8), i === 3 ? belly : fur, tail).position.set(-0.04 - i * 0.05, 0.05 + i * 0.07, 0));
   return { root, tail, head };
 }
 
@@ -1458,7 +1533,7 @@ function wag(D: Dog3, t: number, hop = 0) {
 /** The family: two parents and a child, in warm, varied clothes. */
 const FAMILY: PersonLook[] = [
   { h: 1.82, shirt: "#5d7fa3", pants: "#2f3440", skin: "#c88e68", hair: "#2a1d16", style: "short", mood: "smile" },
-  { h: 1.7, shirt: "#c4574d", pants: "#3f4a5a", skin: "#f0c8a8", hair: "#7a4a2a", style: "long" },
+  { h: 1.7, shirt: "#c4574d", pants: "#3f4a5a", skin: "#f0c8a8", hair: "#7a4a2a", style: "short", ponytail: true, dress: true },
   { h: 1.12, shirt: "#f2c14e", pants: "#4a6fa5", skin: "#e0aa82", hair: "#3b2417", style: "curly", child: true, mood: "laugh" },
 ];
 
