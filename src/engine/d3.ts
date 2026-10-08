@@ -251,6 +251,142 @@ export function sphere(gl: OGLRenderingContext, r: number, seg = 24, rings = 16)
 }
 
 /** A box with flat faces (w × h × d, centred), UVs per face. */
+/** Turns each triangle to face along its vertices' normals (so a built mesh is never culled inside out). */
+function faceOut(pos: number[], nor: number[], idx: number[]) {
+  for (let i = 0; i < idx.length; i += 3) {
+    const [a, b, c] = [idx[i] * 3, idx[i + 1] * 3, idx[i + 2] * 3];
+    const e1 = [pos[b] - pos[a], pos[b + 1] - pos[a + 1], pos[b + 2] - pos[a + 2]];
+    const e2 = [pos[c] - pos[a], pos[c + 1] - pos[a + 1], pos[c + 2] - pos[a + 2]];
+    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const m = [0, 1, 2].map((k) => nor[a + k] + nor[b + k] + nor[c + k]);
+    if (n[0] * m[0] + n[1] * m[1] + n[2] * m[2] < 0) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
+  }
+}
+
+/**
+ * A turned shape (a mug, a pot, a vase): the profile [radius, height][] spun round the y axis.
+ * The profile's surface lies on its right as it's walked (up the outside, down the inside), and
+ * corners sharper than ~50° stay crisp while gentle curves shade smoothly.
+ */
+export function lathe(gl: OGLRenderingContext, profile: [number, number][], seg = 40) {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const segN = profile.slice(1).map(([r, y], i) => {
+    const dr = r - profile[i][0];
+    const dy = y - profile[i][1];
+    const l = Math.hypot(dr, dy) || 1;
+    return [dy / l, -dr / l] as [number, number];
+  });
+  // Rows: one per profile point, two where a corner is sharp (one normal for each side).
+  const rows: { r: number; y: number; n: [number, number] }[] = [];
+  profile.forEach(([r, y], i) => {
+    const a = segN[i - 1];
+    const b = segN[i];
+    if (!a || !b) return rows.push({ r, y, n: (a ?? b)! });
+    if (a[0] * b[0] + a[1] * b[1] < 0.64) {
+      rows.push({ r, y, n: a }, { r, y, n: b });
+    } else {
+      const l = Math.hypot(a[0] + b[0], a[1] + b[1]) || 1;
+      rows.push({ r, y, n: [(a[0] + b[0]) / l, (a[1] + b[1]) / l] });
+    }
+  });
+  rows.forEach((row, j) => {
+    for (let i = 0; i <= seg; i++) {
+      const ang = (i / seg) * Math.PI * 2;
+      const c = Math.cos(ang);
+      const sn = Math.sin(ang);
+      pos.push(c * row.r, row.y, sn * row.r);
+      nor.push(c * row.n[0], row.n[1], sn * row.n[0]);
+      uv.push(i / seg, j / (rows.length - 1));
+    }
+  });
+  const W = seg + 1;
+  for (let j = 0; j < rows.length - 1; j++)
+    for (let i = 0; i < seg; i++) {
+      const p = j * W + i;
+      idx.push(p, p + W, p + 1, p + 1, p + W, p + W + 1);
+    }
+  faceOut(pos, nor, idx);
+  return geo(gl, pos, nor, uv, idx);
+}
+
+/**
+ * A torus in the xy plane (ring radius `R`, tube radius `r`), or the part of one swept through
+ * `arc` radians from -arc/2 to +arc/2 about +x: a mug's handle.
+ */
+export function torus(gl: OGLRenderingContext, R: number, r: number, arc = Math.PI * 2, seg = 32, tube = 14) {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= seg; i++) {
+    const u = -arc / 2 + (i / seg) * arc;
+    const cu = Math.cos(u);
+    const su = Math.sin(u);
+    for (let j = 0; j <= tube; j++) {
+      const v = (j / tube) * Math.PI * 2;
+      const cv = Math.cos(v);
+      const sv = Math.sin(v);
+      pos.push((R + r * cv) * cu, (R + r * cv) * su, r * sv);
+      nor.push(cv * cu, cv * su, sv);
+      uv.push(i / seg, j / tube);
+    }
+  }
+  const T = tube + 1;
+  for (let i = 0; i < seg; i++)
+    for (let j = 0; j < tube; j++) {
+      const p = i * T + j;
+      idx.push(p, p + T, p + 1, p + 1, p + T, p + T + 1);
+    }
+  faceOut(pos, nor, idx);
+  return geo(gl, pos, nor, uv, idx);
+}
+
+/**
+ * A leaf blade, both sides: `len` long up +y, `width` across at its widest, its tip arching over
+ * by `curl` towards -z and folded along the midrib by `fold`, so it catches the light like a leaf.
+ */
+export function leaf(gl: OGLRenderingContext, len: number, width: number, curl = 0.3, fold = 0.25, segL = 14, segW = 6) {
+  const P = (t: number, s: number): Num3 => {
+    const half = (width / 2) * Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.92 + 0.04)), 0.75);
+    const x = s * half;
+    return [x, t * len * (1 - 0.25 * curl * t), -curl * len * t * t + fold * Math.abs(x)];
+  };
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  for (const side of [1, -1]) {
+    const base = pos.length / 3;
+    for (let i = 0; i <= segL; i++)
+      for (let j = 0; j <= segW; j++) {
+        const t = i / segL;
+        const sw = (j / segW) * 2 - 1;
+        const p = P(t, sw);
+        const e = 1e-3;
+        const dt = P(Math.min(1, t + e), sw).map((v, k) => v - P(Math.max(0, t - e), sw)[k]);
+        const ds = P(t, Math.min(1, sw + e)).map((v, k) => v - P(t, Math.max(-1, sw - e))[k]);
+        let n: Num3 = [ds[1] * dt[2] - ds[2] * dt[1], ds[2] * dt[0] - ds[0] * dt[2], ds[0] * dt[1] - ds[1] * dt[0]];
+        const l = Math.hypot(...n) || 1;
+        n = [(n[0] / l) * side, (n[1] / l) * side, (n[2] / l) * side];
+        // (The faces sit a hair apart so they never fight.)
+        pos.push(p[0] + n[0] * 0.002, p[1] + n[1] * 0.002, p[2] + n[2] * 0.002);
+        nor.push(...n);
+        uv.push(j / segW, t);
+      }
+    const W = segW + 1;
+    for (let i = 0; i < segL; i++)
+      for (let j = 0; j < segW; j++) {
+        const p = base + i * W + j;
+        idx.push(p, p + W, p + 1, p + 1, p + W, p + W + 1);
+      }
+  }
+  faceOut(pos, nor, idx);
+  return geo(gl, pos, nor, uv, idx);
+}
+
 export function box(gl: OGLRenderingContext, w: number, h: number, d: number) {
   const pos: number[] = [];
   const nor: number[] = [];

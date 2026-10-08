@@ -8,10 +8,10 @@
  * - d3-phone:   a phone turns from its back (camera lenses, side buttons) to its screen, floating.
  * - d3-lineup:  a laptop, a tablet and a phone stand together; the camera glides across them.
  * - d3-dive:    the camera flies from a wide shot straight into the laptop's screen, landing on the page.
- * - d3-desk:    a desk in your colours from above: the laptop, a phone, a mug, a notebook, a plant.
+ * - d3-desk:    a desk in your colours from above: the laptop, a phone, a tablet, a mug, a plant.
  */
 import { Texture, Torus, type Program, type Transform } from "ogl";
-import { cove, project, quad, render, rgb, setCrop, setScreen, slab, cylinder, sphere, box, world, type View, type World } from "../d3";
+import { cove, project, quad, render, rgb, setCrop, setScreen, slab, cylinder, sphere, box, lathe, leaf, torus, world, type View, type World } from "../d3";
 import { desktopUI, mobileUI } from "../uiscreens";
 import { getMedia, type Drawable } from "../media";
 import { textureOf, sizeOf } from "../gl";
@@ -1333,67 +1333,93 @@ function d3Wall(sc: SkillContext) {
 interface DeskParts {
   lap: Laptop;
   phone: Slate;
+  tab: Slate;
   mug: Program;
-  plantPot: Program;
+  coaster: Program;
+  pot: Program;
   top: Program;
-  cover: Program;
+  mat: Program;
 }
 
 function deskWorld(W: World): DeskParts {
   const { gl } = W;
-  // The desk top (in the video's colours, see d3Desk), big enough to fill the frame.
-  const top = slab(gl, 9, 5, 0.16, 0.12, 0.04);
+  // The desk top (in the video's colours, see d3Desk): thick, with softly rounded corners and
+  // edges, big enough to fill the frame; a felt desk mat under the laptop.
+  const top = slab(gl, 9, 5, 0.2, 0.34, 0.08);
   const desk = group(W);
   desk.rotation.x = -Math.PI / 2;
-  desk.position.y = -0.08;
-  const surface = W.mat({ color: "#9c7350", gloss: 0.42 });
+  desk.position.y = -0.1;
+  const surface = W.mat({ color: "#9c7350", gloss: 0.38 });
   W.mesh(top.front, surface, desk, false);
   W.mesh(top.body, surface, desk, false);
+  const pad = slab(gl, 4.4, 2.9, 0.035, 0.22, 0.016);
+  const matG = group(W);
+  matG.rotation.set(-Math.PI / 2, 0, 0.18);
+  matG.position.set(-0.25, 0.0, -0.05);
+  const mat = W.mat({ color: "#2b2f38", gloss: 0.12 });
+  W.mesh(pad.front, mat, matG, false);
+  W.mesh(pad.body, mat, matG, false);
   const lap = laptop(W);
-  lap.root.position.set(-0.3, 0, -0.2);
+  lap.root.position.set(-0.3, 0.02, -0.2);
   lap.root.rotation.y = 0.18;
   lap.hinge.rotation.x = -0.32;
   const phone = slate(W, PHONE, true);
   phone.root.rotation.set(-Math.PI / 2, 0, -0.35);
   phone.root.position.set(2.3, PHONE.t / 2, 0.85);
-  // A mug with a handle, a notebook with a pen, a potted plant.
-  const mug = W.mat({ color: "#7c5cff", gloss: 0.7 });
-  const m = W.mesh(cylinder(gl, 0.24, 0.22, 0.52, 40), mug);
-  m.position.set(2.55, 0.26, -0.7);
-  const handle = W.mesh(cylinder(gl, 0.05, 0.05, 0.28, 16), mug);
-  handle.position.set(2.82, 0.28, -0.7);
-  const coffee = W.mesh(cylinder(gl, 0.21, 0.21, 0.01, 32), W.mat({ color: "#4a2f22", gloss: 0.8 }), W.scene, false);
-  coffee.position.set(2.55, 0.5, -0.7);
-  const book = slab(gl, 1.3, 1.7, 0.08, 0.05, 0.02);
-  const nb = group(W);
-  nb.rotation.set(-Math.PI / 2, 0, 0.25);
-  nb.position.set(-2.9, 0.04, 0.7);
-  const cover = W.mat({ color: "#2f3440", gloss: 0.3 });
-  W.mesh(book.front, cover, nb);
-  W.mesh(book.body, W.mat({ color: "#f3efe6", gloss: 0.2 }), nb);
-  const pen = W.mesh(cylinder(gl, 0.03, 0.03, 1.1, 16), W.mat({ color: "#e9edf3", metal: 0.6, gloss: 0.8 }));
-  pen.rotation.set(0, 0, Math.PI / 2);
-  pen.position.set(-2.2, 0.04, 1.2);
-  pen.rotation.y = 0.4;
-  const plantPot = W.mat({ color: "#e8e2d8", gloss: 0.3 });
-  const pot = W.mesh(cylinder(gl, 0.32, 0.25, 0.55, 32), plantPot);
-  pot.position.set(-3.1, 0.27, -1.2);
-  const leaf = W.mat({ color: "#4f9e5c", gloss: 0.35 });
-  for (const [x, y, z, r] of [
-    [-3.1, 0.85, -1.2, 0.36],
-    [-3.3, 0.7, -1.05, 0.26],
-    [-2.9, 0.72, -1.3, 0.28],
-    [-3.05, 1.08, -1.25, 0.22],
-  ]) {
-    const s = W.mesh(sphere(gl, r, 20, 14), leaf);
-    s.position.set(x, y, z);
-    s.scale.set(1, 0.85, 1);
+  // A tablet lying on the desk with a stylus beside it (it shows the product too).
+  const tab = slate(W, TAB, false);
+  tab.root.rotation.set(-Math.PI / 2, 0, 0.28);
+  tab.root.scale.set(0.66, 0.66, 0.66);
+  tab.root.position.set(-2.95, (TAB.t / 2) * 0.66, 0.75);
+  const penMat = W.mat({ color: "#f2f3f6", gloss: 0.7 });
+  const pen = W.mesh(cylinder(gl, 0.028, 0.028, 1.05, 20), penMat);
+  pen.rotation.set(0, 0.4, Math.PI / 2);
+  pen.position.set(-2.15, 0.03, 1.25);
+  const nib = W.mesh(cylinder(gl, 0.004, 0.028, 0.09, 20), W.mat({ color: "#c9ccd3", metal: 0.6, gloss: 0.8 }));
+  nib.rotation.set(0, 0.4, Math.PI / 2);
+  nib.position.set(-2.15 - Math.cos(0.4) * 0.57, 0.03, 1.25 + Math.sin(0.4) * 0.57);
+  // A ceramic mug on a coaster: real walls with a rounded lip, coffee inside, a looped handle.
+  const coasterM = W.mat({ color: "#c9a27a", gloss: 0.15 });
+  const coaster = W.mesh(lathe(gl, [[0, 0], [0.37, 0], [0.4, 0.015], [0.4, 0.03], [0.37, 0.045], [0, 0.045]], 48), coasterM);
+  coaster.position.set(2.55, 0, -0.7);
+  const mug = W.mat({ color: "#7c5cff", gloss: 0.78 });
+  const cup = W.mesh(
+    lathe(gl, [[0, 0.045], [0.2, 0.045], [0.225, 0.07], [0.24, 0.16], [0.25, 0.5], [0.252, 0.555], [0.245, 0.575], [0.232, 0.575], [0.224, 0.555], [0.215, 0.18], [0.19, 0.1], [0, 0.1]], 56),
+    mug,
+  );
+  cup.position.set(2.55, 0, -0.7);
+  const handle = W.mesh(torus(gl, 0.13, 0.034, Math.PI * 1.25, 32, 14), mug);
+  handle.position.set(2.55 + 0.25, 0.32, -0.7);
+  handle.scale.set(0.9, 1.15, 1);
+  const coffee = W.mesh(cylinder(gl, 0.22, 0.22, 0.01, 48), W.mat({ color: "#5b3a26", gloss: 0.85 }), W.scene, false);
+  coffee.position.set(2.55, 0.47, -0.7);
+  const crema = W.mesh(cylinder(gl, 0.15, 0.15, 0.012, 40), W.mat({ color: "#a8754d", gloss: 0.6 }), W.scene, false);
+  crema.position.set(2.53, 0.472, -0.69);
+  // A potted plant: a glazed pot with a rolled rim, dark soil, and arching leaves in two greens.
+  const potM = W.mat({ color: "#e8e2d8", gloss: 0.55 });
+  const pot = W.mesh(lathe(gl, [[0, 0], [0.24, 0], [0.27, 0.03], [0.33, 0.5], [0.37, 0.52], [0.38, 0.57], [0.36, 0.6], [0.32, 0.6], [0.31, 0.56]], 48), potM);
+  pot.position.set(-3.1, 0, -1.2);
+  const soil = W.mesh(cylinder(gl, 0.315, 0.315, 0.02, 40), W.mat({ color: "#3a2a20", gloss: 0.05 }), W.scene, false);
+  soil.position.set(-3.1, 0.54, -1.2);
+  const greens = [W.mat({ color: "#3f8f4e", gloss: 0.55 }), W.mat({ color: "#5fae5a", gloss: 0.55 }), W.mat({ color: "#2f7a45", gloss: 0.5 })];
+  const plant = group(W);
+  plant.position.set(-3.1, 0.54, -1.2);
+  const N = 11;
+  for (let i = 0; i < N; i++) {
+    const inner = i < 4;
+    const len = inner ? 0.95 + (i % 2) * 0.18 : 0.72 + ((i * 37) % 5) * 0.06;
+    const g = group(W, plant);
+    g.rotation.y = i * 2.39996;
+    const l = W.mesh(leaf(gl, len, inner ? 0.26 : 0.3, inner ? 0.25 : 0.55, 0.3), greens[i % 3], g);
+    l.rotation.x = -(inner ? 0.12 + (i % 2) * 0.1 : 0.42 + ((i * 13) % 4) * 0.08);
+    l.position.set(0, 0, 0);
   }
-  return { lap, phone, mug, plantPot, top: surface, cover };
+  return { lap, phone, tab, mug, coaster: coasterM, pot: potM, top: surface, mat };
 }
 
 function d3Desk(sc: SkillContext) {
   const { t, d, palette } = sc;
+  const tabShot = desktopUI(palette, (sc.brand?.name ?? "").replace(/[*|]/g, "").trim(), sc.seed + 2);
   saasBackground(sc, { beams: 0.6 });
   const st = stage(sc);
   const top = st.top - 20 * sc.u;
@@ -1410,9 +1436,16 @@ function d3Desk(sc: SkillContext) {
       if (P.phone.back) P.phone.back.uniforms.uColor.value = rgb(mixHex("#eceef2", palette.primary, 0.25));
       // The desk is a surface in the video's own colours (a soft tint on light styles, a deep
       // brand tone on dark ones), the mug and notebook in its other colours, so they stand out.
-      P.top.uniforms.uColor.value = rgb(light ? mixHex(palette.primary, "#ffffff", 0.72) : mixHex(palette.primary, palette.bg1, 0.66));
-      P.mug.uniforms.uColor.value = rgb(palette.accent);
-      P.cover.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#000000", light ? 0.15 : 0.35));
+      const deskHex = light ? mixHex(palette.primary, "#ffffff", 0.72) : mixHex(palette.primary, palette.bg1, 0.66);
+      P.top.uniforms.uColor.value = rgb(deskHex);
+      P.mat.uniforms.uColor.value = rgb(light ? mixHex(palette.primary, "#ffffff", 0.45) : mixHex(palette.primary, "#05060a", 0.72));
+      // The mug in whichever of the video's colours (or white glaze) stands out most from the desk.
+      const far = (hex: string) => rgb(hex).reduce((a, v, i) => a + (v - rgb(deskHex)[i]) ** 2, 0);
+      P.mug.uniforms.uColor.value = rgb([palette.accent, palette.secondary, "#f3f1ec"].reduce((a, b) => (far(b) > far(a) * 1.15 ? b : a)));
+      P.coaster.uniforms.uColor.value = rgb(light ? "#d9c3a5" : "#b08a64");
+      P.pot.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#f4f1ec", light ? 0.75 : 0.6));
+      for (const m of P.tab.metal) m.uniforms.uColor.value = rgb(light ? "#d9dce2" : "#8a8f99");
+      paint(W, P.tab.screen, tabShot, TAB.scrW / TAB.scrH, ease.inOutCubic(range(t, 1.4, d - 0.4)), range(t, 0.3, 0.9), 0.04);
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, ease.inOutCubic(range(t, 1.2, d - 0.4)), range(t, 0.1, 0.7), 0.02);
       paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.075);
       const k = ease.inOutCubic(range(t, 0, d));
@@ -1508,7 +1541,7 @@ export const devices3dSkills: Skill[] = [
   {
     id: "d3-desk",
     name: "3D Desk",
-    tagline: "A real 3D desk in your colours from above: the laptop with your site, a phone with your app, a mug, a notebook and a plant, the camera circling slowly.",
+    tagline: "A real 3D desk in your colours from above: the laptop with your site, a phone with your app, a tablet, a mug of coffee and a potted plant, the camera circling slowly.",
     bestFor: "Work, productivity and 'your day' stories: a short headline.",
     sample: SAMPLE,
     render: d3Desk,
