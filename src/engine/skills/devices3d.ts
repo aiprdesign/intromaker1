@@ -1340,6 +1340,7 @@ interface DeskParts {
   top: Program;
   mat: Program;
   folio: Program;
+  leaves: Transform[];
 }
 
 function deskWorld(W: World): DeskParts {
@@ -1415,16 +1416,32 @@ function deskWorld(W: World): DeskParts {
   const plant = group(W);
   plant.position.set(-3.1, 0.568, -1.2);
   const N = 11;
+  const leaves: Transform[] = [];
   for (let i = 0; i < N; i++) {
     const inner = i < 4;
     const len = inner ? 0.95 + (i % 2) * 0.18 : 0.72 + ((i * 37) % 5) * 0.06;
     const g = group(W, plant);
     g.rotation.y = i * 2.39996;
+    leaves.push(g);
     const l = W.mesh(leaf(gl, len, inner ? 0.26 : 0.3, inner ? 0.25 : 0.55, 0.3), greens[i % 3], g);
     l.rotation.x = -(inner ? 0.12 + (i % 2) * 0.1 : 0.42 + ((i * 13) % 4) * 0.08);
     l.position.set(0, 0, 0);
   }
-  return { lap, phone, tab, mug, coaster: coasterM, pot: potM, top: surface, mat, folio: folioM };
+  // A wireless earbuds case by the phone: a glossy rounded pebble with its lid seam and a status light.
+  const pod = slab(gl, 0.5, 0.4, 0.2, 0.19, 0.095);
+  const podG = group(W);
+  podG.rotation.set(-Math.PI / 2, 0, -0.6);
+  podG.position.set(1.55, 0.1, 1.35);
+  const podM = W.mat({ color: "#f4f5f7", gloss: 0.85 });
+  W.mesh(pod.front, podM, podG);
+  W.mesh(pod.body, podM, podG);
+  W.mesh(pod.back, podM, podG);
+  const seam = W.mesh(box(gl, 0.47, 0.006, 0.202), W.mat({ color: "#c3c6cd", gloss: 0.4 }), podG, false);
+  seam.position.set(0, 0.06, 0);
+  seam.rotation.x = Math.PI / 2;
+  const led = W.mesh(sphere(gl, 0.012, 10, 8), W.mat({ color: "#7be08f", emit: "#3fbf60" }), podG, false);
+  led.position.set(0, -0.02, 0.1);
+  return { lap, phone, tab, mug, coaster: coasterM, pot: potM, top: surface, mat, folio: folioM, leaves };
 }
 
 function d3Desk(sc: SkillContext) {
@@ -1456,6 +1473,8 @@ function d3Desk(sc: SkillContext) {
       P.pot.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#f4f1ec", light ? 0.75 : 0.6));
       for (const m of P.tab.metal) m.uniforms.uColor.value = rgb(light ? "#d9dce2" : "#8a8f99");
       P.folio.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#101218", light ? 0.25 : 0.45));
+      // The plant's leaves stir gently, as in a light draught.
+      P.leaves.forEach((g, i) => (g.rotation.z = Math.sin(t * 0.9 + i * 1.7) * 0.035));
       paint(W, P.tab.screen, tabShot, TAB.scrW / TAB.scrH, ease.inOutCubic(range(t, 1.4, d - 0.4)), range(t, 0.3, 0.9), 0.04);
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, ease.inOutCubic(range(t, 1.2, d - 0.4)), range(t, 0.1, 0.7), 0.02);
       paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.075);
@@ -1464,7 +1483,7 @@ function d3Desk(sc: SkillContext) {
       const F = fit(sc, top);
       const r = 8.6 * F;
       const eye: Num3 = [Math.sin(a) * r, lerp(5.6, 4.6, k) * F, Math.cos(a) * r];
-      return render(W, { ...lighting(sc), sun: [-0.5, 0.85, 0.35], sunCol: [1, 0.95, 0.86], eye, target: [0, 0.35, 0], fov: 30, shadowSize: 5.5, shadowAt: [0, 0, 0] }, w, h);
+      return render(W, { ...lighting(sc), sun: [-0.5, 0.85, 0.35], sunCol: [1, 0.95, 0.86], eye, target: [0, 0.35, 0], fov: 30, shadowSize: 5.5, shadowAt: [0, 0, 0], ao: 0.28 }, w, h);
     },
     () => flat(sc, shot, top),
   );
