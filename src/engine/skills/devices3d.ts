@@ -8,7 +8,7 @@
  * - d3-phone:   a phone turns from its back (camera lenses, side buttons) to its screen, floating.
  * - d3-lineup:  a laptop, a tablet and a phone stand together; the camera glides across them.
  * - d3-dive:    the camera flies from a wide shot straight into the laptop's screen, landing on the page.
- * - d3-desk:    a desk scene from above: the laptop, a phone, a mug in your colour, a notebook, a plant.
+ * - d3-desk:    a desk in your colours from above: the laptop, a phone, a mug, a notebook, a plant.
  */
 import { Texture, Torus, type Program, type Transform } from "ogl";
 import { cove, project, quad, render, rgb, setCrop, setScreen, slab, cylinder, sphere, box, world, type View, type World } from "../d3";
@@ -1335,18 +1335,20 @@ interface DeskParts {
   phone: Slate;
   mug: Program;
   plantPot: Program;
+  top: Program;
+  cover: Program;
 }
 
 function deskWorld(W: World): DeskParts {
   const { gl } = W;
-  // The desk top (wood), big enough to fill the frame.
+  // The desk top (in the video's colours, see d3Desk), big enough to fill the frame.
   const top = slab(gl, 9, 5, 0.16, 0.12, 0.04);
   const desk = group(W);
   desk.rotation.x = -Math.PI / 2;
   desk.position.y = -0.08;
-  const wood = W.mat({ color: "#9c7350", gloss: 0.42 });
-  W.mesh(top.front, wood, desk, false);
-  W.mesh(top.body, wood, desk, false);
+  const surface = W.mat({ color: "#9c7350", gloss: 0.42 });
+  W.mesh(top.front, surface, desk, false);
+  W.mesh(top.body, surface, desk, false);
   const lap = laptop(W);
   lap.root.position.set(-0.3, 0, -0.2);
   lap.root.rotation.y = 0.18;
@@ -1387,7 +1389,7 @@ function deskWorld(W: World): DeskParts {
     s.position.set(x, y, z);
     s.scale.set(1, 0.85, 1);
   }
-  return { lap, phone, mug, plantPot };
+  return { lap, phone, mug, plantPot, top: surface, cover };
 }
 
 function d3Desk(sc: SkillContext) {
@@ -1406,7 +1408,11 @@ function d3Desk(sc: SkillContext) {
       const light = !!palette.light;
       for (const m of [...P.lap.metal, ...P.phone.metal]) m.uniforms.uColor.value = rgb(light ? "#d9dce2" : "#8a8f99");
       if (P.phone.back) P.phone.back.uniforms.uColor.value = rgb(mixHex("#eceef2", palette.primary, 0.25));
-      P.mug.uniforms.uColor.value = rgb(palette.primary);
+      // The desk is a surface in the video's own colours (a soft tint on light styles, a deep
+      // brand tone on dark ones), the mug and notebook in its other colours, so they stand out.
+      P.top.uniforms.uColor.value = rgb(light ? mixHex(palette.primary, "#ffffff", 0.72) : mixHex(palette.primary, palette.bg1, 0.66));
+      P.mug.uniforms.uColor.value = rgb(palette.accent);
+      P.cover.uniforms.uColor.value = rgb(mixHex(palette.secondary, "#000000", light ? 0.15 : 0.35));
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, ease.inOutCubic(range(t, 1.2, d - 0.4)), range(t, 0.1, 0.7), 0.02);
       paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.075);
       const k = ease.inOutCubic(range(t, 0, d));
@@ -1502,7 +1508,7 @@ export const devices3dSkills: Skill[] = [
   {
     id: "d3-desk",
     name: "3D Desk",
-    tagline: "A real 3D desk from above: the laptop with your site, a phone with your app, a mug in your colour, a notebook and a plant, the camera circling slowly.",
+    tagline: "A real 3D desk in your colours from above: the laptop with your site, a phone with your app, a mug, a notebook and a plant, the camera circling slowly.",
     bestFor: "Work, productivity and 'your day' stories: a short headline.",
     sample: SAMPLE,
     render: d3Desk,
