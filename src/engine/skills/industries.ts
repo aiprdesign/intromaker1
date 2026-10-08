@@ -34,12 +34,12 @@ const INK = "#1f1d2b";
 const onLight = (p: Palette): Palette => (p.light ? p : { ...p, text: INK, light: true, bg0: "#f7f5f2", bg1: "#ffffff" });
 
 /** Paint a scene (unless the stage is drawn elsewhere) and return the context for drawing on it. */
-function scenic(sc: SkillContext, backdrop: SceneBackdrop | "lawn"): SkillContext {
+function scenic(sc: SkillContext, backdrop: SceneBackdrop | "lawn", bare = false): SkillContext {
   const s2 = { ...sc, palette: onLight(sc.palette) };
   useToon(s2);
   if (!sc.noStage) {
     if (backdrop === "lawn") lawn(s2);
-    else sceneStage(s2, backdrop);
+    else sceneStage(s2, backdrop, { bare });
   }
   return s2;
 }
@@ -542,7 +542,7 @@ function drawBoard(sc: SkillContext, kind: BoardKind, x: number, y: number, bw: 
 }
 
 function boardSlide(sc0: SkillContext, B: BoardSpec) {
-  const sc = scenic(sc0, B.backdrop);
+  const sc = scenic(sc0, B.backdrop, true);
   const { ctx, w, h, t, u, palette, scene, seed } = sc;
   const st = stage(sc);
   const { S, narrow, ex } = st;

@@ -393,6 +393,75 @@ function simpleHouse(W: World, parent: Transform, x: number, z: number, rot: num
     [-1.4, 1.4],
   ]) put(W, box(gl, 1.1, 1.2, 0.1), m.glass, g, wx, wy, 3.02, false);
   put(W, box(gl, 1.0, 2.1, 0.1), m.door, g, 1.3, 1.05, 3.02, false);
+  // A driveway to the street, a walk to the door, a low hedge.
+  put(W, box(gl, 3.2, 0.03, 7.5), driveMat(W), g, s * 4.6, 0.015, 6.4, false);
+  put(W, box(gl, 1.0, 0.025, 7.0), driveMat(W), g, 1.3, 0.012, 6.6, false);
+  for (let i = 0; i < 3; i++) {
+    const hd = W.mesh(sphere(gl, 0.5, 12, 8), hedgeMat(W), g, false);
+    hd.position.set(-2.2 + i * 0.9, 0.35, 3.6);
+    hd.scale.set(1, 0.7, 0.9);
+  }
+  return g;
+}
+
+let sharedGl: unknown;
+let drive: Program | undefined;
+let hedgeM: Program | undefined;
+const driveMat = (W: World) => {
+  if (sharedGl !== W.gl) {
+    sharedGl = W.gl;
+    drive = undefined;
+    hedgeM = undefined;
+  }
+  return (drive ??= W.mat({ color: "#cfcac2", gloss: 0.15 }));
+};
+const hedgeMat = (W: World) => {
+  driveMat(W);
+  return (hedgeM ??= W.mat({ color: "#3f7d45", gloss: 0.25 }));
+};
+
+let carMats: { glass: Program; tyre: Program; light: Program; paints: Program[] } | undefined;
+let carGl: unknown;
+/** A car: a rounded body, a glass cabin, four wheels, headlights. `paint` picks its colour. */
+function car(W: World, parent: Transform, x: number, z: number, rot: number, paint: number) {
+  const { gl } = W;
+  if (!carMats || carGl !== W.gl) {
+    carGl = W.gl;
+    carMats = {
+      glass: W.mat({ color: "#1e2733", metal: 0.6, gloss: 0.95 }),
+      tyre: W.mat({ color: "#1b1c20", gloss: 0.2 }),
+      light: W.mat({ color: "#fff6e0", gloss: 0.6, emit: [0.6, 0.55, 0.45] }),
+      paints: ["#f2f3f5", "#9aa3ad", "#24262b", "#2f4a6d", "#8c2f2f"].map((c) => W.mat({ color: c, metal: 0.55, gloss: 0.85 })),
+    };
+  }
+  const m = carMats;
+  const g = node(parent);
+  g.position.set(x, 0, z);
+  g.rotation.y = rot;
+  const body = slab(gl, 1.9, 0.62, 4.3, 0.24, 0.2);
+  const b = node(g);
+  b.position.y = 0.62;
+  const paintM = m.paints[paint % m.paints.length];
+  W.mesh(body.front, paintM, b);
+  W.mesh(body.back, paintM, b);
+  W.mesh(body.body, paintM, b);
+  const cab = slab(gl, 1.62, 0.56, 2.2, 0.22, 0.16);
+  const c = node(g);
+  c.position.set(0, 1.18, -0.25);
+  W.mesh(cab.front, m.glass, c);
+  W.mesh(cab.back, m.glass, c);
+  W.mesh(cab.body, m.glass, c);
+  for (const [wx, wz] of [
+    [-0.86, 1.35],
+    [0.86, 1.35],
+    [-0.86, -1.35],
+    [0.86, -1.35],
+  ]) {
+    const wh = W.mesh(cylinder(gl, 0.34, 0.34, 0.26, 20), m.tyre, g);
+    wh.rotation.z = Math.PI / 2;
+    wh.position.set(wx, 0.34, wz);
+  }
+  for (const lx of [-0.62, 0.62]) put(W, box(gl, 0.36, 0.12, 0.04), m.light, g, lx, 0.72, 2.16, false);
   return g;
 }
 
@@ -433,6 +502,12 @@ function homeWorld(W: World): HomeParts {
   simpleHouse(W, nb, 20, -1.5, 0, m("#c7d3d8", "#3c4149"), true);
   simpleHouse(W, nb, -4, -30, Math.PI, m("#e6e0d4", "#4a4448"), false);
   tree(W, nb, 12.5, 4, 1.2);
+  // A car in the driveway; a white fence along the side garden.
+  car(W, nb, MAIN.w / 2 + GAR.w / 2 + 0.2, 4.6, 0.04, 0);
+  const fence = W.mat({ color: "#f6f4ef", gloss: 0.35 });
+  for (let z = -6; z <= 3; z += 0.7) put(W, box(gl0(W), 0.08, 1.0, 0.12), fence, nb, -7.2, 0.5, z);
+  put(W, box(gl0(W), 0.06, 0.08, 9.4), fence, nb, -7.2, 0.8, -1.4);
+  put(W, box(gl0(W), 0.06, 0.08, 9.4), fence, nb, -7.2, 0.35, -1.4);
   tree(W, nb, -10, 6, 1.0);
   // The path up to the door and the signs along it (for the journey).
   const path = node(W.scene);
@@ -527,14 +602,23 @@ function homeHero(sc0: SkillContext) {
     ctx.globalAlpha = k * (1 - exitOf(sc));
     const x = st.left + 10 * u;
     const y = sc.h * 0.8 + i * size * 1.9 - (P.length - 1) * size * 1.9;
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.fillRect(x, y - size * 0.7, 3 * u, size * 1.4);
     ctx.font = subFont(size, 650);
+    const tw = ctx.measureText(txt).width;
+    const dx = (1 - k) * 20 * u;
+    // A frosted plate with a brand-coloured edge, so the words read over any part of the picture.
+    ctx.shadowColor = "rgba(20,10,30,0.2)";
+    ctx.shadowBlur = 16 * u;
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
+    ctx.beginPath();
+    ctx.roundRect(x + dx, y - size * 0.95, tw + size * 1.6, size * 1.9, size * 0.5);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = sc.palette.primary;
+    ctx.fillRect(x + dx, y - size * 0.95 + size * 0.4, 4 * u, size * 1.1);
+    ctx.fillStyle = INK;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(0,0,0,0.35)";
-    ctx.shadowBlur = 12 * u;
-    ctx.fillText(txt, x + 16 * u + (1 - k) * 20 * u, y);
+    ctx.fillText(txt, x + dx + size * 0.8, y);
     ctx.restore();
   });
 }
@@ -573,6 +657,16 @@ function communityWorld(W: World): CommunityParts {
     lot(26, z, -Math.PI / 2);
     lot(-2, z, Math.PI / 2);
   }
+  // Cars in some driveways and along the street, trees in the back gardens.
+  let ci = 0;
+  for (let x = -66; x <= 66; x += 12) {
+    if (Math.abs(x - 12) < 8) continue;
+    if (ci % 3 !== 2) car(W, W.scene, x + (ci % 2 ? -4.6 : 4.6), -6.8 + 1.4, Math.PI, ci + 1);
+    ci++;
+    tree(W, W.scene, x + 3, -24, 0.8 + (ci % 3) * 0.12);
+  }
+  car(W, W.scene, -8, 2.0, Math.PI / 2, 3);
+  car(W, W.scene, 26, -2.0, -Math.PI / 2, 0);
   // Street trees.
   for (let x = -70; x <= 70; x += 12) {
     tree(W, W.scene, x + 6, -6.8, 0.9);
@@ -850,7 +944,7 @@ function homeEnergy(sc0: SkillContext) {
     for (const n of [parts.path, parts.posts]) n.traverse((c) => void (c.visible = false));
     glow(H, 0.3);
     const k = sine(range(t, 0, d));
-    const a = lerp(-0.25, -0.75, k);
+    const a = lerp(-0.15, -0.5, k);
     const F = fitBack(sc, top);
     const r = 22 * F;
     const eye: Num3 = [1 + Math.sin(a) * r, lerp(9.5, 7.5, k), Math.cos(a) * r];

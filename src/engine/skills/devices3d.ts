@@ -265,6 +265,8 @@ function lighting(sc: SkillContext): Partial<View> {
     gnd: light ? [0.55, 0.53, 0.52] : [0.25, 0.25, 0.3],
     exposure: light ? 1.0 : 1.08,
     flat: !!sc.flat3d,
+    // A light sweep crosses the glass once the screen is on, now and then.
+    sheen: ((sc.t - 1.6) % 4.5) * 0.9 - 0.3,
   };
 }
 
@@ -388,7 +390,7 @@ function d3Phone(sc: SkillContext) {
       P.phone.root.position.set(0, 1.05 + POD + bob, 0);
       P.phone.root.rotation.set(lerp(0.25, 0.08, turn), lerp(Math.PI + 0.5, -0.32, turn) + Math.sin(t * 0.9) * 0.04, lerp(-0.15, 0.04, turn));
       paint(W, P.phone.screen, shot, PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 2.2, d - 0.4)), range(t, 1.2, 1.9), 0.11);
-      blobs(P, [[0, 0, 0.32, 0.12]]);
+      blobs(P, [[0, 0, 0.18, 0.06]]);
       const F = fit(sc, top);
       return render(W, { ...lighting(sc), eye: [0.25 * F, 1.5 + POD, 5.4 * F], target: [0, 0.95 + POD, 0], fov: 26, shadowSize: 2.8, shadowAt: [0, 0.8, 0] }, w, h);
     },

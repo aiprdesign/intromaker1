@@ -333,6 +333,7 @@ uniform vec3 uEmit;
 uniform float uClip;
 uniform vec4 uFog;
 uniform float uFlat;
+uniform float uSheen;
 uniform sampler2D tShadow;
 uniform float uShadowSoft;
 #ifdef MAP
@@ -430,6 +431,9 @@ void main() {
   float mask = 1.0 - smoothstep(-0.002, 0.002, length(max(q, 0.0)) - uRound.x);
   vec3 dark = vec3(0.02, 0.022, 0.03);
   col = mix(dark, img, uGlow) + env(R) * (0.04 + 0.5 * fres) * 0.6 + uSunCol * spec * 0.4;
+  // A soft light sweep across the glass.
+  float band = vUv.x * 0.8 + vUv.y * 0.6 - uSheen;
+  col += vec3(1.0) * (exp(-band * band * 260.0) * 0.16 + exp(-band * band * 30.0) * 0.05) * step(-1.0, uSheen);
   alpha *= mask;
 #endif
 #ifdef FLOOR
@@ -440,7 +444,7 @@ void main() {
     if (b.z <= 0.0) continue;
     vec2 d = abs(vW.xz - b.xy) - b.zw;
     float dist = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
-    ao = max(ao, exp(-max(dist, 0.0) * 7.0 / max(b.w, 0.3)) * 0.5);
+    ao = max(ao, exp(-max(dist, 0.0) * 5.0 / max(b.w, 0.35)) * 0.42);
   }
   float a = max((1.0 - sh) * 0.32, ao) * uFloorAlpha;
   gl_FragColor = vec4(0.0, 0.0, 0.0, a * uAlpha);
@@ -529,6 +533,7 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     uShadowSoft: { value: 2.4 },
     uFog: { value: [1, 1, 1, 0] },
     uFlat: { value: 0 },
+    uSheen: { value: -9 },
   };
   const blank = new Texture(gl, { image: new Uint8Array([0, 0, 0, 255]), width: 1, height: 1 });
   const mat = (o: MatOpts) => {
@@ -575,6 +580,8 @@ export interface View {
   sky?: Num3;
   gnd?: Num3;
   exposure?: number;
+  /** Where a light sweep crosses the screens (0 → 1.4 across; unset: none). */
+  sheen?: number;
   /** Draw it flat, as a 2D illustration: a straight-on (orthographic) camera and two-tone colour. */
   flat?: boolean;
   /** Distance haze: colour and density (0: none). */
@@ -590,8 +597,10 @@ export interface View {
  */
 export function render(W: World, v: View, w: number, h: number): HTMLCanvasElement {
   const { renderer, camera, light, env, scene, shadow } = W;
-  const cw = Math.max(1, Math.round(w));
-  const ch = Math.max(1, Math.round(h));
+  // Supersampled (drawn larger, then scaled down into the slide) for clean edges.
+  const ss = Math.max(1, Math.min(1.5, 2880 / Math.max(1, w)));
+  const cw = Math.max(1, Math.round(w * ss));
+  const ch = Math.max(1, Math.round(h * ss));
   if (renderer.gl.canvas.width !== cw || renderer.gl.canvas.height !== ch) renderer.setSize(cw, ch);
   if (v.flat) {
     const dist = Math.hypot(v.eye[0] - v.target[0], v.eye[1] - v.target[1], v.eye[2] - v.target[2]);
@@ -611,6 +620,7 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   env.uExposure.value = v.exposure ?? 1;
   env.uFog.value = v.fog ?? [1, 1, 1, 0];
   env.uFlat.value = v.flat ? 1 : 0;
+  env.uSheen.value = v.sheen ?? -9;
   const size = v.shadowSize ?? 4;
   const c = v.shadowAt ?? v.target;
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });

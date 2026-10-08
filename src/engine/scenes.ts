@@ -21,6 +21,8 @@ type C = CanvasRenderingContext2D;
  * sceneStage for the scene being drawn.
  */
 let brand: Palette | undefined;
+/** The slide brings its own board or sign: leave the scene's out (see sceneStage). */
+let bare = false;
 const wallT = (hex: string) => (brand ? mixHex(hex, mixHex(brand.primary, "#ffffff", 0.55), 0.3) : hex);
 const floorT = (hex: string) => (brand ? mixHex(hex, brand.secondary, 0.16) : hex);
 const skyT = (hex: string) => (brand ? mixHex(hex, brand.primary, 0.14) : hex);
@@ -397,9 +399,12 @@ function classroom(sc: SkillContext) {
   const T = sc.globalT ?? sc.t;
   const fy = h * 0.74;
   room(ctx, w, h, fy, ["#fbf4e6", "#f3e8d2"], ["#d8b98f", "#c9a77a"], u);
-  // A chalkboard to the left with a few chalk scribbles; bunting across the top.
+  // A chalkboard to the left with a few chalk scribbles (a window when a slide brings its own
+  // board); bunting across the top.
   const cbx = w * 0.04;
   const cbw = h > w ? w * 0.42 : w * 0.26;
+  if (bare) windowPane(ctx, cbx, h * 0.14, cbw, h * 0.3, u, T);
+  else {
   box(ctx, cbx - 8 * u, h * 0.14 - 8 * u, cbw + 16 * u, h * 0.32 + 16 * u, 8 * u, "#b98a63");
   box(ctx, cbx, h * 0.14, cbw, h * 0.32, 4 * u, "#3f6b55");
   ctx.strokeStyle = "rgba(255,255,255,0.7)";
@@ -410,6 +415,7 @@ function classroom(sc: SkillContext) {
   ctx.textBaseline = "alphabetic";
   ctx.fillText("A B C", cbx + cbw * 0.12, h * 0.25);
   ctx.fillText("1 + 2", cbx + cbw * 0.12, h * 0.36);
+  }
   const colors = brandColors(palette);
   for (let i = 0; i < 14; i++) {
     const x = (i / 13) * w;
@@ -523,11 +529,18 @@ function cafe(sc: SkillContext) {
   // A soft brick pattern on the wall.
   ctx.fillStyle = "rgba(200,120,90,0.12)";
   for (let y = 0, row = 0; y < fy - 10 * u; y += 26 * u, row++) for (let x = (row % 2) * -30 * u; x < w; x += 60 * u) ctx.fillRect(x + 2 * u, y + 2 * u, 56 * u, 22 * u);
-  // A menu board and pendant lamps.
+  // A menu board (framed prints when a slide brings its own board) and a pendant lamp.
   const mx = w * 0.06;
-  box(ctx, mx, h * 0.14, w * 0.18, h * 0.3, 8 * u, mixHex("#3a3f4c", palette.primary, 0.18));
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
-  for (let i = 0; i < 4; i++) box(ctx, mx + 16 * u, h * (0.19 + i * 0.06), w * 0.18 - 32 * u - (i % 2) * 30 * u, 6 * u, 3 * u, "rgba(255,255,255,0.7)");
+  if (bare) {
+    box(ctx, mx, h * 0.16, w * 0.08, h * 0.12, 4 * u, "#c79b74");
+    box(ctx, mx + 5 * u, h * 0.16 + 5 * u, w * 0.08 - 10 * u, h * 0.12 - 10 * u, 2 * u, mixHex(palette.primary, "#ffffff", 0.55));
+    box(ctx, mx + w * 0.1, h * 0.2, w * 0.07, h * 0.09, 4 * u, "#c79b74");
+    box(ctx, mx + w * 0.1 + 5 * u, h * 0.2 + 5 * u, w * 0.07 - 10 * u, h * 0.09 - 10 * u, 2 * u, mixHex(palette.accent, "#ffffff", 0.5));
+  } else {
+    box(ctx, mx, h * 0.14, w * 0.18, h * 0.3, 8 * u, mixHex("#3a3f4c", palette.primary, 0.18));
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    for (let i = 0; i < 4; i++) box(ctx, mx + 16 * u, h * (0.19 + i * 0.06), w * 0.18 - 32 * u - (i % 2) * 30 * u, 6 * u, 3 * u, "rgba(255,255,255,0.7)");
+  }
   // (At the side, clear of the headline.)
   for (const x of [w * 0.93]) {
     ctx.fillStyle = "#3a3f4c";
@@ -1011,12 +1024,14 @@ function house(sc: SkillContext) {
 const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house };
 
 /** Draw a cartoon scene background, if `backdrop` is one. Returns whether it drew. */
-export function sceneStage(sc: SkillContext, backdrop: string | undefined) {
+export function sceneStage(sc: SkillContext, backdrop: string | undefined, opts: { bare?: boolean } = {}) {
   const f = DRAW[backdrop as SceneBackdrop];
   if (!f) return false;
   sc.ctx.save();
   brand = sc.palette;
+  bare = !!opts.bare;
   f(sc);
+  bare = false;
   brand = undefined;
   sc.ctx.restore();
   return true;
