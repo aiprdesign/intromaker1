@@ -70,7 +70,7 @@ export function contrastSlides(plan: Pick<VideoPlan, "style" | "contrast"> & { s
 /**
  * How a contrast slide flips: which side of a split shows the inverse colours ("none": not at
  * all, as for side-by-side columns stacked in a tall frame), or undefined for the full block.
- * The second side (right, or the bottom of a stacked Split Contrast) is the new way.
+ * The right side is the new way, on a phone too (split down a vertical line).
  */
 export function contrastSplit(plan: { scenes?: Scene[] }, index: number, portrait = false): "left" | "right" | "top" | "bottom" | "none" | undefined {
   const scenes = plan.scenes;
@@ -79,6 +79,8 @@ export function contrastSplit(plan: { scenes?: Scene[] }, index: number, portrai
   if (s.contrast === "left" || s.contrast === "right") return s.contrast;
   if (s.contrast === true) return undefined;
   if (meaning(scenes, index) !== "split") return undefined;
-  if (portrait) return s.skill === "contrast-split" ? "bottom" : s.skill === "problem-solution" ? "none" : "right";
+  // (A phone frame splits down a vertical line too; only problem → solution, whose pairs stack
+  // full width there, doesn't split.)
+  if (portrait && s.skill === "problem-solution") return "none";
   return "right";
 }

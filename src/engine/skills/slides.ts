@@ -722,7 +722,7 @@ function problemSolution(sc: SkillContext) {
  * Split contrast: the old way against the new, one on each half of the frame. The renderer shows
  * the second half in inverse colours (see contrast.ts), so the two sides read as opposites:
  * "Before" with the old way struck through, then "With {name}" and the new way, checked.
- * Side by side in landscape and square; stacked (top and bottom) in portrait.
+ * Side by side at any shape, split down a vertical line (on a phone too).
  */
 export function contrastPair(scene: Scene): [string, string] {
   const items = (scene.items ?? []).map((x) => x.trim()).filter(Boolean);
@@ -742,11 +742,9 @@ function contrastSplitSlide(sc: SkillContext) {
   if (hasHead) topHeadline(sc);
   ctx.save();
   ctx.globalAlpha *= 1 - ex;
-  const half = (i: number) =>
-    portrait
-      ? { cx: w / 2, cy: (hasHead ? h * 0.3 : h * 0.06) + ((i + 0.5) * (h * (hasHead ? 0.66 : 0.88))) / 2, cw: w * 0.8 }
-      : { cx: (w * (i + 0.5)) / 2, cy: h * (hasHead ? 0.6 : 0.52), cw: w * 0.36 };
-  const S = portrait ? 1.25 : 1;
+  // Side by side at any shape, split down a vertical line (a phone frame too: narrower columns).
+  const half = (i: number) => ({ cx: (w * (i + 0.5)) / 2, cy: h * (hasHead ? (portrait ? 0.56 : 0.6) : 0.52), cw: w * (portrait ? 0.42 : 0.36) });
+  const S = portrait ? 1.1 : 1;
   const side = (i: number, label: string, text: string, k: number, strike: number, good: boolean) => {
     if (k <= 0) return;
     const { cx, cy, cw } = half(i);
@@ -754,7 +752,7 @@ function contrastSplitSlide(sc: SkillContext) {
     ctx.globalAlpha *= clamp(k * 1.4);
     const rise = (1 - ease.outCubic(clamp(k))) * 26 * u;
     ctx.font = displayFontOf(sc, 84 * u * S);
-    const fit = fitTextLines(ctx, text, cw, { maxLines: 3, minScale: 0.6 });
+    const fit = fitTextLines(ctx, text, cw, { maxLines: portrait ? 4 : 3, minScale: 0.6 });
     const lh = fit.size * 1.12;
     const blockH = fit.lines.length * lh;
     const top = cy - blockH / 2 + rise;
