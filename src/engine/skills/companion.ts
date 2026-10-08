@@ -17,7 +17,7 @@ const talkMouth = (t: number) => Math.max(0, Math.sin(t * 11)) * 0.5;
 
 export type Family = "char" | "pro" | "abs";
 
-const CHARACTER_SLIDE = /^(char|pro|abs)-/;
+const CHARACTER_SLIDE = /^(char|pro|abs|ind)-/;
 const TOON_ART: Record<NonNullable<Look["toon"]>, ArtStyle> = { flat: "flat", comic: "outline", soft: "soft", doodle: "line" };
 
 /** Which characters a plan's Cartoon style uses (null: not a Cartoon style, so no companion). */

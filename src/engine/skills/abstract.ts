@@ -96,7 +96,7 @@ function makeBase(seed: number, p: Palette, kind: CharacterKind): AbsSpec {
 }
 
 /** The character in a slide's `slot`: the video's own cast first (from the character designer), then generated people. */
-function person(sc: SkillContext, slot: number, seed: number): AbsSpec {
+export function person(sc: SkillContext, slot: number, seed: number): AbsSpec {
   const own = sc.cast?.[slot];
   // Your characters wear the intro's colours unless you gave them their own.
   if (own) return matchColors(own, sc.palette, slot);
@@ -462,7 +462,7 @@ function drawAbstractRaw(ctx: CanvasRenderingContext2D, x: number, groundY: numb
 /* ───────────────────────── Motion helpers ───────────────────────── */
 
 /** A pop-up entrance with a squash on landing (0 … 1 enter, squash amount). */
-function bounceIn(t: number, t0: number) {
+export function bounceIn(t: number, t0: number) {
   const k = clamp(spring(t - t0, 11, 6), 0, 1.15);
   const land = t - t0 - 0.28;
   const squash = land > 0 && land < 0.3 ? -Math.sin((land / 0.3) * Math.PI) * 0.12 : 0;

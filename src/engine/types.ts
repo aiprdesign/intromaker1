@@ -88,6 +88,15 @@ export const SKILL_IDS = [
   "abs-parade",
   "abs-chat",
   "abs-cheer",
+  "ind-hometour",
+  "ind-build",
+  "ind-site",
+  "ind-care",
+  "ind-menu",
+  "ind-shop",
+  "ind-lesson",
+  "ind-team",
+  "ind-route",
   "service-spotlight",
   "logo-draw",
   "logo-wipe",
@@ -464,7 +473,7 @@ export interface VideoPlan {
   /** The characters a Cartoon style tells the story with (unset: the style's own). */
   characters?: CharacterKind;
   /** Where a flat Cartoon style's characters are (an office, a hospital…), from the intro's theme (see scenes.ts). */
-  setting?: "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe";
+  setting?: "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe" | "kitchen" | "bedroom" | "bathroom" | "house";
 }
 
 /**
@@ -538,7 +547,7 @@ export interface Look {
   /** Vignette strength multiplier. */
   vignette?: number;
   /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, plain, synthwave horizon, stars, the clean-epic stages (eclipse rim, studio sweep, silk ribbons, light beam, colour bloom), or the sci-fi stages (light-speed warp, ringed planet, wormhole, data rain, quantum mesh). */
-  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow" | "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe";
+  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow" | "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe" | "kitchen" | "bedroom" | "bathroom" | "house";
   /** How cartoon characters are drawn (character slides): flat, comic ink with cel shading, soft clay, or hand-drawn doodle. */
   toon?: "flat" | "comic" | "soft" | "doodle";
   /** How generated abstract characters are drawn (unset: from toon). Your own characters keep theirs. */

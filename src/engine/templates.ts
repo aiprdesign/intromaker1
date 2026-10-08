@@ -1300,6 +1300,15 @@ export const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "abs-parade": "promise",
   "abs-chat": "quote",
   "abs-cheer": "cta",
+  "ind-hometour": "features",
+  "ind-build": "how",
+  "ind-site": "how",
+  "ind-care": "features",
+  "ind-menu": "features",
+  "ind-shop": "features",
+  "ind-lesson": "how",
+  "ind-team": "features",
+  "ind-route": "how",
   "service-spotlight": "features",
   "spotlight": "tour",
   "device-trio": "tour",
@@ -1390,10 +1399,17 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   const people = tpl.category === "Cartoon" ? plan.characters : undefined;
   const roles = people ? ABS_ROLES : tpl.roles;
   let prevSkill: SkillId | undefined;
+  const usedIndustry = new Set<SkillId>();
   const scenes = base.map((scene, i, all) => {
     const role = roleOf(scene, i, all.length);
     if (!role) return scene;
     let skill = roles[role] ?? DEFAULT_ROLE_SKILL[role];
+    // A Cartoon style shows the intro's industry its own way, once per part (see INDUSTRY_ROLES).
+    const ind = tpl.category === "Cartoon" && plan.setting ? INDUSTRY_ROLES[plan.setting]?.[role] : undefined;
+    if (ind && !usedIndustry.has(ind)) {
+      skill = ind;
+      usedIndustry.add(ind);
+    }
     if (role === "reveal" && !plan.brand?.logo) skill = people ? "abs-hello" : tpl.revealNoLogo;
     // In a Cartoon style a character slide wins over the director's words-only design (not over a
     // QR end card, a logo or product moment, or a slide that shows your pictures).
@@ -1405,7 +1421,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill) && !(CHARACTER_SLIDE.test(scene.skill) && CHARACTER_SLIDE.test(skill)) && !cartoonOver) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "ind-hometour", "ind-build", "ind-site", "ind-care", "ind-menu", "ind-shop", "ind-lesson", "ind-team", "ind-route", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser"].includes(scene.skill) && !(CHARACTER_SLIDE.test(scene.skill) && CHARACTER_SLIDE.test(skill)) && !cartoonOver) skill = scene.skill;
     // Pictures are never dropped for characters: the slide keeps them (and gets the companion).
     if (scene.media && CHARACTER_SLIDE.test(skill)) skill = CHARACTER_SLIDE.test(scene.skill) ? DEFAULT_ROLE_SKILL[role] : scene.skill;
     // No character slide twice in a row: the next one in its family steps in.
@@ -1468,8 +1484,24 @@ function staged(tpl: Template, look: Template["look"], setting: VideoPlan["setti
   return { ...look, backdrop: setting, aurora: 0, grid: false };
 }
 
+/** The industry slides a setting gets, by part of the story. */
+const INDUSTRY_ROLES: Partial<Record<NonNullable<VideoPlan["setting"]>, Partial<Record<Role, SkillId>>>> = {
+  house: { features: "ind-hometour", how: "ind-build", promise: "ind-build" },
+  home: { features: "ind-hometour", how: "ind-build" },
+  kitchen: { features: "ind-hometour" },
+  bedroom: { features: "ind-hometour" },
+  bathroom: { features: "ind-hometour" },
+  construction: { how: "ind-site", features: "ind-build" },
+  hospital: { features: "ind-care", how: "ind-care" },
+  cafe: { features: "ind-menu", demo: "ind-menu" },
+  shop: { features: "ind-shop", demo: "ind-shop" },
+  classroom: { how: "ind-lesson", features: "ind-lesson" },
+  office: { features: "ind-team", how: "ind-team" },
+  city: { how: "ind-route", promise: "ind-route" },
+};
+
 /** Character slides: switching characters swaps one for another rather than keeping the old one. */
-const CHARACTER_SLIDE = /^(char|pro|abs)-/;
+const CHARACTER_SLIDE = /^(char|pro|abs|ind)-/;
 
 /**
  * Stretch or compress scene lengths so the film lands on the requested length (within what

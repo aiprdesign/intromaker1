@@ -47,6 +47,7 @@ export function themePick(prompt: string): CharacterPick | undefined {
   if (/\b(kids?|children|child|toddlers?|preschool|kindergarten|parents?|parenting|families|family|babysit(?:ter|ting)?|daycare|nursery)\b/.test(p)) return { template: "cartoon", characters: "blob" };
   if (/\b(classroom|teachers?|teaching|tutors?|tutoring|homework|lessons?|school|schools|pupils|study buddy|flashcards?)\b/.test(p)) return { template: "cartoon", characters: "stick" };
   if (/\b(hiring|recruit(?:ing|ment|ers?)?|human resources|hr|onboarding new (?:hires|employees)|employee (?:wellbeing|engagement|experience)|team building|company culture|diversity|inclusion|volunteers?|volunteering|non-?profits?|charity|charities|community groups?)\b/.test(p)) return { template: "memphis" };
+  if (/\b(home ?builders?|house ?builders?|custom homes?|new[- ]build homes?|real estate|realtors?|estate agents?|show ?homes?)\b/.test(p)) return { template: "cartoon" };
   if (/\b(retro|vintage|nostalgic|old[- ]school|classic diner|since 19\d\d|1920s|1930s|1950s)\b/.test(p)) return { template: "comic", characters: "classic" };
   return undefined;
 }
@@ -58,13 +59,14 @@ export function themePick(prompt: string): CharacterPick | undefined {
  */
 export function scenePick(prompt: string): VideoPlan["setting"] {
   const p = prompt.toLowerCase();
+  if (/\b(home ?builders?|house ?builders?|custom homes?|new homes?|new[- ]build|real estate|realtors?|estate agents?|propert(?:y|ies) (?:listings?|developers?|management)|homes? for sale|house hunting|mortgages?|interior design(?:ers?)?|show ?homes?)\b/.test(p)) return "house";
   if (/\b(construction|builders?|building sites?|contractors?|renovations?|remodel(?:ing)?|roofing|plumb(?:ers?|ing)|electricians?|handyman|architects?|engineering firms?|civil engineering)\b/.test(p)) return "construction";
   if (/\b(hospitals?|clinics?|clinical|doctors?|nurses?|nursing|patients?|medical|health ?care|telehealth|dentists?|dental|pharmac(?:y|ies|ists?)|physio(?:therapy)?|caregivers?|care homes?)\b/.test(p)) return "hospital";
   if (/\b(classrooms?|schools?|teachers?|teaching|tutors?|tutoring|homework|lessons?|pupils|students?|study|studying|flashcards?|kindergarten|universit(?:y|ies)|college)\b/.test(p)) return "classroom";
   if (/\b(caf[eé]s?|coffee|baristas?|bakery|bakeries|restaurants?|diners?|bistros?|food trucks?|takeaway|brunch|tea rooms?)\b/.test(p)) return "cafe";
   if (/\b(shops?|stores?|retail|boutiques?|grocer(?:y|ies)|supermarkets?|point of sale|pos|checkout|inventory|e-?commerce|shopping)\b/.test(p)) return "shop";
-  if (/\b(real estate|realtors?|propert(?:y|ies)|deliver(?:y|ies)|couriers?|rides?|ride-?sharing|taxis?|parking|city|cities|urban|commut(?:e|ing|ers?)|travel|tourism|local business(?:es)?)\b/.test(p)) return "city";
-  if (/\b(homes?|households?|famil(?:y|ies)|parents?|parenting|chores|smart home|cleaning|cleaners|cooking|recipes?|pets?|babysit(?:ter|ting)?|elderly care|home care|interior design|furniture)\b/.test(p)) return "home";
+  if (/\b(propert(?:y|ies)|deliver(?:y|ies)|couriers?|rides?|ride-?sharing|taxis?|parking|city|cities|urban|commut(?:e|ing|ers?)|travel|tourism|local business(?:es)?)\b/.test(p)) return "city";
+  if (/\b(homes?|households?|famil(?:y|ies)|parents?|parenting|chores|smart home|cleaning|cleaners|cooking|recipes?|pets?|babysit(?:ter|ting)?|elderly care|home care|furniture)\b/.test(p)) return "home";
   if (/\b(offices?|teams?|workplace|coworkers?|colleagues|employees?|hiring|recruit(?:ing|ment|ers?)?|hr|onboarding|meetings?|crm|accounting|bookkeeping|invoic(?:e|es|ing)|payroll|b2b|saas|productivity|project management|startups?|consult(?:ing|ants?)|legal|lawyers?|finance|insurance)\b/.test(p)) return "office";
   return undefined;
 }

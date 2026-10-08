@@ -6,10 +6,10 @@
  * clock's hand, a crane's hook, a heart monitor, clouds, steam), so it carries on across cuts.
  * Accents take the video's own colours.
  */
-import { mixHex, rgba, rng, TAU } from "./math";
+import { clamp, ease, mixHex, rgba, rng, TAU } from "./math";
 import type { Palette, SkillContext } from "./types";
 
-export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe"] as const;
+export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house"] as const;
 export type SceneBackdrop = (typeof SCENES)[number];
 
 type C = CanvasRenderingContext2D;
@@ -334,8 +334,8 @@ function hospital(sc: SkillContext) {
   room(ctx, w, h, fy, ["#eef8f6", "#e1f1ee"], ["#d4e4e2", "#c4d8d5"], u);
   windowPane(ctx, w * 0.06, h * 0.12, h > w ? w * 0.34 : w * 0.18, h * 0.32, u, T);
   // A sign with a plus (not a red cross, which is a protected emblem).
-  const px = w * 0.5;
-  const py = h * 0.08;
+  const px = w * (h > w ? 0.5 : 0.36);
+  const py = h * 0.5;
   box(ctx, px - 30 * u, py, 60 * u, 60 * u, 12 * u, "#ffffff");
   ctx.fillStyle = "#22a39a";
   ctx.fillRect(px - 7 * u, py + 12 * u, 14 * u, 36 * u);
@@ -472,6 +472,7 @@ function home(sc: SkillContext) {
   box(ctx, sxx, fy - h * 0.16, sw, h * 0.1, 16 * u, sofa);
   box(ctx, sxx - 10 * u, fy - h * 0.1, sw + 20 * u, h * 0.08, 14 * u, mixHex(sofa, "#000000", 0.08));
   plant(ctx, w * 0.34, fy, h * 0.14, T, "#e8e2d8");
+  drawDog(ctx, w * 0.82, fy + h * 0.12, h * 0.09, T, "#d9a066", -1);
 }
 
 function shop(sc: SkillContext) {
@@ -500,8 +501,8 @@ function shop(sc: SkillContext) {
   };
   shelves(w * 0.03, w * 0.2);
   shelves(w * 0.77, w * 0.2);
-  // Hanging lights.
-  for (const x of [w * 0.38, w * 0.62]) {
+  // Hanging lights, over the shelves (clear of the headline).
+  for (const x of [w * 0.13, w * 0.87]) {
     ctx.fillStyle = "#4a5165";
     ctx.fillRect(x - 1.5 * u, h * 0.07, 3 * u, h * 0.08);
     ctx.beginPath();
@@ -527,7 +528,8 @@ function cafe(sc: SkillContext) {
   box(ctx, mx, h * 0.14, w * 0.18, h * 0.3, 8 * u, mixHex("#3a3f4c", palette.primary, 0.18));
   ctx.fillStyle = "rgba(255,255,255,0.75)";
   for (let i = 0; i < 4; i++) box(ctx, mx + 16 * u, h * (0.19 + i * 0.06), w * 0.18 - 32 * u - (i % 2) * 30 * u, 6 * u, 3 * u, "rgba(255,255,255,0.7)");
-  for (const x of [w * 0.4, w * 0.6, w * 0.8]) {
+  // (At the side, clear of the headline.)
+  for (const x of [w * 0.93]) {
     ctx.fillStyle = "#3a3f4c";
     ctx.fillRect(x - 1.5 * u, 0, 3 * u, h * 0.12);
     ctx.beginPath();
@@ -567,7 +569,446 @@ function cafe(sc: SkillContext) {
   plant(ctx, w * 0.3, fy, h * 0.15, T, "#d9cbb8");
 }
 
-const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe };
+
+/* ───────────────────────── Homes ───────────────────────── */
+
+/**
+ * A friendly cartoon dog, side on, standing on `groundY` and facing right (`dir` −1: left), `s`
+ * tall. Its tail wags and it breathes on the video's clock; `walk` (a phase) trots its legs.
+ */
+export function drawDog(ctx: C, x: number, groundY: number, s: number, T: number, coat = "#d9a066", dir = 1, walk?: number) {
+  const dark = mixHex(coat, "#000000", 0.28);
+  const light = mixHex(coat, "#ffffff", 0.55);
+  ctx.save();
+  ctx.translate(x, groundY);
+  ctx.scale(dir, 1);
+  ctx.lineCap = "round";
+  ctx.fillStyle = "rgba(20,10,40,0.14)";
+  ctx.beginPath();
+  ctx.ellipse(0, s * 0.02, s * 0.6, s * 0.06, 0, 0, TAU);
+  ctx.fill();
+  const breathe = Math.sin(T * 3) * s * 0.01;
+  // Legs (the far pair darker), the tail, then the body and head.
+  for (const [lx, far] of [[-0.32, true], [0.3, true], [-0.24, false], [0.38, false]] as const) {
+    const ph = walk === undefined ? 0 : Math.sin(walk + (lx > 0 ? 0 : Math.PI) + (far ? Math.PI : 0)) * s * 0.08;
+    ctx.strokeStyle = far ? dark : coat;
+    ctx.lineWidth = s * 0.11;
+    ctx.beginPath();
+    ctx.moveTo(lx * s, -s * 0.42);
+    ctx.lineTo(lx * s + ph, -s * 0.06);
+    ctx.stroke();
+  }
+  const wag = Math.sin(T * 9) * 0.5;
+  ctx.strokeStyle = coat;
+  ctx.lineWidth = s * 0.08;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.4, -s * 0.55);
+  ctx.quadraticCurveTo(-s * 0.6, -s * 0.7, -s * 0.58 - Math.sin(wag) * s * 0.12, -s * 0.9 + Math.abs(wag) * s * 0.05);
+  ctx.stroke();
+  ctx.fillStyle = coat;
+  ctx.beginPath();
+  ctx.ellipse(0, -s * 0.52 - breathe, s * 0.46, s * 0.2 + breathe, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.08, -s * 0.42, s * 0.26, s * 0.08, 0, 0, TAU);
+  ctx.fill();
+  // Head with a snout, a floppy ear, an eye and a nose; a collar in the brand's colour.
+  const hx = s * 0.46;
+  const hy = -s * 0.82 - breathe;
+  ctx.fillStyle = coat;
+  ctx.beginPath();
+  ctx.arc(hx, hy, s * 0.2, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.ellipse(hx + s * 0.17, hy + s * 0.06, s * 0.13, s * 0.09, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.ellipse(hx - s * 0.08, hy + s * 0.04, s * 0.08, s * 0.17, 0.35 + Math.sin(T * 9) * 0.06, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#1d1b26";
+  ctx.beginPath();
+  ctx.arc(hx + s * 0.3, hy + s * 0.03, s * 0.045, 0, TAU);
+  ctx.fill();
+  const blink = (T * 0.7) % 3 < 0.08;
+  if (blink) ctx.fillRect(hx + s * 0.04, hy - s * 0.04, s * 0.06, s * 0.012);
+  else {
+    ctx.beginPath();
+    ctx.arc(hx + s * 0.07, hy - s * 0.04, s * 0.03, 0, TAU);
+    ctx.fill();
+  }
+  ctx.strokeStyle = brand?.primary ?? "#e0524c";
+  ctx.lineWidth = s * 0.05;
+  ctx.beginPath();
+  ctx.arc(hx - s * 0.02, hy + s * 0.02, s * 0.2, 1.7, 2.6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A kitchen: cabinets in the brand's colour, a hob with a steaming pot, a sink and a fridge. */
+function kitchen(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f7f4ee", "#efe9df"], ["#cfc6b8", "#bdb3a3"], u);
+  // A tiled splashback band and a window over the sink.
+  const counterY = fy - h * 0.2;
+  ctx.fillStyle = rgba(mixHex(palette.primary, "#ffffff", 0.7), 0.55);
+  ctx.fillRect(0, counterY - h * 0.16, w, h * 0.16);
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.lineWidth = 2 * u;
+  for (let x = 0; x < w; x += 30 * u) {
+    ctx.beginPath();
+    ctx.moveTo(x, counterY - h * 0.16);
+    ctx.lineTo(x, counterY);
+    ctx.stroke();
+  }
+  for (let y = counterY - h * 0.16; y < counterY; y += 22 * u) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  const port = h > w;
+  windowPane(ctx, w * 0.4, h * 0.1, port ? w * 0.3 : w * 0.2, h * 0.2, u, T);
+  // Upper cabinets in the brand's colour at the sides, with handles.
+  const cab = mixHex(palette.primary, "#ffffff", 0.35);
+  for (const [x0, cw] of [[w * 0.02, w * 0.3], [w * 0.68, w * 0.3]] as const) {
+    for (let i = 0; i < 3; i++) {
+      box(ctx, x0 + (i * cw) / 3 + 3 * u, h * 0.1, cw / 3 - 6 * u, h * 0.17, 6 * u, cab);
+      box(ctx, x0 + (i * cw) / 3 + cw / 6 - 10 * u, h * 0.24, 20 * u, 4 * u, 2 * u, "#ffffff");
+    }
+  }
+  // The counter run: base cabinets, a worktop, a hob with a steaming pot, a sink and a fridge.
+  box(ctx, 0, counterY, w * 0.84, fy - counterY, 0, mixHex(cab, "#000000", 0.08));
+  for (let x = 0; x < w * 0.84; x += w * 0.12) box(ctx, x + w * 0.05, counterY + h * 0.05, 26 * u, 5 * u, 2 * u, "#ffffff");
+  box(ctx, 0, counterY - 10 * u, w * 0.86, 14 * u, 4 * u, "#f3efe8");
+  const hob = w * 0.18;
+  box(ctx, hob, counterY - 14 * u, w * 0.1, 6 * u, 2 * u, "#3a3f4c");
+  box(ctx, hob + w * 0.015, counterY - 14 * u - h * 0.07, w * 0.07, h * 0.07, 8 * u, "#9aa3b2");
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.lineWidth = 3 * u;
+  for (let k = 0; k < 3; k++) {
+    ctx.beginPath();
+    for (let i = 0; i <= 10; i++) {
+      const f = i / 10;
+      const x = hob + w * 0.03 + k * w * 0.016 + Math.sin(f * 6 + T * 3 + k) * 4 * u;
+      const y = counterY - 14 * u - h * 0.08 - f * h * 0.08;
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
+  box(ctx, w * 0.46, counterY - 6 * u, w * 0.12, 8 * u, 3 * u, "#b8bfcc");
+  ctx.fillStyle = "#9aa3b2";
+  ctx.fillRect(w * 0.515, counterY - h * 0.07, 5 * u, h * 0.065);
+  ctx.fillRect(w * 0.515, counterY - h * 0.07, 22 * u, 5 * u);
+  const fx = w * 0.86;
+  box(ctx, fx, fy - h * 0.52, w * 0.12, h * 0.52, 10 * u, "#e9edf3");
+  ctx.fillStyle = "#c9d0da";
+  ctx.fillRect(fx, fy - h * 0.32, w * 0.12, 3 * u);
+  box(ctx, fx + 10 * u, fy - h * 0.48, 6 * u, h * 0.1, 3 * u, "#9aa3b2");
+  box(ctx, fx + 10 * u, fy - h * 0.28, 6 * u, h * 0.12, 3 * u, "#9aa3b2");
+  // Pendant lights and a fruit bowl.
+  for (const x of [w * 0.34, w * 0.6]) {
+    ctx.fillStyle = "#3a3f4c";
+    ctx.fillRect(x - 1.5 * u, 0, 3 * u, h * 0.06);
+    ctx.fillStyle = palette.accent;
+    ctx.beginPath();
+    ctx.arc(x, h * 0.075, 18 * u, Math.PI, 0);
+    ctx.fill();
+  }
+  box(ctx, w * 0.66, counterY - 26 * u, 46 * u, 16 * u, 8 * u, "#ffffff");
+  for (const [dx, col] of [[8, "#f2b632"], [22, "#e0524c"], [36, "#7fbf5a"]] as const) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(w * 0.66 + dx * u, counterY - 28 * u, 7 * u, 0, TAU);
+    ctx.fill();
+  }
+}
+
+function bedroom(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f1eef8", "#e6e1f1"], ["#d6b896", "#c7a682"], u);
+  const port = h > w;
+  windowPane(ctx, w * 0.06, h * 0.12, port ? w * 0.3 : w * 0.17, h * 0.3, u, T);
+  // Pictures over the bed, a bed with a headboard, pillows and a blanket in the brand's colour.
+  const bx = w * 0.5;
+  const bw = port ? w * 0.6 : w * 0.34;
+  box(ctx, bx - w * 0.08, h * 0.15, w * 0.07, h * 0.1, 4 * u, "#c79b74");
+  box(ctx, bx - w * 0.075, h * 0.16, w * 0.06, h * 0.08, 3 * u, mixHex(palette.secondary, "#ffffff", 0.5));
+  box(ctx, bx + w * 0.01, h * 0.15, w * 0.07, h * 0.1, 4 * u, "#c79b74");
+  box(ctx, bx + w * 0.015, h * 0.16, w * 0.06, h * 0.08, 3 * u, mixHex(palette.accent, "#ffffff", 0.5));
+  const hb = mixHex(palette.secondary, "#6b5a7a", 0.45);
+  box(ctx, bx - bw / 2, fy - h * 0.32, bw, h * 0.2, 18 * u, hb);
+  box(ctx, bx - bw / 2 - 6 * u, fy - h * 0.15, bw + 12 * u, h * 0.1, 10 * u, "#ffffff");
+  box(ctx, bx - bw * 0.42, fy - h * 0.2, bw * 0.3, h * 0.06, 12 * u, "#ffffff");
+  box(ctx, bx + bw * 0.12, fy - h * 0.2, bw * 0.3, h * 0.06, 12 * u, "#ffffff");
+  box(ctx, bx - bw / 2 - 6 * u, fy - h * 0.14, bw + 12 * u, h * 0.09, 10 * u, palette.primary);
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillRect(bx - bw / 2 - 6 * u, fy - h * 0.12, bw + 12 * u, 5 * u);
+  ctx.fillStyle = "#8a6a4c";
+  ctx.fillRect(bx - bw / 2, fy - h * 0.05, 8 * u, h * 0.05);
+  ctx.fillRect(bx + bw / 2 - 8 * u, fy - h * 0.05, 8 * u, h * 0.05);
+  // Nightstands with a lamp that glows softly, and a plant.
+  for (const s2 of [-1, 1]) {
+    const nx = bx + s2 * (bw / 2 + w * 0.06);
+    box(ctx, nx - w * 0.035, fy - h * 0.12, w * 0.07, h * 0.12, 6 * u, "#c79b74");
+    if (s2 < 0) {
+      ctx.fillStyle = "#6b5a4c";
+      ctx.fillRect(nx - 2 * u, fy - h * 0.2, 4 * u, h * 0.08);
+      ctx.fillStyle = "#ffe2a8";
+      ctx.beginPath();
+      ctx.moveTo(nx - 20 * u, fy - h * 0.19);
+      ctx.lineTo(nx + 20 * u, fy - h * 0.19);
+      ctx.lineTo(nx + 12 * u, fy - h * 0.25);
+      ctx.lineTo(nx - 12 * u, fy - h * 0.25);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,226,140,${0.18 + Math.sin(T * 1.5) * 0.04})`;
+      ctx.beginPath();
+      ctx.arc(nx, fy - h * 0.2, 60 * u, 0, TAU);
+      ctx.fill();
+    } else box(ctx, nx - 14 * u, fy - h * 0.16, 28 * u, h * 0.04, 4 * u, mixHex(palette.primary, "#ffffff", 0.5));
+  }
+  plant(ctx, w * 0.9, fy, h * 0.16, T, "#e8e2d8");
+  ctx.fillStyle = rgba(palette.secondary, 0.3);
+  ctx.beginPath();
+  ctx.ellipse(bx, fy + h * 0.1, bw * 0.7, h * 0.045, 0, 0, TAU);
+  ctx.fill();
+}
+
+function bathroom(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eef6f8", "#e2eef1"], ["#c9d6da", "#b7c7cc"], u);
+  // Tiles on the lower wall.
+  const tileTop = h * 0.4;
+  ctx.fillStyle = rgba(mixHex(palette.primary, "#ffffff", 0.6), 0.5);
+  ctx.fillRect(0, tileTop, w, fy - tileTop);
+  ctx.strokeStyle = "rgba(255,255,255,0.8)";
+  ctx.lineWidth = 2 * u;
+  for (let x = 0; x < w; x += 34 * u) {
+    ctx.beginPath();
+    ctx.moveTo(x, tileTop);
+    ctx.lineTo(x, fy);
+    ctx.stroke();
+  }
+  for (let y = tileTop; y < fy; y += 34 * u) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  // A bathtub with bubbles that drift up, and a shower head.
+  const tx = w * 0.04;
+  const tw = h > w ? w * 0.5 : w * 0.32;
+  const ty = fy - h * 0.16;
+  ctx.fillStyle = "#9aa3b2";
+  ctx.fillRect(tx + tw * 0.12, h * 0.2, 5 * u, ty - h * 0.2);
+  box(ctx, tx + tw * 0.12 - 14 * u, h * 0.2, 34 * u, 10 * u, 5 * u, "#9aa3b2");
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  const r = rng(31);
+  for (let i = 0; i < 14; i++) {
+    const bx = tx + r() * tw;
+    const rise = ((T * 0.25 + r()) % 1) * h * 0.08;
+    ctx.beginPath();
+    ctx.arc(bx, ty - 4 * u - rise * (i % 3 === 0 ? 1 : 0.2), (6 + r() * 12) * u, 0, TAU);
+    ctx.fill();
+  }
+  box(ctx, tx, ty, tw, h * 0.13, 18 * u, "#ffffff");
+  ctx.fillStyle = "#e3e8ee";
+  ctx.fillRect(tx + 10 * u, ty + h * 0.1, tw - 20 * u, 4 * u);
+  ctx.fillStyle = "#c9a26b";
+  ctx.fillRect(tx + 16 * u, fy - h * 0.03, 8 * u, h * 0.03);
+  ctx.fillRect(tx + tw - 24 * u, fy - h * 0.03, 8 * u, h * 0.03);
+  // A vanity with a sink, a round mirror, a towel in the brand's colour and a plant.
+  const vx = w * 0.62;
+  const vw = w * 0.2;
+  box(ctx, vx, fy - h * 0.16, vw, h * 0.16, 8 * u, mixHex(palette.secondary, "#8a6a4c", 0.5));
+  box(ctx, vx - 6 * u, fy - h * 0.18, vw + 12 * u, h * 0.025, 5 * u, "#ffffff");
+  box(ctx, vx + vw * 0.3, fy - h * 0.2, vw * 0.4, h * 0.025, 8 * u, "#e9edf3");
+  ctx.fillStyle = "#9aa3b2";
+  ctx.fillRect(vx + vw / 2 - 2 * u, fy - h * 0.25, 4 * u, h * 0.05);
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(vx + vw / 2, h * 0.27, Math.min(w, h) * 0.1, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = skyT("#d9eef7");
+  ctx.beginPath();
+  ctx.arc(vx + vw / 2, h * 0.27, Math.min(w, h) * 0.088, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillRect(vx + vw / 2 - Math.min(w, h) * 0.04, h * 0.22, 6 * u, Math.min(w, h) * 0.06);
+  const rx = w * 0.88;
+  ctx.fillStyle = "#9aa3b2";
+  ctx.fillRect(rx - 30 * u, h * 0.36, 60 * u, 4 * u);
+  box(ctx, rx - 24 * u, h * 0.36, 48 * u, h * 0.16, 6 * u, palette.primary);
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillRect(rx - 24 * u, h * 0.47, 48 * u, 4 * u);
+  plant(ctx, w * 0.93, fy, h * 0.13, T, "#ffffff");
+}
+
+/**
+ * A custom-built home outside: two storeys with a gable roof, big windows, a front door and a
+ * garage, built up to `p` (0 → 1: the slab, the frame, walls and windows, the roof and the
+ * finishing touches). `W` is its width, standing on `groundY`.
+ */
+export function drawHouse(ctx: C, cx: number, groundY: number, W: number, p: number, T: number, pal: Palette, u: number) {
+  const H = W * 0.62;
+  const left = cx - W / 2;
+  const body = W * 0.68;
+  const gx = left + body;
+  const wall = mixHex(pal.primary, "#ffffff", 0.82);
+  const trim = mixHex(pal.primary, "#1d1b26", 0.35);
+  const roof = mixHex(pal.primary, "#2a2633", 0.25);
+  const k = (a: number, b: number) => clamp((p - a) / (b - a));
+  // 1. The slab.
+  const slab = k(0, 0.18);
+  if (slab > 0) box(ctx, left - W * 0.02, groundY - W * 0.025, (W + W * 0.04) * slab, W * 0.025, 3 * u, "#b9b2a8");
+  // 2. The frame: studs rising.
+  const frame = k(0.15, 0.42);
+  const walls = k(0.38, 0.66);
+  const roofK = k(0.6, 0.85);
+  const finish = k(0.82, 1);
+  const top = groundY - H * 0.7;
+  if (frame > 0 && walls < 1) {
+    ctx.strokeStyle = "#c79b74";
+    ctx.lineWidth = Math.max(2, W * 0.008);
+    const studs = 10;
+    for (let i = 0; i <= studs; i++) {
+      const x = left + (body * i) / studs;
+      const hh = (groundY - top) * clamp(frame * 1.4 - (i / studs) * 0.4);
+      ctx.beginPath();
+      ctx.moveTo(x, groundY - W * 0.025);
+      ctx.lineTo(x, groundY - W * 0.025 - hh);
+      ctx.stroke();
+    }
+    for (const yy of [top, (top + groundY) / 2]) {
+      if (frame < 0.8) continue;
+      ctx.beginPath();
+      ctx.moveTo(left, yy);
+      ctx.lineTo(left + body, yy);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= 4; i++) {
+      const x = gx + ((W - body) * i) / 4;
+      ctx.beginPath();
+      ctx.moveTo(x, groundY - W * 0.025);
+      ctx.lineTo(x, groundY - W * 0.025 - (groundY - top) * 0.55 * frame);
+      ctx.stroke();
+    }
+  }
+  // 3. Walls and windows, cladding up from the ground.
+  if (walls > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left - W * 0.05, groundY - (groundY - top + W * 0.05) * walls, W * 1.1, (groundY - top + W * 0.05) * walls + 2);
+    ctx.clip();
+    box(ctx, left, top, body, groundY - top - W * 0.025, 4 * u, wall);
+    const gTop = groundY - (groundY - top) * 0.55;
+    box(ctx, gx, gTop, W - body, groundY - gTop - W * 0.025, 4 * u, mixHex(wall, "#000000", 0.04));
+    // Garage door with panels.
+    box(ctx, gx + (W - body) * 0.12, gTop + (groundY - gTop) * 0.22, (W - body) * 0.76, (groundY - gTop) * 0.7, 4 * u, "#e9edf3");
+    ctx.fillStyle = "#cfd6e0";
+    for (let i = 1; i < 4; i++) ctx.fillRect(gx + (W - body) * 0.12, gTop + (groundY - gTop) * (0.22 + i * 0.17), (W - body) * 0.76, 2 * u);
+    // Windows (warm light inside) and the front door in the brand's colour.
+    const win = (x: number, y: number, ww: number, wh: number) => {
+      box(ctx, x - 4 * u, y - 4 * u, ww + 8 * u, wh + 8 * u, 4 * u, trim);
+      box(ctx, x, y, ww, wh, 2 * u, mixHex("#ffe2a8", "#bfe3ff", 0.5 + Math.sin(T * 0.6 + x) * 0.1));
+      ctx.fillStyle = trim;
+      ctx.fillRect(x + ww / 2 - 1.5 * u, y, 3 * u, wh);
+    };
+    const fh = (groundY - top) / 2;
+    win(left + body * 0.1, top + fh * 0.22, body * 0.3, fh * 0.52);
+    win(left + body * 0.58, top + fh * 0.22, body * 0.3, fh * 0.52);
+    win(left + body * 0.08, top + fh * 1.2, body * 0.4, fh * 0.55);
+    box(ctx, left + body * 0.62, top + fh * 1.12, body * 0.2, fh * 0.86 - W * 0.025, 4 * u, pal.primary);
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(left + body * 0.79, top + fh * 1.6, 3.5 * u, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 4. The roof drops into place.
+  if (roofK > 0) {
+    const drop = (1 - ease.outCubic(roofK)) * -W * 0.25;
+    ctx.save();
+    ctx.globalAlpha *= clamp(roofK * 3);
+    ctx.fillStyle = roof;
+    ctx.beginPath();
+    ctx.moveTo(left - W * 0.04, top + drop);
+    ctx.lineTo(left + body / 2, top - H * 0.36 + drop);
+    ctx.lineTo(left + body + W * 0.04, top + drop);
+    ctx.closePath();
+    ctx.fill();
+    const gTop = groundY - (groundY - top) * 0.55;
+    ctx.fillRect(gx - W * 0.01, gTop - W * 0.03 + drop, W - body + W * 0.04, W * 0.035);
+    ctx.fillStyle = mixHex(roof, "#ffffff", 0.15);
+    ctx.fillRect(left + body * 0.7, top - H * 0.3 + drop, body * 0.08, H * 0.18);
+    ctx.restore();
+  }
+  // 5. Finishing touches: a path, a hedge, a tree and a light over the door.
+  if (finish > 0) {
+    ctx.save();
+    ctx.globalAlpha *= finish;
+    ctx.fillStyle = "#e6dccb";
+    ctx.beginPath();
+    ctx.moveTo(left + body * 0.64, groundY);
+    ctx.lineTo(left + body * 0.8, groundY);
+    ctx.lineTo(left + body * 0.86, groundY + W * 0.06);
+    ctx.lineTo(left + body * 0.58, groundY + W * 0.06);
+    ctx.fill();
+    ctx.fillStyle = "#5fb36f";
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.arc(left + body * (0.05 + i * 0.1), groundY - W * 0.02, W * 0.035, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+/** The house outside, on a lawn under the sky, with the dog in the garden. */
+function house(sc: SkillContext) {
+  const { ctx, w, h, u, seed, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  sky(ctx, w, h, T, u, seed);
+  const ground = h * 0.76;
+  // Distant hills, the lawn, a fence and trees.
+  ctx.fillStyle = mixHex("#bfe3b0", palette.secondary, 0.1);
+  ctx.beginPath();
+  ctx.ellipse(w * 0.2, ground, w * 0.4, h * 0.12, 0, Math.PI, 0);
+  ctx.ellipse(w * 0.85, ground, w * 0.35, h * 0.1, 0, Math.PI, 0);
+  ctx.fill();
+  const lawn = ctx.createLinearGradient(0, ground, 0, h);
+  lawn.addColorStop(0, "#8fd17a");
+  lawn.addColorStop(1, "#6fbf62");
+  ctx.fillStyle = lawn;
+  ctx.fillRect(0, ground, w, h - ground);
+  const port = h > w;
+  const HW = port ? w * 0.7 : w * 0.36;
+  const hx = port ? w * 0.5 : w * 0.3;
+  drawHouse(ctx, hx, ground, HW, 1, T, palette, u);
+  ctx.fillStyle = "#ffffff";
+  for (let x = hx + HW * 0.55; x < w; x += 22 * u) box(ctx, x, ground - h * 0.06, 10 * u, h * 0.06, 4 * u, "#ffffff");
+  ctx.fillRect(hx + HW * 0.55, ground - h * 0.045, w, 5 * u);
+  for (const tx of [w * 0.06, w * 0.93]) {
+    ctx.fillStyle = "#8a5a3b";
+    ctx.fillRect(tx - 5 * u, ground - h * 0.14, 10 * u, h * 0.14);
+    ctx.fillStyle = "#4caf6a";
+    ctx.beginPath();
+    ctx.arc(tx + Math.sin(T + tx) * 2 * u, ground - h * 0.2, h * 0.08, 0, TAU);
+    ctx.fill();
+  }
+  drawDog(ctx, w * (port ? 0.78 : 0.62), ground + h * 0.08, h * 0.09, T, "#d9a066", -1);
+}
+
+const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house };
 
 /** Draw a cartoon scene background, if `backdrop` is one. Returns whether it drew. */
 export function sceneStage(sc: SkillContext, backdrop: string | undefined) {
