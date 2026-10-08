@@ -2630,7 +2630,8 @@ function sanitizeBase(b: unknown): Scene["base"] {
   const o = b as Record<string, unknown>;
   const ok = (v: unknown) => typeof v === "string" && (SKILL_IDS as readonly string[]).includes(v);
   if (!ok(o.skill) || !ok(o.styled) || typeof o.text !== "string" || typeof o.shown !== "string") return undefined;
-  return { skill: o.skill as SkillId, styled: o.styled as SkillId, text: o.text.slice(0, 200), shown: o.shown.slice(0, 200) };
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 8).map((x) => x.slice(0, 120)) : undefined);
+  return { skill: o.skill as SkillId, styled: o.styled as SkillId, text: o.text.slice(0, 200), shown: o.shown.slice(0, 200), items: list(o.items), lent: list(o.lent), subtext: typeof o.subtext === "string" ? o.subtext.slice(0, 100) : undefined };
 }
 
 function sanitizeMedia(m: unknown): Media | undefined {

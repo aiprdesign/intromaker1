@@ -974,8 +974,9 @@ function proExplainer(sc: SkillContext) {
   const icons = iconsFor(P.map((p) => p.title), sc);
   const room = st.bottom - st.top;
   const cur = T.reduce((c, ti, i) => (t >= ti - 0.05 ? i : c), -1);
-  const card = narrow ? { x: st.left, y: st.top, w: st.width, h: room * 0.52 } : { x: st.left + st.width * 0.38, y: st.top + room * 0.04, w: st.width * 0.62, h: room * 0.92 };
-  const H = narrow ? room * 0.46 : room * 1.02;
+  // (Vertical frames: the card above, the presenter below with clear space for the head and the raised arm.)
+  const card = narrow ? { x: st.left, y: st.top, w: st.width, h: room * 0.42 } : { x: st.left + st.width * 0.38, y: st.top + room * 0.04, w: st.width * 0.62, h: room * 0.92 };
+  const H = narrow ? room * 0.5 : room * 1.02;
   const cx = narrow ? st.left + st.width * 0.3 : st.left + st.width * 0.17;
   const ground = st.bottom;
   ctx.save();

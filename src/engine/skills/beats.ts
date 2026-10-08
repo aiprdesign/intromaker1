@@ -22,9 +22,8 @@ import { findHotspots, getImage, getMedia, mediaSize, type Drawable } from "../m
 import { arrow3d, bezierPts, clickRipple, drawCursor, drawIcon, glassCard, iconsFor, pill, pillWidth, saasBackground, spring } from "../saasfx";
 import { fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
-import { mockShot } from "./gallery";
+import { mobileUI } from "../uiscreens";
 import { checkBadge, cursorPath, iconTile } from "./interactions";
-import { drawCover } from "./media";
 import { fitTimes } from "./moments";
 import { topHeadline } from "./saas";
 
@@ -226,16 +225,23 @@ function phoneTiming(scene: Scene) {
 }
 
 /** The screen's picture: the full-page screenshot (tall, so it scrolls) when there is one. */
-function phoneShot(sc: SkillContext): { img: Drawable | HTMLCanvasElement; tall: boolean } {
+function phoneShot(sc: SkillContext): { img: Drawable | HTMLCanvasElement; tall: boolean; designed?: boolean } {
   const { scene, brand, t, palette, seed } = sc;
-  const media = getMedia(scene.media ?? (brand?.images[0] ? { src: brand.images[0], kind: "image" } : undefined), t);
+  const own = getMedia(scene.media, t);
+  if (own) {
+    const { w, h } = mediaSize(own);
+    return { img: own, tall: h > w * 1.4 };
+  }
+  // The site as a phone shows it (the mobile capture) beats the desktop page squeezed in.
+  const mobile = brand?.mobile && !scene.media ? getImage(brand.mobile) : null;
+  if (mobile && mobile.naturalWidth && mobile.naturalHeight > mobile.naturalWidth * 1.4) return { img: mobile, tall: true };
   const page = brand?.page?.src ? getImage(brand.page.src) : null;
   if (page && page.naturalWidth && page.naturalHeight > page.naturalWidth * 1.4 && !scene.media) return { img: page, tall: true };
-  if (media) {
-    const { w, h } = mediaSize(media as Drawable);
-    return { img: media, tall: h > w * 1.4 };
-  }
-  return { img: mockShot(palette, seed, 1), tall: false };
+  // A tall picture of the site's (a phone screenshot) next; a wide desktop one would only show a sliver.
+  const pic = brand?.images[0] ? getImage(brand.images[0]) : null;
+  if (pic && pic.naturalWidth && pic.naturalHeight > pic.naturalWidth * 1.4) return { img: pic, tall: true };
+  // No pictures: a designed mobile app screen in the video's colours.
+  return { img: mobileUI(palette, brand?.name ?? "", seed), tall: true, designed: true };
 }
 
 function phoneTour(sc: SkillContext) {
@@ -296,13 +302,22 @@ function phoneTour(sc: SkillContext) {
   const sk = ease.inOutCubic(range(t, T.scroll, T.taps[2] + 0.4));
   const top = sy + sh * 0.06;
   const vh = sh - (top - sy);
-  if (shot.tall) {
-    // A tall page scrolls by, pausing a little at each tap.
-    const { w: iw, h: ih } = mediaSize(shot.img as Drawable);
-    const s = sw / iw;
-    const travel = Math.max(0, ih * s - vh);
-    ctx.drawImage(shot.img, sx, top - travel * sk * 0.85, sw, ih * s);
-  } else drawCover(ctx, shot.img as Drawable, sx, top, sw, vh, 1.04, 0.2 + 0.6 * sk, 0.15);
+  // The screen scrolls vertically, as a phone does: a tall page scrolls by at full width; a shorter
+  // picture fills the screen a little larger and glides down it.
+  const { w: iw, h: ih } = shot.img instanceof HTMLCanvasElement ? { w: shot.img.width, h: shot.img.height } : mediaSize(shot.img as Drawable);
+  const travel = iw ? Math.max(0, (ih * sw) / iw - vh) : 0;
+  if (iw && ih) {
+    // (The designed screen has its own status bar: it starts at the glass's top, under the phone's.)
+    if (shot.designed) ctx.drawImage(shot.img, sx, sy - Math.max(0, (ih * sw) / iw - sh) * sk, sw, (ih * sw) / iw);
+    else if (shot.tall) ctx.drawImage(shot.img, sx, top - travel * sk * 0.85, sw, (ih * sw) / iw);
+    else {
+      // Cover the screen a little larger than it, and glide down the picture.
+      const s = Math.max(sw / iw, vh / ih) * 1.18;
+      const dw = iw * s;
+      const dh = ih * s;
+      ctx.drawImage(shot.img, sx + (sw - dw) / 2, top - (dh - vh) * (0.1 + 0.8 * sk), dw, dh);
+    }
+  }
   // Status bar: the island, signal and battery (no clock, no numbers).
   ctx.fillStyle = palette.light ? "#ffffff" : palette.bg1;
   ctx.fillRect(sx, sy, sw, top - sy);

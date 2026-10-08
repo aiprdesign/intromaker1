@@ -263,7 +263,6 @@ const PICTURE: Partial<Record<SkillId, Kind>> = {
   "device-trio": "ui",
   "exploded-ui": "ui",
   "comment-pins": "ui",
-  "phone-tour": "ui",
   "before-after": "ui",
   "product-showcase": "ui",
   "type-mask": "photo",

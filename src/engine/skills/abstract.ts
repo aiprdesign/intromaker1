@@ -541,9 +541,10 @@ function absCrowd(sc: SkillContext) {
     const row = i < back ? 0 : 1;
     const k = row ? i - back : i;
     const count = row ? n - back : back;
-    const H = room * (row ? 0.62 : 0.5);
+    // Sized to their slot too, so a tall vertical frame doesn't blow the crowd up past its edges.
+    const H = Math.min(room * (row ? 0.62 : 0.5), (st.width / count) * (row ? 2.3 : 2.1));
     const x = st.left + (st.width * (k + (row ? 0.5 : 1))) / (row ? count : count + 1);
-    const ground = row ? st.bottom : st.bottom - room * 0.16;
+    const ground = row ? st.bottom : st.bottom - H * 0.3;
     return { i, x, H, ground };
   });
   for (const p of people) {

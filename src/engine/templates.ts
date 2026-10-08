@@ -1415,13 +1415,17 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   const people = tpl.category === "Cartoon" ? plan.characters : undefined;
   const roles = people ? ABS_ROLES : tpl.roles;
   let prevSkill: SkillId | undefined;
+  const used = new Set<SkillId>();
   const usedIndustry = new Set<SkillId>();
   const scenes = base.map((cur, i, all): Scene => {
     // Restyle from the director's choice, not the last style's: while the slide still shows what a
     // style made of it, its pre-style skill and words come back (an edit since then wins).
     const b = cur.base;
     const restyled = !!b && !cur.locked && cur.skill === b.styled;
-    const scene: Scene = restyled ? { ...cur, skill: b.skill, text: cur.text === b.shown ? b.text : cur.text } : cur;
+    const lentBack = restyled && !!b.lent && JSON.stringify(cur.items) === JSON.stringify(b.lent);
+    const scene: Scene = restyled
+      ? { ...cur, skill: b.skill, text: cur.text === b.shown ? b.text : cur.text, ...(lentBack ? { items: b.items } : {}), ...(b.subtext && !cur.subtext ? { subtext: b.subtext } : {}) }
+      : cur;
     const role = roleOf(scene, i, all.length);
     if (!role) return { ...scene, base: undefined };
     let skill = roles[role] ?? DEFAULT_ROLE_SKILL[role];
@@ -1458,14 +1462,26 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (scene.media && CHARACTER_SLIDE.test(skill)) skill = CHARACTER_SLIDE.test(scene.skill) ? DEFAULT_ROLE_SKILL[role] : scene.skill;
     // A slide style you picked yourself stays, whatever the template would choose.
     if (scene.locked) skill = scene.skill;
-    // No character slide twice in a row: the next one in its family steps in.
+    // No character slide twice in a row, and a middle slide's layout not twice in a video while
+    // its family has another: one that suits the slide steps in (a slide without a list prefers
+    // one that needs none).
     const prev = i > 0 ? prevSkill : undefined;
-    if (prev === skill && CHARACTER_SLIDE.test(skill) && !scene.locked) {
-      const pool = CHARACTER_POOLS.find((p) => p.includes(skill) || p[0].slice(0, 4) === skill.slice(0, 4));
-      const alt = pool?.find((x) => x !== skill);
-      if (alt) skill = alt;
+    const pool = CHARACTER_SLIDE.test(skill) ? CHARACTER_POOLS.find((p) => p.includes(skill) || p[0].slice(0, 4) === skill.slice(0, 4)) : undefined;
+    const few = (scene.items?.filter(Boolean).length ?? 0) < 2;
+    if (pool && !scene.locked && (prev === skill || (pool.includes(skill) && used.has(skill)))) {
+      // (A conversation suits quotes and questions, not a list of features.)
+      const talk = (x: SkillId) => (x === "abs-chat" || x === "pro-duo") && !["quote", "solve", "support", "compare"].includes(role);
+      const rank = (x: SkillId) => (used.has(x) ? 2 : 0) + (few && !ITEMLESS.has(x) && pool.some((y) => ITEMLESS.has(y)) ? 1 : 0) + (talk(x) ? 0.5 : 0);
+      const alt = pool.filter((x) => x !== skill && x !== prev).sort((a, b) => rank(a) - rank(b))[0];
+      if (alt && (prev === skill || !used.has(alt))) skill = alt;
     }
+    used.add(skill);
     prevSkill = skill;
+    // A character slide that lists points, on a slide without its own list, shows the product's
+    // (from the storyboard) rather than stand-in examples.
+    const borrowed = LIST_SLIDES.has(skill) && few && !scene.locked ? all.find((x) => (x.items?.filter(Boolean).length ?? 0) >= 2)?.items?.filter(Boolean).slice(0, 3) : undefined;
+    // A mock-up's interface label ("Run", "To do / In progress / Done") isn't a line for a character slide.
+    const uiLabel = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && role !== "cta" && !!scene.subtext && (/\s\/\s/.test(scene.subtext) || /^\S{1,10}$/.test(scene.subtext.trim()));
     const [beats, floor] = roleLength({ ...scene, skill }, role);
     const duration = Math.max(floor, beats * beat) * tpl.pace;
     let transition: Transition = "cut";
@@ -1480,7 +1496,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     last = transition;
     // A word swap ("planned|built|shared") turned into a character slide keeps its first word.
     const text = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && scene.text?.includes("|") ? scene.text.replace(/([^\s|]+)(?:\|[^\s|]+)+/g, "$1") : scene.text;
-    return { ...scene, text, role, skill, duration, transition, base: { skill: scene.skill, text: scene.text, styled: skill, shown: text } };
+    return { ...scene, text, role, skill, duration, transition, ...(borrowed ? { items: borrowed } : {}), ...(uiLabel ? { subtext: undefined } : {}), base: { skill: scene.skill, text: scene.text, styled: skill, shown: text, ...(borrowed ? { items: scene.items, lent: borrowed } : {}), ...(uiLabel ? { subtext: scene.subtext } : {}) } };
   });
   // A 3D style always has the product on a real 3D device: when no part of the story called for
   // one, the first words-only middle slide becomes the 3D laptop.
@@ -1547,6 +1563,11 @@ const INDUSTRY_ROLES: Partial<Record<NonNullable<VideoPlan["setting"]>, Partial<
   office: { features: "ind-team", how: "ind-team" },
   city: { how: "ind-route", promise: "ind-route" },
 };
+
+/** Character slides that read well without a list of points (a crowd under the headline, a sign). */
+const ITEMLESS = new Set<SkillId>(["abs-crowd", "pro-unveil"]);
+/** Character slides that list points (a board, signs, a team, updates). */
+const LIST_SLIDES = new Set<SkillId>(["char-presenter", "char-team", "char-desk", "abs-features", "abs-parade", "pro-explainer"]);
 
 /** Character slides: switching characters swaps one for another rather than keeping the old one. */
 const CHARACTER_SLIDE = /^(char|pro|abs|ind)-/;

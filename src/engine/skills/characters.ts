@@ -752,7 +752,7 @@ function charPresenter(sc: SkillContext) {
   // The board: right of the presenter (beside in widescreen, above in vertical frames).
   const board = narrow
     ? { x: st.left, y: st.top, w: st.width, h: room * 0.56 }
-    : { x: st.left + st.width * 0.36, y: st.top, w: st.width * 0.64, h: room };
+    : { x: st.left + st.width * 0.4, y: st.top, w: st.width * 0.6, h: room };
   const H = narrow ? room * 0.42 : room * 0.95;
   const cx = narrow ? st.left + st.width * 0.28 : st.left + st.width * 0.15;
   const footY = st.bottom;
@@ -803,7 +803,7 @@ function charPresenter(sc: SkillContext) {
       }
       ctx.restore();
     }
-    return { x: board.x + pad, y };
+    return { x: board.x - 6 * u, y };
   });
   ctx.restore();
   // The presenter steps in and points at the current row.

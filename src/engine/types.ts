@@ -393,7 +393,7 @@ export interface Scene {
    * What the director chose before a style restyled this slide (and what the style made of it), so
    * switching styles starts from the director's choice instead of the last style's.
    */
-  base?: { skill: SkillId; text: string; styled: SkillId; shown: string };
+  base?: { skill: SkillId; text: string; styled: SkillId; shown: string; items?: string[]; lent?: string[]; subtext?: string };
   /** List content for multi-item skills (bento features, pain points, logos…). */
   items?: string[];
   /** Chapter label shown above the headline ("How it works", "Loved by teams"). */
