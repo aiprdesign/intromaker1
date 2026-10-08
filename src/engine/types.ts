@@ -480,6 +480,8 @@ export interface VideoPlan {
   concept?: string;
   /** Software the intro is for (a web product or a phone-first app): its styles show it on real 3D devices. */
   software?: "web" | "app";
+  /** Light and dark slides mixed through the video (see contrast.ts toneSlides). Unset: on; false: the style's own tone throughout. */
+  tones?: boolean;
   /** 3D device slides in software intros (the 3D styles always have them). Unset: on; false: off. */
   devices3d?: boolean;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */

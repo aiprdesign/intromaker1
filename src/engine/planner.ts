@@ -2855,6 +2855,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     pointer: (POINTER_STYLES as readonly string[]).includes(raw.pointer as string) && raw.pointer !== "auto" ? (raw.pointer as VideoPlan["pointer"]) : undefined,
     shapes: raw.shapes === false ? false : undefined,
     contrast: raw.contrast === false ? false : undefined,
+    tones: raw.tones === false ? false : undefined,
     cast: sanitizeCast(raw.cast),
     characters: (KINDS as readonly string[]).includes(raw.characters as string) ? (raw.characters as VideoPlan["characters"]) : undefined,
     setting: (SCENES as readonly string[]).includes(raw.setting as string) ? raw.setting : undefined,

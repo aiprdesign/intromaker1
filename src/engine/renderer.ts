@@ -10,7 +10,8 @@ import { brandFontReady } from "./fonts";
 import { scratch } from "./scratch";
 import { drawLogo, getImage } from "./media";
 import { withPlaceholders } from "./placeholders";
-import { canContrast, contrastSlides, contrastSplit } from "./contrast";
+import { canContrast, contrastSlides, contrastSplit, toneSlides } from "./contrast";
+import { TEMPLATE_MAP } from "./templates";
 import { isMovieStyle } from "./trailers";
 import { pairedSubFamily, setBrandFont, setSubFamily, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
@@ -81,6 +82,9 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   voiceover?: VideoPlan["voiceover"];
   render3d?: VideoPlan["render3d"];
   software?: VideoPlan["software"];
+  template?: VideoPlan["template"];
+  tones?: VideoPlan["tones"];
+  contrast?: VideoPlan["contrast"];
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
@@ -187,7 +191,9 @@ function drawSceneOnce(
       (plan.scenes?.[index]?.skill === scene.skill ? contrastSlides(plan).has(index) : scene.contrast === true && canContrast(scene)));
   ({ scene, plan } = withPlaceholders(scene, plan));
   const base = brandPalette(plan.palette, plan.brand, schemeOf(plan));
-  const palette = flip ? (inverse ? inversePalette(base) : contrastPalette(base)) : base;
+  // Light and dark slides: some middle slides take the opposite tone of the style (contrast.ts).
+  const tone = !flip && forceFlip === undefined && plan.style === "saas" && plan.scenes?.[index]?.skill === scene.skill && tonesOn(plan) && toneSlides(plan).has(index);
+  const palette = flip ? (inverse ? inversePalette(base) : contrastPalette(base)) : tone ? tonePalette(base) : base;
   const beat = 60 / (plan.bpm ?? 120);
   const saas = plan.style === "saas";
   // Beat-locked motion: within each beat, animation is front-loaded so moves hit on the beat and
@@ -212,7 +218,7 @@ function drawSceneOnce(
     // The studio's text effect overrides the template's. (A plan without a look renders like
     // NO_LOOK, so the override starts from that.)
     // (A contrast slide is a flat colour block: no shader stage.)
-    look: flip ? { ...(plan.look ?? NO_LOOK), shader: undefined, ...(plan.textFx ? { text: plan.textFx } : {}) } : plan.textFx ? { ...(plan.look ?? NO_LOOK), text: plan.textFx } : plan.look,
+    look: flip || tone ? { ...(plan.look ?? NO_LOOK), shader: undefined, ...(plan.textFx ? { text: plan.textFx } : {}) } : plan.textFx ? { ...(plan.look ?? NO_LOOK), text: plan.textFx } : plan.look,
     globalT,
     concept: plan.concept,
     product: plan.product,
@@ -653,6 +659,32 @@ export function contrastPalette(p: Palette): Palette {
     accent: mixHex(p.secondary, text, 0.55),
     text,
   });
+}
+
+/** Light and dark slides suit the styles with a stage of their own design (not the Cartoon, product trailer or product styles). */
+function tonesOn(plan: PlanLike) {
+  const cat = plan.template ? TEMPLATE_MAP[plan.template]?.category : undefined;
+  return !plan.product && !plan.look?.toon && cat !== "Cartoon" && cat !== "Product Trailers";
+}
+
+/**
+ * A slide in the opposite tone of the style, for light and dark slides: a dark style's slide goes
+ * clean and light (a whisper of its colour, near-black type); a light style's goes deep and dark
+ * (its colour sunk almost to black, white type). Highlights stay the brand's, nudged until they read.
+ */
+export function tonePalette(p: Palette): Palette {
+  const block = /^#[0-9a-f]{6}$/i.test(p.primary) ? p.primary : "#5b5bf0";
+  if (p.light) {
+    const bg0 = mixHex(block, "#06070b", 0.86);
+    let primary = p.primary;
+    for (let k = 0.08; k <= 0.6 && contrast(primary, bg0) < 3.2; k += 0.08) primary = mixHex(p.primary, "#ffffff", k);
+    return legible({ ...p, light: false, bg0, bg1: mixHex(bg0, "#000000", 0.35), support: mixHex(bg0, "#ffffff", 0.08), primary, text: "#f4f5f8" });
+  }
+  const bg0 = mixHex(block, "#ffffff", 0.9);
+  const text = mixHex("#0b0b12", block, 0.1);
+  let primary = block;
+  for (let k = 0.08; k <= 0.6 && contrast(primary, bg0) < 3.2; k += 0.08) primary = mixHex(block, "#000000", k);
+  return legible({ ...p, light: true, bg0, bg1: mixHex(bg0, "#ffffff", 0.5), support: mixHex(bg0, text, 0.06), primary, secondary: mixHex(p.secondary, "#000000", 0.3), accent: mixHex(p.accent, "#000000", 0.3), text });
 }
 
 /**

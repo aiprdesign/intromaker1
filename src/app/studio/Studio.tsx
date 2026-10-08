@@ -357,6 +357,26 @@ export default function Studio() {
     if (plan.style === "saas" && plan.template && plan.software && (plan.devices3d !== false) !== devicesOn)
       setPlan((p) => (p.style === "saas" && p.template ? applyBackground(applyTemplate({ ...p, devices3d: devicesOn ? undefined : false }, p.template, { palette: p.palette }), bgRef.current) : p));
   }, [plan, devicesOn]);
+  // Light and dark slides mixed through the video: on by default; remembered.
+  const [tonesOn, setTonesOn] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.tones") === "off") setTonesOn(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseTones = (on: boolean) => {
+    setTonesOn(on);
+    try {
+      localStorage.setItem("intromaker.tones", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.tones !== false) !== tonesOn) setPlan((p) => ({ ...p, tones: tonesOn ? undefined : false }));
+  }, [plan, tonesOn]);
   // Contrast slides (a bold colour-block text beat every few slides): on by default; remembered.
   const [contrastOn, setContrastOn] = useState(true);
   useEffect(() => {
@@ -2557,6 +2577,18 @@ export default function Studio() {
               <p className="hint">{devicesOn ? `Your ${plan.software === "app" ? "app on a 3D phone" : "product on a 3D laptop"}, with its parts popping out, on a few slides that suit it. The 3D styles show more.` : "Slides keep the style's own designs (the 3D styles keep their devices)."}</p>
             </>
           )}
+          <label className="field-label">
+            Light & dark slides <span className="tpl-desc">{tonesOn ? "Mixed" : "Style's own"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={tonesOn ? "active" : ""} onClick={() => chooseTones(true)}>
+              Mixed
+            </button>
+            <button className={!tonesOn ? "active" : ""} onClick={() => chooseTones(false)}>
+              Style&apos;s own
+            </button>
+          </div>
+          <p className="hint">{tonesOn ? "Some slides switch to the opposite tone (light slides in a dark style, dark ones in a light style) for more colour and pace. The opener, logo and end card keep the style's own." : "The style's own tone throughout."}</p>
           <label className="field-label">
             Contrast slides <span className="tpl-desc">{contrastOn ? "On" : "Off"}</span>
           </label>

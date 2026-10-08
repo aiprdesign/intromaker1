@@ -84,3 +84,31 @@ export function contrastSplit(plan: { scenes?: Scene[] }, index: number, portrai
   if (portrait && s.skill === "problem-solution") return "none";
   return "right";
 }
+
+/** Slides that keep the style's own stage in a light/dark rhythm (logos, product shots, characters, homes, the close). */
+const OWN_STAGE = /^(logo-|liquid-logo|qr-end|cta|product-|char-|pro-|abs-|ind-|home-)/;
+
+/**
+ * Light and dark slides: so a video doesn't sit on one tone throughout, some middle slides switch
+ * to the opposite tone of the style (a dark style's slide goes light, a light style's goes deep
+ * and dark), every other eligible slide, the starting one varied by the video's seed. The opener,
+ * the logo reveal, the end card, logos, product shots, character and home scenes keep the style's
+ * own stage, and contrast slides keep theirs. `plan.tones = false` turns it off.
+ */
+export function toneSlides(plan: Pick<VideoPlan, "style"> & { scenes?: Scene[]; seed?: number; tones?: boolean }): Set<number> {
+  const scenes = plan.scenes;
+  const out = new Set<number>();
+  if (!scenes || scenes.length < 4 || plan.style !== "saas" || plan.tones === false) return out;
+  const flips = contrastSlides({ ...plan, contrast: (plan as { contrast?: boolean }).contrast });
+  const eligible = scenes
+    .map((s, i) => i)
+    .filter((i) => {
+      const s = scenes[i];
+      return i > 0 && i < scenes.length - 1 && s.role !== "reveal" && s.role !== "cta" && !OWN_STAGE.test(s.skill) && !flips.has(i);
+    });
+  const start = (plan.seed ?? 0) % 2;
+  eligible.forEach((i, k) => {
+    if (k % 2 === start) out.add(i);
+  });
+  return out;
+}
