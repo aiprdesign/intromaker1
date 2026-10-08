@@ -133,6 +133,72 @@ function glyph(g: G, kind: number, x: number, y: number, s: number, col: string)
   g.restore();
 }
 
+/** A project board: four columns of cards with tags, progress, avatars and due dates. */
+function kanban(g: G, T: ReturnType<typeof theme>, r: () => number) {
+  const cols = [
+    ["To do", T.faint, ["Research interviews", "Pricing page copy", "Onboarding emails"]],
+    ["In progress", T.a, ["New dashboard", "Mobile checkout", "Help centre search"]],
+    ["Review", T.c, ["Brand refresh", "Billing settings"]],
+    ["Done", T.b, ["Team invites", "Dark mode", "Export to CSV"]],
+  ] as const;
+  const tags = ["Design", "Web", "Mobile", "Content", "Growth"];
+  const x0 = 310;
+  const cw = 298;
+  cols.forEach(([title, col, cards], ci) => {
+    const x = x0 + ci * (cw + 20);
+    rr(g, x, 132, cw, 836, 20, mixHex(T.bg, "#e9ebf2", 0.6));
+    rr(g, x + 20, 156, 10, 10, 5, col);
+    g.fillStyle = T.ink;
+    font(g, 18, 720);
+    g.fillText(title, x + 40, 162);
+    const tw = g.measureText(title).width;
+    rr(g, x + 50 + tw, 148, 30, 26, 13, T.card);
+    g.fillStyle = T.sub;
+    font(g, 14, 650);
+    g.textAlign = "center";
+    g.fillText(String(cards.length), x + 65 + tw, 162);
+    g.textAlign = "left";
+    let y = 194;
+    cards.forEach((card, k) => {
+      const tall = (ci + k) % 2 === 0;
+      const ch = tall ? 214 : 168;
+      rr(g, x + 14, y, cw - 28, ch, 16, T.card, true);
+      const tag = tags[(ci * 3 + k) % tags.length];
+      const tc = [T.a, T.b, T.c][(ci + k) % 3];
+      font(g, 13, 700);
+      const tgw = g.measureText(tag).width + 24;
+      rr(g, x + 32, y + 20, tgw, 26, 13, mixHex(tc, "#ffffff", 0.84));
+      g.fillStyle = tc;
+      g.fillText(tag, x + 44, y + 34);
+      g.fillStyle = T.ink;
+      font(g, 18, 680);
+      g.fillText(card, x + 32, y + 76, cw - 64);
+      if (tall) {
+        // A cover strip: a soft brand gradient standing in for an attached image.
+        const cg = g.createLinearGradient(x + 32, y + 96, x + cw - 46, y + 140);
+        cg.addColorStop(0, mixHex(tc, "#ffffff", 0.55));
+        cg.addColorStop(1, mixHex(T.a, T.b, 0.5));
+        g.fillStyle = cg;
+        g.beginPath();
+        g.roundRect(x + 32, y + 94, cw - 64, 50, 10);
+        g.fill();
+      }
+      const py = y + ch - 52;
+      const pr = ci === 3 ? 1 : ci === 0 ? 0.08 + r() * 0.1 : 0.35 + r() * 0.45;
+      rr(g, x + 32, py, cw - 64, 8, 4, T.line);
+      rr(g, x + 32, py, (cw - 64) * pr, 8, 4, ci === 3 ? T.b : tc);
+      avatar(g, x + 44, py + 30, 12, [T.a, T.b, T.c][k % 3], "ABCDEFGHJK".charAt((ci * 3 + k) % 10));
+      avatar(g, x + 64, py + 30, 12, [T.c, T.a, T.b][k % 3], "LMNPRSTUVW".charAt((ci * 5 + k) % 10));
+      g.fillStyle = T.faint;
+      font(g, 13, 600);
+      g.textAlign = "right";
+      g.fillText(["Mon", "Tue", "Wed", "Thu", "Fri"][(ci + k * 2) % 5], x + cw - 32, py + 31);
+      g.textAlign = "left";
+      y += ch + 14;
+    });
+  });
+}
+
 export function desktopUI(p: Palette, name: string, seed = 0): HTMLCanvasElement {
   const key = `d|${p.primary}|${p.secondary}|${p.accent}|${name}|${seed % 3}`;
   const hit = cache.get(key);
@@ -170,13 +236,16 @@ export function desktopUI(p: Palette, name: string, seed = 0): HTMLCanvasElement
   g.fillStyle = "#ffffff";
   font(g, 22, 760);
   g.fillText(name.slice(0, 14) || "Workspace", 86, 55);
+  // One seed in three shows a project board instead of the dashboard, for variety across slides.
+  const board = seed % 3 === 2;
+  const on = board ? 1 : 0;
   const nav = ["Overview", "Projects", "Team", "Calendar", "Reports", "Tasks"];
   nav.forEach((n, i) => {
     const y = 128 + i * 52;
-    if (i === 0) rr(g, 18, y - 22, 232, 46, 12, T.a);
-    glyph(g, i, 46, y + 1, 20, i === 0 ? "#ffffff" : "rgba(255,255,255,0.55)");
-    g.fillStyle = i === 0 ? "#ffffff" : "rgba(255,255,255,0.7)";
-    font(g, 18, i === 0 ? 700 : 540);
+    if (i === on) rr(g, 18, y - 22, 232, 46, 12, T.a);
+    glyph(g, i, 46, y + 1, 20, i === on ? "#ffffff" : "rgba(255,255,255,0.55)");
+    g.fillStyle = i === on ? "#ffffff" : "rgba(255,255,255,0.7)";
+    font(g, 18, i === on ? 700 : 540);
     g.fillText(n, 72, y + 1);
   });
   rr(g, 18, H - 150, 232, 120, 16, "rgba(255,255,255,0.08)");
@@ -193,10 +262,10 @@ export function desktopUI(p: Palette, name: string, seed = 0): HTMLCanvasElement
   // Top bar: a greeting, search and an avatar.
   g.fillStyle = T.ink;
   font(g, 30, 750);
-  g.fillText("Good morning", 310, 66);
+  g.fillText(board ? "Product launch" : "Good morning", 310, 66);
   g.fillStyle = T.sub;
   font(g, 16, 500);
-  g.fillText("Here's what's happening today", 310, 98);
+  g.fillText(board ? "Board view · Sprint 14" : "Here's what's happening today", 310, 98);
   rr(g, 980, 40, 380, 50, 14, T.card, true);
   glyph(g, 4, 1008, 65, 16, T.faint);
   g.fillStyle = T.faint;
@@ -205,6 +274,11 @@ export function desktopUI(p: Palette, name: string, seed = 0): HTMLCanvasElement
   rr(g, 1380, 40, 50, 50, 14, T.card, true);
   glyph(g, 3, 1405, 65, 18, T.sub);
   avatar(g, 1478, 65, 25, T.b, "J");
+  if (board) {
+    kanban(g, T, r);
+    cache.set(key, c);
+    return c;
+  }
   // KPI cards with sparklines.
   const kpis = ["Active projects", "Tasks done", "Team members", "On schedule"];
   const vals = ["24", "186", "12", "9 of 10"];

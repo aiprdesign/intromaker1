@@ -10,7 +10,7 @@
  * - d3-dive:    the camera flies from a wide shot straight into the laptop's screen, landing on the page.
  * - d3-desk:    a desk scene from above: the laptop, a phone, a mug in your colour, a notebook, a plant.
  */
-import { Torus, type Program, type Transform } from "ogl";
+import { Texture, Torus, type Program, type Transform } from "ogl";
 import { cove, project, quad, render, rgb, setCrop, setScreen, slab, cylinder, sphere, box, world, type View, type World } from "../d3";
 import { desktopUI, mobileUI } from "../uiscreens";
 import { getMedia, type Drawable } from "../media";
@@ -73,6 +73,100 @@ function group(W: World, parent: Transform = W.scene) {
   return g;
 }
 
+const metalExtra = new Map<Program, boolean>();
+
+/** Key rows, back to front: widths in key units (rows sum to 14.5) and their legends. */
+const KEY_ROWS: { h: number; keys: [number, string][] }[] = [
+  { h: 0.55, keys: [[1.5, "esc"], ...["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"].map((k) => [1, k] as [number, string]), [1, "⏻"]] },
+  { h: 1, keys: [..."`1234567890-=".split("").map((k) => [1, k] as [number, string]), [1.5, "delete"]] },
+  { h: 1, keys: [[1.5, "tab"], ..."QWERTYUIOP[]\\".split("").map((k) => [1, k] as [number, string])] },
+  { h: 1, keys: [[1.75, "caps"], ..."ASDFGHJKL;'".split("").map((k) => [1, k] as [number, string]), [1.75, "return"]] },
+  { h: 1, keys: [[2.25, "shift"], ..."ZXCVBNM,./".split("").map((k) => [1, k] as [number, string]), [2.25, "shift"]] },
+  { h: 1, keys: [[1, "fn"], [1, "ctrl"], [1, "opt"], [1.25, "cmd"], [5, ""], [1.25, "cmd"], [1, "opt"], [1, "◀"], [1, "▲▼"], [1, "▶"]] },
+];
+
+/** The keyboard: individual keys with rounded caps sitting in the deck, legends printed on them, speaker grilles either side. */
+function keyboard(W: World, root: Transform) {
+  const { gl } = W;
+  const kbW = 2.72;
+  const unit = kbW / 14.5;
+  const gap = unit * 0.14;
+  const zBack = -0.93;
+  const totalH = KEY_ROWS.reduce((a, r) => a + r.h, 0) * unit;
+  const keyM = W.mat({ color: "#17181c", metal: 0.15, gloss: 0.42 });
+  const capH = 0.016;
+  const geos = new Map<string, ReturnType<typeof slab>>();
+  // Legends and grilles are printed on a canvas laid over the deck.
+  const cv = document.createElement("canvas");
+  cv.width = 2048;
+  cv.height = Math.round(2048 * (totalH / kbW));
+  const g = cv.getContext("2d")!;
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.fillStyle = "rgba(235,238,245,0.82)";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  const px = cv.width / kbW;
+  let z = zBack;
+  for (const row of KEY_ROWS) {
+    const rh = row.h * unit;
+    let x = -kbW / 2;
+    for (const [kw, label] of row.keys) {
+      const w = kw * unit;
+      const key = `${(w - gap).toFixed(3)}x${(rh - gap).toFixed(3)}`;
+      let geo = geos.get(key);
+      if (!geo) {
+        geo = slab(gl, w - gap, rh - gap, capH, Math.min(0.022, (rh - gap) * 0.25), 0.005);
+        geos.set(key, geo);
+      }
+      const n = new (W.scene.constructor as new () => Transform)();
+      n.setParent(root);
+      n.rotation.x = -Math.PI / 2;
+      n.position.set(x + w / 2, LAP.t + capH / 2, z + rh / 2);
+      W.mesh(geo.front, keyM, n, false);
+      W.mesh(geo.body, keyM, n, false);
+      if (label) {
+        const big = label.length === 1 || label.length === 2;
+        g.font = `${big ? 600 : 500} ${Math.round(px * unit * (big ? 0.34 : 0.2))}px Inter, "Helvetica Neue", Arial, sans-serif`;
+        const cx = (x + w / 2 + kbW / 2) * px;
+        const cy = (z + rh / 2 - zBack) * px;
+        if (big) g.fillText(label, cx, cy);
+        else {
+          g.textAlign = "left";
+          g.fillText(label, (x + kbW / 2) * px + px * unit * 0.14, (z + rh - zBack) * px - px * unit * 0.2);
+          g.textAlign = "center";
+        }
+      }
+      x += w;
+    }
+    z += rh;
+  }
+  const tex = new Texture(gl, { image: cv, generateMipmaps: true, minFilter: gl.LINEAR_MIPMAP_LINEAR, magFilter: gl.LINEAR, anisotropy: 8 });
+  const legend = W.mat({ color: "#ffffff", kind: "decal" });
+  legend.uniforms.tMap.value = tex;
+  const lq = W.mesh(quad(gl, kbW, totalH), legend, root, false);
+  lq.rotation.x = -Math.PI / 2;
+  lq.position.set(0, LAP.t + capH + 0.0008, zBack + totalH / 2);
+  // Speaker grilles: fine dots either side of the keys.
+  const gc = document.createElement("canvas");
+  gc.width = 64;
+  gc.height = 512;
+  const gg = gc.getContext("2d")!;
+  gg.fillStyle = "rgba(20,22,28,0.85)";
+  for (let yy = 6; yy < 512; yy += 12) for (let xx = 6 + ((yy / 12) % 2) * 6; xx < 64; xx += 12) {
+    gg.beginPath();
+    gg.arc(xx, yy, 2.4, 0, Math.PI * 2);
+    gg.fill();
+  }
+  const gtex = new Texture(gl, { image: gc, generateMipmaps: true, minFilter: gl.LINEAR_MIPMAP_LINEAR, magFilter: gl.LINEAR });
+  const grille = W.mat({ color: "#ffffff", kind: "decal" });
+  grille.uniforms.tMap.value = gtex;
+  for (const sx of [-1, 1]) {
+    const q = W.mesh(quad(gl, 0.13, totalH), grille, root, false);
+    q.rotation.x = -Math.PI / 2;
+    q.position.set(sx * (kbW / 2 + 0.11), LAP.t + 0.0008, zBack + totalH / 2);
+  }
+}
+
 function laptop(W: World, parent?: Transform): Laptop {
   const { gl } = W;
   const root = group(W, parent);
@@ -124,7 +218,21 @@ function laptop(W: World, parent?: Transform): Laptop {
     const port = W.mesh(box(gl, 0.01, 0.035, 0.12), black, root, false);
     port.position.set(-LAP.w / 2 - 0.002, LAP.t * 0.48, pz);
   }
-  return { root, hinge, screen, metal: [metal, deck] };
+  keyboard(W, root);
+  // An inset glass trackpad and a camera notch at the top of the screen.
+  const pad = slab(gl, 1.0, 0.56, 0.006, 0.05, 0.003);
+  const padN = group(W, root);
+  padN.rotation.x = -Math.PI / 2;
+  padN.position.set(0, LAP.t + 0.0015, 0.62);
+  const padM = W.mat({ color: "#cfd3da", metal: 0.55, gloss: 0.88 });
+  W.mesh(pad.front, padM, padN, false);
+  W.mesh(pad.body, padM, padN, false);
+  metalExtra.set(padM, true);
+  const notch = slab(gl, 0.24, 0.05, 0.002, 0.018, 0.001);
+  const nN = group(W, lid);
+  nN.position.set(0, 0.04 + LAP.scrH / 2 - 0.02, LAP.lidT / 2 + 0.0045);
+  W.mesh(notch.front, black, nN, false);
+  return { root, hinge, screen, metal: [metal, deck, padM] };
 }
 
 function slate(W: World, dims: typeof PHONE, phone: boolean, parent?: Transform): Slate {

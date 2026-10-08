@@ -44,6 +44,23 @@ function sky(sc: SkillContext, horizon = 0.62) {
   g.addColorStop(1, "#f6d7b0");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
+  // A low warm sun glow and a few soft, still clouds.
+  const sun = ctx.createRadialGradient(w * 0.82, h * horizon * 0.86, 0, w * 0.82, h * horizon * 0.86, w * 0.42);
+  sun.addColorStop(0, "rgba(255,236,200,0.55)");
+  sun.addColorStop(1, "rgba(255,236,200,0)");
+  ctx.fillStyle = sun;
+  ctx.fillRect(0, 0, w, h);
+  ctx.save();
+  ctx.filter = `blur(${Math.round(w * 0.006)}px)`;
+  for (const [cx, cy, s] of [[0.18, 0.16, 1], [0.46, 0.09, 0.7], [0.68, 0.22, 0.85]] as const) {
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    for (const [dx, dy, r] of [[0, 0, 0.05], [0.045, 0.012, 0.038], [-0.045, 0.014, 0.034], [0.085, 0.022, 0.026], [-0.08, 0.024, 0.022]] as const) {
+      ctx.beginPath();
+      ctx.ellipse(w * (cx + dx * s), h * (cy + dy * s), w * r * s, w * r * s * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
   // Flat (2D) views look straight on, so the lawn runs on under the horizon.
   if (sc.flat3d) {
     ctx.fillStyle = "#78ad55";
@@ -58,6 +75,7 @@ const GOLDEN: Partial<View> = {
   gnd: [0.5, 0.44, 0.34],
   exposure: 1.06,
   fog: [0.98, 0.89, 0.77, 0.0],
+  ao: 0.28,
 };
 
 /** A clean label with a dot, popped in by `k`; the brand's colour when `lit`. */
@@ -193,7 +211,7 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     trim: W.mat({ color: STYLES[0].trim, gloss: 0.4 }),
     roof: W.mat({ color: STYLES[0].roof, gloss: 0.3, kind: "shingle" }),
     door: W.mat({ color: "#7c5cff", gloss: 0.6 }),
-    stone: W.mat({ color: STYLES[0].stone, gloss: 0.15 }),
+    stone: W.mat({ color: STYLES[0].stone, gloss: 0.15, kind: "stone" }),
     glass: W.mat({ color: "#6f8db0", metal: 0.85, gloss: 0.97, emit: [0, 0, 0] }),
     garage: W.mat({ color: "#f4f2ee", gloss: 0.45 }),
   };
@@ -238,6 +256,7 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   put(W, box(gl, 3.0, 2.35, 0.08), mats.garage, walls, gx, b + 1.18, gz + 0.04);
   for (let i = 1; i < 4; i++) put(W, box(gl, 3.0, 0.03, 0.1), mats.trim, walls, gx, b + i * 0.59, gz + 0.05, false);
   put(W, box(gl, 3.24, 0.14, 0.12), mats.trim, walls, gx, b + 2.42, gz + 0.06);
+  const curtain = W.mat({ color: "#efe6d6", gloss: 0.08 });
   const win = (x: number, y: number, ww: number, hh: number, z: number, side = false) => {
     const fr = side ? box(gl, 0.1, hh + 0.24, ww + 0.24) : box(gl, ww + 0.24, hh + 0.24, 0.1);
     const gl2 = side ? box(gl, 0.12, hh, ww) : box(gl, ww, hh, 0.12);
@@ -247,6 +266,8 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     const tran = side ? box(gl, 0.14, 0.05, ww) : box(gl, ww, 0.05, 0.14);
     put(W, mull, mats.trim, walls, x, y, z, false);
     put(W, tran, mats.trim, walls, x, y + hh * 0.1, z, false);
+    // Soft curtains drawn to either side, read through the glass.
+    if (!side) for (const k of [-1, 1]) put(W, box(gl, ww * 0.16, hh * 0.92, 0.012), curtain, walls, x + k * ww * 0.39, y - hh * 0.02, z + 0.086, false);
     // A sill under it, and on the front, shutters either side.
     if (side) put(W, box(gl, 0.22, 0.08, ww + 0.4), mats.trim, walls, x - 0.06, y - hh / 2 - 0.16, z, false);
     else {
@@ -354,14 +375,24 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   return { root, slab: slabT, frame: frameT, walls, roof, land, solar, hvac, insul, mats, rising: [mats.siding, mats.stone, mats.trim, mats.glass, mats.garage, mats.door] };
 }
 
-let treeMats: { bark: Program; leaf: Program; leaf2: Program } | undefined;
+let treeMats: { bark: Program; leaf: Program; leaf2: Program; pine: Program; pine2: Program } | undefined;
 let treeGl: unknown;
 function tree(W: World, parent: Transform, x: number, z: number, s: number) {
   if (!treeMats || treeGl !== W.gl) {
     treeGl = W.gl;
-    treeMats = { bark: W.mat({ color: "#6b4b35", gloss: 0.2 }), leaf: W.mat({ color: "#4d8a43", gloss: 0.25 }), leaf2: W.mat({ color: "#6a9c4a", gloss: 0.25 }) };
+    treeMats = { bark: W.mat({ color: "#6b4b35", gloss: 0.2 }), leaf: W.mat({ color: "#4d8a43", gloss: 0.25 }), leaf2: W.mat({ color: "#6a9c4a", gloss: 0.25 }), pine: W.mat({ color: "#2f6b45", gloss: 0.2 }), pine2: W.mat({ color: "#3d7a4e", gloss: 0.2 }) };
   }
   const { gl } = W;
+  // Roughly one tree in three is a pine: stacked cones on a short trunk.
+  if (Math.abs(Math.round(x * 7 + z * 13)) % 3 === 0) {
+    const t = W.mesh(cylinder(gl, 0.1 * s, 0.16 * s, 1.2 * s, 12), treeMats.bark, parent);
+    t.position.set(x, 0.6 * s, z);
+    for (const [y, r, hh, alt] of [[1.7, 1.25, 2.0, 0], [2.7, 0.95, 1.7, 1], [3.6, 0.65, 1.4, 0]] as const) {
+      const c = W.mesh(cylinder(gl, 0, r * s, hh * s, 18), alt ? treeMats.pine2 : treeMats.pine, parent);
+      c.position.set(x, y * s, z);
+    }
+    return;
+  }
   const trunk = W.mesh(cylinder(gl, 0.14 * s, 0.2 * s, 2.4 * s, 14), treeMats.bark, parent);
   trunk.position.set(x, 1.2 * s, z);
   for (const [dx, dy, dz, r, alt] of [
@@ -477,7 +508,12 @@ function street(W: World, z: number, len = 200) {
   const { gl } = W;
   put(W, box(gl, len, 0.03, 7), W.mat({ color: "#4a4d54", gloss: 0.2 }), W.scene, 0, 0.015, z, false);
   put(W, box(gl, len, 0.06, 1.6), W.mat({ color: "#d4d0c8", gloss: 0.15 }), W.scene, 0, 0.03, z - 4.6, false);
-  for (let x = -len / 2; x < len / 2; x += 6) put(W, box(gl, 2.6, 0.035, 0.18), W.mat({ color: "#f2e7c4", gloss: 0.2 }), W.scene, x, 0.02, z, false);
+  // A kerb between road and lawn, sidewalk expansion joints and the centre dashes.
+  put(W, box(gl, len, 0.12, 0.22), W.mat({ color: "#bdb8ae", gloss: 0.2 }), W.scene, 0, 0.06, z - 3.6, false);
+  const joint = W.mat({ color: "#b3aea4", gloss: 0.1 });
+  const dash = W.mat({ color: "#f2e7c4", gloss: 0.2 });
+  for (let x = -len / 2; x < len / 2; x += 1.6) put(W, box(gl, 0.03, 0.065, 1.6), joint, W.scene, x, 0.031, z - 4.6, false);
+  for (let x = -len / 2; x < len / 2; x += 6) put(W, box(gl, 2.6, 0.035, 0.18), dash, W.scene, x, 0.02, z, false);
 }
 
 /* ───────────────────────── The home's world ───────────────────────── */

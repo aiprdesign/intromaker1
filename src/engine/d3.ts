@@ -355,6 +355,10 @@ uniform float uFloorAlpha;
 #ifdef GRASS
 uniform vec3 uColor2;
 #endif
+#ifdef DECAL
+uniform sampler2D tMap;
+#endif
+uniform float uAO;
 #ifdef BACKDROP
 uniform vec3 uGlowA;
 uniform vec3 uGlowB;
@@ -425,8 +429,22 @@ void main() {
 #ifdef GRASS
   float nz = hash(floor(vW.xz * 6.0)) * 0.5 + hash(floor(vW.xz * 1.3)) * 0.5;
   base = mix(uColor, uColor2, nz);
+  // Mowing stripes, light and dark, as on a kept lawn.
+  base *= 0.94 + 0.08 * step(0.5, fract(vW.x / 3.2));
+#endif
+#ifdef STONE
+  // Stone blocks in staggered courses with mortar lines and a little variation per block.
+  vec2 sp = vec2(vW.x + vW.z, vW.y) * vec2(2.2, 3.6);
+  float row = floor(sp.y);
+  sp.x += mod(row, 2.0) * 0.5;
+  vec2 cell = floor(sp);
+  vec2 fr = fract(sp);
+  float mortar = step(0.06, fr.x) * step(fr.x, 0.94) * step(0.08, fr.y) * step(fr.y, 0.92);
+  base *= mix(0.72, 0.9 + hash(cell) * 0.22, mortar);
 #endif
   float sh = shadowAt();
+  // Soft contact darkening where surfaces meet the ground (a cheap ambient occlusion).
+  if (uAO > 0.0) base *= mix(1.0 - uAO * (1.0 - smoothstep(0.5, 0.9, N.y)), 1.0, smoothstep(0.0, 0.9, vW.y));
   float ndl = max(dot(N, uSun), 0.0);
   vec3 H = normalize(uSun + V);
   float spec = pow(max(dot(N, H), 0.0), mix(6.0, 220.0, gloss)) * mix(0.05, 1.2, gloss);
@@ -452,7 +470,15 @@ void main() {
   // A soft light sweep across the glass.
   float band = vUv.x * 0.8 + vUv.y * 0.6 - uSheen;
   col += vec3(1.0) * (exp(-band * band * 260.0) * 0.16 + exp(-band * band * 30.0) * 0.05) * step(-1.0, uSheen);
+  // A touch of depth: the glass edge darkens very slightly.
+  col *= 1.0 - 0.1 * pow(length((vUv - 0.5) * vec2(1.0, 1.2)) * 1.25, 3.0);
   alpha *= mask;
+#endif
+#ifdef DECAL
+  // A printed decal (key legends, grilles): the picture's colour and alpha, lightly lit.
+  vec4 dc = texture2D(tMap, vec2(vUv.x, vUv.y));
+  col = dc.rgb * (0.75 + 0.25 * ndl);
+  alpha *= dc.a;
 #endif
 #ifdef FLOOR
   // A shadow catcher: clear, darkened by the sun's shadow and soft contact shadows under objects.
@@ -500,7 +526,7 @@ export interface MatOpts {
   metal?: number;
   gloss?: number;
   alpha?: number;
-  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass" | "siding" | "shingle" | "backdrop";
+  kind?: "lit" | "keyboard" | "screen" | "floor" | "grass" | "siding" | "shingle" | "backdrop" | "decal" | "stone";
   color2?: string;
   /** Light it gives off (a lit window), added to its shading. */
   emit?: string | Num3;
@@ -557,10 +583,11 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     uFlat: { value: 0 },
     uSheen: { value: -9 },
     uRim: { value: [0, 0, 0] },
+    uAO: { value: 0 },
   };
   const blank = new Texture(gl, { image: new Uint8Array([0, 0, 0, 255]), width: 1, height: 1 });
   const mat = (o: MatOpts) => {
-    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : o.kind === "siding" ? "#define SIDING\n" : o.kind === "shingle" ? "#define SHINGLE\n" : o.kind === "backdrop" ? "#define BACKDROP\n" : "";
+    const defines = o.kind === "keyboard" ? "#define KEYBOARD\n" : o.kind === "screen" ? "#define MAP\n" : o.kind === "floor" ? "#define FLOOR\n" : o.kind === "grass" ? "#define GRASS\n" : o.kind === "siding" ? "#define SIDING\n" : o.kind === "shingle" ? "#define SHINGLE\n" : o.kind === "backdrop" ? "#define BACKDROP\n" : o.kind === "decal" ? "#define DECAL\n" : o.kind === "stone" ? "#define STONE\n" : "";
     const uniforms: Record<string, { value: unknown }> = {
       ...env,
       uColor: { value: typeof o.color === "string" ? rgb(o.color) : o.color },
@@ -573,8 +600,9 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     if (o.kind === "screen") Object.assign(uniforms, { tMap: { value: blank }, uUv: { value: [1, 1, 0, 0] }, uGlow: { value: 1 }, uRound: { value: [0.04, 1.6, 0] } });
     if (o.kind === "floor") Object.assign(uniforms, { uBlob: { value: new Array(24).fill(0) }, uFloorAlpha: { value: 1 } });
     if (o.kind === "grass") uniforms.uColor2 = { value: rgb(o.color2 ?? "#5a9e48") };
+    if (o.kind === "decal") uniforms.tMap = { value: blank };
     if (o.kind === "backdrop") Object.assign(uniforms, { uGlowA: { value: [1, 1, 1] }, uGlowB: { value: [1, 1, 1] } });
-    const transparent = o.transparent ?? (o.kind === "floor" || o.kind === "screen" || (o.alpha ?? 1) < 1);
+    const transparent = o.transparent ?? (o.kind === "floor" || o.kind === "screen" || o.kind === "decal" || (o.alpha ?? 1) < 1);
     return new Program(gl, { vertex: VERT, fragment: defines + FRAG, uniforms, transparent, depthWrite: o.kind !== "floor", cullFace: o.doubleSided ? false : gl.BACK });
   };
   const mesh = (g: Geometry, p: Program, parent: Transform = scene, cast = true) => {
@@ -604,6 +632,8 @@ export interface View {
   sky?: Num3;
   gnd?: Num3;
   exposure?: number;
+  /** Contact darkening near the ground (0: none, ~0.3: soft). */
+  ao?: number;
   /** A coloured rim light on edges (rgb, 0 for none). */
   rim?: Num3;
   /** Where a light sweep crosses the screens (0 → 1.4 across; unset: none). */
@@ -648,6 +678,7 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   env.uFlat.value = v.flat ? 1 : 0;
   env.uSheen.value = v.sheen ?? -9;
   env.uRim.value = v.rim ?? [0, 0, 0];
+  env.uAO.value = v.ao ?? 0;
   const size = v.shadowSize ?? 4;
   const c = v.shadowAt ?? v.target;
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });
