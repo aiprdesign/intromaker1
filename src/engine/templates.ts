@@ -278,7 +278,7 @@ export const TEMPLATES: Template[] = [
     pace: 1,
     roles: ROLES,
     revealNoLogo: "char-hello",
-    sample: sample("Learning, *made friendly*."),
+    sample: sample("Learning, *made friendly*.", "char-hello", { subtext: "Say hello to your new helper" }),
   },
   {
     id: "comic",
@@ -296,7 +296,7 @@ export const TEMPLATES: Template[] = [
     pace: 0.9,
     roles: ROLES,
     revealNoLogo: "char-hello",
-    sample: sample("Your new *sidekick*!"),
+    sample: sample("Your new *sidekick*!", "char-hello", { subtext: "Ready for action" }),
   },
   {
     id: "storybook",
@@ -314,7 +314,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.15,
     roles: ROLES,
     revealNoLogo: "char-hello",
-    sample: sample("Once upon a *better way*."),
+    sample: sample("Once upon a *better way*.", "char-presenter", { items: ["Plan — Set goals that fit", "Share — Keep friends in the loop", "Grow — See how far you have come"] }),
   },
   {
     id: "claybuddies",
@@ -332,7 +332,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.05,
     roles: ROLES,
     revealNoLogo: "char-hello",
-    sample: sample("Help that feels *soft*."),
+    sample: sample("Help that feels *soft*.", "char-cheer", { subtext: "Come on in" }),
   },
   {
     id: "sunnypark",
@@ -350,7 +350,7 @@ export const TEMPLATES: Template[] = [
     pace: 1,
     roles: ROLES,
     revealNoLogo: "char-hello",
-    sample: sample("A brighter day, *outside*."),
+    sample: sample("A brighter day, *outside*.", "char-team", { items: ["Play", "Learn", "Share", "Grow"] }),
   },
   {
     id: "nightowls",
@@ -368,7 +368,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.1,
     roles: ROLES,
     revealNoLogo: "char-hello",
-    sample: sample("Sweet dreams, *sorted*."),
+    sample: sample("Sweet dreams, *sorted*.", "char-hello", { subtext: "Rest easy tonight" }),
   },
   {
     id: "explainer",
@@ -386,7 +386,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.1,
     roles: PRO_ROLES,
     revealNoLogo: "pro-unveil",
-    sample: sample("Here's how it *works*."),
+    sample: sample("Here's how it *works*.", "pro-walk", { subtext: "A quick walk-through" }),
   },
   {
     id: "storycast",
@@ -404,7 +404,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.1,
     roles: PRO_ROLES,
     revealNoLogo: "pro-unveil",
-    sample: sample("A better day *starts here*."),
+    sample: sample("A better day *starts here*.", "pro-highfive", { subtext: "Let's get going" }),
   },
   {
     id: "abstract",
@@ -422,7 +422,7 @@ export const TEMPLATES: Template[] = [
     pace: 1,
     roles: ABS_ROLES,
     revealNoLogo: "abs-hello",
-    sample: sample("Made for *your team*."),
+    sample: sample("Made for *your team*.", "abs-hello", { subtext: "Planning, made playful" }),
   },
   {
     id: "memphis",
@@ -440,7 +440,7 @@ export const TEMPLATES: Template[] = [
     pace: 1.05,
     roles: ABS_ROLES,
     revealNoLogo: "abs-hello",
-    sample: sample("Join the *crowd*."),
+    sample: sample("Join the *crowd*.", "abs-parade", { items: ["Plan", "Share", "Grow"] }),
   },
   {
     id: "keynote",
