@@ -694,7 +694,14 @@ void main() {
   col += mix(uColor2, vec3(0.75, 1.0, 0.45), 0.35) * uSunCol * pow(max(dot(-N, uSun), 0.0), 1.5) * 0.45 * sh;
 #endif
   // Flat (2D) look: the base colour in two tones, light and shade, no reflections or haze.
-  if (uFlat > 0.5) col = base * (ndl * sh > 0.3 ? 1.0 : 0.82) * (N.y > 0.7 ? 1.04 : 1.0);
+  // (Three tones: sunlit, turned away from the sun, and in a cast shadow; tops a touch lighter.)
+  // Faces take a tone by where they point (towards the sun, across it, away from it), cast
+  // shadows a step darker and tops a touch lighter, so walls, floors and ceilings separate.
+  if (uFlat > 0.5) {
+    float band = ndl > 0.55 ? 1.0 : ndl > 0.18 ? 0.9 : 0.8;
+    float inShade = ndl > 0.18 && sh < 0.5 ? 0.82 : 1.0;
+    col = base * band * inShade * (N.y > 0.7 ? 1.05 : N.y < -0.7 ? 0.9 : 1.0) * mix(0.97, 1.03, hemi.b);
+  }
   float alpha = uAlpha;
 #ifdef MAP
   // A screen: the picture glows (cover-fitted, scrolling), behind glass with a corner radius.
@@ -738,7 +745,7 @@ void main() {
   col += uRim * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (1.0 - uFlat);
 #endif
   // Haze with distance (outdoor scenes), towards the horizon's colour.
-  if (uFog.a > 0.0 && uFlat < 0.5) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
+  if (uFog.a > 0.0) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
 #ifdef MAP
   // Screens keep their own colours (crisp UI), lifted only a touch with the exposure.
   col *= mix(1.0, uExposure, 0.4);
@@ -889,6 +896,8 @@ export interface View {
   sheen?: number;
   /** Draw it flat, as a 2D illustration: a straight-on (orthographic) camera and two-tone colour. */
   flat?: boolean;
+  /** Flat colours on the 3D scene: the same perspective camera and models, shaded in a few flat tones (lit, shade, shadow) like a modern 3D illustration, with no reflections. */
+  cel?: boolean;
   /** Distance haze: colour and density (0: none). */
   fog?: [number, number, number, number];
   /** Half-size of the shadow camera's view and where it centres. */
@@ -923,13 +932,14 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   if (v.sky) env.uSky.value = v.sky;
   if (v.gnd) env.uGnd.value = v.gnd;
   env.uExposure.value = v.exposure ?? 1;
-  env.uFog.value = v.fog ?? [1, 1, 1, 0];
-  env.uFlat.value = v.flat ? 1 : 0;
+  // (A flat 2D view has no depth to haze; flat colours on a 3D scene keep the distance haze.)
+  env.uFog.value = v.fog && !v.flat ? v.fog : [1, 1, 1, 0];
+  env.uFlat.value = v.flat || v.cel ? 1 : 0;
   env.uSheen.value = v.sheen ?? -9;
   env.uRim.value = v.rim ?? [0, 0, 0];
   env.uAO.value = v.ao ?? 0;
   env.uFill.value = v.fill ?? [0, 0, 0];
-  env.uStudio.value = v.flat ? 0 : v.studio ?? 0;
+  env.uStudio.value = v.flat || v.cel ? 0 : v.studio ?? 0;
   const size = v.shadowSize ?? 4;
   const c = v.shadowAt ?? v.target;
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });

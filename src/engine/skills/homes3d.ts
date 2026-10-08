@@ -633,7 +633,7 @@ function homeHero(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const r = 23 * F;
     const eye: Num3 = [1.8 + Math.sin(a) * r, lerp(3.4, 2.6, k), Math.cos(a) * r + 1];
-    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.6, 3.1, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, eye, target: [1.6, 3.1, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // Feature captions, elegant, one after another at the lower left.
@@ -759,7 +759,7 @@ function homeAerial(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const eye: Num3 = [lerp(-58, 22, k), lerp(58, 46, k) * F, lerp(74, 66, k) * F];
     const target: Num3 = [lerp(-22, 26, k), 0, lerp(10, 6, k)];
-    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target, fov: 36, shadowSize: 70, shadowAt: [eye[0] + 14, 0, 18], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, eye, target, fov: 36, shadowSize: 70, shadowAt: [eye[0] + 14, 0, 18], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
     anchors = parts.spots.map((p) => project(W, p, w, h));
     return out;
   });
@@ -831,7 +831,7 @@ function homeBuild3d(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const r = 24 * F;
     const eye: Num3 = [1.8 + Math.sin(a) * r, lerp(9, 6, kk), Math.cos(a) * r];
-    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.6, 2.4, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, eye, target: [1.6, 2.4, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // The steps, as a checklist at the right (a row on narrow frames).
@@ -941,7 +941,7 @@ function homePlan(sc0: SkillContext) {
     const spin = range(t, 2.5, d) * 0.35;
     const r = lerp(0.01, 15, tilt) * F;
     const eye: Num3 = [Math.sin(0.5 + spin) * r, lerp(23, 13, tilt) * F, Math.cos(0.5 + spin) * r];
-    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, sun: [0.5, 0.75, 0.45], eye, target: [0, 0, 0], fov: 34, shadowSize: 10, shadowAt: [0, 0, 0] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, sun: [0.5, 0.75, 0.45], eye, target: [0, 0, 0], fov: 34, shadowSize: 10, shadowAt: [0, 0, 0] }, w, h);
     anchors = parts.rooms.map((r0) => project(W, r0.at, w, h));
     labels = parts.rooms.map((r0, i) => names[i] ?? r0.name);
     return out;
@@ -991,7 +991,7 @@ function homeEnergy(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const r = 22 * F;
     const eye: Num3 = [1 + Math.sin(a) * r, lerp(9.5, 7.5, k), Math.cos(a) * r];
-    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, sun: [0.55, 0.6, 0.6], sunCol: [1, 0.93, 0.8], eye, target: [0, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, sun: [0.55, 0.6, 0.6], sunCol: [1, 0.93, 0.8], eye, target: [0, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
     anchors = spots.map((p) => project(W, p, w, h));
     return out;
   });
@@ -1033,7 +1033,7 @@ function homeChoice(sc0: SkillContext) {
     const k = range(t, 0, d);
     const F = fitBack(sc, top);
     const eye: Num3 = [lerp(9, 6, k) * F, lerp(3.2, 3.6, k), lerp(19, 16, k) * F];
-    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.6, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, eye, target: [1.6, 3, 0], fov: 32, shadowSize: 16, shadowAt: [1.5, 0, 0], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // The options as swatch chips along the bottom.
@@ -1111,7 +1111,7 @@ function homeJourney(sc0: SkillContext) {
     const F = fitBack(sc, top);
     const eye: Num3 = [lerp(5, 2.4, k), lerp(4.2, 3.0, k), lerp(32, 18, k) * F];
     const target: Num3 = [1.4, lerp(2.6, 2.0, k), lerp(0, 3, k)];
-    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target, fov: 34, shadowSize: 16, shadowAt: [1.5, 0, 4], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
+    const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, eye, target, fov: 34, shadowSize: 16, shadowAt: [1.5, 0, 4], fog: [0.98, 0.89, 0.77, 0.008] }, w, h);
     anchors = parts.postAt.map((p) => project(W, p, w, h));
     return out;
   });
@@ -1843,7 +1843,7 @@ function homeWalkthrough(sc0: SkillContext) {
     const eye = spline(parts.rooms.slice(0, n).map((r) => r.eye), s);
     const target = spline(parts.rooms.slice(0, n).map((r) => r.target), s);
     const back: Num3 = [eye[0], eye[1] + (F - 1) * 0.8, eye[2] + (F - 1) * 3];
-    return render(W, { ...INDOOR, flat: !!sc.flat3d, eye: back, target, fov: 46, shadowSize: 9, shadowAt: [eye[0] + 1, 0, -1.5] }, w, h);
+    return render(W, { ...INDOOR, flat: !!sc.flat3d, cel: true, eye: back, target, fov: 46, shadowSize: 9, shadowAt: [eye[0] + 1, 0, -1.5] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // The room's name as the camera arrives.
@@ -1872,7 +1872,7 @@ function homeFamily(sc0: SkillContext) {
     const a = lerp(-0.35, 0.3, k);
     const r = lerp(5.6, 4.6, k) * F;
     const eye: Num3 = [-4.8 + Math.sin(a) * r, lerp(1.6, 1.35, k), -1.6 + Math.cos(a) * r];
-    return render(W, { ...INDOOR, flat: !!sc.flat3d, eye, target: [-4.8, 0.85, -1.9], fov: 38, shadowSize: 6, shadowAt: [-5, 0, -1.8] }, w, h);
+    return render(W, { ...INDOOR, flat: !!sc.flat3d, cel: true, eye, target: [-4.8, 0.85, -1.9], fov: 38, shadowSize: 6, shadowAt: [-5, 0, -1.8] }, w, h);
   });
   if (!cv) fallback(sc, top);
   const line = plain(scene.subtext ?? "");
@@ -1912,7 +1912,7 @@ function homeWelcome(sc0: SkillContext) {
     const k = sine(range(t, 0, d));
     const F = fitBack(sc, top);
     const eye: Num3 = [lerp(3.4, 1.8, k), lerp(2.0, 1.7, k), lerp(15.5, 11.5, k) * F];
-    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.4, 2.4, 3.5], fov: 34, shadowSize: 12, shadowAt: [1.4, 0, 4], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, eye, target: [1.4, 2.4, 3.5], fov: 34, shadowSize: 12, shadowAt: [1.4, 0, 4], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
   });
   if (!cv) fallback(sc, top);
   // The call to action: a button in the brand's colour.
