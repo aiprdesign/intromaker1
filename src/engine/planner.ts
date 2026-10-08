@@ -2624,6 +2624,15 @@ function sanitizeBands(v: unknown): [number, number][] {
   return out;
 }
 
+/** A slide's pre-style choice (see Scene.base): kept only when every part is valid. */
+function sanitizeBase(b: unknown): Scene["base"] {
+  if (!b || typeof b !== "object") return undefined;
+  const o = b as Record<string, unknown>;
+  const ok = (v: unknown) => typeof v === "string" && (SKILL_IDS as readonly string[]).includes(v);
+  if (!ok(o.skill) || !ok(o.styled) || typeof o.text !== "string" || typeof o.shown !== "string") return undefined;
+  return { skill: o.skill as SkillId, styled: o.styled as SkillId, text: o.text.slice(0, 200), shown: o.shown.slice(0, 200) };
+}
+
 function sanitizeMedia(m: unknown): Media | undefined {
   const media = m as Partial<Media> | undefined;
   if (!media || !isAsset(media.src)) return undefined;
@@ -2711,6 +2720,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
       media: sanitizeMedia(s.media),
       contrast: typeof s.contrast === "boolean" ? s.contrast : undefined,
       locked: s.locked === true ? true : undefined,
+      base: sanitizeBase(s.base),
       eyebrow: typeof s.eyebrow === "string" && s.eyebrow.trim() ? s.eyebrow.slice(0, 40) : undefined,
       role: typeof s.role === "string" && /^[a-z]{2,14}$/.test(s.role) ? s.role : undefined,
       items: Array.isArray(s.items)

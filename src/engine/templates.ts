@@ -1416,9 +1416,14 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   const roles = people ? ABS_ROLES : tpl.roles;
   let prevSkill: SkillId | undefined;
   const usedIndustry = new Set<SkillId>();
-  const scenes = base.map((scene, i, all) => {
+  const scenes = base.map((cur, i, all): Scene => {
+    // Restyle from the director's choice, not the last style's: while the slide still shows what a
+    // style made of it, its pre-style skill and words come back (an edit since then wins).
+    const b = cur.base;
+    const restyled = !!b && !cur.locked && cur.skill === b.styled;
+    const scene: Scene = restyled ? { ...cur, skill: b.skill, text: cur.text === b.shown ? b.text : cur.text } : cur;
     const role = roleOf(scene, i, all.length);
-    if (!role) return scene;
+    if (!role) return { ...scene, base: undefined };
     let skill = roles[role] ?? DEFAULT_ROLE_SKILL[role];
     // A Cartoon style shows the intro's industry its own way, once per part (see INDUSTRY_ROLES).
     const ind = !plan.setting || scene.media ? undefined : tpl.category === "Cartoon" ? INDUSTRY_ROLES[plan.setting]?.[role] : plan.setting === "house" ? HOME_ROLES[role] : undefined;
@@ -1475,13 +1480,13 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     last = transition;
     // A word swap ("planned|built|shared") turned into a character slide keeps its first word.
     const text = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && scene.text?.includes("|") ? scene.text.replace(/([^\s|]+)(?:\|[^\s|]+)+/g, "$1") : scene.text;
-    return { ...scene, text, role, skill, duration, transition };
+    return { ...scene, text, role, skill, duration, transition, base: { skill: scene.skill, text: scene.text, styled: skill, shown: text } };
   });
   // A 3D style always has the product on a real 3D device: when no part of the story called for
   // one, the first words-only middle slide becomes the 3D laptop.
   if (tpl.category === "3D" && !plan.product && !scenes.some((x) => x.skill.startsWith("d3-"))) {
     const i = scenes.findIndex((x, k) => k > 0 && k < scenes.length - 1 && !x.media && !x.locked && x.role && !["hook", "reveal", "cta", "logos"].includes(x.role) && !/^(qr-end|liquid-logo|logo-|product-)/.test(x.skill));
-    if (i > 0) scenes[i] = { ...scenes[i], skill: "d3-laptop" };
+    if (i > 0) scenes[i] = { ...scenes[i], skill: "d3-laptop", base: scenes[i].base && { ...scenes[i].base!, styled: "d3-laptop" as SkillId } };
   }
   // Templates change the feel, not the runtime: keep the film within -12%/+10% of the length
   // the same storyboard runs at a neutral 120 bpm, scaling every scene proportionally.
@@ -1507,7 +1512,9 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
   };
   const fitted = plan.target ? fitLength(styledPlan, plan.target) : styledPlan;
   // The cinematography pass: transition grammar, holds and variety, in this style's own vocabulary.
-  return cinematography(fitted, { pool: tpl.transitions, roleSkill: (role) => (role in DEFAULT_ROLE_SKILL ? (roles[role as Role] ?? DEFAULT_ROLE_SKILL[role as Role]) : undefined) });
+  const shot = cinematography(fitted, { pool: tpl.transitions, roleSkill: (role) => (role in DEFAULT_ROLE_SKILL ? (roles[role as Role] ?? DEFAULT_ROLE_SKILL[role as Role]) : undefined) });
+  // (What the style finally shows is what a later restyle recognises as the style's own.)
+  return { ...shot, scenes: shot.scenes.map((x) => (x.base ? { ...x, base: { ...x.base, styled: x.skill, shown: x.text } } : x)) };
 }
 
 /**

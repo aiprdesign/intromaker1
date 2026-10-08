@@ -26,7 +26,7 @@ import { fillTextFit, fitTextLines, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { coverDraw, fitted, mockShot } from "./gallery";
 import { checkBadge, cursorPath, ellipsize, focus, iconTile, windowChrome, wrap, wrapClamp } from "./interactions";
-import { topHeadline } from "./saas";
+import { topHeadline, underHeadline } from "./saas";
 
 const at = (t: number, kind: SfxCue["kind"]): SfxCue => ({ t, kind });
 const titleOf = (item: string) => item.split(/\s+[—–]\s+/)[0].trim();
@@ -1033,9 +1033,10 @@ function beforeAfter(sc: SkillContext) {
   const pains = (scene.items ?? []).map(titleOf).filter(Boolean).slice(0, 4);
   const notes = pains.length >= 2 ? pains : ["Scattered spreadsheets", "Endless status meetings", "Copy-pasting between tools", "Lost in email threads"];
   const fw = portrait ? w * 0.9 : Math.min(w * 0.66, h * 0.62 * 1.6);
-  const fh = portrait ? Math.min(h * 0.56, fw * 1.2) : fw / 1.6;
+  const fh0 = portrait ? Math.min(h * 0.56, fw * 1.2) : fw / 1.6;
   const fx = (w - fw) / 2;
-  const fy = portrait ? h * 0.3 : Math.max(h * 0.28, h * 0.61 - fh / 2);
+  // Under a headline that wraps, the frame starts lower and gets shorter.
+  const { y: fy, h: fh } = underHeadline(sc, portrait ? h * 0.3 : Math.max(h * 0.28, h * 0.61 - fh0 / 2), fh0);
   const rr = 22 * u * S;
   // The slider: a peek of "after", dragged to the middle, then all the way across.
   let hk = 0.93;

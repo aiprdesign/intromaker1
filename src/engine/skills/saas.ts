@@ -80,7 +80,36 @@ function stagger(sc: SkillContext) {
 
 /** Top-of-frame headline with an optional chapter eyebrow ("How it works") above it. */
 export function topHeadline(sc: SkillContext) {
-  const { w, h, t, d, u, scene } = sc;
+  const { t, d, scene } = sc;
+  const { layout, capTop, shift, gap, ebH, hasEb } = topLayout(sc);
+  if (hasEb) eyebrow(sc, scene.eyebrow!, capTop + shift - gap - ebH, range(t, 0.05, 0.45) * (1 - range(t, d - 0.4, d)));
+  blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
+  return layout;
+}
+
+/**
+ * Where content under the top headline may start: under its last line, with a gap. A headline
+ * that wraps to two or three lines pushes this down, so windows below can shrink to clear it.
+ */
+export function belowHeadline(sc: SkillContext) {
+  const { layout } = topLayout(sc);
+  const last = layout.ys[layout.ys.length - 1] ?? sc.h * 0.12;
+  return last + layout.size * 0.62 + tokens(sc.w, sc.h).space(3);
+}
+
+/**
+ * A box under the top headline, `y` to `y + hh`: when the headline runs onto more lines, the box's
+ * top moves down to clear it and the box gets shorter (its bottom stays put, never under a third).
+ */
+export function underHeadline(sc: SkillContext, y: number, hh: number) {
+  const bottom = y + hh;
+  const top = Math.min(Math.max(y, belowHeadline(sc)), bottom - hh / 3);
+  return { y: top, h: bottom - top };
+}
+
+/** The top headline's layout (lines, eyebrow and title-safe shift), without drawing it. */
+function topLayout(sc: SkillContext) {
+  const { w, h, u, scene } = sc;
   const portrait = h > w;
   const hasEb = !!scene.eyebrow;
   // With an eyebrow the block sits lower, so the pill clears the top and the headline sits closer
@@ -96,9 +125,7 @@ export function topHeadline(sc: SkillContext) {
   const blockTop = hasEb ? capTop - gap - ebH * 2 : capTop;
   const shift = Math.max(0, g.safe.top - blockTop);
   if (shift) layout.ys = layout.ys.map((y) => y + shift);
-  if (hasEb) eyebrow(sc, scene.eyebrow!, capTop + shift - gap - ebH, range(t, 0.05, 0.45) * (1 - range(t, d - 0.4, d)));
-  blurInLayout(sc, layout, 0.1, 0.06, { exitAt: d - 0.4 });
-  return layout;
+  return { layout, capTop, shift, gap, ebH, hasEb };
 }
 
 /** Chapter eyebrow above a centred block whose first line sits at `top`. */
@@ -1075,9 +1102,11 @@ function uiCards(sc: SkillContext) {
   const ex = ease.inCubic(exitT(sc, 0.4));
   // Central product screen.
   const sw = portrait ? w * 0.78 : w * 0.5;
-  const sh = sw / (portrait ? 0.9 : 1.6);
+  // (Shorter, and lower, under a headline that wraps.)
+  const fit = underHeadline(sc, (portrait ? h * 0.55 : h * 0.58) - sw / (portrait ? 0.9 : 1.6) / 2, sw / (portrait ? 0.9 : 1.6));
+  const sh = fit.h;
   const scx = w / 2;
-  const scy = portrait ? h * 0.55 : h * 0.58;
+  const scy = fit.y + sh / 2;
   const k0 = clamp(spring(t - 0.2, 9, 7), 0, 1.05);
   ctx.save();
   ctx.globalAlpha = clamp(t / 0.3) * (1 - ex);
@@ -1806,8 +1835,9 @@ function siteScroll(sc: SkillContext) {
   const ex = ease.inCubic(exitT(sc, 0.4));
   // The browser window.
   const ww = portrait ? w * 0.88 : w * 0.7;
-  const top = h * (scene.eyebrow ? 0.28 : 0.25);
-  const wh = Math.min(h * 0.7, h - top - 24 * u);
+  // Under the headline: a headline on two or three lines pushes the window down and makes it shorter.
+  const top = Math.max(h * (scene.eyebrow ? 0.28 : 0.25), belowHeadline(sc));
+  const wh = Math.min(h * 0.7, h - top - Math.max(24 * u, tokens(w, h).safe.top * 0.6));
   const x0 = w / 2 - ww / 2;
   const bar = 34 * u;
   const vx = x0;
@@ -1931,8 +1961,9 @@ function browserScroll(sc: SkillContext) {
   topHeadline(sc);
   const ex = ease.inCubic(exitT(sc, 0.4));
   const ww = portrait ? w * 0.88 : w * 0.7;
-  const top = h * (scene.eyebrow ? 0.28 : 0.25);
-  const wh = Math.min(h * 0.7, h - top - 24 * u);
+  // Under the headline: a headline on two or three lines pushes the window down and makes it shorter.
+  const top = Math.max(h * (scene.eyebrow ? 0.28 : 0.25), belowHeadline(sc));
+  const wh = Math.min(h * 0.7, h - top - Math.max(24 * u, tokens(w, h).safe.top * 0.6));
   const x0 = w / 2 - ww / 2;
   const bar = 34 * u;
   // Tilted in from below, settling flat (a faux 3D rotateX).

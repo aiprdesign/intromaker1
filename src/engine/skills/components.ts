@@ -16,7 +16,7 @@ import { getImage, getMedia, segmentShot, type Region } from "../media";
 import { glassCard, saasBackground, spring } from "../saasfx";
 import { subFont } from "../text";
 import type { Brand, Scene, SfxCue, Skill, SkillContext, SitePart } from "../types";
-import { topHeadline } from "./saas";
+import { topHeadline, underHeadline } from "./saas";
 
 /** Live captures are laid out at a 1440px-wide viewport; part boxes are in those page pixels. */
 const CAPTURE_WIDTH = 1440;
@@ -238,10 +238,14 @@ function uiAssemble(sc: SkillContext) {
   const barH = 40 * u * (portrait ? 1.1 : 1);
   const maxW = portrait ? w * 0.92 : w * 0.8;
   const maxH = portrait ? h * 0.6 : h * 0.7;
-  const cw = Math.min(maxW, (maxH - barH) * aspect);
+  const cw0 = Math.min(maxW, (maxH - barH) * aspect);
+  const wy0 = portrait ? h * 0.3 : Math.max(h * 0.25, h * 0.6 - (cw0 / aspect + barH) / 2);
+  // Under a headline that wraps, the window shrinks (keeping its shape) to clear it.
+  const fit = underHeadline(sc, wy0, cw0 / aspect + barH);
+  const cw = Math.min(cw0, (fit.h - barH) * aspect);
   const ch = cw / aspect;
   const wx = (w - cw) / 2;
-  const wy = portrait ? h * 0.3 : Math.max(h * 0.25, h * 0.6 - (ch + barH) / 2);
+  const wy = fit.y;
   const s = cw / frame.w;
   const cx0 = wx;
   const cy0 = wy + barH;
