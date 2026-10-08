@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { softwareKind } from "@/engine/software";
 import { assetUrl } from "@/engine/assets";
 import { AiError, describe, modelOf, readAiConfig, runDirector, serverReachesLocal, type AiConfig } from "@/lib/ai";
 import { readShot } from "@/lib/storage";
@@ -387,6 +388,8 @@ function finishPlan(c: Ctx, raw: z.infer<typeof SitePlanSchema>) {
       concept: c.concept.id,
       // A physical product: its photos are cut out on the stage and the narrator speaks about the product.
       product: c.site?.kind === "product" ? true : undefined,
+      // SaaS, tech and app intros show the product on real 3D devices (see applyTemplate).
+      software: c.site?.kind === "product" ? undefined : softwareKind(c.concept.id, c.site ? [c.site.name, c.site.tagline, c.site.description, ...c.site.headlines, ...c.site.features].join(" ") : c.prompt),
       scenes: out.scenes.map((s) => {
         const idx = "media" in s ? (s.media as number) : -1;
         // Testimonials get the real author's avatar when the quote matches the site's.

@@ -11,6 +11,7 @@ import { writeVoiceover } from "./script";
 import { isClaimWord, isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
 import { DEFAULT_TRAILER_STYLE, detectTrailerStyle, FILM_CUE, TRAILER_STYLE_MAP, type TrailerStyle } from "./trailers";
+import { softwareKind } from "./software";
 import {
   FONTS,
   PALETTE_IDS,
@@ -2313,7 +2314,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
 
   // Thin material (a one-line prompt, a sparse page) makes a tight shorter cut rather than
   // padding with invented beats, and the director says what would unlock the full length.
-  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target, ...(home ? { setting: "house" as const } : {}) });
+  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target, ...(home ? { setting: "house" as const } : { software: softwareKind(concept.id, [site.name, site.tagline, site.description, ...site.headlines, ...site.features].join(" ")) }) });
   const styled = applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
@@ -2817,6 +2818,8 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,
     textFx: (TEXT_FX as readonly string[]).includes(raw.textFx as string) ? (raw.textFx as VideoPlan["textFx"]) : undefined,
     concept: typeof raw.concept === "string" && CONCEPT_MAP[raw.concept] ? raw.concept : undefined,
+    software: raw.software === "web" || raw.software === "app" ? raw.software : undefined,
+    devices3d: raw.devices3d === false ? false : undefined,
     voiceover: sanitizeVoice(raw.voiceover),
     target: Number(raw.target) > 0 ? Math.min(120, Math.max(6, Number(raw.target))) : undefined,
     product: raw.product === true ? true : undefined,

@@ -1143,10 +1143,10 @@ function d3Split(sc: SkillContext) {
   studio(sc);
   const narrow = h > w * 0.85;
   if (narrow) {
-    // Vertical frames have no room beside the device: the usual layout.
-    return d3Laptop(sc);
+    // Vertical frames have no room beside the device: the usual layout (an app's on the phone).
+    return sc.app && !scene.media ? d3Phone(sc) : d3Laptop(sc);
   }
-  const phone = !!sc.brand?.mobile && !scene.media;
+  const phone = (!!sc.brand?.mobile || !!sc.app) && !scene.media;
   const shot = shotOf(sc, phone);
   // The device on the right, turning slowly towards the words.
   frame(

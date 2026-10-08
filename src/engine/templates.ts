@@ -1499,7 +1499,9 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (i > 0 && all[i - 1].skill === "product-teaser") transition = "flash";
     last = transition;
     // A word swap ("planned|built|shared") turned into a character slide keeps its first word.
-    const text = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && scene.text?.includes("|") ? scene.text.replace(/([^\s|]+)(?:\|[^\s|]+)+/g, "$1") : scene.text;
+    const swapped = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && scene.text?.includes("|") ? scene.text.replace(/([^\s|]+)(?:\|[^\s|]+)+/g, "$1") : scene.text;
+    // (One turned into a 3D device slide reads as a list: "planned, tracked and shared".)
+    const text = skill.startsWith("d3-") && !scene.skill.startsWith("d3-") ? swapList(swapped) : swapped;
     return { ...scene, text, role, skill, duration, transition, ...(borrowed ? { items: borrowed } : {}), ...(uiLabel ? { subtext: undefined } : {}), base: { skill: scene.skill, text: scene.text, styled: skill, shown: text, ...(borrowed ? { items: scene.items, lent: borrowed } : {}), ...(uiLabel ? { subtext: scene.subtext } : {}) } };
   });
   // A 3D style always has the product on a real 3D device: when no part of the story called for
@@ -1508,6 +1510,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     const i = scenes.findIndex((x, k) => k > 0 && k < scenes.length - 1 && !x.media && !x.locked && x.role && !["hook", "reveal", "cta", "logos"].includes(x.role) && !/^(qr-end|liquid-logo|logo-|product-)/.test(x.skill));
     if (i > 0) scenes[i] = { ...scenes[i], skill: "d3-laptop", base: scenes[i].base && { ...scenes[i].base!, styled: "d3-laptop" as SkillId } };
   }
+  // SaaS, tech and app intros show the product on real 3D devices in the other styles too.
+  if (plan.software && plan.devices3d !== false && !plan.product && plan.setting !== "house" && !["3D", "Cartoon", "Product Trailers"].includes(tpl.category ?? "")) softwareDevices(scenes, plan.software);
   // Templates change the feel, not the runtime: keep the film within -12%/+10% of the length
   // the same storyboard runs at a neutral 120 bpm, scaling every scene proportionally.
   const neutral = base.reduce((a, scene, i, all) => {
@@ -1551,6 +1555,54 @@ const HOME_ROLES: Partial<Record<Role, SkillId>> = { hook: "home-hero", features
 
 /** Real 3D device slides for 3D styles when the site is captured, by part of the story. */
 const DEVICE_ROLES: Partial<Record<Role, SkillId>> = { meet: "d3-split", tour: "d3-dive", features: "d3-popout", reach: "d3-wall", demo: "d3-desk", promise: "d3-phone", solve: "d3-macro", integrations: "d3-lineup", support: "d3-laptop", gallery: "d3-desk" };
+
+/** A word swap said as a list: "planned|tracked|shared" → "planned, tracked and shared". */
+function swapList<T extends string | undefined>(text: T): T {
+  return text?.replace(/[^\s|]+(?:\|[^\s|]+)+/g, (m) => {
+    const w = m.split("|");
+    return `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}`;
+  }) as T;
+}
+
+/** The parts of a software intro that suit a 3D device, best first. */
+const DEVICE_SLOTS: Role[] = ["meet", "promise", "solve", "features", "reach", "integrations", "bento", "demo", "support", "gallery"];
+
+/**
+ * A software intro in a style without devices of its own gets a few real 3D device slides
+ * (one in a short video, up to three in a long one): the product on a laptop (a web product) or
+ * a phone (an app) first (beside its points when the slide has some), then a pop-out of its parts, a device lineup or a screen wall. They take
+ * words-only middle slides that fit (a short headline, at most four points), never two in a row,
+ * and leave your pictures, demos, the website's own scroll and assembled UI, logos and slides you
+ * picked yourself alone.
+ */
+function softwareDevices(scenes: Scene[], kind: "web" | "app") {
+  const middle = scenes.length - 2;
+  const cap = middle <= 3 ? 1 : middle <= 6 ? 2 : 3;
+  const bare: SkillId[] = kind === "app" ? ["d3-phone", "d3-lineup", "d3-macro"] : ["d3-laptop", "d3-wall", "d3-lineup", "d3-macro"];
+  const listed: SkillId[] = ["d3-split", "d3-popout"];
+  const used = new Set<SkillId>();
+  const isDevice = (k: number) => !!scenes[k]?.skill.startsWith("d3-");
+  const fits = (s: Scene, k: number) =>
+    k > 0 && k < scenes.length - 1 && !s.media && !s.locked && !!s.role && DEVICE_SLOTS.includes(s.role as Role) &&
+    !DEMO_SKILLS.has(s.skill) && !["ui-assemble", "site-scroll", "phone-tour"].includes(s.skill) && !CHARACTER_SLIDE.test(s.skill) &&
+    !/^(qr-end|liquid-logo|logo-|product-|home-|d3-)/.test(s.skill) && (s.text ?? "").replace(/[*|]/g, "").length <= 48 &&
+    (s.items?.length ?? 0) <= 4 && !isDevice(k - 1) && !isDevice(k + 1);
+  const order = scenes.map((s, k) => k).filter((k) => fits(scenes[k], k)).sort((a, b) => DEVICE_SLOTS.indexOf(scenes[a].role as Role) - DEVICE_SLOTS.indexOf(scenes[b].role as Role) || a - b);
+  let placed = scenes.filter((s) => s.skill.startsWith("d3-")).length;
+  for (const k of order) {
+    if (placed >= cap) break;
+    // (Placing one rules out its neighbours.)
+    if (!fits(scenes[k], k)) continue;
+    const n = scenes[k].items?.length ?? 0;
+    const skill = (n >= 2 ? listed.filter((x) => x !== "d3-split" || n <= 3) : bare).find((x) => !used.has(x));
+    if (!skill) continue;
+    used.add(skill);
+    placed++;
+    // A word swap ("planned|tracked|shared") reads as a list on a device slide.
+    const text = swapList(scenes[k].text);
+    scenes[k] = { ...scenes[k], skill, text, base: scenes[k].base && { ...scenes[k].base!, styled: skill } };
+  }
+}
 
 /** The industry slides a setting gets, by part of the story. */
 const INDUSTRY_ROLES: Partial<Record<NonNullable<VideoPlan["setting"]>, Partial<Record<Role, SkillId>>>> = {

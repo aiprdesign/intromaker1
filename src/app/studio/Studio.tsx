@@ -335,6 +335,28 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.render3d === "flat") !== flat3d) setPlan((p) => ({ ...p, render3d: flat3d ? "flat" : undefined }));
   }, [plan, flat3d]);
+  // 3D device slides in SaaS, tech and app intros: on by default; remembered. Switching restyles
+  // the video, so the slides they took go back to the director's own.
+  const [devicesOn, setDevicesOn] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.devices3d") === "off") setDevicesOn(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseDevices = (on: boolean) => {
+    setDevicesOn(on);
+    try {
+      localStorage.setItem("intromaker.devices3d", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if (plan.style === "saas" && plan.template && plan.software && (plan.devices3d !== false) !== devicesOn)
+      setPlan((p) => (p.style === "saas" && p.template ? applyBackground(applyTemplate({ ...p, devices3d: devicesOn ? undefined : false }, p.template, { palette: p.palette }), bgRef.current) : p));
+  }, [plan, devicesOn]);
   // Contrast slides (a bold colour-block text beat every few slides): on by default; remembered.
   const [contrastOn, setContrastOn] = useState(true);
   useEffect(() => {
@@ -2519,6 +2541,22 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{flat3d ? "Devices, homes and scenes drawn as clean flat illustrations, straight on." : "Modelled devices and homes with real light, shadows and a moving camera."}</p>
+          {plan.software && (
+            <>
+              <label className="field-label">
+                3D device slides <span className="tpl-desc">{devicesOn ? "On" : "Off"}</span>
+              </label>
+              <div className="seg-control">
+                <button className={devicesOn ? "active" : ""} onClick={() => chooseDevices(true)}>
+                  {plan.software === "app" ? "Phones & devices" : "Laptops & devices"}
+                </button>
+                <button className={!devicesOn ? "active" : ""} onClick={() => chooseDevices(false)}>
+                  Off
+                </button>
+              </div>
+              <p className="hint">{devicesOn ? `Your ${plan.software === "app" ? "app on a 3D phone" : "product on a 3D laptop"}, with its parts popping out, on a few slides that suit it. The 3D styles show more.` : "Slides keep the style's own designs (the 3D styles keep their devices)."}</p>
+            </>
+          )}
           <label className="field-label">
             Contrast slides <span className="tpl-desc">{contrastOn ? "On" : "Off"}</span>
           </label>

@@ -80,6 +80,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   characters?: VideoPlan["characters"];
   voiceover?: VideoPlan["voiceover"];
   render3d?: VideoPlan["render3d"];
+  software?: VideoPlan["software"];
   style?: VideoPlan["style"];
   look?: VideoPlan["look"];
   scheme?: VideoPlan["scheme"];
@@ -173,6 +174,7 @@ function drawScene(
     cast: plan.cast,
     characters: plan.characters,
     flat3d: plan.render3d === "flat",
+    app: plan.software === "app",
     edit: opts.edit ? (l) => opts.edit!(index, l) : undefined,
   };
   resetCtx(target);

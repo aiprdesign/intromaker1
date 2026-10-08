@@ -473,6 +473,10 @@ export interface VideoPlan {
   product?: boolean;
   /** Product concept (devtools, ai, fintech…): picks icon families and story vocabulary. */
   concept?: string;
+  /** Software the intro is for (a web product or a phone-first app): its styles show it on real 3D devices. */
+  software?: "web" | "app";
+  /** 3D device slides in software intros (the 3D styles always have them). Unset: on; false: off. */
+  devices3d?: boolean;
   /** Colour balance: the 60-30-10 rule (default for SaaS films) or every palette colour at full strength. */
   scheme?: "60-30-10" | "vibrant";
   /** Glow on type and the highlight bloom. Off by default (crisp, halo-free text); true turns it on. */
@@ -635,6 +639,8 @@ export interface SkillContext {
   noStage?: boolean;
   /** Draw 3D slides flat, as 2D illustrations (VideoPlan.render3d). */
   flat3d?: boolean;
+  /** The intro is for a phone-first app (VideoPlan.software): device slides lead with the phone. */
+  app?: boolean;
   /** Product concept id (see concepts.ts) for on-brand icon choices. */
   concept?: string;
   /** A physical product film: product photos are shown cut out of their white backgrounds. */
