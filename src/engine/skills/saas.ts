@@ -1819,11 +1819,27 @@ function stopSections(secs: { y: number; h: number }[], iw: number, d: number) {
  * window (bordered, glowing, the page dimmed behind it), then drops back as the scroll moves on.
  * Without known sections (or a still image) it falls back to a plain scroll.
  */
+/**
+ * What a scrolling slide scrolls: the slide's own picture when it's a tall page; else the site's
+ * full-page capture (a one-screen screenshot has nothing below it to scroll to); else the picture.
+ */
+function scrollSrc(sc: SkillContext): string | undefined {
+  const { scene, brand } = sc;
+  const own = scene.media?.kind === "image" ? scene.media.src : undefined;
+  const ownImg = own ? getImage(own) : null;
+  const tall = (im: HTMLImageElement | null) => !!im && im.naturalWidth > 0 && im.naturalHeight > im.naturalWidth * 1.3;
+  if (own && tall(ownImg)) return own;
+  const page = brand?.page?.src;
+  if (page && page !== own && tall(getImage(page))) return page;
+  return own;
+}
+
 function siteScroll(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
-  const img = getImage(scene.media?.kind === "image" ? scene.media.src : undefined);
+  const src = scrollSrc(sc);
+  const img = getImage(src);
   // The page's own sections (snapped to the screenshot's real dividers), or found in the screenshot.
-  const bands = img && img.naturalWidth ? (brand?.page?.src === scene.media?.src ? snapBands(img, brand!.page!.bands) : pageBands(img)) : [];
+  const bands = img && img.naturalWidth ? (brand?.page?.src === src ? snapBands(img, brand!.page!.bands) : pageBands(img)) : [];
   const iw = img?.naturalWidth ?? 0;
   const ih = img?.naturalHeight ?? 0;
   const secs = bands.map(([a, b]) => ({ y: a * ih, h: (b - a) * ih })).filter((x) => x.h > 8);
@@ -2002,7 +2018,8 @@ function browserScroll(sc: SkillContext) {
   const vy = top + bar;
   const vw = ww;
   const vh = wh - bar;
-  const img = getMedia(scene.media, t);
+  const src = scrollSrc(sc);
+  const img = src && src !== (scene.media?.kind === "image" ? scene.media.src : undefined) ? getImage(src) : getMedia(scene.media, t);
   const T = scrollTiming(d);
   const p1 = ease.inOutCubic(range(t, T.first, T.first + 1.1)) * 0.4;
   const p2 = ease.inOutCubic(range(t, T.second, T.second + 1.2)) * 0.45;
