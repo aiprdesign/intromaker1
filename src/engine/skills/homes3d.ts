@@ -15,6 +15,9 @@
  *                 double-pane windows, a high-efficiency system.
  * - home-choice:  the same home restyled per option (farmhouse, craftsman, modern, coastal…).
  * - home-journey: the camera walks up the path to the front door past a sign for each step of buying.
+ * - home-walkthrough: one seamless glide through a furnished home, room to room, out to the patio.
+ * - home-family:  a happy family and their dog in the living room, the camera arcing round.
+ * - home-welcome: the family and dog wave from the path of the home at golden hour; the button.
  */
 import { Transform, type Program } from "ogl";
 import { box, cylinder, gable, project, quad, render, rgb, slab, sphere, world, type View, type World } from "../d3";
@@ -87,7 +90,10 @@ function label(sc: SkillContext, x: number, y: number, text: string, size: numbe
   const tw = ctx.measureText(text).width + size * 1.9;
   const th = size * 2.05;
   ctx.globalAlpha *= clamp(k * 1.8);
-  ctx.translate(x, y - (1 - Math.min(1, k)) * 14 * u);
+  // Kept inside the frame (a pin near the edge of a tall frame would cut its label off).
+  const m = 12 * u;
+  const cx = Math.min(sc.w - m - tw / 2, Math.max(m + tw / 2, x));
+  ctx.translate(cx, y - (1 - Math.min(1, k)) * 14 * u);
   ctx.shadowColor = "rgba(20,10,30,0.22)";
   ctx.shadowBlur = 18 * u;
   ctx.shadowOffsetY = 6 * u;
@@ -1122,6 +1128,550 @@ function homeJourney(sc0: SkillContext) {
 
 /* ───────────────────────── Registry ───────────────────────── */
 
+/* ───────────────────────── People and a dog ───────────────────────── */
+
+/** One material per colour and finish, per world (people and props share them). */
+const matsByWorld = new WeakMap<World, Map<string, Program>>();
+function mc(W: World, color: string, gloss = 0.3, emit?: string) {
+  let m = matsByWorld.get(W);
+  if (!m) matsByWorld.set(W, (m = new Map()));
+  const key = `${color}|${gloss}|${emit ?? ""}`;
+  let p = m.get(key);
+  if (!p) m.set(key, (p = W.mat({ color, gloss, ...(emit ? { emit } : {}) })));
+  return p;
+}
+
+interface Person3 {
+  root: Transform;
+  armL: Transform;
+  armR: Transform;
+  hipL: Transform;
+  hipR: Transform;
+  kneeL: Transform;
+  kneeR: Transform;
+  head: Transform;
+  h: number;
+}
+interface PersonLook {
+  h: number;
+  shirt: string;
+  pants: string;
+  skin: string;
+  hair: string;
+  style: "short" | "long" | "bun" | "curly";
+  shoes?: string;
+  child?: boolean;
+}
+
+/** A friendly person in 3D (faces +z): jointed hips, knees and shoulders so they can sit and wave. */
+function person3d(W: World, parent: Transform, L: PersonLook): Person3 {
+  const { gl } = W;
+  const h = L.h;
+  const root = node(parent);
+  const legLen = h * (L.child ? 0.4 : 0.46);
+  const thigh = legLen * 0.5;
+  const shin = legLen * 0.5;
+  const torsoH = h * (L.child ? 0.3 : 0.31);
+  const torsoR = h * (L.child ? 0.12 : 0.105);
+  const headR = h * (L.child ? 0.1 : 0.072);
+  const r = h * 0.04;
+  const shirt = mc(W, L.shirt, 0.25);
+  const pants = mc(W, L.pants, 0.25);
+  const skin = mc(W, L.skin, 0.35);
+  const hair = mc(W, L.hair, 0.45);
+  const shoes = mc(W, L.shoes ?? "#2b2a30", 0.5);
+  const legs = [-1, 1].map((sd) => {
+    const hip = node(root);
+    hip.position.set(sd * torsoR * 0.48, legLen, 0);
+    W.mesh(cylinder(gl, r * 1.1, r, thigh, 12), pants, hip).position.y = -thigh / 2;
+    const knee = node(hip);
+    knee.position.y = -thigh;
+    W.mesh(cylinder(gl, r, r * 0.85, shin, 12), pants, knee).position.y = -shin / 2;
+    put(W, box(gl, r * 2.2, r * 1.2, r * 3.4), shoes, knee, 0, -shin + r * 0.45, r * 0.8);
+    return { hip, knee };
+  });
+  // The torso, a rounded top for the shoulders, the neck and head with hair and a happy face.
+  W.mesh(cylinder(gl, torsoR * 0.88, torsoR, torsoH, 18), shirt, root).position.y = legLen + torsoH / 2;
+  const top = W.mesh(sphere(gl, torsoR * 0.88, 18, 10), shirt, root);
+  top.position.y = legLen + torsoH;
+  top.scale.set(1, 0.42, 0.85);
+  const head = node(root);
+  head.position.y = legLen + torsoH + headR * 1.25;
+  W.mesh(cylinder(gl, headR * 0.42, headR * 0.42, headR * 0.7, 10), skin, head).position.y = -headR * 0.95;
+  W.mesh(sphere(gl, headR, 22, 16), skin, head);
+  const cap = W.mesh(sphere(gl, headR * 1.07, 20, 14), hair, head);
+  cap.position.set(0, headR * (L.style === "curly" ? 0.26 : 0.22), -headR * 0.1);
+  cap.scale.set(L.style === "curly" ? 1.14 : 1.02, L.style === "curly" ? 0.95 : 0.82, 1.02);
+  if (L.style === "long") put(W, box(gl, headR * 1.9, headR * 1.9, headR * 0.7), hair, head, 0, -headR * 0.55, -headR * 0.55);
+  if (L.style === "bun") W.mesh(sphere(gl, headR * 0.42, 12, 10), hair, head).position.set(0, headR * 0.95, -headR * 0.55);
+  const dark = mc(W, "#26201f", 0.6);
+  for (const sd of [-1, 1]) {
+    W.mesh(sphere(gl, headR * 0.14, 8, 6), dark, head).position.set(sd * headR * 0.36, headR * 0.08, headR * 0.9);
+    W.mesh(sphere(gl, headR * 0.16, 8, 6), mc(W, "#f09a8a", 0.3), head).position.set(sd * headR * 0.55, -headR * 0.2, headR * 0.78);
+  }
+  const smile = W.mesh(cylinder(gl, headR * 0.3, headR * 0.3, headR * 0.05, 16), mc(W, "#9c3b3b", 0.4), head);
+  smile.position.set(0, -headR * 0.3, headR * 0.86);
+  smile.rotation.x = Math.PI / 2 - 0.3;
+  smile.scale.set(1, 1, 0.45);
+  // Arms from the shoulders: a sleeve, a forearm and a hand.
+  const armLen = h * (L.child ? 0.32 : 0.36);
+  const arms = [-1, 1].map((sd) => {
+    const sh = node(root);
+    sh.position.set(sd * torsoR * 1.02, legLen + torsoH * 0.9, 0);
+    W.mesh(cylinder(gl, r * 0.95, r * 0.85, armLen * 0.5, 12), shirt, sh).position.y = -armLen * 0.25;
+    W.mesh(cylinder(gl, r * 0.8, r * 0.7, armLen * 0.5, 12), skin, sh).position.y = -armLen * 0.75;
+    W.mesh(sphere(gl, r * 1.05, 10, 8), skin, sh).position.y = -armLen;
+    sh.rotation.z = sd * 0.08;
+    return sh;
+  });
+  return { root, armL: arms[0], armR: arms[1], hipL: legs[0].hip, hipR: legs[1].hip, kneeL: legs[0].knee, kneeR: legs[1].knee, head, h };
+}
+
+/** Sit a person down on a seat `seatY` high. */
+function sitDown(P: Person3, seatY: number) {
+  const legLen = P.hipL.position.y;
+  P.root.position.y = seatY - legLen + P.h * 0.02;
+  for (const hip of [P.hipL, P.hipR]) hip.rotation.x = -Math.PI / 2;
+  for (const knee of [P.kneeL, P.kneeR]) knee.rotation.x = Math.PI / 2;
+}
+
+/** A happy idle: a little bounce and sway; `wave` raises the right arm and waves it. */
+function happy(P: Person3, t: number, phase: number, wave = 0) {
+  P.head.rotation.z = Math.sin(t * 1.6 + phase) * 0.06;
+  P.head.rotation.y = Math.sin(t * 0.9 + phase) * 0.12;
+  P.armL.rotation.z = -0.1 - Math.sin(t * 1.3 + phase) * 0.05;
+  P.armR.rotation.z = lerp(0.1 + Math.sin(t * 1.3 + phase) * 0.05, 2.7 + Math.sin(t * 9 + phase) * 0.28, wave);
+}
+
+interface Dog3 {
+  root: Transform;
+  tail: Transform;
+  head: Transform;
+}
+
+/** A happy dog in 3D (faces +x): floppy ears, a tongue out and a tail that wags. */
+function dog3d(W: World, parent: Transform, coat: string, ears: string, collar: string): Dog3 {
+  const { gl } = W;
+  const root = node(parent);
+  const fur = mc(W, coat, 0.3);
+  const fur2 = mc(W, ears, 0.3);
+  const dark = mc(W, "#1f1a18", 0.7);
+  const body = W.mesh(sphere(gl, 0.26, 20, 14), fur, root);
+  body.position.set(0, 0.44, 0);
+  body.scale.set(1.35, 0.82, 0.78);
+  W.mesh(sphere(gl, 0.2, 16, 12), fur, root).position.set(0.24, 0.5, 0);
+  const neck = W.mesh(cylinder(gl, 0.13, 0.13, 0.05, 18), mc(W, collar, 0.5), root);
+  neck.position.set(0.36, 0.62, 0);
+  neck.rotation.z = -0.9;
+  const head = node(root);
+  head.position.set(0.42, 0.74, 0);
+  W.mesh(sphere(gl, 0.16, 18, 14), fur, head);
+  const snout = W.mesh(sphere(gl, 0.09, 14, 10), fur, head);
+  snout.position.set(0.14, -0.05, 0);
+  snout.scale.set(1.35, 0.8, 0.95);
+  W.mesh(sphere(gl, 0.035, 10, 8), dark, head).position.set(0.26, -0.02, 0);
+  for (const sd of [-1, 1]) {
+    W.mesh(sphere(gl, 0.025, 8, 6), dark, head).position.set(0.11, 0.05, sd * 0.08);
+    const ear = W.mesh(sphere(gl, 0.08, 12, 10), fur2, head);
+    ear.position.set(-0.02, -0.02, sd * 0.15);
+    ear.scale.set(0.55, 1.35, 0.35);
+    ear.rotation.x = sd * 0.25;
+  }
+  const tongue = put(W, box(gl, 0.06, 0.012, 0.05), mc(W, "#e8737a", 0.5), head, 0.18, -0.11, 0);
+  tongue.rotation.z = -0.5;
+  for (const [x, z] of [
+    [0.22, 0.11],
+    [0.22, -0.11],
+    [-0.22, 0.11],
+    [-0.22, -0.11],
+  ]) {
+    W.mesh(cylinder(gl, 0.05, 0.045, 0.32, 10), fur, root).position.set(x, 0.17, z);
+    W.mesh(sphere(gl, 0.055, 10, 8), fur, root).position.set(x + 0.02, 0.03, z);
+  }
+  const tail = node(root);
+  tail.position.set(-0.36, 0.52, 0);
+  const tm = W.mesh(cylinder(gl, 0.02, 0.04, 0.3, 10), fur, tail);
+  tm.position.set(-0.06, 0.12, 0);
+  tm.rotation.z = 0.55;
+  return { root, tail, head };
+}
+
+/** The dog's happy loop: a wagging tail, a tilting head and little hops. */
+function wag(D: Dog3, t: number, hop = 0) {
+  D.tail.rotation.y = Math.sin(t * 16) * 0.65;
+  D.head.rotation.z = Math.sin(t * 2.2) * 0.12;
+  D.head.rotation.x = Math.sin(t * 1.4) * 0.1;
+  D.root.position.y = Math.abs(Math.sin(t * 5)) * 0.12 * hop;
+}
+
+/** The family: two parents and a child, in warm, varied clothes. */
+const FAMILY: PersonLook[] = [
+  { h: 1.82, shirt: "#5d7fa3", pants: "#2f3440", skin: "#c88e68", hair: "#2a1d16", style: "short" },
+  { h: 1.7, shirt: "#c4574d", pants: "#3f4a5a", skin: "#f0c8a8", hair: "#7a4a2a", style: "long" },
+  { h: 1.12, shirt: "#f2c14e", pants: "#4a6fa5", skin: "#e0aa82", hair: "#3b2417", style: "curly", child: true },
+];
+
+/* ───────────────────────── Inside the home ───────────────────────── */
+
+interface InteriorParts {
+  family: Person3[];
+  dog: Dog3;
+  throw: Program;
+  rooms: { name: string; eye: Num3; target: Num3 }[];
+}
+
+/**
+ * A furnished home laid out in a line, cut away like a film set (no ceiling or front wall) so the
+ * camera glides from room to room: the foyer, the living room (the family and the dog), the
+ * kitchen, the owner's suite and out to the patio.
+ */
+function interiorWorld(W: World): InteriorParts {
+  const { gl } = W;
+  ground(W);
+  const wallM = mc(W, "#ece3d6", 0.2);
+  const trim = mc(W, "#ffffff", 0.45);
+  const oak = mc(W, "#a8794f", 0.45);
+  const wood = mc(W, "#8a6446", 0.4);
+  const white = mc(W, "#f7f6f2", 0.4);
+  const stoneTop = mc(W, "#2f3237", 0.75);
+  const fabric = mc(W, "#8b96a6", 0.2);
+  const linen = mc(W, "#ece6dc", 0.15);
+  const glass = mc(W, "#cfe3f2", 0.9, "#cfe3f2");
+  const warm = mc(W, "#fff1d6", 0.2, "#ffe4b0");
+  const green = mc(W, "#4f8a4a", 0.3);
+  const green2 = mc(W, "#6a9c4a", 0.3);
+  const H = 2.8;
+  // Floors: oak through the house, a tiled kitchen and a deck outside.
+  put(W, box(gl, 27.2, 0.2, 8.2), oak, W.scene, -0.4, 0.1, 0, false);
+  put(W, box(gl, 8, 0.02, 8), mc(W, "#d9d3ca", 0.5), W.scene, 3, 0.21, 0, false);
+  put(W, box(gl, 6.4, 0.18, 8.2), mc(W, "#a07a55", 0.3), W.scene, 16.2, 0.09, 0, false);
+  // Walls: the back wall with windows, the front wall with the open door, half walls between rooms.
+  const wall = (x0: number, z0: number, x1: number, z1: number, hh = H) => {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const m = put(W, box(gl, len, hh, 0.16), wallM, W.scene, (x0 + x1) / 2, hh / 2 + 0.2, (z0 + z1) / 2);
+    m.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+  };
+  wall(-14, -4, 13, -4);
+  wall(-14, -4, -14, 2.2);
+  for (const x of [-9, -1, 7]) wall(x, -4, x, -1.6);
+  // Baseboards along the back wall.
+  put(W, box(gl, 27, 0.14, 0.04), trim, W.scene, -0.5, 0.27, -3.9, false);
+  // The patio doors: glass panels either side of an open slider.
+  wall(13, -4, 13, -2.6);
+  for (const z of [-2.4, -0.8]) put(W, box(gl, 0.06, 2.4, 1.5), glass, W.scene, 13, 1.4, z, false);
+  put(W, box(gl, 0.14, 0.12, 4.2), trim, W.scene, 13, 2.65, -1.3);
+  // Windows on the back wall: bright panes in white frames.
+  const win = (x: number, w: number, y = 1.6, hh = 1.5) => {
+    put(W, box(gl, w + 0.18, hh + 0.18, 0.06), trim, W.scene, x, y, -3.9, false);
+    put(W, box(gl, w, hh, 0.04), glass, W.scene, x, y, -3.86, false);
+    put(W, box(gl, 0.05, hh, 0.07), trim, W.scene, x, y, -3.84, false);
+  };
+  win(-6.5, 2.4);
+  win(-3.5, 1.4);
+  win(10, 1.8);
+  // The front door, open, in a white frame (it takes the brand's colour).
+  put(W, box(gl, 0.2, 2.5, 0.16), trim, W.scene, -14, 1.45, 2.3);
+  put(W, box(gl, 0.07, 2.3, 1.0), mc(W, "#7c5cff", 0.5), W.scene, -13.85, 1.35, 1.65);
+  // Foyer: a console with a lamp and a mirror, a runner rug, a tall plant.
+  put(W, box(gl, 1.4, 0.8, 0.4), wood, W.scene, -11.5, 0.6, -3.6);
+  put(W, box(gl, 0.9, 1.1, 0.05), mc(W, "#d8e2ea", 0.95), W.scene, -11.5, 1.85, -3.88, false);
+  put(W, box(gl, 1.4, 0.02, 3.4), mc(W, "#b86b4b", 0.1), W.scene, -11.5, 0.22, -0.8, false);
+  const plant = (x: number, z: number, s = 1) => {
+    W.mesh(cylinder(gl, 0.22 * s, 0.17 * s, 0.4 * s, 16), white, W.scene).position.set(x, 0.4 * s, z);
+    for (const [dx, dy, dz, rr] of [
+      [0, 0.85, 0, 0.32],
+      [0.15, 1.1, 0.08, 0.24],
+      [-0.12, 1.15, -0.06, 0.22],
+    ] as const)
+      W.mesh(sphere(gl, rr * s, 14, 10), dy > 1 ? green2 : green, W.scene).position.set(x + dx * s, dy * s + 0.2, z + dz * s);
+  };
+  plant(-9.6, -3.4, 1.15);
+  // Living room: a sofa and armchair on a rug, a coffee table, a fireplace with a TV, a floor lamp.
+  put(W, box(gl, 4.4, 0.02, 3.2), mc(W, "#e5d9c6", 0.1), W.scene, -5, 0.22, -1.6, false);
+  put(W, box(gl, 3.2, 0.45, 1.0), fabric, W.scene, -5, 0.45, -3.0);
+  put(W, box(gl, 3.2, 0.6, 0.25), fabric, W.scene, -5, 0.9, -3.42);
+  for (const sd of [-1, 1]) put(W, box(gl, 0.25, 0.55, 1.0), fabric, W.scene, -5 + sd * 1.6, 0.62, -3.0);
+  const throwM = W.mat({ color: "#7c5cff", gloss: 0.15 });
+  put(W, box(gl, 0.7, 0.05, 0.9), throwM, W.scene, -3.9, 0.7, -2.95);
+  for (const x of [-6.1, -4.0]) {
+    const pl = put(W, box(gl, 0.5, 0.4, 0.14), linen, W.scene, x, 0.95, -3.2);
+    pl.rotation.x = -0.25;
+  }
+  put(W, box(gl, 1.4, 0.38, 0.75), wood, W.scene, -5, 0.4, -1.4);
+  W.mesh(cylinder(gl, 0.12, 0.09, 0.14, 14), white, W.scene).position.set(-4.6, 0.66, -1.4);
+  put(W, box(gl, 1.0, 0.45, 0.95), fabric, W.scene, -7.6, 0.45, -1.2);
+  put(W, box(gl, 0.22, 0.55, 0.95), fabric, W.scene, -8.0, 0.8, -1.2);
+  W.mesh(cylinder(gl, 0.02, 0.02, 1.6, 8), mc(W, "#2b2a30", 0.6), W.scene).position.set(-8.3, 1.0, -2.6);
+  W.mesh(cylinder(gl, 0.22, 0.28, 0.32, 18), warm, W.scene).position.set(-8.3, 1.85, -2.6);
+  put(W, box(gl, 2.0, 1.1, 0.3), mc(W, "#d8d2c8", 0.3), W.scene, -1.9, 0.75, -3.75);
+  put(W, box(gl, 0.9, 0.5, 0.05), mc(W, "#2a1a14", 0.3, "#ff9a4a"), W.scene, -1.9, 0.62, -3.58, false);
+  put(W, box(gl, 1.6, 0.9, 0.06), mc(W, "#121418", 0.9), W.scene, -1.9, 1.95, -3.88, false);
+  plant(-8.3, -0.2, 0.9);
+  // Kitchen: base and wall cabinets with a stone top, a tall fridge, an island with stools under pendants.
+  put(W, box(gl, 6.6, 0.9, 0.65), white, W.scene, 3.2, 0.65, -3.55);
+  put(W, box(gl, 6.7, 0.06, 0.7), stoneTop, W.scene, 3.2, 1.13, -3.53);
+  put(W, box(gl, 5.2, 0.7, 0.4), white, W.scene, 2.5, 2.25, -3.75);
+  put(W, box(gl, 0.95, 2.2, 0.7), mc(W, "#c9ccd1", 0.8), W.scene, 6.1, 1.3, -3.5);
+  for (let i = 0; i < 6; i++) put(W, box(gl, 0.02, 0.6, 0.02), mc(W, "#b9bcc2", 0.8), W.scene, 0.3 + i * 0.95, 0.8, -3.21, false);
+  put(W, box(gl, 3.0, 0.9, 1.1), mc(W, "#5b6b7c", 0.35), W.scene, 3, 0.65, -0.9);
+  put(W, box(gl, 3.15, 0.07, 1.25), stoneTop, W.scene, 3, 1.14, -0.9);
+  for (const x of [2, 3, 4]) {
+    W.mesh(cylinder(gl, 0.2, 0.2, 0.06, 16), wood, W.scene).position.set(x, 0.9, 0.0);
+    W.mesh(cylinder(gl, 0.025, 0.025, 0.7, 8), mc(W, "#2b2a30", 0.6), W.scene).position.set(x, 0.55, 0.0);
+    W.mesh(cylinder(gl, 0.01, 0.01, 0.9, 6), mc(W, "#2b2a30", 0.6), W.scene, false).position.set(x, 2.55, -0.9);
+    W.mesh(sphere(gl, 0.17, 16, 12), warm, W.scene, false).position.set(x, 2.05, -0.9);
+  }
+  for (const [x, c] of [
+    [2.6, "#e9a23b"],
+    [2.75, "#d9534f"],
+    [2.5, "#7ab648"],
+  ] as const)
+    W.mesh(sphere(gl, 0.07, 10, 8), mc(W, c, 0.5), W.scene).position.set(x, 1.24, -0.95);
+  // Owner's suite: a bed with pillows and a soft throw, nightstands with lit lamps, a bench.
+  put(W, box(gl, 2.3, 1.3, 0.12), mc(W, "#9a8f86", 0.2), W.scene, 10, 0.95, -3.9);
+  put(W, box(gl, 2.1, 0.32, 2.3), wood, W.scene, 10, 0.36, -2.75);
+  put(W, box(gl, 2.0, 0.26, 2.2), white, W.scene, 10, 0.64, -2.75);
+  put(W, box(gl, 2.06, 0.08, 1.5), linen, W.scene, 10, 0.8, -2.35);
+  put(W, box(gl, 2.08, 0.06, 0.55), throwM, W.scene, 10, 0.86, -1.95);
+  for (const x of [9.5, 10.5]) {
+    const pl = put(W, box(gl, 0.75, 0.35, 0.16), linen, W.scene, x, 0.95, -3.55);
+    pl.rotation.x = -0.3;
+  }
+  for (const x of [8.4, 11.6]) {
+    put(W, box(gl, 0.55, 0.55, 0.45), wood, W.scene, x, 0.48, -3.6);
+    W.mesh(cylinder(gl, 0.14, 0.18, 0.26, 14), warm, W.scene).position.set(x, 1.05, -3.6);
+  }
+  put(W, box(gl, 1.4, 0.45, 0.45), linen, W.scene, 10, 0.42, -1.1);
+  put(W, box(gl, 3.0, 0.02, 2.2), mc(W, "#cdbfae", 0.1), W.scene, 10, 0.22, -1.6, false);
+  // The patio: lounge chairs, planters, string lights over the deck, the garden beyond.
+  for (const z of [-2.8, -1.4]) {
+    const c = put(W, box(gl, 0.75, 0.25, 1.7), white, W.scene, 16.5, 0.45, z);
+    c.rotation.y = 0.3;
+    const b = put(W, box(gl, 0.75, 0.7, 0.1), white, W.scene, 16.2, 0.75, z - 0.85);
+    b.rotation.x = -0.6;
+  }
+  W.mesh(cylinder(gl, 0.35, 0.35, 0.05, 20), wood, W.scene).position.set(17.6, 0.6, -2.1);
+  W.mesh(cylinder(gl, 0.04, 0.04, 0.42, 8), wood, W.scene).position.set(17.6, 0.38, -2.1);
+  plant(18.6, -3.4, 1.1);
+  plant(14, -3.4, 0.9);
+  for (let i = 0; i <= 12; i++) {
+    const k = i / 12;
+    W.mesh(sphere(gl, 0.05, 8, 6), warm, W.scene, false).position.set(13.3 + k * 5.6, 2.7 - Math.sin(k * Math.PI) * 0.45, -3.6 + k * 1.2);
+  }
+  tree(W, W.scene, 21, -6, 1.1);
+  tree(W, W.scene, 17, -9, 1.3);
+  // The family at home: dad on the sofa, mum beside it, their child on the rug with the dog.
+  const family = FAMILY.map((L) => person3d(W, W.scene, L));
+  sitDown(family[0], 0.68);
+  family[0].root.position.set(-5.6, family[0].root.position.y, -2.95);
+  family[1].root.position.set(-3.2, 0.2, -2.2);
+  family[1].root.rotation.y = -0.35;
+  family[2].root.position.set(-5.0, 0.2, -0.4);
+  family[2].root.rotation.y = 0.4;
+  const dog = dog3d(W, W.scene, "#c98f4f", "#7a4f2a", "#7c5cff");
+  dog.root.position.set(-4.0, 0.2, -0.2);
+  dog.root.rotation.y = Math.PI * 0.85;
+  return {
+    family,
+    dog,
+    throw: throwM,
+    rooms: [
+      { name: "Welcoming foyer", eye: [-15.4, 1.75, 3.7], target: [-11.2, 1.2, -1.6] },
+      { name: "Open living room", eye: [-6.2, 1.7, 3.5], target: [-5, 0.95, -1.6] },
+      { name: "Chef-inspired kitchen", eye: [2.2, 1.85, 3.4], target: [3.2, 1.1, -1.6] },
+      { name: "Owner's suite", eye: [9.2, 1.7, 3.3], target: [10.2, 0.85, -1.8] },
+      { name: "Backyard patio", eye: [14.6, 1.75, 3.0], target: [17, 0.95, -1.6] },
+    ],
+  };
+}
+
+/** A Catmull-Rom point through `pts` at `s` (0 → pts.length - 1). */
+function spline(pts: Num3[], s: number): Num3 {
+  const n = pts.length - 1;
+  const i = Math.min(n - 1, Math.max(0, Math.floor(s)));
+  const f = clamp(s - i);
+  const p0 = pts[Math.max(0, i - 1)];
+  const p1 = pts[i];
+  const p2 = pts[i + 1];
+  const p3 = pts[Math.min(n, i + 2)];
+  const out: Num3 = [0, 0, 0];
+  for (let k = 0; k < 3; k++)
+    out[k] = 0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * f + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * f * f + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * f * f * f);
+  return out;
+}
+
+/** The interior's light: soft daylight from above the cut-away, warm lamps. */
+const INDOOR: Partial<View> = { sun: [0.18, 1, 0.4], sunCol: [1, 0.92, 0.8], sky: [0.86, 0.84, 0.82], gnd: [0.55, 0.48, 0.42], exposure: 0.98, ao: 0.25 };
+
+/** A warm backdrop behind the cut-away rooms (above the walls). */
+function indoorBack(sc: SkillContext) {
+  const { ctx, w, h, palette } = sc;
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, mixHex("#f4ece2", palette.primary, 0.06));
+  g.addColorStop(1, "#e9dccb");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/** The brand's colour on the soft furnishings and the front door. */
+function tintInterior(P: InteriorParts, sc: SkillContext) {
+  P.throw.uniforms.uColor.value = rgb(mixHex(sc.palette.primary, "#ffffff", 0.15));
+}
+
+/** A frosted caption plate at the lower left, sliding in by `k`. */
+function caption(sc: SkillContext, txt: string, y: number, size: number, k: number) {
+  if (k <= 0) return;
+  const { ctx, u } = sc;
+  const st = stage(sc);
+  ctx.save();
+  ctx.globalAlpha *= clamp(k) * (1 - exitOf(sc));
+  ctx.font = subFont(size, 650);
+  const tw = ctx.measureText(txt).width;
+  const x = st.left + 10 * u + (1 - clamp(k)) * 20 * u;
+  ctx.shadowColor = "rgba(20,10,30,0.2)";
+  ctx.shadowBlur = 16 * u;
+  ctx.fillStyle = "rgba(255,255,255,0.86)";
+  ctx.beginPath();
+  ctx.roundRect(x, y - size * 0.95, tw + size * 1.6, size * 1.9, size * 0.5);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.fillStyle = sc.palette.primary;
+  ctx.fillRect(x, y - size * 0.95 + size * 0.4, 4 * u, size * 1.1);
+  ctx.fillStyle = INK;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(txt, x + size * 0.8, y);
+  ctx.restore();
+}
+
+const ROOM_WORDS = /\b(room|kitchen|suite|bed|bath|dining|living|office|den|loft|study|pantry|laundry|garage|porch|patio|foyer|entry|closet|primary|owner|backyard|yard|garden|deck|nook|flex|media)\b/i;
+
+function homeWalkthrough(sc0: SkillContext) {
+  const sc = { ...sc0, palette: onLight(sc0.palette) };
+  const { t, d, u, scene } = sc;
+  indoorBack(sc);
+  const st = stage(sc);
+  const top = st.top - 24 * u;
+  // Your room names when the points name rooms; the home's own otherwise.
+  const own = (scene.items ?? []).map((x) => plain(split(x).title)).filter((x) => ROOM_WORDS.test(x));
+  let names: string[] = [];
+  // One continuous glide, slowing (never stopping) at each room; a short slide visits fewer rooms.
+  const n = d >= 8 ? 5 : d >= 6 ? 4 : 3;
+  const k = range(t, 0.2, d - 0.3);
+  const seg = k * (n - 1);
+  const i0 = Math.floor(seg);
+  const s = Math.min(n - 1, i0 + sine(seg - i0) * 0.72 + (seg - i0) * 0.28);
+  const cv = frame(sc, top, (w, h) => {
+    const R = world("interior", w, h, interiorWorld);
+    if (!R) return null;
+    const { W, parts } = R;
+    tintInterior(parts, sc);
+    names = parts.rooms.map((r, i) => own[i] ?? r.name);
+    parts.family.forEach((P, i) => happy(P, t, i * 1.7, i === 1 ? clamp((t - 1.0) / 0.4) : 0));
+    wag(parts.dog, t, 1);
+    const F = fitBack(sc, top);
+    const eye = spline(parts.rooms.slice(0, n).map((r) => r.eye), s);
+    const target = spline(parts.rooms.slice(0, n).map((r) => r.target), s);
+    const back: Num3 = [eye[0], eye[1] + (F - 1) * 0.8, eye[2] + (F - 1) * 3];
+    return render(W, { ...INDOOR, flat: !!sc.flat3d, eye: back, target, fov: 46, shadowSize: 9, shadowAt: [eye[0] + 1, 0, -1.5] }, w, h);
+  });
+  if (!cv) fallback(sc, top);
+  // The room's name as the camera arrives.
+  const room = Math.round(s);
+  const kk = 1 - Math.abs(s - room) * 2.2;
+  const size = 23 * u * st.S;
+  if (names[room]) caption(sc, names[room], sc.h * 0.86, size, kk);
+}
+
+function homeFamily(sc0: SkillContext) {
+  const sc = { ...sc0, palette: onLight(sc0.palette) };
+  const { t, d, u, scene } = sc;
+  indoorBack(sc);
+  const st = stage(sc);
+  const top = st.top - 24 * u;
+  const cv = frame(sc, top, (w, h) => {
+    const R = world("interior", w, h, interiorWorld);
+    if (!R) return null;
+    const { W, parts } = R;
+    tintInterior(parts, sc);
+    parts.family.forEach((P, i) => happy(P, t, i * 1.7, i === 2 ? 0.5 + 0.5 * Math.sin(t * 1.1) : i === 1 ? clamp((t - 1.4) / 0.4) * (1 - clamp((t - 3.2) / 0.4)) : 0));
+    wag(parts.dog, t, 1);
+    // A slow arc around the living room at sitting height, pushing in a little.
+    const k = sine(range(t, 0, d));
+    const F = fitBack(sc, top);
+    const a = lerp(-0.35, 0.3, k);
+    const r = lerp(5.6, 4.6, k) * F;
+    const eye: Num3 = [-4.8 + Math.sin(a) * r, lerp(1.6, 1.35, k), -1.6 + Math.cos(a) * r];
+    return render(W, { ...INDOOR, flat: !!sc.flat3d, eye, target: [-4.8, 0.85, -1.9], fov: 38, shadowSize: 6, shadowAt: [-5, 0, -1.8] }, w, h);
+  });
+  if (!cv) fallback(sc, top);
+  const line = plain(scene.subtext ?? "");
+  if (line) caption(sc, line, sc.h * 0.86, 23 * u * st.S, clamp((t - 1.1) / 0.5));
+}
+
+/** The family and the dog on the front path, the house aglow: the welcome home. */
+function welcomeWorld(W: World) {
+  const parts = homeWorld(W);
+  const fam = node(W.scene);
+  const family = FAMILY.map((L) => person3d(W, fam, L));
+  const xs = [0.55, 1.9, 1.25];
+  family.forEach((P, i) => P.root.position.set(xs[i], 0.05, i === 2 ? 6.9 : 6.3));
+  const dog = dog3d(W, fam, "#c98f4f", "#7a4f2a", "#7c5cff");
+  dog.root.position.set(2.7, 0.05, 6.9);
+  dog.root.rotation.y = -Math.PI / 2 + 0.5;
+  return { ...parts, family, dog };
+}
+
+function homeWelcome(sc0: SkillContext) {
+  const sc = { ...sc0, palette: onLight(sc0.palette) };
+  const { t, d, u, scene, ctx, palette } = sc;
+  sky(sc);
+  const st = stage(sc);
+  const top = st.top - 24 * u;
+  const cv = frame(sc, top, (w, h) => {
+    const R = world("welcome", w, h, welcomeWorld);
+    if (!R) return null;
+    const { W, parts } = R;
+    setup(parts.house, sc);
+    for (const nn of [parts.path, parts.posts]) nn.traverse((c) => void (c.visible = nn === parts.path));
+    glow(parts.house, 0.85);
+    parts.family.forEach((P, i) => happy(P, t, i * 1.3, clamp((t - 0.6 - i * 0.25) / 0.4)));
+    wag(parts.dog, t, 1);
+    const k = sine(range(t, 0, d));
+    const F = fitBack(sc, top);
+    const eye: Num3 = [lerp(3.4, 1.8, k), lerp(2.0, 1.7, k), lerp(15.5, 11.5, k) * F];
+    return render(W, { ...GOLDEN, flat: !!sc.flat3d, eye, target: [1.4, 2.4, 3.5], fov: 34, shadowSize: 12, shadowAt: [1.4, 0, 4], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
+  });
+  if (!cv) fallback(sc, top);
+  // The call to action: a button in the brand's colour.
+  const label0 = plain(scene.subtext ?? "") || "Find your home";
+  const kb = clamp(range(t, 1.2, 1.7));
+  if (kb > 0) {
+    const size = 26 * u * st.S;
+    ctx.save();
+    ctx.globalAlpha = kb * (1 - exitOf(sc));
+    ctx.font = subFont(size, 750);
+    const tw = ctx.measureText(label0).width + size * 2.4;
+    const th = size * 2.3;
+    // Under the headline, over the sky, clear of the family on the path.
+    const x = sc.w / 2;
+    const y = top + size * 1.3 + (1 - kb) * 16 * u;
+    ctx.shadowColor = "rgba(20,10,30,0.28)";
+    ctx.shadowBlur = 22 * u;
+    ctx.shadowOffsetY = 8 * u;
+    ctx.fillStyle = palette.primary;
+    ctx.beginPath();
+    ctx.roundRect(x - tw / 2, y - th / 2, tw, th, th / 2);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label0, x, y + 1);
+    ctx.restore();
+  }
+}
+
 const pops = (n: number, start: number) => (scene: Scene) => pointTimes(scene, n, start).map((ti) => at(ti, "pop"));
 
 export const homes3dSkills: Skill[] = [
@@ -1194,6 +1744,34 @@ export const homes3dSkills: Skill[] = [
     itemsHint: "2–4 short steps",
     render: homeJourney,
     sfx: (scene) => pops(itemsOr(scene, JOURNEY_POINTS, 4, 2).length, 0.8)(scene),
+  },
+  {
+    id: "home-walkthrough",
+    name: "Room to Room",
+    tagline: "One seamless 3D glide through a furnished home: the foyer, the living room (a happy family and their dog), the kitchen, the owner's suite and out to the patio, the rooms named as you arrive.",
+    bestFor: "Model homes, home tours and listings: up to 5 room names (else the home's own).",
+    sample: { text: "Step *inside*", items: ["Welcoming foyer", "Open living room", "Chef-inspired kitchen", "Owner's suite", "Backyard patio"] },
+    itemsHint: "0–5 room names",
+    render: homeWalkthrough,
+    sfx: () => [at(0.2, "whoosh")],
+  },
+  {
+    id: "home-family",
+    name: "Life at Home",
+    tagline: "A happy family in their 3D living room: a parent on the sofa, another waving, their child playing with a tail-wagging dog, as the camera arcs slowly round.",
+    bestFor: "The feeling of home for homebuilders and real estate: a headline and an optional caption.",
+    sample: { text: "Made for *real life*", subtext: "Room to grow, together" },
+    render: homeFamily,
+    sfx: () => [at(0.3, "whoosh")],
+  },
+  {
+    id: "home-welcome",
+    name: "Welcome Home",
+    tagline: "The family and their dog wave from the path of their new home at golden hour, the windows aglow, as the camera eases in and your button appears.",
+    bestFor: "The end card for homebuilders and real estate: a headline and the button's words.",
+    sample: { text: "Find your *home*", subtext: "Book a tour" },
+    render: homeWelcome,
+    sfx: () => [at(0.2, "whoosh"), at(1.25, "pop")],
   },
 ];
 

@@ -78,7 +78,7 @@ export const CONCEPTS: Concept[] = [
   {
     id: "ai",
     name: "AI product",
-    keywords: /\b(ai|a\.i\.|artificial intelligence|gpt|llms?|agents?|copilot|generative|machine learning|assistant|prompts?|models?|autopilot|intelligent)\b/g,
+    keywords: /\b(ai|a\.i\.|artificial intelligence|gpt|llms?|ai agents?|agentic|copilot|generative|machine learning|assistant|prompts?|ai models?|language models?|autopilot|intelligent)\b/g,
     icons: ["Sparkles", "BrainCircuit", "Bot", "WandSparkles", "Zap", "MessageSquareText"],
     orbit: ["FileText", "Mail", "MessagesSquare", "Database", "CalendarCheck", "Globe", "Image", "Code"],
     arc: ["hook", "pain", "reveal", "tour", "features", "how", "cards", "quote", "logos", "integrations", "bento", "meet", "cta"],
@@ -316,7 +316,7 @@ export const CONCEPTS: Concept[] = [
   {
     id: "realestate",
     name: "Real estate",
-    keywords: /\b(real estate|propert(y|ies)|homes|houses?|home buyers?|listings?|rentals?|renters?|landlords?|tenants?|mortgages?|realtors?|estate agents?|apartments?|viewings?|leases?)\b/g,
+    keywords: /\b(real estate|realty|propert(y|ies)|homes|houses?|home ?builders?|house ?builders?|custom homes?|new homes?|new[- ]build|model homes?|floor ?plans?|move-in|home buyers?|listings?|rentals?|renters?|landlords?|tenants?|mortgages?|realtors?|estate agents?|apartments?|viewings?|leases?)\b/g,
     icons: ["House", "Building2", "KeyRound", "MapPin", "Handshake", "FileSignature"],
     orbit: ["House", "MapPin", "CalendarCheck", "FileSignature", "Landmark", "Camera", "Mail", "Smartphone"],
     arc: ["hook", "reveal", "tour", "features", "how", "quote", "cards", "logos", "integrations", "pain", "bento", "meet", "cta"],

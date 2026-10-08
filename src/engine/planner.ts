@@ -1504,6 +1504,51 @@ function scoreHeadline(text: string) {
  *   7. Ecosystem — integrations, if the site mentions them
  *   8. CTA       — closing line + the site's own button, clicked
  */
+/** Builders, realtors and agencies selling homes (not software for the property trade). */
+const HOME_BIZ = /\b(home ?builders?|house ?builders?|custom homes?|new homes?|new[- ]build|model homes?|floor ?plans?|realty|realtors?|real estate agen(?:ts?|cy|cies)|estate agen(?:ts?|cy|cies)|brokerage|homes? for sale|house hunting|find (?:your|their) (?:next |dream )?home|move-in|communit(?:y|ies))\b/;
+const PROPTECH = /\b(apps?|software|platform|saas|dashboards?|crm|api|portal for (?:landlords|agents)|property management (?:app|software|platform))\b/;
+function isHomeBusiness(site: SiteData) {
+  const t = [site.name, site.tagline, site.description, ...site.headlines.slice(0, 8)].join(" ").toLowerCase();
+  return HOME_BIZ.test(t) && !PROPTECH.test(t);
+}
+
+const HOME_ROOMS = /\b(room|kitchen|suite|bed(?:room)?s?|bath(?:room)?s?|dining|living|office|den|loft|study|pantry|laundry|garage|porch|patio|foyer|entry|closet|backyard|yard|garden|deck|nook)\b/i;
+
+/**
+ * Re-tell a home business's film as a home's story (in place): hook → brand → room to room → life
+ * at home → (a photo of theirs) → the community → the path home → welcome home.
+ */
+function homeStory(scenes: Scene[], site: SiteData, beats: (n: number) => number, target: number) {
+  const hook = scenes.find((sc) => sc.role === "hook");
+  const reveal = scenes.find((sc) => sc.role === "reveal");
+  const close = scenes[scenes.length - 1];
+  // Their own pictures stay (one, after life at home).
+  const photo = scenes.find((sc) => sc.media && sc !== hook && sc !== reveal && sc !== close);
+  const rooms = [...site.headlines, ...site.features].map((x) => x.split(/\s+[—–]\s+/)[0].trim()).filter((x) => x.length < 34 && HOME_ROOMS.test(x)).slice(0, 5);
+  const steps = site.steps.map((x) => x.split(/\s+[—–]\s+/)[0].trim()).filter((x) => x.length < 30).slice(0, 4);
+  // The length decides how much of the story fits: room to room always; life at home from 20s;
+  // their photo, the community and the path home in longer films.
+  const roomy = target >= 30;
+  const middle: Scene[] = ([
+    { role: "tour", skill: "home-walkthrough", text: "Step *inside*", items: rooms.length >= 2 ? rooms : undefined, duration: beats(18), transition: "dolly", why: "One seamless walk from room to room, so viewers picture living there" },
+    { role: "promise", skill: "home-family", text: "Made for *real life*", subtext: "Room to grow, together", duration: beats(10), transition: "dissolve", why: "Life at home: the family and the dog, the feeling the home is for" },
+    ...(photo && roomy ? [photo] : []),
+    ...(roomy
+      ? [
+          { role: "reach", skill: "home-aerial", text: "A place to *belong*", duration: beats(10), transition: "dolly", why: "The community around the home" } as Scene,
+          { role: "how", skill: "home-journey", text: "Your path *home*", items: steps.length >= 2 ? steps : undefined, duration: beats(10), transition: "whip", why: "How buying works, as a walk up to the front door" } as Scene,
+        ]
+      : []),
+  ] as Scene[]).filter((sc) => target >= 18 || sc.skill !== "home-family");
+  const opener = hook ? { ...hook, skill: hook.media ? hook.skill : ("home-hero" as const) } : undefined;
+  // A generic button becomes the home business's own next step.
+  const generic = /^(get started|learn more|sign up|start (?:free|now|today)|try (?:it|now)|join now|contact us)$/i;
+  const button = close?.subtext && !generic.test(close.subtext.trim()) ? close.subtext : "Book a tour";
+  const end = close?.role === "cta" && close.skill !== "qr-end" ? { ...close, skill: "home-welcome" as const, subtext: button, why: "The welcome home: the family at the door, and the one action to take" } : close;
+  const out = [opener, reveal, ...middle, end].filter((x): x is Scene => !!x);
+  scenes.splice(0, scenes.length, ...out);
+}
+
 function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const seed = (req.seed ?? hashString(site.url)) >>> 0;
   const r = rng(seed);
@@ -2260,9 +2305,15 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     if (/waitlist/i.test(ctaLabel)) cta.text = `Be first to try *${site.name}*`;
   }
 
+  // A home business (a builder, a realtor, an agency; not property software) tells a home's story
+  // rather than an app's: the home at golden hour, the brand, one seamless walk from room to room,
+  // the family's life there, the community, the path home, and the welcome home with the button.
+  const home = concept.id === "realestate" && isHomeBusiness(site);
+  if (home) homeStory(scenes, site, beats, target);
+
   // Thin material (a one-line prompt, a sparse page) makes a tight shorter cut rather than
   // padding with invented beats, and the director says what would unlock the full length.
-  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target });
+  const plan = sanitizePlan({ title: site.name, palette: "cosmos", font: "inter", aspect: req.aspect, bpm, seed, scenes, brand, style: "saas", concept: concept.id, target, ...(home ? { setting: "house" as const } : {}) });
   const styled = applyTemplate(plan, req.template ?? DEFAULT_TEMPLATE, {
     palette: req.palette && req.palette !== "auto" ? req.palette : undefined,
   });
