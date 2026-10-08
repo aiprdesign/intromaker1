@@ -339,6 +339,8 @@ uniform float uClip;
 uniform vec4 uFog;
 uniform float uFlat;
 uniform float uSheen;
+uniform vec3 uFill;
+uniform float uStudio;
 uniform vec3 uRim;
 uniform sampler2D tShadow;
 uniform float uShadowSoft;
@@ -383,6 +385,12 @@ vec3 env(vec3 R) {
   vec3 c = mix(uGnd * 0.6, uSky, smoothstep(-0.25, 0.55, R.y));
   c += vec3(1.0) * exp(-pow((R.x + 0.35) * 2.6, 2.0)) * smoothstep(0.15, 0.85, R.y) * 1.3;
   c += vec3(1.0) * exp(-pow((R.x - 0.75) * 7.0, 2.0)) * smoothstep(-0.1, 0.25, R.y) * smoothstep(0.75, 0.25, R.y) * 0.7;
+  // Studio sets: a large overhead softbox and a thin strip light behind, for crisp product highlights.
+  if (uStudio > 0.0) {
+    vec2 box = abs(vec2(R.x, R.z) / max(R.y, 0.05)) - vec2(0.55, 0.35);
+    c += vec3(1.0) * (1.0 - smoothstep(0.0, 0.08, max(box.x, box.y))) * step(0.0, R.y) * 0.9 * uStudio;
+    c += vec3(1.0) * exp(-pow((R.x + 0.05) * 18.0, 2.0)) * smoothstep(0.0, 0.2, R.y) * smoothstep(0.0, -0.4, R.z) * 0.6 * uStudio;
+  }
   return c;
 }
 
@@ -452,6 +460,9 @@ void main() {
   vec3 R = reflect(-V, N);
   vec3 hemi = mix(uGnd, uSky, N.y * 0.5 + 0.5);
   vec3 diff = base * (hemi * 0.6 + uSunCol * ndl * sh * 0.85);
+  // A soft wrap-around fill from the side opposite the key light (studio three-point lighting).
+  float fw = max(dot(N, normalize(vec3(-uSun.x, 0.3, uSun.z))) * 0.5 + 0.5, 0.0);
+  diff += base * uFill * fw * fw;
   vec3 F0 = mix(vec3(0.04), base, metal);
   vec3 F = F0 + (1.0 - F0) * fres;
   vec3 col = diff * (1.0 - metal * 0.85) + env(R) * F * mix(0.25, 1.0, gloss) + uSunCol * spec * sh * mix(vec3(1.0), base, metal * 0.5);
@@ -466,7 +477,7 @@ void main() {
   vec2 q = abs(vUv - 0.5) * vec2(uRound.y, 1.0) - (vec2(uRound.y, 1.0) * 0.5 - uRound.x);
   float mask = 1.0 - smoothstep(-0.002, 0.002, length(max(q, 0.0)) - uRound.x);
   vec3 dark = vec3(0.02, 0.022, 0.03);
-  col = mix(dark, img, uGlow) + env(R) * (0.04 + 0.5 * fres) * 0.6 + uSunCol * spec * 0.4;
+  col = mix(dark, img, uGlow) + env(R) * (0.015 + 0.5 * fres) * 0.6 + uSunCol * spec * 0.25;
   // A soft light sweep across the glass.
   float band = vUv.x * 0.8 + vUv.y * 0.6 - uSheen;
   col += vec3(1.0) * (exp(-band * band * 260.0) * 0.16 + exp(-band * band * 30.0) * 0.05) * step(-1.0, uSheen);
@@ -501,8 +512,13 @@ void main() {
 #endif
   // Haze with distance (outdoor scenes), towards the horizon's colour.
   if (uFog.a > 0.0 && uFlat < 0.5) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
+#ifdef MAP
+  // Screens keep their own colours (crisp UI), lifted only a touch with the exposure.
+  col *= mix(1.0, uExposure, 0.4);
+#else
   col *= uExposure;
   col = col / (1.0 + max(col - 0.85, 0.0) * 1.2);
+#endif
   gl_FragColor = vec4(col * alpha, alpha);
 }`;
 
@@ -582,6 +598,8 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     uFog: { value: [1, 1, 1, 0] },
     uFlat: { value: 0 },
     uSheen: { value: -9 },
+    uFill: { value: [0, 0, 0] },
+    uStudio: { value: 0 },
     uRim: { value: [0, 0, 0] },
     uAO: { value: 0 },
   };
@@ -636,6 +654,10 @@ export interface View {
   ao?: number;
   /** A coloured rim light on edges (rgb, 0 for none). */
   rim?: Num3;
+  /** A soft fill light opposite the key (rgb, 0 for none). */
+  fill?: Num3;
+  /** Studio reflections: an overhead softbox and a strip light in glossy surfaces (0 → 1). */
+  studio?: number;
   /** Where a light sweep crosses the screens (0 → 1.4 across; unset: none). */
   sheen?: number;
   /** Draw it flat, as a 2D illustration: a straight-on (orthographic) camera and two-tone colour. */
@@ -679,6 +701,8 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   env.uSheen.value = v.sheen ?? -9;
   env.uRim.value = v.rim ?? [0, 0, 0];
   env.uAO.value = v.ao ?? 0;
+  env.uFill.value = v.fill ?? [0, 0, 0];
+  env.uStudio.value = v.flat ? 0 : v.studio ?? 0;
   const size = v.shadowSize ?? 4;
   const c = v.shadowAt ?? v.target;
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });

@@ -624,7 +624,39 @@ function renderDof(sc: SkillContext, W: World, P: DeviceParts, v: View, w: numbe
     n.visible = was[i];
     n.traverse((c) => void (c.visible = was[i]));
   });
+  studioFinish(out.ctx, w, h, !!sc.palette.light);
   return out.canvas;
+}
+
+/**
+ * A studio finish over a finished 3D frame: a soft bloom from the brightest parts (screens,
+ * highlights), a gentle lens vignette and a light contrast grade. Steady from frame to frame.
+ */
+function studioFinish(ctx: CanvasRenderingContext2D, w: number, h: number, light: boolean) {
+  const s = 6;
+  const bw = Math.max(1, Math.round(w / s));
+  const bh = Math.max(1, Math.round(h / s));
+  const b = scratch("d3-bloom", bw, bh);
+  b.ctx.clearRect(0, 0, bw, bh);
+  // Keep the highlights only: darken and push contrast so mid-tones fall away, then blur.
+  b.ctx.filter = `brightness(${light ? 0.6 : 0.7}) contrast(4.5) blur(${Math.max(2, bw * 0.02).toFixed(1)}px)`;
+  b.ctx.drawImage(ctx.canvas, 0, 0, w, h, 0, 0, bw, bh);
+  b.ctx.filter = "none";
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = light ? 0.1 : 0.2;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(b.canvas, 0, 0, w, h);
+  ctx.restore();
+  // A lens vignette, kept subtle so headlines in the corners stay clear.
+  const vg = ctx.createRadialGradient(w / 2, h * 0.55, Math.min(w, h) * 0.35, w / 2, h * 0.55, Math.hypot(w, h) * 0.62);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, light ? "rgba(20,24,40,0.12)" : "rgba(0,0,6,0.32)");
+  ctx.save();
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
 }
 
 function lighting(sc: SkillContext): Partial<View> {
@@ -639,6 +671,9 @@ function lighting(sc: SkillContext): Partial<View> {
     rim: rgb(mixHex(sc.palette.primary, "#ffffff", 0.3)).map((v) => v * (light ? 0.22 : 0.5)) as Num3,
     // A light sweep crosses the glass once the screen is on, now and then.
     sheen: ((sc.t - 1.6) % 4.5) * 0.9 - 0.3,
+    // Three-point studio lighting: a cool fill opposite the key and softbox reflections in metal and glass.
+    fill: light ? [0.16, 0.17, 0.2] : (rgb(mixHex("#9aa6c4", sc.palette.primary, 0.25)).map((v) => v * 0.22) as Num3),
+    studio: light ? 0.75 : 1,
   };
 }
 
