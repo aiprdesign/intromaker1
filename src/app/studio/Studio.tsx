@@ -1830,7 +1830,7 @@ export default function Studio() {
           <SkillPicker plan={plan} scene={s} value={s.skill} onPick={(id) => {
             if (id === s.skill) return;
             const r = restyleScene(s, id, plan);
-            updateScene(i, { skill: id, text: r.text, subtext: r.subtext, items: r.items });
+            updateScene(i, { skill: id, text: r.text, subtext: r.subtext, items: r.items, locked: true });
           }} />
         </div>
         {plan.style === "saas" && (

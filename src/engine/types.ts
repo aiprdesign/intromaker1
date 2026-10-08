@@ -383,6 +383,8 @@ export interface Scene {
    * break the rhythm. Unset: the director decides (see contrast.ts); true or false: your choice.
    */
   contrast?: boolean;
+  /** You chose this slide's style yourself: re-styling the video keeps it. */
+  locked?: boolean;
   /** List content for multi-item skills (bento features, pain points, logos…). */
   items?: string[];
   /** Chapter label shown above the headline ("How it works", "Loved by teams"). */

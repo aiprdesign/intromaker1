@@ -15,7 +15,7 @@ import { cove, quad, render, rgb, setScreen, slab, cylinder, sphere, box, world,
 import { desktopUI, mobileUI } from "../uiscreens";
 import { getMedia, type Drawable } from "../media";
 import { textureOf, sizeOf } from "../gl";
-import { clamp, ease, lerp, mixHex, range } from "../math";
+import { clamp, ease, hashString, lerp, mixHex, range } from "../math";
 import { saasBackground } from "../saasfx";
 import { scratch } from "../scratch";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -49,7 +49,7 @@ function shotOf(sc: SkillContext, mobile = false): Drawable | HTMLCanvasElement 
 /* ───────────────────────── Models ───────────────────────── */
 
 const LAP = { w: 3.2, d: 2.2, t: 0.1, lidH: 2.1, lidT: 0.06, scrW: 2.96, scrH: 1.85 };
-const PHONE = { w: 0.78, h: 1.62, t: 0.085, scrW: 0.72, scrH: 1.56 };
+const PHONE = { w: 0.76, h: 1.62, t: 0.08, scrW: 0.732, scrH: 1.592 };
 const TAB = { w: 1.9, h: 2.6, t: 0.07, scrW: 1.78, scrH: 2.48 };
 
 interface Laptop {
@@ -131,8 +131,9 @@ function slate(W: World, dims: typeof PHONE, phone: boolean, parent?: Transform)
   const metal = W.mat({ color: "#cfd3da", metal: 0.9, gloss: 0.7 });
   const glass = W.mat({ color: "#07080b", metal: 0.1, gloss: 0.96 });
   const back = W.mat({ color: "#e4e5ea", metal: 0.25, gloss: 0.75 });
-  const r = phone ? 0.13 : 0.14;
-  const s0 = slab(gl, dims.w, dims.h, dims.t, r, phone ? 0.034 : 0.028);
+  // A current flagship: a flat titanium-like frame with tight corners, near edge-to-edge glass.
+  const r = phone ? 0.115 : 0.14;
+  const s0 = slab(gl, dims.w, dims.h, dims.t, r, phone ? 0.018 : 0.028);
   W.mesh(s0.front, glass, root);
   W.mesh(s0.body, metal, root);
   W.mesh(s0.back, back, root);
@@ -140,35 +141,44 @@ function slate(W: World, dims: typeof PHONE, phone: boolean, parent?: Transform)
   const scr = W.mesh(quad(gl, dims.scrW, dims.scrH), screen, root, false);
   scr.position.z = dims.t / 2 + 0.002;
   if (phone) {
-    // A camera island on the back with two lenses, and side buttons.
-    const isl = slab(gl, 0.3, 0.3, 0.02, 0.08, 0.01);
+    // The Dynamic Island over the screen.
+    const pill = slab(gl, 0.2, 0.058, 0.002, 0.029, 0.0005);
+    const isle = group(W, root);
+    isle.position.set(0, dims.scrH / 2 - 0.06, dims.t / 2 + 0.0045);
+    const ink = W.mat({ color: "#010102", gloss: 0.95 });
+    W.mesh(pill.front, ink, isle, false);
+    W.mesh(pill.body, ink, isle, false);
+    // A camera plateau on the back with three lenses, a flash and a sensor; side buttons.
+    const isl = slab(gl, 0.36, 0.36, 0.022, 0.1, 0.011);
     const island = group(W, root);
-    island.position.set(-dims.w / 2 + 0.22, dims.h / 2 - 0.22, -dims.t / 2 - 0.01);
+    island.position.set(-dims.w / 2 + 0.24, dims.h / 2 - 0.24, -dims.t / 2 - 0.011);
     island.rotation.y = Math.PI;
     const islandMat = W.mat({ color: "#d9dbe2", metal: 0.3, gloss: 0.85 });
     W.mesh(isl.front, islandMat, island);
     W.mesh(isl.body, metal, island);
     const lensMat = W.mat({ color: "#111318", metal: 0.4, gloss: 0.98 });
-    for (const [lx, ly] of [
-      [-0.065, 0.065],
-      [0.065, -0.065],
-    ]) {
-      const lens = W.mesh(cylinder(gl, 0.05, 0.055, 0.03, 28), lensMat, island);
+    const LENSES = [
+      [-0.085, 0.085],
+      [-0.085, -0.085],
+      [0.085, 0.0],
+    ];
+    for (const [lx, ly] of LENSES) {
+      const lens = W.mesh(cylinder(gl, 0.056, 0.06, 0.034, 32), lensMat, island);
       lens.rotation.x = Math.PI / 2;
       lens.position.set(lx, ly, 0.02);
     }
     const ring = W.mat({ color: "#b9bcc5", metal: 1, gloss: 0.9 });
-    for (const [lx, ly] of [
-      [-0.065, 0.065],
-      [0.065, -0.065],
-    ]) {
-      const r2 = W.mesh(cylinder(gl, 0.062, 0.064, 0.02, 32), ring, island, false);
+    for (const [lx, ly] of LENSES) {
+      const r2 = W.mesh(cylinder(gl, 0.068, 0.07, 0.022, 36), ring, island, false);
       r2.rotation.x = Math.PI / 2;
       r2.position.set(lx, ly, 0.012);
     }
     const flash = W.mesh(cylinder(gl, 0.018, 0.018, 0.01, 16), W.mat({ color: "#f5ead2", gloss: 0.9 }), island, false);
     flash.rotation.x = Math.PI / 2;
-    flash.position.set(0.075, 0.075, 0.016);
+    flash.position.set(0.1, 0.11, 0.016);
+    const lidar = W.mesh(cylinder(gl, 0.016, 0.016, 0.01, 16), lensMat, island, false);
+    lidar.rotation.x = Math.PI / 2;
+    lidar.position.set(0.1, -0.11, 0.016);
     for (const [y, len] of [
       [0.35, 0.22],
       [0.05, 0.14],
@@ -176,8 +186,11 @@ function slate(W: World, dims: typeof PHONE, phone: boolean, parent?: Transform)
       const btn = W.mesh(box(gl, 0.02, len, 0.03), metal, root);
       btn.position.set(dims.w / 2 + 0.006, y, 0);
     }
-    const act = W.mesh(box(gl, 0.02, 0.1, 0.03), metal, root);
-    act.position.set(-dims.w / 2 - 0.006, 0.45, 0);
+    // The action button and a camera control button.
+    const act = W.mesh(box(gl, 0.018, 0.07, 0.028), metal, root);
+    act.position.set(-dims.w / 2 - 0.005, 0.48, 0);
+    const camBtn = W.mesh(box(gl, 0.012, 0.12, 0.03), W.mat({ color: "#2a2c31", metal: 0.6, gloss: 0.9 }), root, false);
+    camBtn.position.set(dims.w / 2 + 0.002, -0.28, 0);
     // Antenna bands in the frame, the speaker slot, the port and speaker holes at the bottom.
     const dark = W.mat({ color: "#2a2c31", gloss: 0.4 });
     for (const [x, y] of [
@@ -205,7 +218,15 @@ interface DeviceParts {
   floor: Program;
   floorMesh: Transform;
   wall: Program;
+  cove: Transform;
   candy: { node: Transform; mat: Program }[];
+  /** The environments: a light studio, a dark keynote stage with neon arches, a sunlit loft. */
+  stage: Transform;
+  stagePlinth: Transform;
+  arches: Program[];
+  loft: Transform;
+  loftTable: Transform;
+  env: Env;
   podium: Transform;
   podiumTop: Program;
   ring: Program;
@@ -213,6 +234,8 @@ interface DeviceParts {
 
 /** The podium's height (devices stand on it). */
 const POD = 0.32;
+
+type Env = "studio" | "stage" | "loft";
 
 function devicesWorld(W: World): DeviceParts {
   const { gl } = W;
@@ -253,7 +276,84 @@ function devicesWorld(W: World): DeviceParts {
     } else W.mesh(g as ReturnType<typeof sphere>, mat, n);
     candy.push({ node: n, mat });
   });
-  return { lap, phone, tab, floor, floorMesh: f, wall, candy, podium, podiumTop, ring };
+  // A keynote stage: a stepped round plinth under the devices, neon arches behind, light bars.
+  const stage = group(W);
+  const stagePlinth = group(W);
+  const dark = W.mat({ color: "#121318", metal: 0.3, gloss: 0.9 });
+  W.mesh(cylinder(gl, 3.4, 3.45, 0.12, 72), dark, stagePlinth).position.y = 0.06;
+  W.mesh(cylinder(gl, 2.9, 2.95, 0.12, 72), dark, stagePlinth).position.y = 0.18;
+  W.mesh(cylinder(gl, 2.4, 2.45, 0.08, 72), dark, stagePlinth).position.y = POD - 0.04;
+  const arches: Program[] = [];
+  [
+    [0, -3.2, 4.6, 0.055],
+    [0, -5.2, 5.6, 0.045],
+    [0, -7.2, 6.6, 0.04],
+  ].forEach(([x, z, r, tube], i) => {
+    const m = W.mat({ color: "#7c5cff", gloss: 0.5, emit: [0.6, 0.4, 1] });
+    arches.push(m);
+    const a = W.mesh(new Torus(gl, { radius: r, tube, radialSegments: 12, tubularSegments: 120, arc: Math.PI }), m, stage, false);
+    a.position.set(x, 0, z);
+    void i;
+  });
+  for (const sx of [-1, 1]) {
+    for (let k = 0; k < 3; k++) {
+      const m = arches[k % arches.length];
+      const bar = W.mesh(box(gl, 0.06, 3.2, 0.06), m, stage, false);
+      bar.position.set(sx * (5.4 + k * 1.3), 1.6, -2.6 - k * 1.6);
+    }
+  }
+  // A sunlit loft: a low oak table under the devices, a tall window of soft light, a plant, a
+  // shelf of books, a rug.
+  const loft = group(W);
+  const loftTable = group(W);
+  const oak = W.mat({ color: "#7d5a3f", gloss: 0.5 });
+  const top = slab(gl, 5.6, 3.0, 0.1, 0.4, 0.04);
+  const tt = group(W, loftTable);
+  tt.rotation.x = -Math.PI / 2;
+  tt.position.y = POD - 0.05;
+  W.mesh(top.front, oak, tt);
+  W.mesh(top.body, oak, tt);
+  W.mesh(top.back, oak, tt);
+  for (const [lx, lz] of [
+    [-2.4, -1.1],
+    [2.4, -1.1],
+    [-2.4, 1.1],
+    [2.4, 1.1],
+  ]) W.mesh(cylinder(gl, 0.07, 0.05, POD - 0.1, 16), oak, loftTable).position.set(lx, (POD - 0.1) / 2, lz);
+  const light = W.mat({ color: "#fffaf0", gloss: 0.2, emit: [0.9, 0.86, 0.78] });
+  const frameM = W.mat({ color: "#2a2b30", metal: 0.4, gloss: 0.5 });
+  const win = group(W, loft);
+  win.position.set(-4.2, 3.4, -10.7);
+  W.mesh(quad(gl, 4.2, 6.4), light, win, false);
+  for (const [bx, by, bw, bh] of [
+    [0, 0, 0.1, 6.4],
+    [-2.1, 0, 0.12, 6.6],
+    [2.1, 0, 0.12, 6.6],
+    [0, 3.2, 4.3, 0.12],
+    [0, 1.0, 4.2, 0.08],
+    [0, -1.2, 4.2, 0.08],
+  ]) W.mesh(box(gl, bw, bh, 0.12), frameM, win, false).position.set(bx, by, 0.05);
+  const potM = W.mat({ color: "#e9e4dc", gloss: 0.3 });
+  const leaf = W.mat({ color: "#4f8f55", gloss: 0.35 });
+  W.mesh(cylinder(gl, 0.55, 0.42, 1.1, 32), potM, loft).position.set(5.2, 0.55, -3.2);
+  for (const [lx, ly, lz, r] of [
+    [5.2, 1.9, -3.2, 0.8],
+    [4.7, 2.6, -3.0, 0.6],
+    [5.7, 2.5, -3.4, 0.62],
+    [5.1, 3.2, -3.3, 0.5],
+  ]) W.mesh(sphere(gl, r, 20, 14), leaf, loft).position.set(lx, ly, lz);
+  const shelf = W.mat({ color: "#3b3d44", gloss: 0.4 });
+  for (const y of [1.6, 2.6, 3.6]) W.mesh(box(gl, 3.0, 0.08, 0.6), shelf, loft, false).position.set(4.6, y, -10.4);
+  const books = ["#c9a27a", "#7c8696", "#e6dccb", "#8a6446", "#d9cdb8"].map((c) => W.mat({ color: c, gloss: 0.3 }));
+  for (let r2 = 0; r2 < 3; r2++) for (let i = 0; i < 6; i++) W.mesh(box(gl, 0.2, 0.55 + ((i * 7 + r2) % 3) * 0.08, 0.45), books[(i + r2) % books.length], loft, false).position.set(3.4 + i * 0.32 + (r2 % 2) * 0.4, 1.64 + r2 * 1.0 + 0.3, -10.4);
+  const rug = slab(gl, 9, 6, 0.03, 0.6, 0.012);
+  const rg = group(W, loft);
+  rg.rotation.x = -Math.PI / 2;
+  rg.position.set(0, 0.016, 0.5);
+  const rugM = W.mat({ color: "#d8cbb7", gloss: 0.1 });
+  W.mesh(rug.front, rugM, rg, false);
+  W.mesh(rug.body, rugM, rg, false);
+  return { lap, phone, tab, floor, floorMesh: f, wall, cove: c, candy, stage, stagePlinth, arches, loft, loftTable, env: "studio", podium, podiumTop, ring };
 }
 
 /** Device finishes that suit the stage: silver on light stages, space grey on dark ones; the phone's back in a soft tint of the brand. */
@@ -262,7 +362,7 @@ function finish(sc: SkillContext, P: DeviceParts) {
   const alu = rgb(light ? "#d9dce2" : "#7b808b");
   for (const m of [...P.lap.metal, ...P.phone.metal, ...P.tab.metal]) m.uniforms.uColor.value = alu;
   for (const s of [P.phone, P.tab]) if (s.back) s.back.uniforms.uColor.value = rgb(mixHex(light ? "#eceef2" : "#5d626c", sc.palette.primary, 0.22));
-  P.wall.uniforms.uColor.value = rgb(studioTone(sc));
+  P.wall.uniforms.uColor.value = rgb(envTone(sc, P.env));
   P.wall.uniforms.uGlowA.value = rgb(mixHex(sc.palette.primary, light ? "#ffffff" : "#000000", light ? 0.35 : 0.2));
   P.wall.uniforms.uGlowB.value = rgb(mixHex(sc.palette.secondary, light ? "#ffffff" : "#000000", light ? 0.35 : 0.2));
   const tints = [sc.palette.primary, sc.palette.secondary, sc.palette.accent, light ? "#e9ebf0" : "#c9ccd6", mixHex(sc.palette.primary, "#ffffff", 0.45), "#ffffff"];
@@ -271,6 +371,36 @@ function finish(sc: SkillContext, P: DeviceParts) {
   const pr = rgb(sc.palette.primary);
   P.ring.uniforms.uColor.value = pr;
   P.ring.uniforms.uEmit.value = pr.map((v) => v * 0.8);
+  [sc.palette.primary, sc.palette.secondary, sc.palette.accent].forEach((c, i) => {
+    const v = rgb(mixHex(c, "#ffffff", 0.15));
+    P.arches[i].uniforms.uColor.value = v;
+    P.arches[i].uniforms.uEmit.value = v.map((x) => x * 0.95);
+  });
+}
+
+/** The environment for a slide: varied across a video's device slides, the same on every frame. */
+function envFor(sc: SkillContext): Env {
+  // (The dark stage suits dark palettes and the bright loft light ones, so the headline reads.)
+  const pool: Env[] = sc.palette.light ? ["studio", "loft"] : ["studio", "stage"];
+  return pool[(hashString(`${sc.scene.skill}:${sc.scene.text}`) + sc.seed) % pool.length];
+}
+
+/** The backdrop's colour in an environment. */
+function envTone(sc: SkillContext, env: Env) {
+  if (env === "stage") return mixHex("#0d0e14", sc.palette.primary, 0.1);
+  if (env === "loft") return mixHex("#ece4d8", sc.palette.primary, 0.04);
+  return studioTone(sc);
+}
+
+/** Show an environment's set. */
+function setEnv(P: DeviceParts, env: Env) {
+  P.env = env;
+  const show2 = (n: Transform, on: boolean) => {
+    n.visible = on;
+    n.traverse((c) => void (c.visible = on));
+  };
+  show2(P.stage, env === "stage");
+  show2(P.loft, env === "loft");
 }
 
 /** The studio's colour: a soft tint of the brand on light stages, a deep one on dark stages. */
@@ -279,10 +409,12 @@ const studioTone = (sc: SkillContext) => (sc.palette.light ? mixHex("#eceef3", s
 /** The studio behind the headline (the same colour as the backdrop, lit from above). */
 function studio(sc: SkillContext) {
   const { ctx, w, h } = sc;
-  const tone = studioTone(sc);
+  const env = envFor(sc);
+  const tone = envTone(sc, env);
+  const bright = env === "loft" || (env === "studio" && !!sc.palette.light);
   const g = ctx.createRadialGradient(w / 2, h * 0.35, 0, w / 2, h * 0.35, Math.max(w, h) * 0.75);
-  g.addColorStop(0, mixHex(tone, "#ffffff", sc.palette.light ? 0.5 : 0.08));
-  g.addColorStop(1, mixHex(tone, "#000000", sc.palette.light ? 0.03 : 0.25));
+  g.addColorStop(0, mixHex(tone, "#ffffff", bright ? 0.5 : 0.08));
+  g.addColorStop(1, mixHex(tone, "#000000", bright ? 0.03 : 0.25));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 }
@@ -330,9 +462,43 @@ const CANDY_LINEUP: [number, number, number, number][] = [
 
 /** Stand the devices on the podium (or on the studio floor). */
 function onPodium(P: DeviceParts, on: boolean) {
-  P.podium.visible = on;
-  P.podium.traverse((n) => void (n.visible = on));
+  const surf = (n: Transform, v: boolean) => {
+    n.visible = v;
+    n.traverse((c) => void (c.visible = v));
+  };
+  surf(P.podium, on && P.env === "studio");
+  surf(P.stagePlinth, on && P.env === "stage");
+  surf(P.loftTable, on && P.env === "loft");
   P.floorMesh.position.y = on ? POD + 0.002 : 0.002;
+}
+
+/**
+ * Render with depth of field: the devices (and what they stand on) pin-sharp, the backdrop, the
+ * set and the floating shapes softly out of focus, like a photo taken with a fast lens.
+ */
+function renderDof(sc: SkillContext, W: World, P: DeviceParts, v: View, w: number, h: number): HTMLCanvasElement {
+  const full = render(W, v, w, h);
+  if (sc.flat3d) return full;
+  const out = scratch("d3-dof", w, h);
+  out.ctx.clearRect(0, 0, w, h);
+  const blur = Math.max(2, w * 0.0065);
+  out.ctx.filter = `blur(${blur.toFixed(1)}px)`;
+  out.ctx.drawImage(full, 0, 0, w, h);
+  out.ctx.filter = "none";
+  // The in-focus pass: only the devices, their surface and the contact shadows.
+  const off: Transform[] = [P.cove, P.stage, P.loft, ...P.candy.map((c) => c.node)];
+  const was = off.map((n) => n.visible);
+  for (const n of off) {
+    n.visible = false;
+    n.traverse((c) => void (c.visible = false));
+  }
+  const sharp = render(W, v, w, h);
+  out.ctx.drawImage(sharp, 0, 0, w, h);
+  off.forEach((n, i) => {
+    n.visible = was[i];
+    n.traverse((c) => void (c.visible = was[i]));
+  });
+  return out.canvas;
 }
 
 function lighting(sc: SkillContext): Partial<View> {
@@ -449,10 +615,11 @@ function d3Laptop(sc: SkillContext) {
       const R = world("devices", w, h, devicesWorld);
       if (!R) return null;
       const { W, parts: P } = R;
+      setEnv(P, envFor(sc));
       finish(sc, P);
       show(P, { lap: true });
       onPodium(P, true);
-      floatCandy(P, CANDY_LAPTOP, t);
+      floatCandy(P, P.env === "loft" ? [] : CANDY_LAPTOP, t);
       P.lap.root.position.set(0, POD + 0.015, 0);
       P.lap.root.rotation.y = 0;
       const open = ease.inOutCubic(range(t, 0.15, 1.7));
@@ -462,7 +629,7 @@ function d3Laptop(sc: SkillContext) {
       const k = ease.inOutCubic(range(t, 0, d * 0.75));
       const F = fit(sc, top);
       const eye = mixShot([4.4 * F, 1.35, 4.6 * F], [-1.5 * F, 2.4, 7.0 * F], k);
-      return render(W, { ...lighting(sc), eye: [eye[0], eye[1] + POD, eye[2]], target: [0, lerp(0.35, 0.78, open) + POD, -0.4], fov: 30, shadowSize: 3.5, shadowAt: [0, 0.8, -0.3] }, w, h);
+      return renderDof(sc, W, P, { ...lighting(sc), eye: [eye[0], eye[1] + POD, eye[2]], target: [0, lerp(0.35, 0.78, open) + POD, -0.4], fov: 30, shadowSize: 3.5, shadowAt: [0, 0.8, -0.3] }, w, h);
     },
     () => flat(sc, shot, top),
   );
@@ -481,18 +648,19 @@ function d3Phone(sc: SkillContext) {
       const R = world("devices", w, h, devicesWorld);
       if (!R) return null;
       const { W, parts: P } = R;
+      setEnv(P, envFor(sc));
       finish(sc, P);
       show(P, { phone: true });
       onPodium(P, true);
-      floatCandy(P, CANDY_PHONE.map(([x, y, z, k]) => [x, y + POD, z, k] as [number, number, number, number]), t);
+      floatCandy(P, P.env === "loft" ? [] : CANDY_PHONE.map(([x, y, z, k]) => [x, y + POD, z, k] as [number, number, number, number]), t);
       const turn = ease.inOutCubic(range(t, 0.1, 1.9));
       const bob = Math.sin(t * 1.6) * 0.04;
       P.phone.root.position.set(0, 1.05 + POD + bob, 0);
       P.phone.root.rotation.set(lerp(0.25, 0.08, turn), lerp(Math.PI + 0.5, -0.32, turn) + Math.sin(t * 0.9) * 0.04, lerp(-0.15, 0.04, turn));
-      paint(W, P.phone.screen, shot, PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 2.2, d - 0.4)), range(t, 1.2, 1.9), 0.11);
+      paint(W, P.phone.screen, shot, PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 2.2, d - 0.4)), range(t, 1.2, 1.9), 0.075);
       blobs(P, [[0, 0, 0.18, 0.06]]);
       const F = fit(sc, top);
-      return render(W, { ...lighting(sc), eye: [0.25 * F, 1.5 + POD, 5.4 * F], target: [0, 0.95 + POD, 0], fov: 26, shadowSize: 2.8, shadowAt: [0, 0.8, 0] }, w, h);
+      return renderDof(sc, W, P, { ...lighting(sc), eye: [0.25 * F, 1.5 + POD, 5.4 * F], target: [0, 0.95 + POD, 0], fov: 26, shadowSize: 2.8, shadowAt: [0, 0.8, 0] }, w, h);
     },
     () => flat(sc, shot, top),
   );
@@ -511,10 +679,11 @@ function d3Lineup(sc: SkillContext) {
       const R = world("devices", w, h, devicesWorld);
       if (!R) return null;
       const { W, parts: P } = R;
+      setEnv(P, envFor(sc));
       finish(sc, P);
       show(P, { lap: true, phone: true, tab: true });
       onPodium(P, false);
-      floatCandy(P, CANDY_LINEUP, t);
+      floatCandy(P, P.env === "loft" ? [] : CANDY_LINEUP, t);
       P.lap.root.position.set(0, 0, 0);
       P.lap.root.rotation.y = 0;
       P.lap.hinge.rotation.x = -0.3;
@@ -526,7 +695,7 @@ function d3Lineup(sc: SkillContext) {
       const scroll = ease.inOutCubic(range(t, 1.4, d - 0.4));
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, scroll, range(t, 0.2, 0.8), 0.02);
       paint(W, P.tab.screen, shot, TAB.scrW / TAB.scrH, scroll, range(t, 0.5, 1.1), 0.06);
-      paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, scroll, range(t, 0.7, 1.3), 0.11);
+      paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, scroll, range(t, 0.7, 1.3), 0.075);
       blobs(P, [
         [0, -0.1, LAP.w / 2 - 0.1, LAP.d / 2 - 0.1],
         [-2.75, 0.1, 0.8, 0.06],
@@ -535,7 +704,7 @@ function d3Lineup(sc: SkillContext) {
       const k = ease.inOutCubic(range(t, 0, d));
       const F = fit(sc, top);
       const eye: Num3 = [lerp(-2.2, 2.2, k), 2.3, 9.4 * F];
-      return render(W, { ...lighting(sc), eye, target: [lerp(-0.5, 0.5, k), 0.95, 0], fov: 30, shadowSize: 5, shadowAt: [0, 0.8, 0] }, w, h);
+      return renderDof(sc, W, P, { ...lighting(sc), eye, target: [lerp(-0.5, 0.5, k), 0.95, 0], fov: 30, shadowSize: 5, shadowAt: [0, 0.8, 0] }, w, h);
     },
     () => flat(sc, shot, top),
   );
@@ -557,10 +726,11 @@ function d3Dive(sc: SkillContext) {
       const R = world("devices", cw, ch, devicesWorld);
       if (!R) return null;
       const { W, parts: P } = R;
+      setEnv(P, envFor(sc));
       finish(sc, P);
       show(P, { lap: true });
       onPodium(P, true);
-      floatCandy(P, CANDY_LAPTOP, t);
+      floatCandy(P, P.env === "loft" ? [] : CANDY_LAPTOP, t);
       P.lap.root.position.set(0, POD + 0.015, 0);
       P.lap.root.rotation.y = 0;
       const lean = -0.3;
@@ -581,7 +751,7 @@ function d3Dive(sc: SkillContext) {
       const F = fit(sc, st.top);
       const eye = mixShot([3.6 * F, 2.6 + POD, 6.8 * F], near, dive);
       const target = mixShot([0, 0.9 + POD, -0.4], sc0, dive);
-      return render(W, { ...lighting(sc), eye, target, fov, shadowSize: 3.5, shadowAt: [0, 0.8, -0.3] }, cw, ch);
+      return renderDof(sc, W, P, { ...lighting(sc), eye, target, fov, shadowSize: 3.5, shadowAt: [0, 0.8, -0.3] }, cw, ch);
     },
     () => flat(sc, shot, st.top),
   );
@@ -674,7 +844,7 @@ function d3Desk(sc: SkillContext) {
       if (P.phone.back) P.phone.back.uniforms.uColor.value = rgb(mixHex("#eceef2", palette.primary, 0.25));
       P.mug.uniforms.uColor.value = rgb(palette.primary);
       paint(W, P.lap.screen, shot, LAP.scrW / LAP.scrH, ease.inOutCubic(range(t, 1.2, d - 0.4)), range(t, 0.1, 0.7), 0.02);
-      paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.11);
+      paint(W, P.phone.screen, shotOf(sc, true), PHONE.scrW / PHONE.scrH, ease.inOutCubic(range(t, 1.6, d - 0.4)), range(t, 0.4, 1.0), 0.075);
       const k = ease.inOutCubic(range(t, 0, d));
       const a = lerp(0.55, -0.35, k);
       const F = fit(sc, top);

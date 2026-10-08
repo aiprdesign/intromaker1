@@ -182,7 +182,8 @@ function drawScene(
   // Product shots float on a gently tilted, orbiting plane in every SaaS style (the 3D styles
   // set their own depth); headline, logo and closing shots stay flat so their type reads cleanly.
   // The 3D logo intros stage their own 3D, so they're never put on a tilted panel as well.
-  const own3d = LOGO_3D_IDS.has(scene.skill);
+  // (Nor are the real 3D, industry and homebuilder scenes: they have their own camera.)
+  const own3d = LOGO_3D_IDS.has(scene.skill) || /^(d3|home|ind)-/.test(scene.skill);
   const styleDepth = plan.style === "saas" && !own3d ? plan.look?.depth ?? 0 : 0;
   const depth = styleDepth || (plan.style === "saas" && PRODUCT_SHOTS.has(scene.skill) ? 10 : 0);
   // The default product stage only leans back: rows and cards stay perfectly level.
@@ -210,8 +211,9 @@ function drawScene(
     renderSlide(csc);
     layer.ctx.restore();
     const shot = exitLayer(layer.canvas, w, h, exit, sc.u);
-    if (slab) projectSlab(target, shot, w, h, globalT, sc);
-    else projectTurn(target, shot, w, h, turn, globalT, sc);
+    // (Held still: a panel that keeps swaying re-samples its text every frame, which shimmers.)
+    if (slab) projectSlab(target, shot, w, h, 0, sc);
+    else projectTurn(target, shot, w, h, turn, 0, sc);
     resetCtx(target);
     return sc;
   }
@@ -225,7 +227,7 @@ function drawScene(
     if (transitionIn) applyTransitionIn(csc);
     renderSlide(csc);
     layer.ctx.restore();
-    projectPlane(target, exitLayer(layer.canvas, w, h, exit, sc.u), w, h, depth, globalT, level);
+    projectPlane(target, exitLayer(layer.canvas, w, h, exit, sc.u), w, h, depth, 0, level);
     resetCtx(target);
     return sc;
   }
@@ -984,16 +986,17 @@ function brandBug(ctx: CanvasRenderingContext2D, plan: VideoPlan, time: number, 
  */
 function applyCamera(sc: SkillContext, globalT: number) {
   const { ctx, w, h, u } = sc;
+  // SaaS slides hold still: a frame that keeps zooming by fractions of a pixel makes text shimmer.
+  // Slides move their own elements instead (and trailers keep the cinematic camera below).
+  if (sc.style === "saas") return;
   // Cinematic dolly: every shot keeps pulling back slowly (5% over the shot, from slightly closer
   // to its resting framing), drifting a touch to one side, so no frame is ever static. Cuts hide
   // the reset.
   const p = clamp(sc.t / Math.max(0.5, sc.d));
-  const saas = sc.style === "saas";
   const push = 0.05 * (1 - (p * p * (3 - 2 * p) * 0.35 + p * 0.65));
   const side = sc.seed % 2 ? 1 : -1;
-  // SaaS shots land: a quick settle from slightly closer and turned, like a camera move ending.
-  const arrive = saas ? 1 - ease.outExpo(clamp(sc.t / 0.75)) : 0;
-  const s = 1.035 + push + 0.05 * arrive;
+  const arrive = 0;
+  const s = 1.035 + push;
   // Each shot gets its own camera grammar (so a film doesn't repeat one move): a pull-back that
   // drifts aside, one that cranes up, or one that trucks across — all inside the overscan.
   const move = (sc.seed >>> 3) % 3;
@@ -1002,8 +1005,7 @@ function applyCamera(sc: SkillContext, globalT: number) {
   const crane = move === 1 ? (0.5 - eased) * 16 * u : -p * 6 * u;
   const dx = noise1(globalT * 0.45, 11) * (move === 2 ? 5 : 9) * u + across + side * arrive * 26 * u;
   const dy = noise1(globalT * 0.37, 23) * (move === 1 ? 4 : 7) * u + crane;
-  // SaaS shots never roll or skew: text, cards and UI rows stay perfectly level.
-  const rot = saas ? 0 : noise1(globalT * 0.23, 37) * 0.007;
+  const rot = noise1(globalT * 0.23, 37) * 0.007;
   ctx.translate(w / 2 + dx, h / 2 + dy);
   ctx.rotate(rot);
   ctx.scale(s, s);

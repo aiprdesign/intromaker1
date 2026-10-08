@@ -2710,6 +2710,7 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
       baseTransition: (TRANSITIONS as readonly string[]).includes(s.baseTransition as string) ? (s.baseTransition as Transition) : undefined,
       media: sanitizeMedia(s.media),
       contrast: typeof s.contrast === "boolean" ? s.contrast : undefined,
+      locked: s.locked === true ? true : undefined,
       eyebrow: typeof s.eyebrow === "string" && s.eyebrow.trim() ? s.eyebrow.slice(0, 40) : undefined,
       role: typeof s.role === "string" && /^[a-z]{2,14}$/.test(s.role) ? s.role : undefined,
       items: Array.isArray(s.items)
