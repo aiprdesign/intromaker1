@@ -55,13 +55,13 @@ export default function Home() {
       <section className="section" id="skills">
         <div className="section-head">
           <span className="eyebrow">The skill library</span>
-          <h2>213 motion skills, rendered live.</h2>
+          <h2>214 motion skills, rendered live.</h2>
           <p>The cards below are real-time output of the engine: the same frames you export.</p>
         </div>
         <SkillGrid limit={9} swipe />
         <div className="center">
           <Link href="/skills" className="btn btn-ghost btn-lg">
-            See the 213 skills →
+            See the 214 skills →
           </Link>
         </div>
       </section>

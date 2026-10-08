@@ -15,7 +15,7 @@ import { exitT } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
 import { arrow3d, drawIcon, glassCard, iconsFor, pill, saasBackground, spring } from "../saasfx";
-import { fillTextFit, fillTextMid, fitTextLines, subFont } from "../text";
+import { displayFont, fillTextFit, fillTextMid, fitTextLines, subFont } from "../text";
 import type { Scene, SfxCue, Skill, SkillContext } from "../types";
 import { coverDraw, gallery } from "./gallery";
 import { checkBadge, ellipsize, iconTile, windowChrome, wrap, wrapClamp } from "./interactions";
@@ -718,6 +718,86 @@ function problemSolution(sc: SkillContext) {
   ctx.restore();
 }
 
+/**
+ * Split contrast: the old way against the new, one on each half of the frame. The renderer shows
+ * the second half in inverse colours (see contrast.ts), so the two sides read as opposites:
+ * "Before" with the old way struck through, then "With {name}" and the new way, checked.
+ * Side by side in landscape and square; stacked (top and bottom) in portrait.
+ */
+export function contrastPair(scene: Scene): [string, string] {
+  const items = (scene.items ?? []).map((x) => x.trim()).filter(Boolean);
+  if (items.length >= 2) return [items[0], items[1]];
+  const [a, b] = (items[0] ?? "").split(/\s*(?:→|->|\|)\s*/);
+  return [a || "Scattered tools", b || "One clear place"];
+}
+
+function contrastSplitSlide(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
+  saasBackground(sc, { beams: 0.6 });
+  const portrait = h > w * 1.05;
+  const ex = ease.inCubic(exitT(sc, 0.4));
+  const [oldWay, newWay] = contrastPair(scene);
+  const name = (brand?.name ?? "").replace(/[*|]/g, "").trim();
+  const hasHead = !!scene.text?.trim();
+  if (hasHead) topHeadline(sc);
+  ctx.save();
+  ctx.globalAlpha *= 1 - ex;
+  const half = (i: number) =>
+    portrait
+      ? { cx: w / 2, cy: (hasHead ? h * 0.3 : h * 0.06) + ((i + 0.5) * (h * (hasHead ? 0.66 : 0.88))) / 2, cw: w * 0.8 }
+      : { cx: (w * (i + 0.5)) / 2, cy: h * (hasHead ? 0.6 : 0.52), cw: w * 0.36 };
+  const S = portrait ? 1.25 : 1;
+  const side = (i: number, label: string, text: string, k: number, strike: number, good: boolean) => {
+    if (k <= 0) return;
+    const { cx, cy, cw } = half(i);
+    ctx.save();
+    ctx.globalAlpha *= clamp(k * 1.4);
+    const rise = (1 - ease.outCubic(clamp(k))) * 26 * u;
+    ctx.font = displayFontOf(sc, 84 * u * S);
+    const fit = fitTextLines(ctx, text, cw, { maxLines: 3, minScale: 0.6 });
+    const lh = fit.size * 1.12;
+    const blockH = fit.lines.length * lh;
+    const top = cy - blockH / 2 + rise;
+    pill(sc, label, cx, top - 52 * u * S, { size: 21 * u * S, weight: good ? 700 : 600, color: rgba(palette.text, good ? 1 : 0.75), fill: good ? rgba(palette.accent, 0.2) : undefined, border: good ? rgba(palette.accent, 0.55) : undefined });
+    ctx.font = fit.font;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = good ? palette.text : rgba(palette.text, 0.9 - 0.35 * strike);
+    fit.lines.forEach((l, j) => {
+      const ly = top + lh * (j + 0.5);
+      fillTextMid(ctx, l, cx, ly);
+      if (!good && strike > 0) {
+        const lw = ctx.measureText(l).width;
+        const sk = clamp(strike * fit.lines.length - j);
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 4 * u * S;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(cx - lw / 2 - 6 * u, ly);
+        ctx.lineTo(cx - lw / 2 - 6 * u + (lw + 12 * u) * sk, ly);
+        ctx.stroke();
+      }
+    });
+    if (good) checkBadge(sc, cx, top + blockH + 52 * u * S, 24 * u * S, clamp(k * 1.2 - 0.2));
+    ctx.restore();
+  };
+  const T = contrastSplitTiming(d);
+  side(0, "Before", oldWay, ease.outCubic(range(t, T.old, T.old + 0.45)), ease.inOutCubic(range(t, T.strike, T.strike + 0.45)), false);
+  side(1, name && name !== "Your product" ? `With ${name}` : "With us", newWay, clamp(spring(t - T.fresh, 12, 7), 0, 1.06), 0, true);
+  ctx.restore();
+}
+
+/** Contrast split timing: the old way, its strike, then the new way springing in. */
+function contrastSplitTiming(d: number) {
+  const k = clamp(d / 4.5, 0.75, 1.2);
+  return { old: 0.25 * k, strike: 1.0 * k, fresh: 1.5 * k };
+}
+
+/** The video's display face at a size (the headline's own family). */
+function displayFontOf(sc: SkillContext, size: number) {
+  return displayFont(sc.font, size);
+}
+
 /* ───────────────────────── registry ───────────────────────── */
 
 export const slideSkills: Skill[] = [
@@ -774,6 +854,19 @@ export const slideSkills: Skill[] = [
     sfx: (scene) => {
       const T = solveTiming(scene);
       return [...T.rows.flatMap((r) => [at(r + 0.3, "strike"), at(r + 0.6, "pop")]), at(T.end, "success")];
+    },
+  },
+  {
+    id: "contrast-split",
+    name: "Split Contrast",
+    tagline: "The old way and the new, side by side, the new half in inverse colours: the old way is struck through, then the new way springs in with a check.",
+    bestFor: "A clear contrast the site or prompt states itself ('instead of', 'less … more', 'from … to', 'no more'). items = [old way, new way], short phrases in the site's words; headline optional and neutral ('A different *way to work*'; no 'better', 'faster' or other comparative claims).",
+    sample: { text: "A different *way to work*", items: ["Scattered spreadsheets", "One shared workspace"] },
+    itemsHint: "2: old way, new way",
+    render: contrastSplitSlide,
+    sfx: (scene) => {
+      const T = contrastSplitTiming(scene.duration);
+      return [at(T.old, "whoosh"), at(T.strike, "strike"), at(T.fresh, "pop")];
     },
   },
 ];

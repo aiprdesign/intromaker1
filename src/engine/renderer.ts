@@ -128,20 +128,32 @@ function drawScene(
   transitionIn = true,
   music?: MusicPulse,
 ) {
-  // A split contrast slide: drawn as usual, then flipped, and one half of the frame shows the
+  // A split contrast slide: drawn as usual, then flipped, and one side of the frame shows the
   // flipped copy, its seam easing in from the edge to the middle (see contrast.ts).
   const own = plan.scenes?.[index]?.skill === scene.skill;
-  const side = plan.style === "saas" && !opts.edit && (own ? contrastSlides(plan).has(index) && contrastSplit(plan, index) : scene.contrast === "left" || scene.contrast === "right" ? scene.contrast : undefined);
+  const side =
+    plan.style === "saas" && !opts.edit
+      ? own
+        ? contrastSlides(plan).has(index)
+          ? contrastSplit(plan, index, h > w * 1.05)
+          : undefined
+        : scene.contrast === "left" || scene.contrast === "right"
+          ? scene.contrast
+          : undefined
+      : undefined;
+  if (side === "none") return drawSceneOnce(target, scene, plan, t, w, h, index, opts, globalT, d, transitionIn, music, false);
   if (!side || !canContrast(scene)) return drawSceneOnce(target, scene, plan, t, w, h, index, opts, globalT, d, transitionIn, music);
   const sc = drawSceneOnce(target, scene, plan, t, w, h, index, opts, globalT, d, transitionIn, music, false);
   const layer = scratch("split-contrast", w, h);
   drawSceneOnce(layer.ctx, scene, plan, t, w, h, index, opts, globalT, d, transitionIn, music, true, true);
-  const open = (w / 2) * ease.inOutCubic(clamp(t / 0.6));
+  const k = ease.inOutCubic(clamp(t / 0.6));
   target.save();
   target.setTransform(1, 0, 0, 1, 0, 0);
   target.beginPath();
-  if (side === "left") target.rect(0, 0, open, h);
-  else target.rect(w - open, 0, open, h);
+  if (side === "left") target.rect(0, 0, (w / 2) * k, h);
+  else if (side === "right") target.rect(w - (w / 2) * k, 0, (w / 2) * k, h);
+  else if (side === "top") target.rect(0, 0, w, (h / 2) * k);
+  else target.rect(0, h - (h / 2) * k, w, (h / 2) * k);
   target.clip();
   target.drawImage(layer.canvas, 0, 0, w, h);
   target.restore();

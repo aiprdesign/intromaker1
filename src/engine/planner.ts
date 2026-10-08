@@ -729,6 +729,33 @@ function promptPains(prompt: string) {
   return out.slice(0, 3);
 }
 
+/**
+ * A contrast the words state themselves, as [old way, new way]: "less time typing, more time
+ * selling", "from stressed to calm", "replace spreadsheets with one workspace", or "instead of /
+ * no more / less time on X" (the new way then being `fallback`: the product itself, in its own
+ * words). (The claim-safe copy pass softens "no more X" to "less time on X" before this reads it.) Only short
+ * phrases in the writer's own words, so the slide never puts a claim in their mouth.
+ */
+export function contrastPairOf(text: string, fallback?: string): [string, string] | undefined {
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  // (Short phrases only, no prices or numbers, and not a place: "from anywhere to production".)
+  const ok = (x?: string) => !!x && x.trim().split(/\s+/).length <= 6 && x.trim().length >= 3 && !/\d/.test(x) && !/^(anywhere|everywhere|anything|here|there|home|day one|one|any)\b/i.test(x.trim());
+  const clean = (x: string) => x.trim().replace(/^(the|your|all)\s+/i, "").replace(/\s+(in|for|with) (minutes|seconds|days)$/i, (m) => m);
+  const end = "(?=\\s*(?:[,.;:!?]|$|\\s+(?:and|so|for|with|while)\\b))";
+  const tries: [RegExp, (m: RegExpMatchArray) => [string, string] | undefined][] = [
+    [new RegExp(`\\bless\\s+([^,.;:!?]+?)\\s*(?:,|and|&)?\\s+more\\s+([^,.;:!?]+?)${end}`, "i"), (m) => [cap(clean(m[1])), `More ${clean(m[2])}`]],
+    [new RegExp(`\\breplac(?:e|es|ing)\\s+([^,.;:!?]+?)\\s+with\\s+([^,.;:!?]+?)${end}`, "i"), (m) => [cap(clean(m[1])), cap(clean(m[2]))]],
+    [new RegExp(`\\bfrom\\s+([^,.;:!?]+?)\\s+to\\s+([^,.;:!?]+?)${end}`, "i"), (m) => [cap(clean(m[1])), cap(clean(m[2]))]],
+    [new RegExp(`\\b(?:instead of|rather than|no more|tired of|sick of|less time (?:on|with|spent on))\\s+([^,.;:!?]+?)${end}`, "i"), (m) => (fallback ? [cap(clean(m[1])), cap(fallback)] : undefined)],
+  ];
+  for (const [re, make] of tries) {
+    const m = text.match(re);
+    const pair = m ? make(m) : undefined;
+    if (pair && ok(pair[0]) && ok(pair[1]) && pair[0].toLowerCase() !== pair[1].toLowerCase()) return pair;
+  }
+  return undefined;
+}
+
 function planFromPromptSaas(req: PlanRequest): VideoPlan {
   const prompt = req.prompt.trim();
   const seed = (req.seed ?? hashString(prompt)) >>> 0;
@@ -763,6 +790,9 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     steps: [],
     // Problems the prompt names ("for teams tired of spreadsheets", "no more missed calls").
     pains: promptPains(prompt),
+    // A contrast the prompt states ("less typing, more selling"), for a split contrast slide.
+    // (When it names only the old way, the new way is the product itself: "Invoicing software for freelancers".)
+    contrast: contrastPairOf(prompt, [tagline.replace(/^(an?|the)\s+/i, "").replace(/\s+(instead of|rather than|so you|without|no more)\b.*$/i, ""), ...features].find((f) => f.split(/\s+/).length <= 6 && !/^meet\b/i.test(f))),
     font: null,
     shots: { hero: null, full: null, sections: [] },
     cta: null,
@@ -2071,6 +2101,21 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
       duration: beats(10),
       transition: "whip",
       media: compareMedia,
+    });
+  }
+  // 5e'. A contrast the site or prompt states itself (and no problem slide already shows it): the
+  // old way against the new, side by side, the new way in inverse colours (see contrast.ts).
+  const statedContrast = site.contrast ?? contrastPairOf([whole.tagline, whole.description, ...whole.headlines].join(". "), shortFeatures[0]);
+  if (statedContrast && !candidates.some((c) => c.scene.role === "pain" || c.scene.role === "solve" || c.scene.role === "compare")) {
+    // (One the prompt asks for in its own words is kept even in a short video.)
+    add(site.contrast ? 2 : target >= 30 ? 5 : 7, {
+      role: "compare", skill: "contrast-split",
+      text: "Before and *after*",
+      items: statedContrast,
+      eyebrow: "The switch",
+      why: `The ${site.contrast ? "prompt" : "site"} sets the old way against the new ("${statedContrast[0]}" → "${statedContrast[1]}")`,
+      duration: beats(9),
+      transition: "cut",
     });
   }
   // 5f. Support: when the site talks about help, docs or onboarding (and the demo isn't already a

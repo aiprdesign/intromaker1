@@ -197,6 +197,7 @@ export const SKILL_IDS = [
   "world-map",
   "feature-slides",
   "problem-solution",
+  "contrast-split",
   "liquid-logo",
   "qr-end",
   "product-hero",
@@ -348,6 +349,8 @@ export interface SiteData {
   steps: string[];
   /** Problems the product removes ("no more spreadsheets" → "Spreadsheets"). */
   pains: string[];
+  /** A contrast it states itself, as [old way, new way] ("less typing, more selling"; see contrastPairOf). */
+  contrast?: [string, string];
   /** The site's headline font family (e.g. from Google Fonts). */
   font: string | null;
   /** Screenshots from the live browser capture (same-origin /api/shot URLs). */
