@@ -2549,18 +2549,23 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Exported frames stay pin-sharp, even mid-move."}</p>
-          <label className="field-label">
-            3D slides <span className="tpl-desc">{flat3d ? "Flat 2D" : "Real 3D"}</span>
-          </label>
-          <div className="seg-control">
-            <button className={!flat3d ? "active" : ""} onClick={() => chooseFlat3d(false)}>
-              Real 3D
-            </button>
-            <button className={flat3d ? "active" : ""} onClick={() => chooseFlat3d(true)}>
-              Flat 2D
-            </button>
-          </div>
-          <p className="hint">{flat3d ? "Devices, homes and scenes drawn as clean flat illustrations, straight on." : "Modelled devices and homes with real light, shadows and a moving camera."}</p>
+          {/* (Only when the intro has a 3D device or home slide: it's what the switch changes.) */}
+          {plan.scenes.some((s) => /^(d3|home)-/.test(s.skill)) && (
+            <>
+              <label className="field-label">
+                3D slides <span className="tpl-desc">{flat3d ? "Flat 2D" : "Real 3D"}</span>
+              </label>
+              <div className="seg-control">
+                <button className={!flat3d ? "active" : ""} onClick={() => chooseFlat3d(false)}>
+                  Real 3D
+                </button>
+                <button className={flat3d ? "active" : ""} onClick={() => chooseFlat3d(true)}>
+                  Flat 2D
+                </button>
+              </div>
+              <p className="hint">{flat3d ? "Devices, homes and scenes drawn as clean flat illustrations, straight on." : "Modelled devices with real light and shadows, and homes in flat colours, with a moving camera."}</p>
+            </>
+          )}
           {plan.software && (
             <>
               <label className="field-label">
