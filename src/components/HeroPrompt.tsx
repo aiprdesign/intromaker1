@@ -295,6 +295,12 @@ export default function HeroPrompt() {
         </>
       )}
     </div>
+      <div className="hero-random">
+        <button type="button" className="btn btn-ghost" onClick={() => go("/studio?random=1", "prompt")} disabled={pending("prompt")}>
+          🎲 Make a random intro
+        </button>
+        <span className="hint">A made-up brand on a random topic: see what it can make</span>
+      </div>
     </>
   );
 }

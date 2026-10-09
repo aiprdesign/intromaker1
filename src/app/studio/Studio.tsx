@@ -989,7 +989,12 @@ export default function Studio() {
     const r = randomIntro(Math.random, lastTopicRef.current);
     lastTopicRef.current = r.kind;
     setPrompt(r.prompt);
-    void generate({ prompt: r.prompt, seed: Math.floor(Math.random() * 1e9) });
+    // (A random intro is made from its prompt alone: an imported website steps aside.)
+    setSite(null);
+    setSiteUrl("");
+    setBrandColors(undefined);
+    setImportError(null);
+    void generate({ prompt: r.prompt, site: null, colors: undefined, seed: Math.floor(Math.random() * 1e9) });
   };
   const generate = async (opts: GenOpts = {}) => {
     const { run, signal } = opts.signal ? { run: runRef.current, signal: opts.signal } : startRun();
@@ -1555,7 +1560,7 @@ export default function Studio() {
         .catch((status) => setNote(status === 401 ? "Sign in to open your saved intros." : "That saved intro wasn't found."));
       return;
     }
-    const hasBootParams = hash.startsWith("#plan=") || ["skill", "url", "prompt", "photos"].some((k) => params.get(k));
+    const hasBootParams = hash.startsWith("#plan=") || ["skill", "url", "prompt", "photos", "random"].some((k) => params.get(k));
     if (!hasBootParams) {
       bootingRef.current = false;
       saving.current = true;
@@ -1631,6 +1636,11 @@ export default function Studio() {
     if (params.get("look") === "trailer") {
       styleRef.current = "trailer";
       setStyle("trailer");
+    }
+    // ?random=1 (the homepage's Random intro): a random topic, made straight away.
+    if (params.get("random")) {
+      surprise();
+      return;
     }
     const web = params.get("url");
     if (web) {
@@ -2744,6 +2754,15 @@ export default function Studio() {
                 Generate ✦
               </button>
             )}
+            <button
+              className="btn btn-ghost btn-lg dice-btn"
+              onClick={surprise}
+              disabled={loading || importing || remaking || takesLoading}
+              aria-label="Random intro"
+              title="Random intro: a made-up brand on a random topic, to see what the studio can make"
+            >
+              🎲
+            </button>
             {remaking ? (
               <button className="btn btn-lg stop-btn" onClick={stopDirecting} title="Stop the remake. The video on screen stays as it is.">
                 <span className="spinner sm" /> Remaking… <span className="stop-label">■ Stop</span>
