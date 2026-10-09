@@ -1612,7 +1612,8 @@ function interiorWorld(W: World): InteriorParts {
   // Floors: oak through the house, a tiled kitchen and a deck outside.
   put(W, box(gl, 27.2, 0.2, 8.2), oak, W.scene, -0.4, 0.1, 0, false);
   put(W, box(gl, 8, 0.02, 8), mc(W, "#d9d3ca", 0.5), W.scene, 3, 0.21, 0, false);
-  put(W, box(gl, 6.4, 0.18, 8.2), mc(W, "#a07a55", 0.3), W.scene, 16.2, 0.09, 0, false);
+  put(W, box(gl, 3.6, 0.18, 8.2), mc(W, "#a07a55", 0.3), W.scene, 14.8, 0.09, 0, false);
+  for (let z = -3.9; z < 4.1; z += 0.45) put(W, box(gl, 3.6, 0.182, 0.015), mc(W, "#8a6446", 0.3), W.scene, 14.8, 0.091, z, false);
   // Walls: the back wall with windows, the front wall with the open door, half walls between rooms.
   const wall = (x0: number, z0: number, x1: number, z1: number, hh = H) => {
     const len = Math.hypot(x1 - x0, z1 - z0);
@@ -1642,8 +1643,10 @@ function interiorWorld(W: World): InteriorParts {
   put(W, box(gl, 0.2, 2.5, 0.16), trim, W.scene, -14, 1.45, 2.3);
   put(W, box(gl, 0.07, 2.3, 1.0), mc(W, "#7c5cff", 0.5), W.scene, -13.85, 1.35, 1.65);
   furnish(W, { wood, oak, white, linen, fabric, stoneTop, glass, warm, throwM });
-  tree(W, W.scene, 21, -6, 1.1);
-  tree(W, W.scene, 17, -9, 1.3);
+  // Trees beyond the back fence.
+  tree(W, W.scene, 15.5, -7.2, 1.2);
+  tree(W, W.scene, 19.5, -8.5, 1.4);
+  tree(W, W.scene, 23, -6.8, 1.1);
   // The family at home: dad on the sofa, mum beside it, their child on the rug with the dog.
   const family = FAMILY.map((L) => person3d(W, W.scene, L));
   family[1].talks = true;
@@ -1665,7 +1668,7 @@ function interiorWorld(W: World): InteriorParts {
       { name: "Open living room", eye: [-6.2, 1.7, 3.5], target: [-5, 0.95, -1.6] },
       { name: "Chef-inspired kitchen", eye: [2.2, 1.85, 3.4], target: [3.2, 1.1, -1.6] },
       { name: "Owner's suite", eye: [9.2, 1.7, 3.3], target: [10.2, 0.85, -1.8] },
-      { name: "Backyard patio", eye: [14.6, 1.75, 3.0], target: [17, 0.95, -1.6] },
+      { name: "Backyard and pool", eye: [14.2, 2.4, 3.6], target: [19.4, 0.5, -1.6] },
     ],
   };
 }
@@ -2054,43 +2057,92 @@ function furnish(W: World, M: FurnishMats) {
   curtains(7.75, 0.8);
   plant(12.55, -1.1, 1.0, mc(W, "#d9c2a0", 0.3));
 
-  /* The patio: cushioned loungers with a side table, a table under an umbrella, an outdoor rug,
-     planters. */
-  rb(4.0, 0.02, 2.8, 0.08, mc(W, "#4f6f8a", 0.1), 16.6, 0.19, -1.8);
-  for (const z of [-2.8, -1.3]) {
+  /* Out back, neatly laid out: the deck by the house with a dining set under an umbrella and
+     planters; steps down to a stone-paved pool deck with a rectangular pool (coping, steps,
+     ripples), three loungers in a row along its edge with towels and side tables, a pool umbrella;
+     a slatted fence with a clipped hedge along the back, trees beyond, string lights overhead. */
+  const stone = mc(W, "#e7e1d6", 0.25);
+  const joint = mc(W, "#cfc6b8", 0.2);
+  const water = mc(W, "#4fb8d8", 0.85);
+  const waterHi = mc(W, "#8fdcef", 0.85);
+  const tileBand = mc(W, "#2f86a8", 0.5);
+  const hedge = mc(W, "#3f7d3f", 0.25);
+  const slat = mc(W, "#8a6446", 0.3);
+  const towel = M.throwM;
+  // The paved pool deck (light stone in a grid of joints) beside the wood deck.
+  bx(7.6, 0.06, 7.6, stone, 20.2, 0.17, -1.0, 0, false);
+  for (let x = 16.6; x < 24; x += 0.9) bx(0.02, 0.062, 7.6, joint, x, 0.172, -1.0, 0, false);
+  for (let z = -4.6; z < 2.8; z += 0.9) bx(7.6, 0.062, 0.02, joint, 20.2, 0.172, z, 0, false);
+  // The pool: coping round a basin of water, a tiled waterline, corner steps and a few ripples.
+  const px = 20.2;
+  const pz = -2.0;
+  const pw = 5.0;
+  const pd = 2.8;
+  for (const [x, z, w, d] of [[px, pz - pd / 2 - 0.18, pw + 0.72, 0.36], [px, pz + pd / 2 + 0.18, pw + 0.72, 0.36], [px - pw / 2 - 0.18, pz, 0.36, pd], [px + pw / 2 + 0.18, pz, 0.36, pd]] as const) rb(w, 0.08, d, 0.04, M.white, x, 0.23, z);
+  // (The water sits just above the paving, inside the coping, so it reads from the deck.)
+  bx(pw + 0.04, 0.012, pd + 0.04, tileBand, px, 0.206, pz, 0, false);
+  bx(pw - 0.16, 0.014, pd - 0.16, water, px, 0.209, pz, 0, false);
+  for (let i = 0; i < 3; i++) bx(0.8 - i * 0.22, 0.014, 0.5 + i * 0.36, waterHi, px - pw / 2 + 0.45 + i * 0.1, 0.212 + i * 0.002, pz + pd / 2 - 0.33 - i * 0.18, 0, false);
+  for (const [dx, dz, w] of [[-0.9, -0.5, 0.9], [0.6, 0.3, 1.2], [1.6, -0.7, 0.7], [-0.2, 0.9, 0.8]] as const) rb(w, 0.01, 0.05, 0.02, waterHi, px + dx, 0.222, pz + dz);
+  // The ladder at the far end: two steel rails.
+  for (const dz of [-0.25, 0.25]) {
+    const r = W.mesh(torus(gl, 0.18, 0.018, Math.PI, 16, 6), steel, W.scene);
+    r.position.set(px + pw / 2 - 0.05, 0.36, pz + dz);
+    r.rotation.y = Math.PI / 2;
+  }
+  // Three loungers in a row along the near edge, facing the water, a towel on each, side tables between.
+  const loungeZ = pz + pd / 2 + 1.35;
+  [px - 1.6, px, px + 1.6].forEach((x, i) => {
     const ln = node(W.scene);
-    ln.position.set(16.0, 0, z);
-    ln.rotation.y = 0.3;
-    rb(0.7, 0.1, 1.7, 0.03, M.wood, 0, 0.42, 0, 0, 0, ln);
-    rb(0.64, 0.1, 1.2, 0.05, M.white, 0, 0.51, 0.24, 0, 0, ln);
-    rb(0.64, 0.6, 0.1, 0.05, M.white, 0, 0.72, -0.6, 0, -0.6, ln);
-    rb(0.32, 0.22, 0.08, 0.06, M.throwM, 0, 0.82, -0.45, 0, -0.6, ln);
-    for (const sx of [-0.3, 0.3]) for (const sz of [-0.75, 0.75]) cy(0.025, 0.025, 0.24, M.wood, sx, 0.3, sz, 8, ln);
+    ln.position.set(x, 0.2, loungeZ);
+    ln.rotation.y = Math.PI;
+    rb(0.7, 0.08, 1.8, 0.03, M.wood, 0, 0.26, 0, 0, 0, ln);
+    rb(0.64, 0.09, 1.25, 0.05, M.white, 0, 0.34, 0.24, 0, 0, ln);
+    rb(0.64, 0.5, 0.09, 0.04, M.white, 0, 0.5, -0.66, 0, -0.95, ln);
+    rb(0.5, 0.025, 0.7, 0.02, i === 1 ? mc(W, "#f2c14e", 0.2) : towel, 0, 0.395, 0.3, 0, 0, ln);
+    for (const sx of [-0.3, 0.3]) for (const sz of [-0.8, 0.8]) cy(0.025, 0.025, 0.22, M.wood, sx, 0.11, sz, 8, ln);
+  });
+  for (const x of [px - 0.8, px + 0.8]) {
+    cy(0.2, 0.2, 0.03, M.wood, x, 0.62, loungeZ + 0.3, 20);
+    cy(0.022, 0.022, 0.4, M.wood, x, 0.42, loungeZ + 0.3, 8);
+    W.mesh(lathe(gl, [[0, 0], [0.045, 0], [0.05, 0.12], [0, 0.12]], 14), mc(W, "#ff8a6a", 0.5), W.scene).position.set(x, 0.635, loungeZ + 0.3);
   }
-  cy(0.22, 0.22, 0.03, M.wood, 16.95, 0.6, -2.05, 20);
-  cy(0.025, 0.025, 0.4, M.wood, 16.95, 0.4, -2.05, 8);
-  W.mesh(lathe(gl, [[0, 0], [0.04, 0], [0.045, 0.1], [0, 0.1]], 14), mc(W, "#f2c14e", 0.4), W.scene).position.set(16.95, 0.615, -2.05);
-  // A table for four under a canvas umbrella.
-  cy(0.55, 0.55, 0.04, M.wood, 18.2, 0.92, -0.4, 28);
-  cy(0.04, 0.04, 0.72, dark, 18.2, 0.56, -0.4, 10);
-  cy(0.3, 0.32, 0.03, dark, 18.2, 0.215, -0.4, 20);
-  cy(0.02, 0.02, 1.9, dark, 18.2, 1.85, -0.4, 8);
-  W.mesh(lathe(gl, [[0, 0.42], [0.2, 0.36], [1.2, 0], [1.2, -0.03], [0.2, 0.33], [0, 0.39]], 32), mc(W, "#e9dcc6", 0.2), W.scene).position.set(18.2, 2.35, -0.4);
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * TAU + 0.6;
+  // The pool umbrella at the end of the row.
+  const ux = px + 2.85;
+  cy(0.25, 0.28, 0.06, dark, ux, 0.23, loungeZ, 20);
+  cy(0.02, 0.02, 2.1, dark, ux, 1.25, loungeZ, 8);
+  W.mesh(lathe(gl, [[0, 0.42], [0.2, 0.36], [1.25, 0], [1.25, -0.03], [0.2, 0.33], [0, 0.39]], 32), mc(W, "#f4efe6", 0.2), W.scene).position.set(ux, 2.0, loungeZ);
+  // The wood deck by the house: a dining table for four under an umbrella, planters at its corners.
+  const tx = 14.75;
+  const tz = -1.4;
+  cy(0.55, 0.55, 0.04, M.wood, tx, 0.92, tz, 28);
+  cy(0.04, 0.04, 0.72, dark, tx, 0.56, tz, 10);
+  cy(0.3, 0.32, 0.03, dark, tx, 0.215, tz, 20);
+  cy(0.02, 0.02, 1.9, dark, tx, 1.85, tz, 8);
+  W.mesh(lathe(gl, [[0, 0.42], [0.2, 0.36], [1.15, 0], [1.15, -0.03], [0.2, 0.33], [0, 0.39]], 32), mc(W, "#e9dcc6", 0.2), W.scene).position.set(tx, 2.35, tz);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * TAU + Math.PI / 4;
     const ch = node(W.scene);
-    ch.position.set(18.2 + Math.cos(a) * 0.85, 0, -0.4 + Math.sin(a) * 0.85);
+    ch.position.set(tx + Math.cos(a) * 0.82, 0, tz + Math.sin(a) * 0.82);
     ch.rotation.y = -a - Math.PI / 2;
-    rb(0.5, 0.05, 0.48, 0.03, M.wood, 0, 0.62, 0, 0, 0, ch);
-    rb(0.5, 0.5, 0.05, 0.03, M.wood, 0, 0.9, -0.23, 0, -0.1, ch);
-    for (const [sx, sz] of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]] as const) cy(0.02, 0.02, 0.42, dark, sx, 0.4, sz, 8, ch);
+    rb(0.48, 0.05, 0.46, 0.03, M.wood, 0, 0.62, 0, 0, 0, ch);
+    rb(0.48, 0.48, 0.05, 0.03, M.wood, 0, 0.9, -0.22, 0, -0.1, ch);
+    for (const [sx, sz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]] as const) cy(0.02, 0.02, 0.42, dark, sx, 0.4, sz, 8, ch);
   }
-  plant(18.6, -3.4, 1.2, mc(W, "#5b6b7c", 0.4));
-  plant(14, -3.4, 1.0, mc(W, "#5b6b7c", 0.4));
-  plant(14.2, 0.6, 0.8, mc(W, "#c96f4a", 0.4));
+  for (const [x, z] of [[13.6, -3.4], [15.9, -3.4], [13.6, 2.6], [15.9, 2.6]] as const) plant(x, z, 0.85, mc(W, "#5b6b7c", 0.4));
+  // Two steps down from the deck to the pool deck.
+  for (let i = 0; i < 2; i++) bx(0.3, 0.09, 6.0, M.wood, 16.5 + i * 0.3, 0.17 - i * 0.07, -1.0);
+  // The back boundary: a slatted fence on posts, a clipped hedge in front, planters at the corners.
+  for (let x = 13.2; x <= 24.1; x += 1.8) bx(0.12, 1.7, 0.12, slat, x, 0.85, -5.1);
+  for (let r = 0; r < 6; r++) bx(10.9, 0.18, 0.04, slat, 18.65, 0.3 + r * 0.24, -5.06, 0, false);
+  for (let x = 13.6; x < 24; x += 1.05) rb(1.0, 0.7, 0.6, 0.28, hedge, x, 0.55, -4.65);
+  for (let z = -4.4; z < 2.6; z += 1.05) rb(0.6, 0.7, 1.0, 0.28, hedge, 24.2, 0.55, z);
+  plant(23.4, 2.2, 1.1, mc(W, "#5b6b7c", 0.4));
+  plant(17.2, -4.0, 0.8, mc(W, "#c96f4a", 0.4));
+  // String lights over the deck.
   for (let i = 0; i <= 12; i++) {
     const k = i / 12;
-    W.mesh(sphere(gl, 0.05, 8, 6), M.warm, W.scene, false).position.set(13.3 + k * 5.6, 2.7 - Math.sin(k * Math.PI) * 0.45, -3.6 + k * 1.2);
+    W.mesh(sphere(gl, 0.05, 8, 6), M.warm, W.scene, false).position.set(13.2 + k * 3.2, 2.75 - Math.sin(k * Math.PI) * 0.35, -3.6 + k * 6.0);
   }
 }
 
@@ -2361,7 +2413,7 @@ export const homes3dSkills: Skill[] = [
     name: "Room to Room",
     tagline: "One seamless 3D glide through a furnished home: the foyer, the living room (a happy family and their dog), the kitchen, the owner's suite and out to the patio, the rooms named as you arrive.",
     bestFor: "Model homes, home tours and listings: up to 5 room names (else the home's own).",
-    sample: { text: "Step *inside*", items: ["Welcoming foyer", "Open living room", "Chef-inspired kitchen", "Owner's suite", "Backyard patio"] },
+    sample: { text: "Step *inside*", items: ["Welcoming foyer", "Open living room", "Chef-inspired kitchen", "Owner's suite", "Backyard and pool"] },
     itemsHint: "0–5 room names",
     render: homeWalkthrough,
     sfx: () => [at(0.2, "whoosh")],
