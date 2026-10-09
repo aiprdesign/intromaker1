@@ -196,6 +196,61 @@ function qrFor(text: string) {
   return q;
 }
 
+/**
+ * A small scannable tile for an end card: the code for `url` (dark on white, square modules, the
+ * quiet zone kept) with a caption under it, centred on `cx`, its top at `top`, `size` wide. `k`
+ * scales it in (0..1). Returns its height.
+ */
+export function qrTile(ctx: CanvasRenderingContext2D, url: string, cx: number, top: number, size: number, k: number, caption = qrLabel(url)) {
+  const q = qrFor(url);
+  const n = q.size;
+  const quiet = 3;
+  // Whole-pixel modules: crisp edges a camera locks onto, and a tile that sits on the pixel grid.
+  const mod = Math.max(2, Math.floor(size / (n + quiet * 2)));
+  size = mod * (n + quiet * 2);
+  const capH = Math.round(size * 0.17);
+  const th = size + capH;
+  if (k <= 0) return th;
+  ctx.save();
+  ctx.translate(Math.round(cx), Math.round(top + th / 2));
+  ctx.scale(0.85 + 0.15 * k, 0.85 + 0.15 * k);
+  ctx.globalAlpha *= clamp(k * 1.4);
+  ctx.translate(-size / 2, -th / 2);
+  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  ctx.shadowBlur = size * 0.12;
+  ctx.shadowOffsetY = size * 0.04;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(0, 0, size, th, mod * 2.4);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  const ink = "#0c0a16";
+  ctx.fillStyle = ink;
+  const ox = mod * quiet;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.data[r][c]) ctx.fillRect(ox + c * mod, ox + r * mod, mod, mod);
+  // The address it opens, under the code, so a viewer knows where it goes (shrunk to fit).
+  ctx.font = subFont(capH * 0.52, 700);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const cw = ctx.measureText(caption).width;
+  const room = size - mod * quiet;
+  if (cw > room) ctx.font = subFont(Math.max(capH * 0.3, (capH * 0.52 * room) / cw), 700);
+  ctx.fillText(caption, size / 2, size + capH * 0.32);
+  ctx.restore();
+  return th;
+}
+
+/** A link as people read it: no https://, no www., no trailing slash. */
+export function qrLabel(url: string) {
+  return url.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/$/, "");
+}
+
+/** A social handle from contact details ("@slug"), as a profile link: Instagram, the default network. */
+export function socialUrl(contact?: string | null): string | null {
+  const handle = (contact ?? "").match(/(?:^|\s|·)@([A-Za-z0-9_.]{2,30})\b/)?.[1];
+  return handle ? `https://instagram.com/${handle}` : null;
+}
+
 function qrTiming(d: number, beat: number) {
   // The scan lands with the final chord, like the CTA's click (see arrange.ts).
   const scan = ctaClickAt(d, beat);

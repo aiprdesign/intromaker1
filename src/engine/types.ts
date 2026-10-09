@@ -511,6 +511,10 @@ export interface VideoPlan {
   shapeSet?: ShapeSet;
   /** The business's own icons (Lucide names, from the prompt; see charpick motifPick): a pizza, a wrench… */
   motifs?: string[];
+  /** A QR code to the website on the end card (on when there's a website; false turns it off). */
+  endQr?: boolean;
+  /** Where the end card's QR code goes, when not the website (the showcase points at Prodintro.com). */
+  qrUrl?: string;
   /** The watermark line for the "text" set (default: the brand's name). */
   watermark?: string;
   /** Headline text effect chosen in the studio; overrides the template's (look.text). */
@@ -672,6 +676,10 @@ export interface SkillContext {
   shapeSet?: ShapeSet;
   /** The business's own icons (VideoPlan.motifs). */
   motifs?: string[];
+  /** A QR code to the website on the end card (VideoPlan.endQr). */
+  endQr?: boolean;
+  /** Where that QR code goes, when set (VideoPlan.qrUrl). */
+  qrUrl?: string;
   watermark?: string;
   /** The mouse pointer's look (unset: auto). */
   pointer?: PointerStyle;

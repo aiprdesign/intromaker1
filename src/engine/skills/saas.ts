@@ -7,7 +7,7 @@
  */
 import { exitT, lightSweep } from "../fx";
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
-import { tokens } from "../grid";
+import { onGrid, tokens } from "../grid";
 import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, pageBands, segmentShot, snapBands } from "../media";
 import {
   blurInLayout,
@@ -42,6 +42,7 @@ import { ctaClickAt } from "../arrange";
 import { CONCEPT_MAP } from "../concepts";
 import type { Brand, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { parseStat } from "./worlds";
+import { qrTarget, qrTile, socialUrl } from "./endings";
 import { drawCover, mockUi } from "./media";
 
 /* ───────── shared helpers ───────── */
@@ -1709,10 +1710,41 @@ function ctaLockup(sc: SkillContext) {
   const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + (card && !side ? 64 : 80) * u;
   const button = ctaButton(sc, w / 2, by, S, T, { info: !card });
   ctx.restore();
+  let box: { x: number; y: number; w: number; h: number } | null = null;
   if (card) {
     // (Beside the call to action, centred on its column: lock-up to button.)
-    if (side) contactCard(sc, details, w * 0.72, null, (h * 0.2 + by + button.bh / 2) / 2, Math.min(w * 0.4, 740 * u), 1.3, T);
-    else contactCard(sc, details, w / 2, by + button.bh / 2 + 34 * u * S, null, Math.min(w * 0.86, 820 * u * S), S, T);
+    if (side) box = contactCard(sc, details, w * 0.72, null, (h * 0.2 + by + button.bh / 2) / 2, Math.min(w * 0.4, 740 * u), 1.3, T);
+    else box = contactCard(sc, details, w / 2, by + button.bh / 2 + tokens(w, h).space(4) * S, null, Math.min(w * 0.86, 820 * u * S), S, T);
+  }
+  // A QR code to the website, so a viewer can open it from their phone: under the contact card
+  // when there's room, else in the lower corner.
+  // (Where it goes: a set link, else the website, else the social profile.)
+  const url = sc.endQr !== false ? sc.qrUrl || qrTarget({ scene: { ...scene, items: [] }, brand }) || socialUrl(brand?.contact) : null;
+  if (url) {
+    // (Laid out on the design system: grid-step gaps, inside the title-safe area, on whole pixels.)
+    const g = tokens(w, h);
+    const k = clamp(spring(t - (T.button + 0.45), 10, 7), 0, 1.05);
+    const short = Math.min(w, h);
+    const gap = g.space(3);
+    const floor = h - g.safe.bottom;
+    let size = onGrid(short * (h > w ? 0.2 : 0.17), u);
+    let cx: number;
+    let top: number;
+    if (box && box.y + box.h + gap + size * 1.17 <= floor) {
+      // Under the contact card, its right edge on the card's.
+      cx = side ? box.x + box.w - size / 2 : w / 2;
+      top = box.y + box.h + gap;
+    } else if (box && side) {
+      // (Less room under the card: as big as fits down to the safe area.)
+      size = onGrid((floor - (box.y + box.h) - g.space(2)) / 1.17, u);
+      cx = box.x + box.w - size / 2;
+      top = box.y + box.h + g.space(2);
+    } else {
+      // No card: the lower right corner of the safe area.
+      cx = g.safe.right - size / 2;
+      top = floor - size * 1.17;
+    }
+    if (size > short * 0.08) qrTile(ctx, url, cx, top, size, k);
   }
   ctx.restore();
   ctaCursor(sc, w / 2 + shift + button.bw * 0.1, by + 4 * u, T);
@@ -1727,18 +1759,22 @@ const CONTACT_LABEL: Record<string, string> = { Globe: "Website", Phone: "Call",
  * set large (the phone number largest). Rows slide in one after another as the button lands.
  * Centred on `cx`; its top at `top`, or centred on `cy`.
  */
-function contactCard(sc: SkillContext, items: { text: string; icon: string }[], cx: number, top: number | null, cy: number | null, cw: number, S: number, T: ReturnType<typeof ctaTiming>) {
+function contactCard(sc: SkillContext, items: { text: string; icon: string }[], cx: number, top: number | null, cy: number | null, cw: number, S: number, T: ReturnType<typeof ctaTiming>): { x: number; y: number; w: number; h: number } {
   const { ctx, t, u, h, palette } = sc;
-  const pad = 22 * u * S;
-  const rowH = 76 * u * S;
+  // (On the 8pt grid: padding, row height and the card's place snap to the rhythm, on whole pixels.)
+  const g = tokens(sc.w, h);
+  const pad = onGrid(24 * u * S, u);
+  const rowH = onGrid(76 * u * S, u);
   const rows = items.slice(0, 5);
   const ch = pad * 2 + rows.length * rowH;
+  cw = Math.round(cw);
   let y0 = top ?? (cy ?? h / 2) - ch / 2;
-  // (Kept inside the frame: a tall card in a short frame moves up rather than off the bottom.)
-  y0 = Math.min(y0, h - ch - 28 * u);
-  const x0 = cx - cw / 2;
+  // (Kept inside the safe area: a tall card in a short frame moves up rather than off the bottom.)
+  y0 = Math.round(Math.min(y0, h - g.safe.bottom - ch));
+  const x0 = Math.round(cx - cw / 2);
   const k = ease.outCubic(range(t, T.button + 0.05, T.button + 0.55));
-  if (k <= 0) return;
+  const bounds = { x: x0, y: y0, w: cw, h: ch };
+  if (k <= 0) return bounds;
   ctx.save();
   ctx.globalAlpha = k;
   ctx.translate(0, (1 - k) * 18 * u);
@@ -1747,7 +1783,7 @@ function contactCard(sc: SkillContext, items: { text: string; icon: string }[], 
   ctx.shadowOffsetY = 14 * u;
   ctx.fillStyle = palette.light ? "rgba(255,255,255,0.82)" : rgba(mixHex(palette.bg0, "#ffffff", 0.06), 0.72);
   ctx.beginPath();
-  ctx.roundRect(x0, y0, cw, ch, 26 * u * S);
+  ctx.roundRect(x0, y0, cw, ch, g.radius.xl * S);
   ctx.fill();
   ctx.shadowColor = "transparent";
   ctx.strokeStyle = rgba(palette.text, 0.14);
@@ -1799,6 +1835,7 @@ function contactCard(sc: SkillContext, items: { text: string; icon: string }[], 
     ctx.restore();
   });
   ctx.restore();
+  return bounds;
 }
 
 /**

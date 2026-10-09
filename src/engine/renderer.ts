@@ -96,6 +96,8 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   shapes?: VideoPlan["shapes"];
   shapeSet?: VideoPlan["shapeSet"];
   motifs?: VideoPlan["motifs"];
+  endQr?: VideoPlan["endQr"];
+  qrUrl?: VideoPlan["qrUrl"];
   watermark?: VideoPlan["watermark"];
   pointer?: VideoPlan["pointer"];
   title?: VideoPlan["title"];
@@ -249,6 +251,8 @@ function drawSceneOnce(
     shapes: plan.style === "saas" && plan.shapes !== false ? plan.seed >>> 0 : undefined,
     shapeSet: plan.shapeSet,
     motifs: plan.motifs,
+    endQr: plan.endQr !== false,
+    qrUrl: plan.qrUrl,
     watermark: plan.shapeSet === "text" ? watermarkText(plan) : undefined,
     pointer: plan.pointer,
     cast: plan.cast,

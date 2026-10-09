@@ -11,6 +11,7 @@ import { brandPalette } from "@/engine/renderer";
 import { cartoonPick, motifPick, scenePick, themePick, WANTS_CHARACTERS, type CharacterPick } from "@/engine/charpick";
 import CharacterKindPicker, { CHARACTER_NAMES, type CharacterChoice } from "@/components/CharacterKindPicker";
 import ShapesPicker from "@/components/ShapesPicker";
+import { qrLabel, socialUrl } from "@/engine/skills/endings";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
 import TransitionPicker, { TransitionStylePicker, TRANSITION_NAMES } from "@/components/TransitionPicker";
 import type { PlanLimits } from "@/lib/plans";
@@ -316,6 +317,28 @@ export default function Studio() {
   useEffect(() => {
     if ((plan.motionBlur !== false) !== motionBlur) setPlan((p) => ({ ...p, motionBlur: motionBlur ? undefined : false }));
   }, [plan, motionBlur]);
+  // A QR code to the website on the end card: on by default; remembered.
+  const [endQr, setEndQr] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("intromaker.endqr") === "off") setEndQr(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const chooseEndQr = (on: boolean) => {
+    setEndQr(on);
+    try {
+      localStorage.setItem("intromaker.endqr", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if ((plan.endQr !== false) !== endQr) setPlan((p) => ({ ...p, endQr: endQr ? undefined : false }));
+  }, [plan, endQr]);
+  // Where it goes: a set link, else the website, else the social profile.
+  const qrGoesTo = plan.qrUrl || (plan.brand?.domain ? `https://${plan.brand.domain.replace(/^https?:\/\//, "")}` : null) || socialUrl(plan.brand?.contact);
   // 3D slides: real 3D (default) or drawn flat as 2D illustrations; remembered.
   const [flat3d, setFlat3d] = useState(false);
   useEffect(() => {
@@ -2631,6 +2654,24 @@ export default function Studio() {
             </button>
           </div>
           <p className="hint">{motionBlur ? "In the exported video, fast moves streak like a film camera's and still parts stay sharp. The preview stays sharp." : "Exported frames stay pin-sharp, even mid-move."}</p>
+          <label className="field-label">
+            QR code on the end card <span className="tpl-desc">{endQr ? "On" : "Off"}</span>
+          </label>
+          <div className="seg-control">
+            <button className={endQr ? "active" : ""} onClick={() => chooseEndQr(true)}>
+              Show
+            </button>
+            <button className={!endQr ? "active" : ""} onClick={() => chooseEndQr(false)}>
+              Off
+            </button>
+          </div>
+          <p className="hint">
+            {!endQr
+              ? "No QR code on the last slide."
+              : qrGoesTo
+                ? `Viewers scan it to open ${qrLabel(qrGoesTo)} (shown under the code).`
+                : "Add your website or a social handle (@yourname) to the prompt and the end card gets a QR code to it."}
+          </p>
           {/* (Only when the intro has a 3D device or home slide: it's what the switch changes.) */}
           {plan.scenes.some((s) => /^(d3|home)-/.test(s.skill)) && (
             <>

@@ -3110,6 +3110,8 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     setting: (SCENES as readonly string[]).includes(raw.setting as string) ? raw.setting : undefined,
     render3d: raw.render3d === "flat" ? "flat" : undefined,
     shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
+    endQr: raw.endQr === false ? false : undefined,
+    qrUrl: typeof raw.qrUrl === "string" && /^https:\/\/[^\s/]+\.[^\s]{2,}$/.test(raw.qrUrl) && raw.qrUrl.length <= 200 ? raw.qrUrl : undefined,
     motifs: Array.isArray(raw.motifs) ? (raw.motifs as unknown[]).filter((m): m is string => typeof m === "string" && hasIcon(m)).slice(0, 6) : undefined,
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,
     textFx: (TEXT_FX as readonly string[]).includes(raw.textFx as string) ? (raw.textFx as VideoPlan["textFx"]) : undefined,

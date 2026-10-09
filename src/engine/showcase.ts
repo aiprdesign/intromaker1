@@ -52,6 +52,9 @@ function galleryOrder() {
 }
 
 /** `icon`: the business's own icon (a cone, a wrench), else its group's, for the card's tag. */
+/** Where a showcase intro's QR code goes. */
+export const SHOWCASE_QR = "https://prodintro.com";
+
 export type ShowcaseIntro = RandomIntro & { group: ShowcaseGroup; icon: string; plan: VideoPlan };
 
 export function showcaseIntros(): ShowcaseIntro[] {
@@ -76,6 +79,8 @@ export function showcaseIntros(): ShowcaseIntro[] {
     // The niche's colours (cosy browns for a restaurant, red and yellow for pizza…).
     if (r.colors && plan.brand) plan = { ...plan, brand: { ...plan.brand, colors: r.colors } };
     const group = GROUP.get(kind) ?? "Apps";
+    // (The showcase's businesses are made up: their end-card QR codes open Prodintro.com.)
+    plan = { ...plan, qrUrl: SHOWCASE_QR };
     return { ...r, group, icon: plan.motifs?.[0] ?? GROUP_ICONS[group], plan };
   });
 }

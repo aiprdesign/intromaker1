@@ -6577,12 +6577,24 @@ code.secret {
 /* Showcase: icon tabs by business, scrolling sideways on a phone. */
 .show-tabs {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
-  overflow-x: auto;
   padding: 4px 2px 12px;
   margin: 0 0 18px;
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
+}
+/* Phones: one row that swipes sideways, without a scrollbar. */
+@media (max-width: 640px) {
+  .show-tabs {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .show-tabs::-webkit-scrollbar {
+    display: none;
+  }
 }
 .show-tab {
   flex: 0 0 auto;

@@ -27,23 +27,26 @@ function inTemplate(plan: Omit<VideoPlan, "palette" | "font" | "bpm" | "scenes">
 }
 
 export const SAAS_SAMPLE: VideoPlan = inTemplate(
-  { title: "Lumetrik", aspect: "16:9", seed: 1207, brand: { name: "Lumetrik", domain: "lumetrik.app", images: [], videos: [] }, concept: "analytics" },
+  { title: "Lumetrik", aspect: "16:9", qrUrl: "https://prodintro.com", seed: 1207, brand: { name: "Lumetrik", domain: "lumetrik.app", images: [], videos: [] }, concept: "analytics" },
   "midnight",
   [
     [{ role: "hook", skill: "blur-reveal", text: "Your metrics, *finally clear*.", eyebrow: "Introducing Lumetrik", subtext: "Analytics for product teams", transition: "cut" }, 8],
     [{ role: "problem", skill: "pain-strike", text: "There's a *better* way.", items: ["Scattered dashboards", "Weekly CSV exports", "Guesswork"], transition: "dolly" }, 10],
     [{ role: "demo", skill: "ui-tour", text: "Your metrics, *one view*", eyebrow: "The product", items: ["Live funnels", "Shared reports"], transition: "whip" }, 12],
+    [{ role: "demo", skill: "d3-laptop", text: "Meet your new *dashboard*", transition: "dolly" }, 12],
     [{ role: "features", skill: "ai-prompt", text: "Just *ask*.", subtext: "Here's what changed:", items: ["Why did signups dip on Tuesday?", "Mobile checkout errors rose after Monday's release", "Fix shipped, checkout back to normal", "A summary is ready for your team"], transition: "dolly" }, 12],
     [{ role: "features", skill: "chart-grow", text: "Growth you can *see*", subtext: "12,480 weekly active users", transition: "push" }, 9],
     [{ role: "features", skill: "live-cursors", text: "Built for *teams*", subtext: "Looks great, let's ship it", items: ["Q3 roadmap", "Funnel review", "Launch metrics", "Release notes"], transition: "dolly" }, 10],
+    [{ role: "features", skill: "d3-phone", text: "In your *pocket*", transition: "dolly" }, 10],
     [{ role: "features", skill: "integrations", text: "Works with *your stack*", transition: "whip" }, 8],
+    [{ role: "features", skill: "d3-lineup", text: "On your *screens*", transition: "dolly" }, 10],
     [{ role: "cta", skill: "cta", text: "Start with *Lumetrik*", subtext: "Get started", transition: "dolly" }, 8],
   ],
 );
 
 /** A speed promo made only of fast type slides: words switching on the half-beat, cut on the beat. */
 export const SPEED_SAMPLE: VideoPlan = inTemplate(
-  { title: "Lumetrik", aspect: "16:9", seed: 4410, brand: { name: "Lumetrik", domain: "lumetrik.app", images: [], videos: [] }, concept: "analytics" },
+  { title: "Lumetrik", aspect: "16:9", qrUrl: "https://prodintro.com", seed: 4410, brand: { name: "Lumetrik", domain: "lumetrik.app", images: [], videos: [] }, concept: "analytics" },
   "pop",
   [
     [{ role: "hook", skill: "crash-zoom", text: "Meet *Lumetrik*", items: ["Data", "Charts", "Answers"], subtext: "Analytics for product teams", transition: "cut" }, 9],
@@ -102,7 +105,7 @@ export const SAMPLE_FILMS = [
     id: "saas",
     label: "SaaS launch",
     plan: SAAS_SAMPLE,
-    blurb: "Lumetrik is an imaginary analytics app. Its launch video covers a hook, the problem, a product tour, an AI answer, live charts, teamwork, integrations and a call to action.",
+    blurb: "Lumetrik is an imaginary analytics app. Its launch video covers a hook, the problem, a product tour, a real 3D laptop, an AI answer, live charts, the phone app, teamwork, integrations, a 3D device lineup and a call to action.",
     prompt: 'Launch video for "Lumetrik", an analytics app for product teams. Dashboards, AI insights, team sharing',
   },
   {

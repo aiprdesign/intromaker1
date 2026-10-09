@@ -72,7 +72,7 @@ export default function ShowcaseGallery() {
                 <pre>{x.prompt}</pre>
               </details>
               <div className="show-links">
-                <Link className="skill-use" href={`/studio#plan=${encodePlan(x.plan)}`}>
+                <Link className="skill-use" href={`/studio#plan=${encodePlan({ ...x.plan, qrUrl: undefined })}`}>
                   Edit this intro →
                 </Link>
                 <Link className="skill-use" href={`/studio?prompt=${encodeURIComponent(x.prompt)}`}>
@@ -92,7 +92,7 @@ export default function ShowcaseGallery() {
                 <strong>{open.name}</strong> <span className="show-muted">· {open.kind}</span>
               </div>
               <div className="show-links">
-                <Link className="btn btn-primary" href={`/studio#plan=${encodePlan(open.plan)}`}>
+                <Link className="btn btn-primary" href={`/studio#plan=${encodePlan({ ...open.plan, qrUrl: undefined })}`}>
                   Edit this intro
                 </Link>
                 <button className="btn btn-ghost" onClick={() => setOpen(null)}>
