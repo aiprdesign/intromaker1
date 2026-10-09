@@ -44,6 +44,7 @@ import { useNarration } from "@/components/useNarration";
 import { writeVoiceover } from "@/engine/script";
 import { DEFAULT_VOICE, speakable, wordBudget } from "@/engine/voice";
 import { EXAMPLE_PROMPTS, HERO_PLAN } from "@/engine/demos";
+import { randomIntro } from "@/engine/surprise";
 import { PALETTES } from "@/engine/palettes";
 import { assetUrl, extractBrandColors, extractLogoColors } from "@/engine/media";
 import { ANGLES, LENGTHS, decodePlan, encodePlan, isLength, parseSaasPrompt, planFromPrompt, planFromSite, safePlan, sanitizePlan, type Angle, type Length, type StyleChoice } from "@/engine/planner";
@@ -981,6 +982,15 @@ export default function Studio() {
     setEngineLabel(take.engineLabel);
   };
 
+  // A random intro: a made-up brand on a random topic, so you can see what the studio does
+  // (each topic leads the director to the slides it shows best). Not the same topic twice running.
+  const lastTopicRef = useRef<string | undefined>(undefined);
+  const surprise = () => {
+    const r = randomIntro(Math.random, lastTopicRef.current);
+    lastTopicRef.current = r.kind;
+    setPrompt(r.prompt);
+    void generate({ prompt: r.prompt, seed: Math.floor(Math.random() * 1e9) });
+  };
   const generate = async (opts: GenOpts = {}) => {
     const { run, signal } = opts.signal ? { run: runRef.current, signal: opts.signal } : startRun();
     // A film from another website or prompt picks its own best style; the same one keeps your pick.
@@ -2353,6 +2363,19 @@ export default function Studio() {
             }}
           />
           <PromptMeter text={prompt} optional={!!site} />
+          {!site && (
+            <div className="random-row">
+              <button
+                className="btn btn-ghost random-intro"
+                onClick={surprise}
+                disabled={loading || importing || remaking || takesLoading}
+                title="A random topic with a made-up brand: see the kinds of intros and slides the studio can make"
+              >
+                🎲 Random intro
+              </button>
+              <span className="hint">A random topic, to see what it can do</span>
+            </div>
+          )}
           {!site && (
             <details className="examples-fold">
               <summary>Example prompts</summary>

@@ -1579,6 +1579,17 @@ textarea {
 .field-label.inline {
   margin-top: 0;
 }
+.random-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 2px;
+}
+.random-row .random-intro {
+  padding: 6px 12px;
+  font-size: 13px;
+}
 .examples-fold summary {
   cursor: pointer;
   font-size: 12.5px;
