@@ -48,7 +48,7 @@ export default function SkillGrid({ limit, pickers = false, group, ids, swipe = 
           return (
             <article className="skill-card" key={s.id} id={!group && pickers ? ANCHORS.get(s.id) : undefined}>
               <div className="skill-canvas">
-                <LoopCanvas scene={scene} plan={{ style: saasAll || i < 10 ? "saas" : "trailer", palette: pal, font: saasAll || i < 10 ? "inter" : i % 3 === 1 ? "grotesk" : "anton", seed: 77 + i }} long={640} />
+                <LoopCanvas scene={scene} plan={{ style: saasAll || i < 10 ? "saas" : "trailer", palette: pal, font: saasAll || i < 10 ? "inter" : i % 3 === 1 ? "grotesk" : "anton", seed: 77 + i }} long={640} live3d />
               </div>
               <div className="skill-meta">
                 <div className="skill-head">

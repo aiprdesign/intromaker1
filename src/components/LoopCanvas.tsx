@@ -11,7 +11,7 @@ import { schedulePreview } from "./previewScheduler";
 import { useVisible } from "./useVisible";
 
 type Props =
-  | { plan: VideoPlan; scene?: undefined; long?: number; fps?: number; className?: string; /** A still poster frame, no animation. */ still?: boolean }
+  | { plan: VideoPlan; scene?: undefined; long?: number; fps?: number; className?: string; /** A still poster frame, no animation. */ still?: boolean; /** Play 3D slides live too (showcase pages). */ live3d?: boolean }
   | {
       scene: Scene;
       plan: Pick<VideoPlan, "palette" | "font" | "seed"> & Partial<Pick<VideoPlan, "style" | "look" | "bpm" | "brand" | "product" | "title" | "trailerStyle" | "shapes" | "shapeSet" | "motifs" | "watermark">>;
@@ -19,14 +19,15 @@ type Props =
       fps?: number;
       className?: string;
       still?: boolean;
+      live3d?: boolean;
     };
 
 /**
  * Autoplaying, looping render of a plan or a single scene. Pauses offscreen and in hidden tabs, and
  * shares one frame budget with the page's other previews (see previewScheduler). 3D slides (devices
- * and homes) aren't animated in previews: a 3D slide shows one still frame, and a video's preview
- * holds a still of each 3D slide while its other slides play, so the 3D engine never slows the
- * page's other previews.
+ * and homes) aren't animated in pickers and menus: a 3D slide shows one still frame, and a video's
+ * preview holds a still of each 3D slide while its other slides play, so the 3D engine never slows
+ * the studio. Showcase pages pass `live3d`, and there 3D slides play like the rest.
  */
 export default function LoopCanvas(props: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -56,7 +57,7 @@ export default function LoopCanvas(props: Props) {
     }
     const t = time < 0 ? 3 : time % totalDuration(p.plan);
     const at = sceneAt(p.plan, t);
-    if (at && THREE_D_SKILLS.has(at.scene.skill)) {
+    if (at && !p.live3d && THREE_D_SKILLS.has(at.scene.skill)) {
       const S = stills.current;
       if (S.plan !== p.plan) {
         S.plan = p.plan;
@@ -112,8 +113,8 @@ export default function LoopCanvas(props: Props) {
     };
   }, []);
 
-  // A single 3D slide stays on its poster frame.
-  const flat3d = (!!props.scene && THREE_D_SKILLS.has(props.scene.skill)) || !!props.still;
+  // A single 3D slide stays on its poster frame (unless the page shows 3D live).
+  const flat3d = (!!props.scene && !props.live3d && THREE_D_SKILLS.has(props.scene.skill)) || !!props.still;
   useEffect(() => {
     if (!visible || !shown || still || flat3d) return;
     let stop = () => {};

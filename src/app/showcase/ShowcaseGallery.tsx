@@ -52,7 +52,7 @@ export default function ShowcaseGallery() {
         {shown.map((x) => (
           <article className="skill-card show-card" key={x.kind}>
             <button className="skill-canvas show-play" onClick={() => setOpen(x)} aria-label={`Watch the ${x.name} intro larger`}>
-              <LoopCanvas plan={x.plan} long={640} />
+              <LoopCanvas plan={x.plan} long={640} live3d />
             </button>
             <div className="skill-meta">
               <div className="skill-head">
@@ -86,7 +86,7 @@ export default function ShowcaseGallery() {
       {open && (
         <div className="show-modal" role="dialog" aria-modal="true" aria-label={`${open.name} intro`} onClick={() => setOpen(null)}>
           <div className="show-modal-box" onClick={(e) => e.stopPropagation()}>
-            <LoopCanvas plan={open.plan} long={1280} className="show-modal-canvas" />
+            <LoopCanvas plan={open.plan} long={1280} className="show-modal-canvas" live3d />
             <div className="show-modal-bar">
               <div>
                 <strong>{open.name}</strong> <span className="show-muted">· {open.kind}</span>
