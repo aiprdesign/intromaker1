@@ -9,7 +9,7 @@
 import { clamp, ease, mixHex, rgba, rng, TAU } from "./math";
 import type { Palette, SkillContext } from "./types";
 
-export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house", "salon", "restaurant", "bakery", "garage", "gym", "yoga", "florist", "bookstore", "hotel", "asian", "antique", "thrift", "music", "repair", "church"] as const;
+export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house", "salon", "restaurant", "bakery", "garage", "gym", "yoga", "florist", "bookstore", "hotel", "asian", "antique", "thrift", "music", "repair", "church", "roofing", "plumbing", "lawn", "cleaning", "icecream"] as const;
 export type SceneBackdrop = (typeof SCENES)[number];
 
 type C = CanvasRenderingContext2D;
@@ -2102,7 +2102,352 @@ function church(sc: SkillContext) {
   }
 }
 
-const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house, salon, restaurant, bakery, garage, gym, yoga, florist, bookstore, hotel, asian, antique, thrift, music, repair, church };
+/** Outdoors: the sky, soft hills and a lawn from `ground` down. */
+function yard(ctx: C, w: number, h: number, T: number, u: number, seed: number, ground: number, pal: Palette) {
+  sky(ctx, w, h, T, u, seed);
+  ctx.fillStyle = mixHex("#bfe3b0", pal.secondary, 0.1);
+  ctx.beginPath();
+  ctx.ellipse(w * 0.2, ground, w * 0.4, h * 0.12, 0, Math.PI, 0);
+  ctx.ellipse(w * 0.85, ground, w * 0.35, h * 0.1, 0, Math.PI, 0);
+  ctx.fill();
+  const lawn = ctx.createLinearGradient(0, ground, 0, h);
+  lawn.addColorStop(0, "#8fd17a");
+  lawn.addColorStop(1, "#6fbf62");
+  ctx.fillStyle = lawn;
+  ctx.fillRect(0, ground, w, h - ground);
+}
+
+/** A roofing job: a house half re-roofed (fresh shingles meeting old), a ladder, shingle bundles and a safety cone. */
+function roofing(sc: SkillContext) {
+  const { ctx, w, h, u, seed, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const ground = h * 0.76;
+  yard(ctx, w, h, T, u, seed, ground, palette);
+  const port = h > w;
+  const HW = port ? w * 0.7 : w * 0.4;
+  const hx = port ? w * 0.5 : w * 0.28;
+  drawHouse(ctx, hx, ground, HW, 1, T, palette, u);
+  // Fresh shingle rows over part of the roof, in the brand's dark tone, laid course by course.
+  const roofTop = ground - HW * 0.95;
+  const roofBase = ground - HW * 0.52;
+  const done = 0.55 + 0.1 * Math.sin(T * 0.3);
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(hx - HW * 0.58, roofBase);
+  ctx.lineTo(hx, roofTop);
+  ctx.lineTo(hx + HW * 0.58, roofBase);
+  ctx.closePath();
+  ctx.clip();
+  const sh = mixHex(palette.primary, "#2b2f38", 0.6);
+  for (let y = roofBase, r = 0; y > roofTop; y -= 12 * u, r++) {
+    for (let x = hx - HW * 0.6 + (r % 2) * 10 * u; x < hx - HW * 0.6 + HW * 1.2 * done; x += 20 * u) box(ctx, x, y - 11 * u, 19 * u, 11 * u, 2 * u, r % 2 ? sh : mixHex(sh, "#000000", 0.12));
+  }
+  ctx.restore();
+  // A ladder against the eaves.
+  const lx = hx + HW * 0.52;
+  ctx.strokeStyle = "#c9a227";
+  ctx.lineWidth = 5 * u;
+  ctx.beginPath();
+  ctx.moveTo(lx, ground);
+  ctx.lineTo(lx - HW * 0.06, roofBase - 10 * u);
+  ctx.moveTo(lx + 22 * u, ground);
+  ctx.lineTo(lx + 22 * u - HW * 0.06, roofBase - 10 * u);
+  for (let i = 1; i < 8; i++) {
+    const f = i / 8;
+    const y = ground - f * (ground - roofBase + 10 * u);
+    ctx.moveTo(lx - HW * 0.06 * f, y);
+    ctx.lineTo(lx + 22 * u - HW * 0.06 * f, y);
+  }
+  ctx.stroke();
+  // Shingle bundles on a pallet and a cone.
+  const bx = port ? w * 0.1 : w * 0.66;
+  box(ctx, bx, ground - 8 * u, w * 0.12, 8 * u, 2 * u, "#a87b57");
+  for (let i = 0; i < 4; i++) box(ctx, bx + 4 * u, ground - 8 * u - (i + 1) * 14 * u, w * 0.12 - 8 * u, 12 * u, 3 * u, i % 2 ? sh : mixHex(sh, "#ffffff", 0.15));
+  ctx.fillStyle = "#f77f00";
+  ctx.beginPath();
+  ctx.moveTo(w * 0.9, ground - h * 0.08);
+  ctx.lineTo(w * 0.87, ground);
+  ctx.lineTo(w * 0.93, ground);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(w * 0.884, ground - h * 0.05, w * 0.032, 5 * u);
+}
+
+/** A plumber's job: a bathroom wall, the cabinet open under the sink showing pipes, a toolbox and a wrench. */
+function plumbing(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eef6f8", "#dcebef"], ["#d8dde3", "#c7cdd5"], u);
+  // Tiles on the wall.
+  ctx.strokeStyle = "rgba(120,150,170,0.18)";
+  ctx.lineWidth = 1.5 * u;
+  for (let y = h * 0.12; y < fy; y += 34 * u) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  for (let x = 0; x < w; x += 34 * u) {
+    ctx.beginPath();
+    ctx.moveTo(x, h * 0.12);
+    ctx.lineTo(x, fy);
+    ctx.stroke();
+  }
+  // The vanity on the left with its doors open, the trap and pipes inside, a basin and tap on top.
+  const vx = w * 0.04;
+  const vw = w * 0.26;
+  box(ctx, vx, fy - h * 0.24, vw, h * 0.24, 6 * u, "#f3ead7");
+  box(ctx, vx + 10 * u, fy - h * 0.21, vw - 20 * u, h * 0.19, 4 * u, "#3a3f4c");
+  ctx.strokeStyle = "#c9ced6";
+  ctx.lineWidth = 9 * u;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(vx + vw * 0.5, fy - h * 0.21);
+  ctx.lineTo(vx + vw * 0.5, fy - h * 0.13);
+  ctx.quadraticCurveTo(vx + vw * 0.5, fy - h * 0.08, vx + vw * 0.6, fy - h * 0.08);
+  ctx.quadraticCurveTo(vx + vw * 0.7, fy - h * 0.08, vx + vw * 0.7, fy - h * 0.13);
+  ctx.lineTo(vx + vw * 0.86, fy - h * 0.13);
+  ctx.stroke();
+  // A drip, now and then.
+  const drip = (T * 0.8) % 1;
+  ctx.fillStyle = "rgba(90,170,230,0.85)";
+  ctx.beginPath();
+  ctx.ellipse(vx + vw * 0.6, fy - h * 0.06 + drip * h * 0.04, 4 * u, 6 * u, 0, 0, TAU);
+  ctx.fill();
+  box(ctx, vx - 6 * u, fy - h * 0.26, vw + 12 * u, h * 0.025, 4 * u, "#ffffff");
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.ellipse(vx + vw * 0.5, fy - h * 0.26, vw * 0.3, h * 0.03, 0, Math.PI, 0);
+  ctx.fill();
+  box(ctx, vx + vw * 0.47, fy - h * 0.34, 12 * u, h * 0.08, 4 * u, "#b8bec9");
+  box(ctx, vx + vw * 0.47, fy - h * 0.34, vw * 0.12, 10 * u, 4 * u, "#b8bec9");
+  // A mirror above.
+  box(ctx, vx + vw * 0.15, h * 0.12, vw * 0.7, h * 0.22, 10 * u, "rgba(200,225,238,0.85)");
+  // A toolbox in the brand's colour and a wrench on the floor, on the right.
+  const tx = w * 0.72;
+  box(ctx, tx, fy - h * 0.1, w * 0.16, h * 0.1, 6 * u, palette.primary);
+  box(ctx, tx, fy - h * 0.1, w * 0.16, h * 0.025, 4 * u, mixHex(palette.primary, "#000000", 0.2));
+  ctx.strokeStyle = "#3a3f4c";
+  ctx.lineWidth = 5 * u;
+  ctx.beginPath();
+  ctx.arc(tx + w * 0.08, fy - h * 0.1, w * 0.03, Math.PI, 0);
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(w * 0.62, fy + h * 0.06);
+  ctx.rotate(-0.3);
+  box(ctx, -w * 0.06, -5 * u, w * 0.12, 10 * u, 4 * u, "#9aa0ad");
+  ctx.fillStyle = "#9aa0ad";
+  ctx.beginPath();
+  ctx.arc(w * 0.06, 0, 13 * u, 0.6, TAU - 0.6);
+  ctx.fill();
+  ctx.restore();
+  // A coiled hose on the wall at the right.
+  ctx.strokeStyle = palette.accent;
+  ctx.lineWidth = 6 * u;
+  for (let k = 0; k < 3; k++) {
+    ctx.beginPath();
+    ctx.ellipse(w * 0.92, h * 0.3, (30 + k * 8) * u, (24 + k * 6) * u, 0, 0, TAU);
+    ctx.stroke();
+  }
+}
+
+/** Lawn care: freshly mown stripes, a mower, trimmed hedges, flower beds and a white fence. */
+function lawn(sc: SkillContext) {
+  const { ctx, w, h, u, seed, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const ground = h * 0.62;
+  yard(ctx, w, h, T, u, seed, ground, palette);
+  // Mower stripes across the lawn, in perspective.
+  for (let i = 0; i < 12; i++) {
+    ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.08)" : "rgba(0,60,0,0.06)";
+    ctx.beginPath();
+    ctx.moveTo(w * (i / 12), ground);
+    ctx.lineTo(w * ((i + 1) / 12), ground);
+    ctx.lineTo(w * ((i + 1) / 12) + (w * ((i + 1) / 12) - w / 2) * 0.6, h);
+    ctx.lineTo(w * (i / 12) + (w * (i / 12) - w / 2) * 0.6, h);
+    ctx.fill();
+  }
+  // A white fence along the back.
+  ctx.fillStyle = "#ffffff";
+  for (let x = 0; x < w; x += 24 * u) box(ctx, x, ground - h * 0.08, 12 * u, h * 0.08, 5 * u, "#ffffff");
+  ctx.fillRect(0, ground - h * 0.06, w, 5 * u);
+  // Clipped hedges and a flower bed at both sides.
+  const colors = [palette.primary, "#ffd166", "#ff8fab", palette.accent, "#ffffff"];
+  for (const [x, wd] of [[w * 0.0, w * 0.22], [w * 0.78, w * 0.22]] as const) {
+    box(ctx, x, ground - h * 0.12, wd, h * 0.12, 22 * u, "#3f8f4e");
+    box(ctx, x + 6 * u, ground - h * 0.115, wd - 12 * u, h * 0.03, 12 * u, "rgba(255,255,255,0.12)");
+    for (let i = 0; i < 9; i++) {
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.beginPath();
+      ctx.arc(x + 14 * u + i * (wd - 28 * u) / 8, ground + h * 0.02 + Math.sin(T * 1.4 + i) * 1.5 * u, 7 * u, 0, TAU);
+      ctx.fill();
+    }
+  }
+  // The mower, crossing slowly.
+  const mx = w * 0.3 + ((T * 30 * u) % (w * 0.4));
+  const my = ground + h * 0.18;
+  box(ctx, mx - 40 * u, my - 26 * u, 80 * u, 30 * u, 8 * u, palette.primary);
+  box(ctx, mx - 30 * u, my - 38 * u, 50 * u, 14 * u, 6 * u, mixHex(palette.primary, "#000000", 0.2));
+  ctx.strokeStyle = "#3a3f4c";
+  ctx.lineWidth = 4 * u;
+  ctx.beginPath();
+  ctx.moveTo(mx - 36 * u, my - 22 * u);
+  ctx.lineTo(mx - 80 * u, my - 80 * u);
+  ctx.lineTo(mx - 100 * u, my - 80 * u);
+  ctx.stroke();
+  for (const dx of [-28, 28]) {
+    ctx.fillStyle = "#2b2f38";
+    ctx.beginPath();
+    ctx.arc(mx + dx * u, my + 6 * u, 10 * u, 0, TAU);
+    ctx.fill();
+  }
+  // A tree at the side.
+  ctx.fillStyle = "#8a5a3b";
+  ctx.fillRect(w * 0.92 - 6 * u, ground - h * 0.3, 12 * u, h * 0.2);
+  ctx.fillStyle = "#4caf6a";
+  ctx.beginPath();
+  ctx.arc(w * 0.92 + Math.sin(T) * 2 * u, ground - h * 0.34, h * 0.1, 0, TAU);
+  ctx.fill();
+}
+
+/** A cleaning job: a bright room sparkling, a mop and bucket, spray bottles, a caddy and rising bubbles. */
+function cleaning(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f4fbfb", "#e4f3f2"], ["#e8e1d6", "#d9d0c2"], u);
+  windowPane(ctx, w * 0.05, h * 0.14, w * 0.16, h * 0.32, u, T);
+  // A wet-floor shine under the mop.
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.beginPath();
+  ctx.ellipse(w * 0.3, fy + h * 0.12, w * 0.14, h * 0.035, 0, 0, TAU);
+  ctx.fill();
+  // The bucket and a mop leaning on it.
+  box(ctx, w * 0.22, fy + h * 0.02, w * 0.08, h * 0.1, 8 * u, palette.primary);
+  box(ctx, w * 0.215, fy + h * 0.02, w * 0.09, h * 0.015, 4 * u, mixHex(palette.primary, "#ffffff", 0.3));
+  ctx.strokeStyle = "#c9a227";
+  ctx.lineWidth = 5 * u;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.33, fy + h * 0.1);
+  ctx.lineTo(w * 0.38, fy - h * 0.3);
+  ctx.stroke();
+  ctx.fillStyle = "#e9ecef";
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.ellipse(w * 0.33 + (i - 2.5) * 5 * u, fy + h * 0.115, 4 * u, 12 * u, (i - 2.5) * 0.15, 0, TAU);
+    ctx.fill();
+  }
+  // A caddy of spray bottles on a side table, right.
+  const tx = w * 0.72;
+  box(ctx, tx, fy - h * 0.14, w * 0.22, h * 0.02, 3 * u, "#c79b74");
+  box(ctx, tx + 8 * u, fy - h * 0.12, 6 * u, h * 0.12, 2 * u, "#a87b57");
+  box(ctx, tx + w * 0.22 - 14 * u, fy - h * 0.12, 6 * u, h * 0.12, 2 * u, "#a87b57");
+  const colors = [palette.primary, palette.accent, "#7bdff2", "#ffd166"];
+  for (let i = 0; i < 4; i++) {
+    const bx = tx + 20 * u + i * w * 0.045;
+    box(ctx, bx, fy - h * 0.24, w * 0.03, h * 0.1, 6 * u, colors[i]);
+    box(ctx, bx + w * 0.005, fy - h * 0.27, w * 0.02, h * 0.03, 3 * u, "#ffffff");
+    box(ctx, bx + w * 0.02, fy - h * 0.265, w * 0.018, 6 * u, 2 * u, "#ffffff");
+  }
+  // Bubbles drifting up, and sparkles twinkling on clean surfaces.
+  const r = rng(77);
+  for (let i = 0; i < 14; i++) {
+    const bx = w * (0.08 + r() * 0.84);
+    if (bx > w * 0.36 && bx < w * 0.64) continue;
+    const y = fy - ((T * (20 + r() * 25) * u + r() * h) % (fy * 0.9));
+    const rad = (6 + r() * 10) * u;
+    ctx.strokeStyle = "rgba(120,190,230,0.55)";
+    ctx.lineWidth = 1.5 * u;
+    ctx.beginPath();
+    ctx.arc(bx + Math.sin(T + i) * 6 * u, y, rad, 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.beginPath();
+    ctx.arc(bx + Math.sin(T + i) * 6 * u - rad * 0.35, y - rad * 0.35, rad * 0.22, 0, TAU);
+    ctx.fill();
+  }
+  for (const [sx, sy, k] of [[0.13, 0.2, 0], [0.8, 0.5, 1.3], [0.24, 0.66, 2.1], [0.9, 0.62, 3]] as const) {
+    const a = 0.5 + 0.5 * Math.sin(T * 2.2 + k);
+    const sz = (8 + 6 * a) * u;
+    ctx.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * a})`;
+    ctx.beginPath();
+    ctx.moveTo(w * sx, h * sy - sz);
+    ctx.lineTo(w * sx + sz * 0.25, h * sy - sz * 0.25);
+    ctx.lineTo(w * sx + sz, h * sy);
+    ctx.lineTo(w * sx + sz * 0.25, h * sy + sz * 0.25);
+    ctx.lineTo(w * sx, h * sy + sz);
+    ctx.lineTo(w * sx - sz * 0.25, h * sy + sz * 0.25);
+    ctx.lineTo(w * sx - sz, h * sy);
+    ctx.lineTo(w * sx - sz * 0.25, h * sy - sz * 0.25);
+    ctx.fill();
+  }
+}
+
+/** An ice cream parlour: pastel stripes, a freezer case of colourful tubs, a big cone sign and stools. */
+function icecream(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#fff4f7", "#ffe8ef"], ["#f2e6da", "#e6d6c6"], u);
+  // Pastel candy stripes on the wall.
+  const stripe = [mixHex(palette.primary, "#ffffff", 0.82), "rgba(255,255,255,0)"];
+  for (let x = 0, i = 0; x < w; x += 40 * u, i++) {
+    ctx.fillStyle = stripe[i % 2];
+    ctx.fillRect(x, 14 * u, 40 * u, fy - h * 0.22);
+  }
+  box(ctx, 0, fy - h * 0.22, w, 8 * u, 0, mixHex(palette.primary, "#ffffff", 0.5));
+  // A big cone sign on the left, gently bobbing.
+  const cx = w * 0.12;
+  const cy = h * 0.28 + Math.sin(T * 1.3) * 4 * u;
+  ctx.fillStyle = "#e0b26b";
+  ctx.beginPath();
+  ctx.moveTo(cx - 34 * u, cy);
+  ctx.lineTo(cx + 34 * u, cy);
+  ctx.lineTo(cx, cy + 100 * u);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(150,100,40,0.5)";
+  ctx.lineWidth = 2 * u;
+  for (let k = -2; k <= 2; k++) {
+    ctx.beginPath();
+    ctx.moveTo(cx + k * 14 * u, cy);
+    ctx.lineTo(cx + k * 4 * u, cy + 70 * u);
+    ctx.stroke();
+  }
+  for (const [dx, dy, c] of [[-16, -10, "#ff8fab"], [16, -10, "#7bdff2"], [0, -34, palette.primary]] as const) {
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(cx + dx * u, cy + dy * u, 28 * u, 0, TAU);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#d62828";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 62 * u, 8 * u, 0, TAU);
+  ctx.fill();
+  // The freezer case on the right: tubs of flavours under the glass.
+  const fx = w * 0.64;
+  const fw = w * 0.34;
+  box(ctx, fx, fy - h * 0.22, fw, h * 0.22, 8 * u, "#ffffff");
+  box(ctx, fx + 8 * u, fy - h * 0.21, fw - 16 * u, h * 0.1, 6 * u, "rgba(220,240,250,0.9)");
+  const flavours = ["#fff3d6", "#ff8fab", "#7bdff2", "#8b5a3c", "#b9f3c4", palette.primary, "#ffd166", "#c8a2ff"];
+  for (let i = 0; i < 8; i++) {
+    const tx = fx + 14 * u + (i % 4) * (fw - 28 * u) / 4;
+    const ty = fy - h * 0.2 + Math.floor(i / 4) * h * 0.045;
+    box(ctx, tx, ty, (fw - 28 * u) / 4 - 8 * u, h * 0.035, 6 * u, flavours[i]);
+  }
+  box(ctx, fx - 4 * u, fy - h * 0.23, fw + 8 * u, 10 * u, 4 * u, mixHex(palette.primary, "#ffffff", 0.3));
+  // Stools at a little counter on the left.
+  for (const x of [w * 0.22, w * 0.3]) {
+    ctx.fillStyle = "#b8bec9";
+    ctx.fillRect(x - 3 * u, fy - h * 0.1, 6 * u, h * 0.1);
+    ctx.fillStyle = palette.primary;
+    ctx.beginPath();
+    ctx.ellipse(x, fy - h * 0.1, 22 * u, 8 * u, 0, 0, TAU);
+    ctx.fill();
+  }
+}
+
+const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house, salon, restaurant, bakery, garage, gym, yoga, florist, bookstore, hotel, asian, antique, thrift, music, repair, church, roofing, plumbing, lawn, cleaning, icecream };
 
 /** Draw a cartoon scene background, if `backdrop` is one. Returns whether it drew. */
 export function sceneStage(sc: SkillContext, backdrop: string | undefined, opts: { bare?: boolean } = {}) {

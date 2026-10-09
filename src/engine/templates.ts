@@ -1641,6 +1641,11 @@ const INDUSTRY_ROLES: Partial<Record<NonNullable<VideoPlan["setting"]>, Partial<
   music: { features: "ind-shop", demo: "ind-shop" },
   repair: { features: "ind-shop", demo: "ind-shop" },
   church: { features: "ind-team", how: "ind-team" },
+  roofing: { how: "ind-site", features: "ind-build" },
+  plumbing: { features: "ind-shop", demo: "ind-shop" },
+  lawn: { how: "ind-route", features: "ind-shop" },
+  cleaning: { how: "ind-route", features: "ind-shop" },
+  icecream: { features: "ind-menu", demo: "ind-menu" },
 };
 
 /** Character slides that read well without a list of points (a crowd under the headline, a sign). */

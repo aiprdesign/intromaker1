@@ -67,6 +67,11 @@ export function scenePick(prompt: string): VideoPlan["setting"] {
   if (/\b(florists?|flower shops?|flowers?|bouquets?|plant shops?|garden cent(?:re|er)s?)\b/.test(p)) return "florist";
   if (/\b(bookstores?|bookshops?|books|used books|librar(?:y|ies)|book clubs?)\b/.test(p)) return "bookstore";
   if (/\b(hotels?|inns?|bed and breakfast|b&bs?|motels?|guest ?houses?|resorts?|lodges?|vacation rentals?)\b/.test(p)) return "hotel";
+  if (/\b(roof(?:ers?|ing|s)?|shingles?|gutters?)\b/.test(p)) return "roofing";
+  if (/\b(plumb(?:ers?|ing)|drains?|water heaters?|leaks?|pipes?)\b/.test(p)) return "plumbing";
+  if (/\b(lawns?|lawn care|mowing|landscap(?:ing|ers?)|gardeners?|yard work|hedges?|tree trimming)\b/.test(p)) return "lawn";
+  if (/\b(cleaning (?:company|service|services)|cleaners?|maid services?|janitorial|house ?keeping|deep cleans?|move-out cleans?)\b/.test(p)) return "cleaning";
+  if (/\b(ice ?cream|gelato|frozen yogh?urt|creamer(?:y|ies)|sundaes?|scoops?)\b/.test(p)) return "icecream";
   if (/\b(churche?s?|chapels?|parish(?:es)?|congregations?|ministr(?:y|ies)|worship|sunday services?)\b/.test(p)) return "church";
   if (/\b(music (?:shops?|stores?)|guitars?|instruments?|music lessons?|drums?|pianos?|vinyl|record (?:shops?|stores?))\b/.test(p)) return "music";
   if (/\b(phone repairs?|screen repairs?|cell ?phone|iphone|computer repairs?|laptop repairs?|electronics repairs?|device repairs?|tablet repairs?)\b/.test(p)) return "repair";
