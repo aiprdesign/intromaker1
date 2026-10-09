@@ -33,7 +33,7 @@ Prodintro.com is proprietary software (see LICENSE); it is built with the third-
 ## Not shipped
 
 - `@img/sharp*`: Optional image optimiser installed by Next.js (libvips, LGPL-3.0). Prodintro.com turns image optimisation off (next.config: images.unoptimized), so it is never loaded, and the Docker build deletes it from the production server. LGPL-3.0 permits commercial use of an unmodified, separately linked library.
-- 55 development tools (TypeScript, tsx, type definitions and their dependencies): used to build and test, not part of the app.
+- 53 development tools (TypeScript, tsx, type definitions and their dependencies): used to build and test, not part of the app.
 
 ## Packages
 
@@ -67,6 +67,8 @@ Prodintro.com is proprietary software (see LICENSE); it is built with the third-
 | [@swc/helpers](https://swc.rs) | 0.5.23 | Apache-2.0 |
 | [@types/dom-mediacapture-transform](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/dom-mediacapture-transform) | 0.1.12 | MIT |
 | [@types/dom-webcodecs](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/dom-webcodecs) | 0.1.13 | MIT |
+| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) | 26.6.3 | MIT |
+| [@types/nodemailer](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/nodemailer) | 8.0.2 | MIT |
 | [baseline-browser-mapping](https://github.com/web-platform-dx/baseline-browser-mapping) | 2.11.26 | Apache-2.0 |
 | [boolbase](https://github.com/fb55/boolbase) | 1.0.0 | ISC |
 | [caniuse-lite](browserslist/caniuse-lite) | 1.0.30001812 | CC-BY-4.0 |
@@ -88,6 +90,7 @@ Prodintro.com is proprietary software (see LICENSE); it is built with the third-
 | [nanoid](ai/nanoid) | 3.3.19 | MIT |
 | [next](https://nextjs.org) | 16.3.6 | MIT |
 | [node-html-parser](https://github.com/taoqf/node-fast-html-parser) | 9.0.4 | MIT |
+| [nodemailer](https://nodemailer.com/) | 10.0.16 | MIT-0 |
 | [nth-check](https://github.com/fb55/nth-check) | 2.1.1 | BSD-2-Clause |
 | [ogl](https://github.com/oframe/ogl#readme) | 1.0.11 | Unlicense |
 | [picocolors](alexeyraspopov/picocolors) | 1.1.1 | ISC |
@@ -105,6 +108,7 @@ Prodintro.com is proprietary software (see LICENSE); it is built with the third-
 | [ts-algebra](https://github.com/ThomasAribart/ts-algebra#readme) | 2.0.0 | MIT |
 | [tslib](https://www.typescriptlang.org/) | 2.8.1 | 0BSD |
 | [undici](https://undici.nodejs.org) | 7.30.0 | MIT |
+| [undici-types](https://undici.nodejs.org) | 8.9.0 | MIT |
 | [uqr](https://github.com/unjs/uqr#readme) | 0.1.3 | MIT |
 | [zod](https://zod.dev) | 4.6.5 | MIT |
 
@@ -1742,6 +1746,58 @@ MIT License
     SOFTWARE
 ```
 
+### @types/node 26.6.3 (MIT)
+
+```
+MIT License
+
+    Copyright (c) Microsoft Corporation.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE
+```
+
+### @types/nodemailer 8.0.2 (MIT)
+
+```
+MIT License
+
+    Copyright (c) Microsoft Corporation.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE
+```
+
 ### baseline-browser-mapping 2.11.26 (Apache-2.0)
 
 ```
@@ -3258,6 +3314,27 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+### nodemailer 10.0.16 (MIT-0)
+
+```
+Copyright (c) 2011-2023 Andris Reinman
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### nth-check 2.1.1 (BSD-2-Clause)
 
 ```
@@ -3932,6 +4009,32 @@ PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ### undici 7.30.0 (MIT)
+
+```
+MIT License
+
+Copyright (c) Matteo Collina and Undici contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### undici-types 8.9.0 (MIT)
 
 ```
 MIT License

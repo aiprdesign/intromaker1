@@ -58,18 +58,22 @@ export async function POST(req: Request) {
   }
 }
 
-/** Delete the account and its saved films: { password }. */
+/** Delete the account and its saved films: { confirm: its email } (or { password }, for older accounts). */
 export async function DELETE(req: Request) {
   const u = await requireUser(req);
   if (u instanceof Response) return u;
   const locked = lockedOut(req);
   if (locked) return locked;
-  const body = (await req.json().catch(() => null)) as { password?: unknown } | null;
-  try {
-    await login(u.email, body?.password);
-  } catch {
-    const w = wrongPassword(req, "account", "Your password is wrong.");
-    return Response.json({ error: w.message }, { status: w.blocked ? 429 : 401 });
+  const body = (await req.json().catch(() => null)) as { password?: unknown; confirm?: unknown } | null;
+  // Confirmed by typing the account's email (passwordless accounts), or by the password (older accounts).
+  const typed = typeof body?.confirm === "string" && body.confirm.trim().toLowerCase() === u.email;
+  if (!typed) {
+    try {
+      await login(u.email, body?.password);
+    } catch {
+      const w = wrongPassword(req, "account", typeof body?.confirm === "string" ? "Type your email address exactly to confirm." : "Your password is wrong.");
+      return Response.json({ error: w.message }, { status: w.blocked ? 429 : 401 });
+    }
   }
   // A live subscription would keep charging an account that no longer exists.
   if (subscribed(u)) {

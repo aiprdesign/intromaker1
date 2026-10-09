@@ -16,7 +16,7 @@ const ROOT = join(dirname(new URL(import.meta.url).pathname), "..");
 const WRITE = process.argv.includes("--write");
 
 /** Permissive licences: commercial use allowed; keep the notice. */
-const PERMISSIVE = new Set(["MIT", "ISC", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "BSD 2 Clause", "BSD 3 Clause", "0BSD", "Unlicense", "CC0-1.0", "BlueOak-1.0.0", "Zlib", "Python-2.0"]);
+const PERMISSIVE = new Set(["MIT", "MIT-0", "ISC", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "BSD 2 Clause", "BSD 3 Clause", "0BSD", "Unlicense", "CC0-1.0", "BlueOak-1.0.0", "Zlib", "Python-2.0"]);
 /** Allowed with conditions, each explained in the notices. */
 const CONDITIONAL: Record<string, string> = {
   "OFL-1.1": "Fonts: free to use, embed and ship commercially (including in rendered videos); the fonts themselves may not be sold on their own.",

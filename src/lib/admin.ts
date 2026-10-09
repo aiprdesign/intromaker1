@@ -454,6 +454,12 @@ export const SERVICE_KEYS = {
   amazonTag: { env: "AMAZON_PAAPI_PARTNER_TAG", label: "Amazon partner tag" },
   ebayId: { env: "EBAY_CLIENT_ID", label: "eBay client id" },
   ebaySecret: { env: "EBAY_CLIENT_SECRET", label: "eBay client secret" },
+  mailKey: { env: "INTROMAKER_MAIL_KEY", label: "Email API key (Resend, Postmark or SendGrid)" },
+  smtpHost: { env: "INTROMAKER_SMTP_HOST", label: "SMTP server (e.g. smtp.hostinger.com)" },
+  smtpUser: { env: "INTROMAKER_SMTP_USER", label: "SMTP username (your mailbox address)" },
+  smtpPass: { env: "INTROMAKER_SMTP_PASS", label: "SMTP password (your mailbox password)" },
+  mailFrom: { env: "INTROMAKER_MAIL_FROM", label: "Send sign-in emails from (an address on your verified domain)" },
+  siteUrl: { env: "INTROMAKER_SITE_URL", label: "Site address, for links in emails (https://…)" },
 } as const;
 export type ServiceKeyName = keyof typeof SERVICE_KEYS;
 export type ServiceKeys = Partial<Record<ServiceKeyName, string>>;

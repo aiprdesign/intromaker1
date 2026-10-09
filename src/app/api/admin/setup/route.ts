@@ -65,7 +65,7 @@ export async function PUT(req: Request) {
   for (const k of NAMES) {
     const v = body.keys?.[k];
     if (typeof v === "string" && v.trim()) {
-      if (/\s/.test(v.trim()) || v.trim().length > 400) return Response.json({ error: `${SERVICE_KEYS[k].label} doesn't look right.` }, { status: 400 });
+      if ((k !== "smtpPass" && /\s/.test(v.trim())) || v.trim().length > 400) return Response.json({ error: `${SERVICE_KEYS[k].label} doesn't look right.` }, { status: 400 });
       next[k] = v.trim();
     }
   }
