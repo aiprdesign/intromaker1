@@ -2936,7 +2936,8 @@ export default function Studio() {
             <div className="takes-row">
               {takes.map((t, i) => (
                 <button key={i} className={`take-card ${i === current ? "active" : ""}`} onClick={() => show(t, i)} title="Use this version">
-                  <LoopCanvas plan={t.plan} long={300} fps={15} />
+                  {/* (A still frame of each version: previews under the timeline cost no CPU or GPU.) */}
+                  <LoopCanvas plan={t.plan} long={300} still />
                   <span className="take-name">{t.label}</span>
                 </button>
               ))}

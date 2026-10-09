@@ -118,6 +118,9 @@ export const SKILL_GROUPS: { name: string; skills: Skill[] }[] = [
   { name: "Cinematic", skills: [...signatureSkills, ...energySkills, ...worldSkills] },
 ];
 
+/** Slides drawn with the WebGL 3D engine (devices and homes): heavy to draw, so previews show them still. */
+export const THREE_D_SKILLS = new Set<SkillId>([...devices3dSkills, ...homes3dSkills].map((s) => s.id));
+
 /** Slides that show a picture or video of their own (`scene.media`), which can be changed per slide. */
 export const MEDIA_SKILLS = new Set<SkillId>([
   "d3-popout",

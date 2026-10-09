@@ -20,11 +20,12 @@
  * - home-welcome: the family and dog wave from the path of the home at golden hour; the button.
  */
 import { Texture, Transform, type Program } from "ogl";
-import { box, cylinder, gable, lathe, leaf, project, quad, render, rgb, slab, sphere, sphereCap, torus, world, type View, type World } from "../d3";
+import { box, cylinder, gable, lathe, leaf, project, quad, render as draw3d, rgb, slab, sphere, sphereCap, torus, world, type View, type World } from "../d3";
 import { clamp, ease, hexToRgb, lerp, mixHex, range, TAU } from "../math";
 import { fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
-import { exitOf, itemsOr, split, stage } from "./beats";
+import { exitOf, itemsOr, split, stage as stageAndHeadline } from "./beats";
+import { topHeadline } from "./saas";
 import { pointTimes } from "./characters";
 import { speechNow, type Viseme } from "../speech";
 
@@ -161,14 +162,48 @@ function pin(sc: SkillContext, x: number, y: number, text: string, size: number,
 }
 
 /** Draw the 3D view under the headline. */
-function frame(sc: SkillContext, top: number, draw: (w: number, h: number) => HTMLCanvasElement | null) {
+let measureCtx: CanvasRenderingContext2D | null = null;
+/**
+ * The stage's layout (where the headline ends, the safe area), measured without drawing the
+ * headline: the home slides draw it over their 3D view (see frame), so a roof reaching up behind
+ * it never covers it.
+ */
+function stage(sc: SkillContext) {
+  if (!measureCtx && typeof document !== "undefined") measureCtx = document.createElement("canvas").getContext("2d");
+  if (!measureCtx) return stageAndHeadline(sc);
+  measureCtx.font = sc.ctx.font;
+  return stageAndHeadline({ ...sc, ctx: measureCtx });
+}
+
+/** Rows the 3D view draws above its frame while `frame` runs (so a roof is never cut at the top). */
+let ABOVE = 0;
+function render(W: World, v: View, w: number, h: number) {
+  return draw3d(W, { ...v, above: ABOVE }, w, h);
+}
+
+/**
+ * The 3D view in the slide: framed below the headline (`top`), and drawn on up to the top of the
+ * slide behind the headline, so a tall roof or tree carries on rather than being cut off.
+ */
+function frame(sc: SkillContext, top: number, draw: (w: number, h: number) => HTMLCanvasElement | null, reach = true) {
   const { ctx, w, h } = sc;
-  const cv = draw(w, h - top);
-  if (!cv) return null;
-  ctx.save();
-  ctx.globalAlpha *= 1 - exitOf(sc);
-  ctx.drawImage(cv, 0, top, w, h - top);
-  ctx.restore();
+  // (Views looking down on the ground, the plan and the flyover, keep the sky behind the headline.)
+  const up = reach ? Math.max(0, top) : 0;
+  ABOVE = up;
+  let cv: HTMLCanvasElement | null;
+  try {
+    cv = draw(w, h - top);
+  } finally {
+    ABOVE = 0;
+  }
+  if (cv) {
+    ctx.save();
+    ctx.globalAlpha *= 1 - exitOf(sc);
+    ctx.drawImage(cv, 0, top - up, w, h - top + up);
+    ctx.restore();
+  }
+  // The headline, over the view.
+  topHeadline(sc);
   return cv;
 }
 
@@ -984,7 +1019,7 @@ function homeAerial(sc0: SkillContext) {
     const out = render(W, { ...GOLDEN, flat: !!sc.flat3d, cel: true, eye, target, fov: 36, shadowSize: 70, shadowAt: [eye[0] + 14, 0, 18], fog: [0.98, 0.89, 0.77, 0.006] }, w, h);
     anchors = parts.spots.map((p) => project(W, p, w, h));
     return out;
-  });
+  }, false);
   if (!cv) fallback(sc, top);
   const size = 22 * u * st.S;
   const cur = T.reduce((cc, ti, i) => (t >= ti - 0.05 ? i : cc), -1);
@@ -1037,7 +1072,8 @@ function homeBuild3d(sc0: SkillContext) {
     H.frame.traverse((c) => void (c.visible = H.frame.visible));
     H.frame.scale.y = Math.max(0.001, ease.outCubic(k(0.12, 0.38)));
     const clip = b + (MAIN.h + 0.2) * ease.inOutCubic(k(0.38, 0.62));
-    for (const m of H.rising) m.uniforms.uClip.value = p < 0.38 ? -1 : clip;
+    // (Once the walls are up the clip lifts, so the chimney and gables above them show in full.)
+    for (const m of H.rising) m.uniforms.uClip.value = p < 0.38 ? -1 : p >= 0.62 ? 99 : clip;
     const roofK = ease.outCubic(k(0.6, 0.8));
     H.roof.visible = roofK > 0;
     H.roof.traverse((c) => void (c.visible = H.roof.visible));
@@ -1165,7 +1201,7 @@ function homePlan(sc0: SkillContext) {
     anchors = parts.rooms.map((r0) => project(W, r0.at, w, h));
     labels = parts.rooms.map((r0, i) => names[i] ?? r0.name);
     return out;
-  });
+  }, false);
   if (!cv) fallback(sc, top);
   const size = 20 * u * st.S;
   sc.ctx.save();

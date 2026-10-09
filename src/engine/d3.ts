@@ -910,7 +910,16 @@ export interface View {
   /** Half-size of the shadow camera's view and where it centres. */
   shadowSize?: number;
   shadowAt?: Num3;
+  /**
+   * Extra rows (in the same units as the height) drawn above the view: the frustum grows upward
+   * off-centre, so the framing below stays put and a tall roof carries on up behind a headline
+   * instead of being cut off. The returned canvas is `h + above` tall.
+   */
+  above?: number;
 }
+
+/** How far each world's last view reached above its frame, as a fraction of the frame's height (see project). */
+const aboveOf = new WeakMap<World, number>();
 
 /**
  * Render the world with this view at `w`×`h` and return the WebGL canvas (draw it into the slide
@@ -920,15 +929,37 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   const { renderer, camera, light, env, scene, shadow } = W;
   // Supersampled (drawn larger, then scaled down into the slide) for clean edges.
   const ss = Math.max(1, Math.min(1.5, 2880 / Math.max(1, w)));
+  const up = Math.max(0, v.above ?? 0);
+  const e = up / Math.max(1, h);
+  aboveOf.set(W, e);
   const cw = Math.max(1, Math.round(w * ss));
-  const ch = Math.max(1, Math.round(h * ss));
+  const ch = Math.max(1, Math.round((h + up) * ss));
   if (renderer.gl.canvas.width !== cw || renderer.gl.canvas.height !== ch) renderer.setSize(cw, ch);
   if (v.flat) {
     const dist = Math.hypot(v.eye[0] - v.target[0], v.eye[1] - v.target[1], v.eye[2] - v.target[2]);
     const hh = dist * Math.tan((((v.fov ?? 30) / 2) * Math.PI) / 180);
-    const hw = hh * (cw / ch);
-    camera.orthographic({ left: -hw, right: hw, bottom: -hh, top: hh, near: 0.05, far: 400 });
-  } else camera.perspective({ fov: v.fov ?? 30, aspect: cw / ch });
+    const hw = hh * (w / Math.max(1, h));
+    camera.orthographic({ left: -hw, right: hw, bottom: -hh, top: hh * (1 + 2 * e), near: 0.05, far: 400 });
+  } else {
+    camera.perspective({ fov: v.fov ?? 30, aspect: w / Math.max(1, h) });
+    if (up > 0) {
+      // An off-centre frustum: the original view's bottom, left and right, its top raised.
+      const n = 0.05;
+      const f = 200;
+      const t0 = n * Math.tan((((v.fov ?? 30) / 2) * Math.PI) / 180);
+      const top = t0 * (1 + 2 * e);
+      const bottom = -t0;
+      const right = t0 * (w / Math.max(1, h));
+      const P = camera.projectionMatrix as unknown as number[];
+      P.fill(0);
+      P[0] = (2 * n) / (2 * right);
+      P[5] = (2 * n) / (top - bottom);
+      P[9] = (top + bottom) / (top - bottom);
+      P[10] = -(f + n) / (f - n);
+      P[11] = -1;
+      P[14] = (-2 * f * n) / (f - n);
+    }
+  }
   camera.position.set(...v.eye);
   camera.lookAt(v.target);
   const s = v.sun ?? [0.45, 0.85, 0.5];
@@ -992,7 +1023,9 @@ export function project(W: World, p: Num3, w: number, h: number) {
   ];
   const e = mul(v, p[0], p[1], p[2], 1);
   const c = mul(P, e[0], e[1], e[2], e[3]);
-  return { x: (c[0] / c[3] * 0.5 + 0.5) * w, y: (1 - (c[1] / c[3] * 0.5 + 0.5)) * h, front: c[3] > 0 };
+  // (A view drawn with rows above its frame: back into the frame's own coordinates.)
+  const e2 = aboveOf.get(W) ?? 0;
+  return { x: (c[0] / c[3] * 0.5 + 0.5) * w, y: (1 - (c[1] / c[3] * 0.5 + 0.5)) * h * (1 + e2) - h * e2, front: c[3] > 0 };
 }
 
 /** Show a crop of a picture on a screen material: `rect` is [left, top, width, height] as fractions of the image. */
