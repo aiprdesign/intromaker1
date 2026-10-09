@@ -308,6 +308,8 @@ export interface Brand {
   name: string;
   /** Display domain, e.g. "acme.com". */
   domain?: string;
+  /** Contact details for the end card (an email, a phone), e.g. from a written brief. */
+  contact?: string;
   logo?: string;
   /** App icon: shown with the name beneath it when the logo is a wide wordmark. */
   icon?: string;

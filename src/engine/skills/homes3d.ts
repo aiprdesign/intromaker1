@@ -3379,6 +3379,21 @@ function homeWelcome(sc0: SkillContext) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label0, x, y + 1);
+    // The website and contact details under the button, on a frosted plate over the home.
+    const info = [sc.brand?.domain, sc.brand?.contact].filter(Boolean).join("  ·  ");
+    if (info) {
+      const fs = 18 * u * st.S;
+      ctx.font = subFont(fs, 600);
+      const iw = ctx.measureText(info).width + fs * 1.6;
+      const ih = fs * 1.9;
+      const iy = y + th / 2 + ih * 0.5 + 10 * u;
+      ctx.fillStyle = "rgba(255,255,255,0.84)";
+      ctx.beginPath();
+      ctx.roundRect(x - iw / 2, iy - ih / 2, iw, ih, ih / 2);
+      ctx.fill();
+      ctx.fillStyle = INK;
+      ctx.fillText(info, x, iy + 1);
+    }
     ctx.restore();
   }
 }

@@ -627,6 +627,73 @@ function naturalCase(phrase: string, source: string) {
 /** "An intro for …" / "Launch video about …" / "A cartoon video with characters for …": the request, not the product. */
 const LEAD_IN = /^(?:an?\s+)?(?:(?:launch|intro|promo|product|explainer|cartoon|animated|fun)\s+)*(?:video|film|teaser|trailer|intro|promo|cartoon|animation|explainer)(?:\s+with\s+(?:cartoon\s+|animated\s+|abstract\s+|blob\s+|memphis\s+|classic\s+|rubber[- ]hose\s+)?(?:characters?|a\s+mascot|mascots|stick\s+figures?|blobs?|people))?\s+(?:for|about|of)\s+/i;
 
+/**
+ * A written brief, the way people write one: a sentence about the business, then labelled parts
+ * ("Features: …", "Services: …", "How it works: …", "End with a "Book a tour" button", a website,
+ * an email and a phone number). The labelled parts are lifted out (steps, the button's words, the
+ * contact details) and the rest, with its features or services, is the prompt the parser reads, so
+ * a long brief doesn't turn into a row of odd feature cards. A plain one-line prompt passes through.
+ */
+type Brief = ReturnType<typeof readBrief>;
+
+export function readBrief(prompt: string) {
+  const list = (x: string) =>
+    x
+      .split(/,|;|\s(?:and|&)\s/i)
+      .map((t) => t.trim().replace(/^(?:and|then)\s+/i, "").replace(/[.]+$/, ""))
+      .filter((t) => t && t.split(/\s+/).length <= 7);
+  const email = prompt.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0];
+  const phone = prompt.match(/(?:\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/)?.[0];
+  const domain = prompt
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, " ")
+    .match(/\b(?:https?:\/\/)?((?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|io|app|co|ai|dev|net|org|shop|studio|example)(?:\.[a-z]{2})?)\b/i)?.[1]
+    ?.toLowerCase();
+  let cta: string | undefined;
+  let steps: string[] = [];
+  let features: string[] = [];
+  let services = false;
+  const keep: string[] = [];
+  // Sentences (a full stop inside a website or an email doesn't end one).
+  for (const raw of prompt.split(/(?<=[.!?])\s+(?=[A-Z"“])|\n+/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const label = line.match(/^(features|key features|what it does|services|our services|we offer|how it works|steps|the process|process|tone|vibe|style|audience|it'?s for|made for|contact|reach us|find us|website)\s*:\s*(.*)$/i);
+    const end = line.match(/\b(?:end|close|finish)\s+(?:with|on)\s+(?:an?\s+|the\s+)?["“]([^"”]{2,32})["”](?:\s+(?:button|cta|call to action|link))?/i) ?? line.match(/^(?:cta|button|call to action)\s*:\s*["“]?([^"”.]{2,32})/i);
+    if (end) cta = end[1].trim();
+    if (label) {
+      const key = label[1].toLowerCase();
+      const body = label[2].replace(/[.]+$/, "");
+      if (/^(features|key features|what it does)$/.test(key)) features = list(body);
+      else if (/services|we offer/.test(key)) {
+        features = list(body);
+        services = true;
+      } else if (/how it works|steps|process/.test(key)) steps = list(body).slice(0, 4);
+      // (Tone and audience aren't copy: the studio's style pick reads them from the prompt as typed.)
+      continue;
+    }
+    // (A contact line, with the email, the phone or the website, isn't copy: it's read above.)
+    const contactLine = (!!email && line.includes(email)) || (!!phone && line.includes(phone)) || (!!domain && line.toLowerCase().includes(domain) && /\b(?:visit|website|web|online at|find us|contact|call|email)\b/i.test(line));
+    if (contactLine) continue;
+    if (end && line.replace(end[0], "").replace(/[^a-z]/gi, "").length < 12) continue;
+    keep.push(end ? line.replace(end[0], "").replace(/\s*(?:and\s*)?[.,]?\s*$/, ".").trim() : line);
+  }
+  // The business sentence first ("Make a launch video for…" reads as "a launch video for…"), its
+  // features (or services) folded in as a list.
+  let core = keep
+    .join(" ")
+    .trim()
+    .replace(/^(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:please\s+)?(?:make|create|build|generate|produce|design|put together|i need|we need|i'd like|we'd like|i want|we want)\s+(?:me\s+|us\s+)?/i, "");
+  if (features.length) {
+    const head = core.replace(/[.]\s*$/, "");
+    const firstEnd = head.search(/[.!?](\s|$)/);
+    const lead = firstEnd > 0 ? head.slice(0, firstEnd) : head;
+    const tail = firstEnd > 0 ? head.slice(firstEnd + 1).trim() : "";
+    const feats = features.length > 1 ? `${features.slice(0, -1).join(", ")} and ${features[features.length - 1]}` : features[0];
+    core = `${lead}: ${feats}.${tail ? ` ${tail}` : ""}`;
+  }
+  return { core: core || prompt, steps, cta, domain, email, phone, services, features };
+}
+
 export function parseSaasPrompt(prompt: string) {
   const brand = extractBrand(prompt);
   let body = prompt.replace(/["“”‘’]/g, "").trim();
@@ -720,7 +787,7 @@ function promptDescription(brand: string | null, pitch: string, features: string
 /** Problems a prompt names: "tired of X", "no more X", "instead of X", "struggling with X". */
 function promptPains(prompt: string) {
   const out: string[] = [];
-  for (const m of prompt.matchAll(/\b(tired of|no more|instead of|struggling with|sick of|without the)\s+([^,.;!?]+?)(?=\s+(?:and|or|with|so|for)\b|[,.;!?]|$)/gi)) {
+  for (const m of prompt.matchAll(/\b(tired of|no more|instead of|struggling with|sick of|without the)\s+([^,.;:!?]+?)(?=\s+(?:and|or|with|so|for)\b|[,.;:!?]|$)/gi)) {
     const phrase = m[2].trim();
     if (!phrase || phrase.split(/\s+/).length > 6) continue;
     const p = m[1].toLowerCase() === "no more" ? `No more ${phrase}` : phrase.charAt(0).toUpperCase() + phrase.slice(1);
@@ -756,8 +823,11 @@ export function contrastPairOf(text: string, fallback?: string): [string, string
   return undefined;
 }
 
-function planFromPromptSaas(req: PlanRequest): VideoPlan {
-  const prompt = req.prompt.trim();
+function planFromPromptSaas(req: PlanRequest & { brief?: Brief }): VideoPlan {
+  // A written brief gives up its steps, button and contact details; the parser reads the rest.
+  const brief = req.brief ?? readBrief(req.prompt.trim());
+  // (The ask in front of the name, "a welcoming intro for", "a homebuilder video for", isn't the pitch.)
+  const prompt = (req.brief ? req.prompt.trim() : brief.core).replace(/^(?:an?\s+)?(?:[\w'-]+\s+){0,4}?(?:video|intro|film|teaser|trailer|promo|opener|launch|showreel)\s+for\s+(?=["“])/i, "");
   const seed = (req.seed ?? hashString(prompt)) >>> 0;
   const parsed = parseSaasPrompt(prompt);
   const brand = parsed.brand ?? "Your product";
@@ -775,19 +845,20 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
   // feature icons, chapters, pacing and CTA voice as website films.
   const site: SiteData = {
     url: "",
-    domain: "",
+    domain: brief.domain ?? "",
     name: brand,
     tagline,
     // The product described in a clean sentence of its own ("Pulse is the analytics app for
     // product teams, with dashboards, AI insights and team sharing."), never the prompt as typed:
     // slides quote it (the AI answer, a subtitle).
-    description: promptDescription(parsed.brand, tagline, named),
+    // (A brief that lists its services says so, so they're shown as services.)
+    description: promptDescription(parsed.brand, tagline, named) + (brief.services && named.length ? ` Our services: ${named.slice(0, 5).join(", ")}.` : ""),
     headlines: features.slice(0, 6),
     features: [],
     stats: numbers.map((n) => naturalCase(n, prompt)),
     testimonials: [],
     clientLogos: [],
-    steps: [],
+    steps: brief.steps,
     // Problems the prompt names ("for teams tired of spreadsheets", "no more missed calls").
     pains: promptPains(prompt),
     // A contrast the prompt states ("less typing, more selling"), for a split contrast slide.
@@ -795,7 +866,7 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     contrast: contrastPairOf(prompt, [tagline.replace(/^(an?|the)\s+/i, "").replace(/\s+(instead of|rather than|so you|without|no more)\b.*$/i, ""), ...features].find((f) => f.split(/\s+/).length <= 6 && !/^meet\b/i.test(f))),
     font: null,
     shots: { hero: null, full: null, sections: [] },
-    cta: null,
+    cta: brief.cta ?? null,
     logo: null,
     images: [],
     videos: [],
@@ -828,6 +899,9 @@ function planFromPromptSaas(req: PlanRequest): VideoPlan {
     if (plan.brand) plan.brand = { ...plan.brand, name: reveal };
     plan.notes = [`No product name was found in the prompt, so the reveal says “${reveal}”. Type the name on that slide, or start the prompt with it (e.g. “Acme is a …”).`, ...(plan.notes ?? [])].slice(0, 3);
   }
+  // The brief's email and phone go on the end card, under the website.
+  const contact = [brief.email, brief.phone].filter(Boolean).join("  ·  ");
+  if (contact && plan.brand) plan.brand = { ...plan.brand, contact };
   return { ...plan, title: plan.brand?.name ?? brand };
 }
 
@@ -873,7 +947,16 @@ export function productFromPrompt(prompt: string, photos: string[]): SiteData {
 
 /** Built-in rule-based director: prompt → storyboard. Deterministic for a given seed. */
 /** Prompt → intro, with a narrator line on every scene (used when voice-over is on). */
-export function planFromPrompt(req: PlanRequest): VideoPlan {
+export function planFromPrompt(req0: PlanRequest): VideoPlan {
+  // A written brief is read whole first (its labels and sentences), before the copy pass below
+  // splits the prompt into phrases: its steps and button are made claim-safe like the rest.
+  const brief = readBrief(req0.prompt);
+  const okLine = (x?: string) => (x && (req0.safe === false || (!isNumericClaim(x) && !isUnsafe(x))) ? (req0.safe === false ? x : safeCopy(x)) || undefined : undefined);
+  const req: PlanRequest & { brief?: Brief } = {
+    ...req0,
+    prompt: brief.core,
+    brief: { ...brief, steps: brief.steps.map((x) => okLine(x)).filter((x): x is string => !!x), cta: okLine(brief.cta) },
+  };
   if (req.safe === false) {
     const prompt = req.prompt.split(/,(?!\d{3})|;|(?<=[.!?])\s+/).filter((part) => !isHealthClaim(part)).join(", ");
     return healthPlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt })));
@@ -885,7 +968,15 @@ export function planFromPrompt(req: PlanRequest): VideoPlan {
     .map((part) => (isNumericClaim(part) || isUnsafe(part) ? "" : safeCopy(part.trim())))
     .filter((part) => part.replace(/[^a-z0-9]/gi, "").length > 1)
     .join(", ");
-  return noteShort(safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt }))), LENGTH_SECONDS[req.length], false);
+  return withBriefCta(noteShort(safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt }))), LENGTH_SECONDS[req.length], false), req.brief?.cta);
+}
+
+/** A trailer ends on the brief's own button words ("Wishlist now"), as a product film's end card does. */
+function withBriefCta(plan: VideoPlan, cta: string | undefined): VideoPlan {
+  if (!cta || plan.style === "saas") return plan;
+  const last = plan.scenes[plan.scenes.length - 1];
+  if (!last || last.subtext === undefined) return plan;
+  return { ...plan, scenes: [...plan.scenes.slice(0, -1), { ...last, subtext: cta }] };
 }
 
 /**
@@ -2345,7 +2436,14 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   }
   // "Free" is an offer, and an offer must be real: only when the site itself offers something free.
   const freeOffer = offersFree([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features].join(" "));
-  const lines = concept.cta.filter((l) => freeOffer || !/\bfree\b/i.test(l)).map((l) => l.replace(/\{name\}/g, site.name));
+  // (With a button of its own, "Get in touch", the line doesn't name another action, "Book a demo".)
+  const ownButton = cleanCta(site.cta);
+  const ACTION = /\b(demo|trial|download|account|install|sign up|subscribe|selling|shopping|building|shipping|creating|training|store)\b/i;
+  const otherAction = (l: string) => {
+    const m = ownButton ? l.match(ACTION) : null;
+    return !!m && !ownButton!.toLowerCase().includes(m[1].toLowerCase());
+  };
+  const lines = concept.cta.filter((l) => (freeOffer || !/\bfree\b/i.test(l)) && !otherAction(l)).map((l) => l.replace(/\{name\}/g, site.name));
   if (freeOffer && /\bfree\b/i.test(ctaLabel)) lines.push("Start *free* today");
   if (cta?.role === "cta") {
     // The closing line mustn't just repeat the button under it ("Start free" / "Start free trial").

@@ -1753,6 +1753,19 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
     });
     ctx.restore();
   }
+  // Contact details (an email, a phone) under the website.
+  const contact = brand?.contact?.trim();
+  if (contact && dk > 0) {
+    ctx.save();
+    ctx.globalAlpha = dk * 0.85;
+    ctx.font = subFont(21 * u * S, 500);
+    ctx.fillStyle = rgba(palette.text, 0.72);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    fillTextMid(ctx, contact, cx, by + bh / 2 + (brand?.domain ? 112 : 58) * u * S + (1 - dk) * 10 * u);
+    ctx.restore();
+  }
+  const below = (brand?.domain ? 54 : 0) + (contact ? 44 : 0);
   // Risk reversal: one reassurance line under the button ("Cancel anytime"), when the site says it.
   const sure = (scene.items ?? []).find((x) => x.trim())?.trim();
   if (sure && dk > 0) {
@@ -1762,7 +1775,7 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
     ctx.fillStyle = rgba(palette.text, 0.66);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    fillTextMid(ctx, `✓  ${sure}`, cx, by + bh / 2 + (brand?.domain ? 118 : 58) * u * S + (1 - dk) * 10 * u);
+    fillTextMid(ctx, `✓  ${sure}`, cx, by + bh / 2 + (58 + below + (below ? 6 : 0)) * u * S + (1 - dk) * 10 * u);
     ctx.restore();
   }
   return { bw, bh };
