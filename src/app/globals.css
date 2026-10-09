@@ -6574,27 +6574,65 @@ code.secret {
   }
 }
 
-/* Showcase: icon tabs by business, scrolling sideways on a phone. */
-.show-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  padding: 4px 2px 12px;
+/* Showcase: icon tabs by business, on one row that scrolls sideways (no scrollbar); the edge
+   with more tabs past it fades out and shows an arrow. */
+.show-tabs-wrap {
+  position: relative;
   margin: 0 0 18px;
 }
-/* Phones: one row that swipes sideways, without a scrollbar. */
-@media (max-width: 640px) {
-  .show-tabs {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .show-tabs::-webkit-scrollbar {
-    display: none;
-  }
+.show-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.show-tabs::-webkit-scrollbar {
+  display: none;
+}
+.show-tabs-wrap.more-right .show-tabs {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 96px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 96px), transparent);
+}
+.show-tabs-wrap.more-left .show-tabs {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 96px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 96px), transparent);
+}
+.show-tabs-wrap.more-left.more-right .show-tabs {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 96px, #000 calc(100% - 96px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 96px, #000 calc(100% - 96px), transparent);
+}
+.show-tabs-arrow {
+  position: absolute;
+  top: calc(50% - 4px);
+  transform: translateY(-50%);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.16));
+  background: var(--card-solid, #17161f);
+  color: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s, border-color 0.15s;
+}
+.show-tabs-arrow:hover {
+  border-color: var(--accent, #7c5cff);
+}
+.show-tabs-arrow.right {
+  right: 0;
+}
+.show-tabs-arrow.left {
+  left: 0;
+}
+.show-tabs-arrow.left svg {
+  transform: rotate(180deg);
 }
 .show-tab {
   flex: 0 0 auto;
