@@ -4,10 +4,10 @@ import { serviceKey } from "./admin";
 import { SITE_URL_ENV } from "./site";
 
 /**
- * Sending email (sign-in links) through the owner's mailbox by SMTP (e.g. Hostinger: smtp.hostinger.com,
+ * Sending email (password-reset links) through the owner's mailbox by SMTP (e.g. Hostinger: smtp.hostinger.com,
  * the mailbox address and its password), or an email service's HTTP API: Resend (keys start "re_"),
  * SendGrid ("SG.") or Postmark (a server token). The settings and the site's address come from
- * Admin → Setup → Email sign-in, else environment variables. SMTP wins when both are set.
+ * Admin → Setup → Password reset email, else environment variables. SMTP wins when both are set.
  */
 
 export class MailError extends Error {}
@@ -31,7 +31,7 @@ export async function mailReady() {
 
 /**
  * The site's public address for links in emails. Never taken from the request in production: a
- * forged Host header would otherwise put the attacker's site in a real sign-in email.
+ * forged Host header would otherwise put the attacker's site in a real password-reset email.
  */
 export async function linkBase(req: Request): Promise<string | null> {
   const set = ((await serviceKey("siteUrl")) || SITE_URL_ENV || "").replace(/\/+$/, "");
@@ -104,21 +104,20 @@ export async function sendMail(m: Mail): Promise<void> {
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-/** The sign-in email: one button, the link spelled out, and why it came. */
-export function signInMail(to: string, link: string, opts: { firstName?: string; isNew: boolean; minutes: number }): Mail {
+/** The password-reset email: one button, the link spelled out, and why it came. */
+export function resetMail(to: string, link: string, opts: { firstName?: string; minutes: number }): Mail {
   const hello = opts.firstName ? `Hi ${opts.firstName},` : "Hi,";
-  const action = opts.isNew ? "finish creating your account" : "sign in";
-  const subject = opts.isNew ? "Confirm your email to get your free videos" : "Your Prodintro.com sign-in link";
-  const text = `${hello}\n\nOpen this link to ${action} on Prodintro.com:\n${link}\n\nThe link works once, for ${opts.minutes} minutes. If you didn't ask for it, ignore this email.\n`;
+  const subject = "Reset your Prodintro.com password";
+  const text = `${hello}\n\nSomeone (hopefully you) asked to reset the password of your Prodintro.com account. Open this link to choose a new one:\n${link}\n\nThe link works once, for ${opts.minutes} minutes. If you didn't ask for it, ignore this email: your password stays as it is.\n`;
   const html = `<!doctype html><html><body style="margin:0;background:#f4f3fb;font-family:Arial,Helvetica,sans-serif;color:#1f1d2b">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" style="max-width:480px;background:#ffffff;border-radius:14px;padding:32px" cellpadding="0" cellspacing="0"><tr><td>
 <p style="margin:0 0 6px;font-weight:700;font-size:18px">Prodintro.com</p>
 <p style="margin:16px 0">${esc(hello)}</p>
-<p style="margin:0 0 24px">Click the button to ${action}.</p>
-<p style="margin:0 0 24px"><a href="${esc(link)}" style="display:inline-block;background:#6d4dff;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">${opts.isNew ? "Confirm and sign in" : "Sign in"}</a></p>
+<p style="margin:0 0 24px">Someone (hopefully you) asked to reset the password of your Prodintro.com account. Click the button to choose a new one.</p>
+<p style="margin:0 0 24px"><a href="${esc(link)}" style="display:inline-block;background:#6d4dff;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">Choose a new password</a></p>
 <p style="margin:0 0 8px;font-size:13px;color:#6b6880">Or paste this link into your browser:<br><span style="word-break:break-all">${esc(link)}</span></p>
-<p style="margin:16px 0 0;font-size:13px;color:#6b6880">The link works once, for ${opts.minutes} minutes. If you didn't ask for it, ignore this email: nothing happens.</p>
+<p style="margin:16px 0 0;font-size:13px;color:#6b6880">The link works once, for ${opts.minutes} minutes. If you didn't ask for it, ignore this email: your password stays as it is.</p>
 </td></tr></table></td></tr></table></body></html>`;
   return { to, subject, text, html };
 }

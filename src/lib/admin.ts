@@ -458,7 +458,7 @@ export const SERVICE_KEYS = {
   smtpHost: { env: "INTROMAKER_SMTP_HOST", label: "SMTP server (e.g. smtp.hostinger.com)" },
   smtpUser: { env: "INTROMAKER_SMTP_USER", label: "SMTP username (your mailbox address)" },
   smtpPass: { env: "INTROMAKER_SMTP_PASS", label: "SMTP password (your mailbox password)" },
-  mailFrom: { env: "INTROMAKER_MAIL_FROM", label: "Send sign-in emails from (an address on your verified domain)" },
+  mailFrom: { env: "INTROMAKER_MAIL_FROM", label: "Send reset emails from (an address on your verified domain)" },
   siteUrl: { env: "INTROMAKER_SITE_URL", label: "Site address, for links in emails (https://…)" },
 } as const;
 export type ServiceKeyName = keyof typeof SERVICE_KEYS;

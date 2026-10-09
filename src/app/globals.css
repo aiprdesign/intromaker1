@@ -6538,7 +6538,8 @@ code.secret {
   text-align: center;
   align-items: center;
 }
-.verify-card {
+.verify-card,
+.reset-card {
   max-width: 460px;
   margin: 8vh auto 0;
 }

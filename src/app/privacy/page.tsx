@@ -48,8 +48,8 @@ export default async function Privacy() {
 
         <h2>Accounts</h2>
         <p>
-          You can make and preview videos without an account; exporting a video needs a free one. Sign-up asks for the minimum: your email address, your
-          first name, your country and, if you like, your state or region. There&apos;s no password: you sign in with a one-time link emailed to you, sent through the site owner&apos;s email service. The server keeps those details,
+          You can make and preview videos without an account; exporting a video needs a free one. Sign-up asks for the minimum: your email address, a password (kept only as a salted hash), your
+          first name, your country and, if you like, your state or region. If you forget your password, a one-time reset link is emailed to you through the site owner&apos;s email service. The server keeps those details,
           your plan, how many videos you&apos;ve exported, how many AI videos and website imports you&apos;ve used this month and today, and the intros you save (their storyboards and a small
           thumbnail). Signing in sets one cookie, which keeps you signed in for 30 days; there are no tracking cookies. You can delete your account and your saved intros at any time from your account page.
         </p>
@@ -105,7 +105,7 @@ export default async function Privacy() {
           <li>Your IP address, in memory only and for at most 24 hours, to apply rate limits and to block signing in from an address after 3 wrong passwords (for an hour). It isn&apos;t written to disk.</li>
           <li>Error logs, which can include the address of a site that failed to load.</li>
           {logging && <li>The video log described above, up to the most recent few thousand videos, until the owner deletes it.</li>}
-          <li>If you have an account: your email, first name, country and state or region, plan, usage counts and saved intros, until you delete the account. Unused sign-in links expire after 15 minutes.</li>
+          <li>If you have an account: your email, first name, country and state or region, password hash, plan, usage counts and saved intros, until you delete the account. Unused password-reset links expire after 30 minutes.</li>
         </ul>
 
         <h2>Claims in generated copy</h2>

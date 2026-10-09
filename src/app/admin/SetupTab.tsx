@@ -298,21 +298,21 @@ export default function SetupTab({ go }: { go: Go }) {
       ),
     },
     (() => {
-      // Email sign-in: SMTP (server, mailbox, password) or an API key with a from address, plus the site's address.
+      // Password-reset email: SMTP (server, mailbox, password) or an API key with a from address, plus the site's address.
       const k = view.keys;
       const on = (n: KeyName) => !!k[n]?.source;
       const mail = (on("smtpHost") && on("smtpUser") && on("smtpPass")) || (on("mailKey") && on("mailFrom"));
       const done = mail && on("siteUrl");
       return {
         done,
-        title: "Email sign-in",
+        title: "Password reset email",
         body: done ? (
-          "Visitors get their sign-in links by email."
+          "Visitors who forget their password get a reset link by email."
         ) : (
           <>
-            Visitors sign in with emailed links (no passwords), so the site needs a way to send email: below, under <strong>Email sign-in</strong>, add your
+            So visitors who forget their password can reset it themselves, the site needs a way to send email: below, under <strong>Password reset email</strong>, add your
             mailbox&apos;s SMTP details (Hostinger: smtp.hostinger.com, the mailbox address and its password) or an email API key, and the site&apos;s address.
-            {mail && !on("siteUrl") ? " Only the site address is missing." : ""}
+            {mail && !on("siteUrl") ? " Only the site address is missing." : " Until then, they ask you (the contact email) and you reset it under Users."}
           </>
         ),
       };
@@ -390,10 +390,10 @@ export default function SetupTab({ go }: { go: Go }) {
         </ol>
       </div>
       <KeysCard
-        title="Email sign-in"
+        title="Password reset email"
         intro={
           <>
-            Visitors sign in with a link emailed to them (no passwords). Either use your mailbox by SMTP (Hostinger: server smtp.hostinger.com, your full
+            Visitors sign in with a password; this sends the &quot;Forgot password?&quot; reset links. Either use your mailbox by SMTP (Hostinger: server smtp.hostinger.com, your full
             email address as the username, and its password), or an API key from Resend (re_…), Postmark (server token) or SendGrid (SG.…) with the address to
             send from. Add this site&apos;s address too, so the links point here. With SMTP, emails come from the mailbox itself.
           </>

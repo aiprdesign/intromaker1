@@ -204,35 +204,39 @@ async function main() {
   check(firstThree.every((st) => st === 200), "a free account exports its 3 free videos");
   check((await exp()).status === 402, "a 4th export on Free is refused with an upgrade message");
   check((await accExport.POST(ureq("/api/account/export", { method: "POST" }))).status === 401, "exporting needs an account");
-  // Passwordless sign-in: a one-time link, emailed (shown here: no email service in a test).
-  const magicRoute = await import("../src/app/api/account/magic/route");
-  const magicVerify = await import("../src/app/api/account/magic/verify/route");
-  const askLink = (body: object, ip = "203.0.113.80") => magicRoute.POST(ureq("/api/account/magic", { method: "POST", ip, body: JSON.stringify(body) }));
-  check((await askLink({ mode: "up", email: "eve@example.com", firstName: "Eve", country: "GB" }, "203.0.113.79")).status === 503, "without an email service (and in production), sign-in links are refused with a setup message");
+  // Forgot password: a one-time reset link, emailed.
+  const resetRoute = await import("../src/app/api/account/reset/route");
+  const resetConfirm = await import("../src/app/api/account/reset/confirm/route");
+  const askReset = (email: string, ip = "203.0.113.80") => resetRoute.POST(ureq("/api/account/reset", { method: "POST", ip, body: JSON.stringify({ email }) }));
+  const setNew = (token: unknown, password: string) => resetConfirm.POST(ureq("/api/account/reset/confirm", { method: "POST", ip: "203.0.113.81", body: JSON.stringify({ token, password }) }));
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", ip: "203.0.113.79", body: JSON.stringify({ email: "eve@example.com", password: "first-pass-1", firstName: "Eve", country: "GB" }) }))).status === 200, "a second account signs up");
+  const noMail = await askReset("eve@example.com", "203.0.113.79");
+  check(noMail.status === 503 && ((await noMail.json()) as { code?: string }).code === "no-mail", "without an email service (and in production), reset emails are refused with a setup message");
   // The site's address comes from the settings (never the request's Host header) and emails go to an outbox file here.
   await admin.writeSettings({ keys: { siteUrl: "https://demo.example" } });
   const outbox = join(dataDir, "outbox.jsonl");
   env.INTROMAKER_MAIL_OUTBOX = outbox;
+  const mails = async () => (await read(outbox, "utf8").catch(() => "")).trim().split("\n").filter(Boolean).length;
   const tokenOf = async (r: Response) => {
     if (r.status !== 200) return undefined;
     const lines = (await read(outbox, "utf8").catch(() => "")).trim().split("\n").filter(Boolean);
     const last = lines.length ? (JSON.parse(lines[lines.length - 1]) as { text: string }) : null;
-    return last?.text.match(/https:\/\/demo\.example\/account\/verify#t=([\w-]+)/)?.[1];
+    return last?.text.match(/https:\/\/demo\.example\/account\/reset#t=([\w-]+)/)?.[1];
   };
-  const upLink = await askLink({ mode: "up", email: "Eve@Example.com", firstName: "Eve", country: "GB", next: "/studio" });
-  const upToken = await tokenOf(upLink);
-  check(!!upToken, "sign-up emails a one-time link to the site's own address");
-  check(!(await acc.findUserByEmail("eve@example.com")), "no account exists until the link is opened");
-  const opened = await magicVerify.POST(ureq("/api/account/magic/verify", { method: "POST", ip: "203.0.113.81", body: JSON.stringify({ token: upToken }) }));
-  const openedBody = (await opened.json()) as { next?: string; created?: boolean };
-  check(opened.status === 200 && /im_user=/.test(opened.headers.get("set-cookie") ?? "") && openedBody.created === true && openedBody.next === "/studio", "opening the link makes the account, signs in and returns to the studio");
-  check((await acc.findUserByEmail("eve@example.com"))?.firstName === "Eve", "the account keeps the name given at sign-up");
-  check((await magicVerify.POST(ureq("/api/account/magic/verify", { method: "POST", ip: "203.0.113.81", body: JSON.stringify({ token: upToken }) }))).status === 400, "a sign-in link works once");
-  const inToken = await tokenOf(await askLink({ mode: "in", email: "eve@example.com" }));
-  check(!!inToken && (await magicVerify.POST(ureq("/api/account/magic/verify", { method: "POST", ip: "203.0.113.81", body: JSON.stringify({ token: inToken }) }))).status === 200, "signing in again is a new link to the same account");
-  const nobody = await askLink({ mode: "in", email: "nobody@example.com" });
-  check(nobody.status === 200 && !(await tokenOf(nobody)), "asking for a link to an unknown email doesn't reveal it (same answer; the email says to sign up)");
-  check((await magicVerify.POST(ureq("/api/account/magic/verify", { method: "POST", ip: "203.0.113.81", body: JSON.stringify({ token: "x".repeat(43) }) }))).status === 400, "a made-up token is refused");
+  const oldToken = await tokenOf(await askReset("Eve@Example.com"));
+  const resetToken = await tokenOf(await askReset("eve@example.com"));
+  check(!!resetToken, "forgot password emails a one-time reset link to the site's own address");
+  check((await setNew(oldToken, "second-pass-2")).status === 400, "only the newest reset link works");
+  check((await setNew(resetToken, "short")).status === 400, "a short new password is refused (and the link isn't spent)");
+  const reset = await setNew(resetToken, "second-pass-2");
+  check(reset.status === 200 && /im_user=/.test(reset.headers.get("set-cookie") ?? ""), "the reset link sets the new password and signs in");
+  check((await setNew(resetToken, "third-pass-3")).status === 400, "a reset link works once");
+  check((await accSession.POST(ureq("/api/account/session", { method: "POST", ip: "203.0.113.82", body: JSON.stringify({ email: "eve@example.com", password: "second-pass-2" }) }))).status === 200, "the new password signs in");
+  check((await accSession.POST(ureq("/api/account/session", { method: "POST", ip: "203.0.113.82", body: JSON.stringify({ email: "eve@example.com", password: "first-pass-1" }) }))).status === 401, "the old password no longer does");
+  const before = await mails();
+  const nobody = await askReset("nobody@example.com");
+  check(nobody.status === 200 && (await mails()) === before, "asking to reset an unknown email doesn't reveal it (same answer, no email)");
+  check((await setNew("x".repeat(43), "fourth-pass-4")).status === 400, "a made-up token is refused");
   check((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "nope-nope" }) }))).status === 401, "a wrong password is refused");
   check((await accSession.POST(ureq("/api/account/session", { method: "POST", origin: "https://evil.example", body: JSON.stringify({ email: "ana@example.com", password: "pass-word-1" }) }))).status === 403, "sign-in from another site is refused");
   // Plans are unlimited by default for now; the owner's limits (set in Admin → Plans) are still

@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import Nav from "@/components/Nav";
-import Verify from "./Verify";
+import Reset from "./Reset";
 
 export const metadata: Metadata = {
-  title: "Signing in · Prodintro.com",
+  title: "Choose a new password · Prodintro.com",
   robots: { index: false },
-  // (The sign-in token is in the address's fragment; never pass the page on as a referrer.)
+  // (The reset token is in the address's fragment; never pass the page on as a referrer.)
   referrer: "no-referrer",
 };
 
-export default function VerifyPage() {
+export default function ResetPage() {
   return (
     <>
       <Nav cta={false} />
-      <Verify />
+      <Reset />
     </>
   );
 }

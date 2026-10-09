@@ -47,8 +47,8 @@ export const RULES = {
   unlock: { limit: 8, windowMs: 15 * MIN },
   /** Account sign-in attempts. */
   accountLogin: { limit: 10, windowMs: 15 * MIN },
-  /** Sign-in links asked for, per address and per email (each sends an email). */
-  magic: { limit: 6, windowMs: 15 * MIN },
+  /** Password-reset emails asked for, per address and per email (each sends an email). */
+  reset: { limit: 6, windowMs: 15 * MIN },
   /** New accounts from one address. */
   signup: { limit: 5, windowMs: 60 * MIN },
   /** Saving films / account changes. */

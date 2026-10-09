@@ -29,7 +29,7 @@ const USERS = join(ROOT, "users");
 const FILMS = join(ROOT, "films");
 const EMAILS = join(ROOT, "emails.json");
 const SECRET = join(ROOT, "secret");
-const MAGIC = join(ROOT, "magic.json");
+const RESETS = join(ROOT, "resets.json");
 
 export const USER_COOKIE = "im_user";
 const SESSION_MS = 30 * 86_400_000;
@@ -354,64 +354,65 @@ export async function findUserByStripeCustomer(customer: string) {
   return null;
 }
 
-// ───────────────────────── Sign-in links (passwordless) ─────────────────────────
+// ───────────────────────── Password reset by email ─────────────────────────
 
-/** How long a sign-in link works. */
-export const MAGIC_MINUTES = 15;
-type MagicRecord = { email: string; exp: number; profile?: { firstName: string; country: string; region?: string }; next?: string };
+/** How long a password-reset link works. */
+export const RESET_MINUTES = 30;
+type ResetRecord = { uid: string; sv: number; exp: number };
 const tokenHash = (t: string) => createHash("sha256").update(t).digest("hex");
 
 /**
- * A one-time sign-in link's token for this email (the profile, for a new account, travels with it).
- * Only a hash of the token is kept, it lasts MAGIC_MINUTES and works once. `exists`: whether an
- * account already has this email (a new one is created when the link is opened).
+ * A one-time password-reset token for this email's account, or null when there's no (enabled)
+ * account. Only a hash of the token is kept; it lasts RESET_MINUTES, works once, and stops working
+ * once the password changes another way (it's tied to the account's session version).
  */
-export async function createMagic(emailRaw: unknown, opts: { profile?: Profile; next?: string } = {}): Promise<{ token: string; email: string; exists: boolean; firstName?: string }> {
+export async function createReset(emailRaw: unknown): Promise<{ token: string; user: User } | null> {
   const email = normEmail(emailRaw);
   if (!emailOk(email)) throw new AccountError("Enter a valid email address.");
-  const existing = await findUserByEmail(email);
-  if (existing?.disabled) throw new AccountError("This account is disabled. Contact the site owner.", 403);
-  const profile = !existing && opts.profile ? readProfile(opts.profile) : undefined;
+  const u = await findUserByEmail(email);
+  if (!u || u.disabled) return null;
   const token = randomBytes(32).toString("base64url");
   await serial(async () => {
     const now = Date.now();
-    const all = (await readJson<Record<string, MagicRecord>>(MAGIC)) ?? {};
-    for (const [k, v] of Object.entries(all)) if (v.exp < now) delete all[k];
-    all[tokenHash(token)] = { email, exp: now + MAGIC_MINUTES * 60_000, profile, next: opts.next };
+    const all = (await readJson<Record<string, ResetRecord>>(RESETS)) ?? {};
+    // (Expired ones go, and so do this account's older links: only the newest works.)
+    for (const [k, v] of Object.entries(all)) if (v.exp < now || v.uid === u.id) delete all[k];
+    all[tokenHash(token)] = { uid: u.id, sv: u.sv, exp: now + RESET_MINUTES * 60_000 };
     await mkdir(ROOT, { recursive: true });
-    await writeJson(MAGIC, all);
+    await writeJson(RESETS, all);
   });
-  return { token, email, exists: !!existing, firstName: existing?.firstName ?? profile?.firstName };
+  return { token, user: u };
 }
 
-/**
- * Open a sign-in link: the account it signs in to (created now for a new email, with the profile
- * given at sign-up), and where to go next. The token is spent either way.
- */
-export async function useMagic(token: unknown): Promise<{ user: User; next?: string; created: boolean }> {
-  if (typeof token !== "string" || token.length < 20 || token.length > 100) throw new AccountError("This sign-in link isn't valid. Ask for a new one.", 400);
+/** Set a new password with a reset link's token. The token is spent, other sessions end. */
+export async function useReset(token: unknown, next: unknown): Promise<User> {
+  if (typeof token !== "string" || token.length < 20 || token.length > 100) throw new AccountError("This reset link isn't valid. Ask for a new one.", 400);
+  const problem = passwordProblem(next);
+  if (problem) throw new AccountError(problem);
   const rec = await serial(async () => {
-    const all = (await readJson<Record<string, MagicRecord>>(MAGIC)) ?? {};
+    const all = (await readJson<Record<string, ResetRecord>>(RESETS)) ?? {};
     const k = tokenHash(token);
     const r = all[k];
     if (r) {
       delete all[k];
-      await writeJson(MAGIC, all);
+      await writeJson(RESETS, all);
     }
     return r;
   });
-  if (!rec) throw new AccountError("This sign-in link has already been used or isn't valid. Ask for a new one.", 400);
-  if (rec.exp < Date.now()) throw new AccountError("This sign-in link has expired. Ask for a new one.", 400);
-  const existing = await findUserByEmail(rec.email);
-  if (existing) {
-    if (existing.disabled) throw new AccountError("This account is disabled. Contact the site owner.", 403);
-    const u = (await updateUser(existing.id, (x) => void (x.lastLoginAt = Date.now()))) ?? existing;
-    return { user: u, next: rec.next, created: false };
-  }
-  if (!rec.profile) throw new AccountError("There's no account for this email yet. Create one to get your free videos.", 404);
-  // (A passwordless account: its password is random and never shown; links sign it in.)
-  const user = await createUser(rec.email, randomBytes(24).toString("base64url"), rec.profile);
-  return { user, next: rec.next, created: true };
+  if (!rec) throw new AccountError("This reset link has already been used or isn't valid. Ask for a new one.", 400);
+  if (rec.exp < Date.now()) throw new AccountError("This reset link has expired. Ask for a new one.", 400);
+  const u = await getUser(rec.uid);
+  if (!u || u.sv !== rec.sv) throw new AccountError("This reset link is out of date. Ask for a new one.", 400);
+  if (u.disabled) throw new AccountError("This account is disabled. Contact the site owner.", 403);
+  const pass = await hashPassword(next as string);
+  const fresh = await updateUser(u.id, (x) => {
+    x.pass = pass;
+    x.sv += 1;
+    x.mustChangePassword = false;
+    x.lastLoginAt = Date.now();
+  });
+  if (!fresh) throw new AccountError("Account not found.", 404);
+  return fresh;
 }
 
 // ───────────────────────── Sessions ─────────────────────────

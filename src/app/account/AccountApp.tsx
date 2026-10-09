@@ -67,82 +67,46 @@ export default function AccountApp() {
 }
 
 function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
-  void onIn;
-  const [mode, setMode] = useState<"in" | "up">("up");
+  const [mode, setMode] = useState<"in" | "up" | "forgot">("up");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Sent: the inbox to check (and, in development without an email service, the link itself).
-  const [sent, setSent] = useState<{ email: string; devLink?: string } | null>(null);
-  // Sign-up asks only for a first name, a country and, optionally, a state or region. No password:
-  // signing in is a link emailed each time.
+  // Sign-up asks only for a first name, a country and, optionally, a state or region.
   const [firstName, setFirstName] = useState("");
   const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
   const [list, setList] = useState<[string, string][]>([]);
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("mode") === "in") setMode("in");
+    const m = new URLSearchParams(location.search).get("mode");
+    if (m === "in" || m === "forgot") setMode(m);
     setList(countries());
     // (The country from the browser's language, as a starting point: "en-US" → United States.)
     const guess = (navigator.language.split("-")[1] ?? "").toUpperCase();
     if (/^[A-Z]{2}$/.test(guess)) setCountry(guess);
   }, []);
   const regions = REGIONS[country];
-  const send = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  if (mode === "forgot") return <Forgot me={me} email={email} setEmail={setEmail} onBack={() => setMode("in")} />;
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const next = safeNext(new URLSearchParams(location.search).get("next")) ?? (wantsPro() ? "/account?plan=pro#plan" : undefined);
-      const r = await api<{ email: string; devLink?: string }>("/api/account/magic", {
-        method: "POST",
-        body: JSON.stringify(mode === "up" ? { mode, email, firstName, country, region, next } : { mode, email, next }),
-      });
-      setSent({ email: r.email, devLink: r.devLink });
+      await api(mode === "up" ? "/api/account" : "/api/account/session", { method: "POST", body: JSON.stringify(mode === "up" ? { email, password, firstName, country, region } : { email, password }) });
+      const next = safeNext(new URLSearchParams(location.search).get("next"));
+      if (next) location.href = next;
+      else onIn();
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
   };
-  if (sent) {
-    return (
-      <main className="account">
-        <div className="account-split">
-          <div className="account-card auth sent">
-            <span className="sent-icon" aria-hidden>
-              ✉️
-            </span>
-            <h1>Check your inbox</h1>
-            <p>
-              We sent a sign-in link to <strong>{sent.email}</strong>. Open it on this device to {mode === "up" ? "finish creating your account" : "sign in"}. It
-              works once, for 15 minutes.
-            </p>
-            <p className="hint">No email? Check spam or promotions, or send it again.</p>
-            {sent.devLink && (
-              <p className="hint">
-                Development (no email service set up): <a href={sent.devLink}>open the sign-in link</a>
-              </p>
-            )}
-            {error && <p className="error">{error}</p>}
-            <div className="admin-row actions">
-              <button type="button" className="btn btn-ghost" onClick={() => setSent(null)}>
-                Use a different email
-              </button>
-              <button type="button" className="btn btn-primary" disabled={busy} onClick={() => send()}>
-                {busy ? "Sending…" : "Send it again"}
-              </button>
-            </div>
-          </div>
-          <PlanCards me={me} />
-        </div>
-      </main>
-    );
-  }
   return (
     <main className="account">
       <div className="account-split">
-        <form className="account-card auth" onSubmit={send}>
+        <form className="account-card auth" onSubmit={submit}>
           <div className="seg-control">
             <button type="button" className={mode === "up" ? "active" : ""} onClick={() => setMode("up")}>
               Create account
@@ -152,8 +116,7 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
             </button>
           </div>
           <h1>{wantsPro() ? (mode === "up" ? "Create an account to get Pro" : "Sign in to get Pro") : mode === "up" ? freeHeadline(me.plans.free.exports) : "Welcome back"}</h1>
-          {mode === "up" && !wantsPro() && me.plans.free.exports < 100_000 && <p className="hint">Sign up free: no card and no password needed. Your free videos are yours to use for your business.</p>}
-          {mode === "in" && <p className="hint">Enter your email and we&apos;ll send you a link to sign in. No password needed.</p>}
+          {mode === "up" && !wantsPro() && me.plans.free.exports < 100_000 && <p className="hint">Sign up free: no card needed. Your free videos are yours to use for your business.</p>}
           {mode === "up" && (
             <label className="fld">
               <span className="fld-cap">First name</span>
@@ -163,6 +126,25 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
           <label className="fld">
             <span className="fld-cap">Email</span>
             <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label className="fld">
+            <span className="fld-cap">
+              Password {mode === "up" && <em>at least 8 characters</em>}
+            </span>
+            <span className="pw-row">
+              <input
+                className="input"
+                type={show ? "text" : "password"}
+                autoComplete={mode === "up" ? "new-password" : "current-password"}
+                required
+                minLength={mode === "up" ? 8 : undefined}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button type="button" className="pw-toggle" onClick={() => setShow((v) => !v)} aria-pressed={show} aria-label={show ? "Hide password" : "Show password"}>
+                {show ? "Hide" : "Show"}
+              </button>
+            </span>
           </label>
           {mode === "up" && (
             <div className="fld-row">
@@ -210,10 +192,103 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
           {mode === "up" && <p className="hint small">We ask only for what&apos;s above: your email to sign in, and your name, country and state to know who uses Prodintro.com. See the <Link href="/privacy">privacy page</Link>.</p>}
           {error && <p className="error">{error}</p>}
           <button className="btn btn-primary" disabled={busy}>
-            {busy ? "Sending…" : mode === "up" ? (me.plans.free.exports < 100_000 ? `Get ${me.plans.free.exports} free videos` : "Create free account") : "Email me a sign-in link"}
+            {busy ? "One moment…" : mode === "up" ? (me.plans.free.exports < 100_000 ? `Get ${me.plans.free.exports} free videos` : "Create free account") : "Sign in"}
           </button>
-          {mode === "up" && <p className="hint small">We&apos;ll email you a link to confirm your address and sign in.</p>}
+          {mode === "in" && (
+            <p className="hint">
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => {
+                  setError(null);
+                  setMode("forgot");
+                }}
+              >
+                Forgot your password?
+              </button>
+            </p>
+          )}
         </form>
+        <PlanCards me={me} />
+      </div>
+    </main>
+  );
+}
+
+/** Forgot password: a reset link by email (or, where the site sends no email, who to ask). */
+function Forgot({ me, email, setEmail, onBack }: { me: Me; email: string; setEmail: (v: string) => void; onBack: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<{ email: string; minutes: number; devLink?: string } | null>(null);
+  const send = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      setSent(await api<{ email: string; minutes: number; devLink?: string }>("/api/account/reset", { method: "POST", body: JSON.stringify({ email }) }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="account">
+      <div className="account-split">
+        {sent ? (
+          <div className="account-card auth sent">
+            <span className="sent-icon" aria-hidden>
+              ✉️
+            </span>
+            <h1>Check your inbox</h1>
+            <p>
+              If an account uses <strong>{sent.email}</strong>, we&apos;ve sent it a link to choose a new password. It works once, for {sent.minutes} minutes.
+            </p>
+            <p className="hint">No email? Check spam or promotions, or send it again.</p>
+            {sent.devLink && (
+              <p className="hint">
+                Development (no email service set up): <a href={sent.devLink}>open the reset link</a>
+              </p>
+            )}
+            {error && <p className="error">{error}</p>}
+            <div className="admin-row actions">
+              <button type="button" className="btn btn-ghost" onClick={onBack}>
+                Back to sign in
+              </button>
+              <button type="button" className="btn btn-primary" disabled={busy} onClick={() => send()}>
+                {busy ? "Sending…" : "Send it again"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form className="account-card auth" onSubmit={send}>
+            <h1>Reset your password</h1>
+            <p className="hint">Enter your account&apos;s email and we&apos;ll send you a link to choose a new password.</p>
+            <label className="fld">
+              <span className="fld-cap">Email</span>
+              <input className="input" type="email" autoComplete="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
+            </label>
+            {error && (
+              <p className="error">
+                {error}
+                {me.contactEmail && /isn't set up/.test(error) && (
+                  <>
+                    {" "}
+                    <a href={`mailto:${me.contactEmail}?subject=Password%20reset`}>Write now</a>
+                  </>
+                )}
+              </p>
+            )}
+            <button className="btn btn-primary" disabled={busy}>
+              {busy ? "Sending…" : "Email me a reset link"}
+            </button>
+            <p className="hint">
+              <button type="button" className="link-btn" onClick={onBack}>
+                Back to sign in
+              </button>
+            </p>
+          </form>
+        )}
         <PlanCards me={me} />
       </div>
     </main>
@@ -369,6 +444,11 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
           Your last payment didn&apos;t go through. Stripe will retry; {me.billing.portal ? "update your card in Manage billing" : "please update your card"} to keep Pro.
         </div>
       )}
+      {u.mustChangePassword && (
+        <div className="account-card warn-card">
+          <strong>Choose a new password.</strong> The site owner reset your password; pick your own below.
+        </div>
+      )}
       {msg && <p className={msg.ok ? "ok-msg" : "error"}>{msg.text}</p>}
 
       <section>
@@ -465,18 +545,32 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
         {u.plan === "free" && u.upgradeRequestedAt && <p className="hint">You asked for Pro on {new Date(u.upgradeRequestedAt).toLocaleDateString()}. The site owner will switch your plan.</p>}
       </section>
 
-      <Security email={u.email} onSignOutAll={() => signOut(true)} />
+      <Security mustChange={u.mustChangePassword} onChanged={() => (setMsg({ ok: true, text: "Password changed. Other devices were signed out." }), reload())} onSignOutAll={() => signOut(true)} />
     </main>
   );
 }
 
-function Security({ email, onSignOutAll }: { email: string; onSignOutAll: () => void }) {
+function Security({ mustChange, onChanged, onSignOutAll }: { mustChange: boolean; onChanged: () => void; onSignOutAll: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [typed, setTyped] = useState("");
+  const [delPw, setDelPw] = useState("");
+  const change = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await api("/api/account/password", { method: "POST", body: JSON.stringify({ current, next }) });
+      setCurrent("");
+      setNext("");
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
   const del = async () => {
     if (!confirm("Delete your account and your saved intros? This can't be undone.")) return;
     try {
-      await api("/api/account", { method: "DELETE", body: JSON.stringify({ confirm: typed }) });
+      await api("/api/account", { method: "DELETE", body: JSON.stringify({ password: delPw }) });
       location.href = "/";
     } catch (err) {
       setError((err as Error).message);
@@ -485,21 +579,33 @@ function Security({ email, onSignOutAll }: { email: string; onSignOutAll: () => 
   return (
     <section className="account-security">
       <h2>Security</h2>
-      <div className="account-card">
-        <strong>Signing in</strong>
-        <p className="hint">You sign in with a link emailed to {email}: there&apos;s no password to remember or to leak.</p>
+      <form className="account-card" onSubmit={change}>
+        <strong>Change password</strong>
+        {!mustChange && (
+          <label className="fld">
+            <span className="fld-cap">Current password</span>
+            <input className="input" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          </label>
+        )}
+        <label className="fld">
+          <span className="fld-cap">
+            New password <em>at least 8 characters</em>
+          </span>
+          <input className="input" type="password" autoComplete="new-password" minLength={8} required value={next} onChange={(e) => setNext(e.target.value)} />
+        </label>
+        {error && <p className="error">{error}</p>}
         <div className="admin-row actions">
           <button type="button" className="btn btn-ghost" onClick={onSignOutAll}>
             Sign out everywhere
           </button>
+          <button className="btn btn-primary">Change password</button>
         </div>
-      </div>
+      </form>
       <details className="account-card danger-zone">
         <summary>Delete account</summary>
-        <p className="hint">Deletes your account and your saved intros. Type your email address to confirm.</p>
-        <input className="input" type="email" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={email} />
-        {error && <p className="error">{error}</p>}
-        <button className="btn btn-ghost danger" onClick={del} disabled={typed.trim().toLowerCase() !== email.toLowerCase()}>
+        <p className="hint">Deletes your account and your saved intros. Enter your password to confirm.</p>
+        <input className="input" type="password" autoComplete="current-password" value={delPw} onChange={(e) => setDelPw(e.target.value)} placeholder="Password" />
+        <button className="btn btn-ghost danger" onClick={del} disabled={!delPw}>
           Delete my account
         </button>
       </details>
