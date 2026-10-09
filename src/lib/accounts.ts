@@ -7,6 +7,7 @@ import type { VideoPlan } from "@/engine/types";
 import { forgetAccount, planLimits } from "./admin";
 import { cookieOf, isHttps, sameOrigin } from "./http";
 import type { PlanId, PlanLimits } from "./plans";
+import { isCountry, REGIONS, regionLabel } from "./regions";
 
 /**
  * Visitor accounts: email + password, saved films, and a plan (Free or Pro).
@@ -41,6 +42,10 @@ export interface User {
   /** Session version: bumping it signs the account out everywhere. */
   sv: number;
   plan: PlanId;
+  /** The little sign-up asks for: a first name, a country (ISO code) and a state or region. */
+  firstName?: string;
+  country?: string;
+  region?: string;
   createdAt: number;
   lastLoginAt?: number;
   disabled?: boolean;
@@ -48,7 +53,7 @@ export interface User {
   upgradeRequestedAt?: number;
   /** Must choose a new password (after a reset by the owner). */
   mustChangePassword?: boolean;
-  usage?: { aiMonth?: string; ai?: number; importDay?: string; imports?: number };
+  usage?: { aiMonth?: string; ai?: number; importDay?: string; imports?: number; exports?: number };
   /** Who set the plan: the owner by hand, or Stripe (only a Stripe plan is taken back by Stripe). */
   planSource?: "admin" | "stripe";
   stripeCustomerId?: string;
@@ -164,22 +169,66 @@ let dummy: string | null = null;
 
 // ───────────────────────── Accounts ─────────────────────────
 
-export async function createUser(emailRaw: unknown, password: unknown): Promise<User> {
+/** Sign-up's profile: a first name, a country and, optionally, a state or region. */
+export interface Profile {
+  firstName?: unknown;
+  country?: unknown;
+  region?: unknown;
+}
+
+/** The profile, checked and tidied (throws an AccountError naming what to fix). */
+export function readProfile(p: Profile): { firstName: string; country: string; region?: string } {
+  const firstName = typeof p.firstName === "string" ? p.firstName.replace(/\s+/g, " ").trim().slice(0, 40) : "";
+  if (!firstName || !/^[\p{L}][\p{L}\p{M}' .-]*$/u.test(firstName)) throw new AccountError("Enter your first name.");
+  if (!isCountry(p.country)) throw new AccountError("Choose your country.");
+  const listed = REGIONS[p.country];
+  const region = typeof p.region === "string" ? p.region.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+  // (The state or region is optional; one given for a country with a list must be on it.)
+  if (region && listed && !listed.includes(region)) throw new AccountError(`Choose your ${regionLabel(p.country).toLowerCase()} from the list.`);
+  if (region && !/^[\p{L}\p{M}\p{N}' .,()-]+$/u.test(region)) throw new AccountError("Enter a valid state or region.");
+  return { firstName, country: p.country, region: region || undefined };
+}
+
+export async function createUser(emailRaw: unknown, password: unknown, profile?: Profile): Promise<User> {
   const email = normEmail(emailRaw);
   if (!emailOk(email)) throw new AccountError("Enter a valid email address.");
   const problem = passwordProblem(password);
   if (problem) throw new AccountError(problem);
+  // (Accounts made by the owner or by tests may come without a profile.)
+  const who = profile ? readProfile(profile) : {};
   const pass = await hashPassword(password as string);
   return serial(async () => {
     const index = await emailIndex();
     if (index[email]) throw new AccountError("An account with this email already exists. Sign in instead.", 409);
-    const u: User = { id: randomUUID(), email, pass, sv: 1, plan: "free", createdAt: Date.now(), lastLoginAt: Date.now() };
+    const u: User = { id: randomUUID(), email, pass, sv: 1, plan: "free", ...who, createdAt: Date.now(), lastLoginAt: Date.now() };
     await saveUser(u);
     index[email] = u.id;
     await mkdir(ROOT, { recursive: true });
     await writeJson(EMAILS, index);
     return u;
   });
+}
+
+/**
+ * Count one exported video against the account's allowance (Free: a few, for commercial use).
+ * Returns the count after this one, or an AccountError (402) when the allowance is used up.
+ */
+export async function recordExport(u: User): Promise<{ used: number; limit: number }> {
+  const limit = (await limitsFor(u)).exports;
+  let used = 0;
+  let over = false;
+  await updateUser(u.id, (x) => {
+    const n = x.usage?.exports ?? 0;
+    if (n >= limit) {
+      over = true;
+      used = n;
+      return;
+    }
+    x.usage = { ...(x.usage ?? {}), exports: n + 1 };
+    used = n + 1;
+  });
+  if (over) throw new AccountError(`You've used your ${limit} free video${limit === 1 ? "" : "s"}. Upgrade to Pro for unlimited videos.`, 402);
+  return { used, limit };
 }
 
 export async function login(emailRaw: unknown, password: unknown): Promise<User> {
@@ -265,6 +314,9 @@ export function publicUser(u: User) {
     id: u.id,
     email: u.email,
     plan: u.plan,
+    firstName: u.firstName,
+    country: u.country,
+    region: u.region,
     createdAt: u.createdAt,
     lastLoginAt: u.lastLoginAt,
     upgradeRequestedAt: u.upgradeRequestedAt,
@@ -390,7 +442,7 @@ export async function spendImport(u: User): Promise<boolean> {
 /** This month's and today's usage, reset when the period rolls over. */
 export function usageOf(u: User) {
   const usage = u.usage ?? {};
-  return { ai: usage.aiMonth === month() ? (usage.ai ?? 0) : 0, imports: usage.importDay === day() ? (usage.imports ?? 0) : 0 };
+  return { ai: usage.aiMonth === month() ? (usage.ai ?? 0) : 0, imports: usage.importDay === day() ? (usage.imports ?? 0) : 0, exports: usage.exports ?? 0 };
 }
 
 // ───────────────────────── Saved films ─────────────────────────

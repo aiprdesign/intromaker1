@@ -184,13 +184,26 @@ async function main() {
     if (init.origin !== null && (init.method ?? "GET") !== "GET") headers.origin = init.origin ?? A;
     return new Request(A + path, { ...init, headers });
   };
-  const signup = await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "Ana@Example.com ", password: "pass-word-1" }) }));
+  // Sign-up asks for the minimum: an email, a password, a first name and a country (the state is optional).
+  const who = { firstName: "Ana", country: "US" };
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", ip: "203.0.113.70", body: JSON.stringify({ email: "zed@example.com", password: "pass-word-1", country: "US" }) }))).status === 400, "sign-up without a first name is refused");
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", ip: "203.0.113.70", body: JSON.stringify({ email: "zed@example.com", password: "pass-word-1", firstName: "Zed" }) }))).status === 400, "sign-up without a country is refused");
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", ip: "203.0.113.70", body: JSON.stringify({ email: "zed@example.com", password: "pass-word-1", firstName: "Zed", country: "US", region: "Atlantis" }) }))).status === 400, "a state that isn't on the country's list is refused");
+  const signup = await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "Ana@Example.com ", password: "pass-word-1", ...who }) }));
   const ucookie = (signup.headers.get("set-cookie") ?? "").split(";")[0];
   check(signup.status === 200 && /HttpOnly/.test(signup.headers.get("set-cookie") ?? "") && ucookie.startsWith("im_user="), "sign-up creates the account and signs in (HttpOnly cookie)");
-  check((await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "another-pass" }) }))).status === 409, "one account per email (case-insensitive)");
-  check((await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "bo@example.com", password: "short" }) }))).status === 400, "short passwords are refused");
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "another-pass", ...who }) }))).status === 409, "one account per email (case-insensitive)");
+  check((await accountRoute.POST(ureq("/api/account", { method: "POST", body: JSON.stringify({ email: "bo@example.com", password: "short", ...who }) }))).status === 400, "short passwords are refused");
   const stored = await read(join(dataDir, "accounts", "users", (await acc.currentUser(ureq("/", { cookie: ucookie })))!.id + ".json"), "utf8");
   check(!stored.includes("pass-word-1") && stored.includes("scrypt$"), "the password is stored only as an scrypt hash");
+  check(stored.includes('"firstName": "Ana"') || stored.includes('"firstName":"Ana"'), "the first name and country are kept with the account");
+  // Free accounts export a few videos (for commercial use); the next one is refused with an upgrade message.
+  const accExport = await import("../src/app/api/account/export/route");
+  const exp = () => accExport.POST(ureq("/api/account/export", { method: "POST", cookie: ucookie }));
+  const firstThree = await Promise.all([exp(), exp(), exp()].map((p) => p.then((r) => r.status)));
+  check(firstThree.every((st) => st === 200), "a free account exports its 3 free videos");
+  check((await exp()).status === 402, "a 4th export on Free is refused with an upgrade message");
+  check((await accExport.POST(ureq("/api/account/export", { method: "POST" }))).status === 401, "exporting needs an account");
   check((await accSession.POST(ureq("/api/account/session", { method: "POST", body: JSON.stringify({ email: "ana@example.com", password: "nope-nope" }) }))).status === 401, "a wrong password is refused");
   check((await accSession.POST(ureq("/api/account/session", { method: "POST", origin: "https://evil.example", body: JSON.stringify({ email: "ana@example.com", password: "pass-word-1" }) }))).status === 403, "sign-in from another site is refused");
   // Plans are unlimited by default for now; the owner's limits (set in Admin → Plans) are still
@@ -203,7 +216,7 @@ async function main() {
   check(plansLib.readLimits({ free: oldFree, pro: oldPro }).free.savedFilms === 3, "limits saved today are kept exactly, even the old default numbers");
   check(plansLib.readLimits({ free: { ...oldFree, savedFilms: 5 } }).free.savedFilms === 5, "limits the owner changed are kept");
   // (Customised, so they're enforced: one value differs from the old defaults.)
-  await admin.writeSettings({ plans: { free: { ...oldFree, maxLong: 1280 }, pro: { ...oldPro, maxFps: 30 } } });
+  await admin.writeSettings({ plans: { free: { ...oldFree, maxLong: 1280, exports: 3 }, pro: { ...oldPro, maxFps: 30, exports: 100_000 } } });
   const save = (cookie: string, body: object) => accFilms.POST(ureq("/api/account/films", { method: "POST", cookie, body: JSON.stringify({ plan, ...body }) }));
   const saved = await Promise.all([1, 2, 3].map(() => save(ucookie, {})));
   check(saved.every((r) => r.status === 200), "Free keeps 3 saved intros");
@@ -211,7 +224,7 @@ async function main() {
   check(fourth.status === 402, "a 4th saved intro on Free is refused with an upgrade message");
   const firstId = (await saved[0].json()).id;
   check((await save(ucookie, { id: firstId, title: "Renamed by save" })).status === 200, "updating a saved intro doesn't count against the limit");
-  const other = await accountRoute.POST(ureq("/api/account", { method: "POST", ip: "203.0.113.61", body: JSON.stringify({ email: "bo@example.com", password: "bo-password" }) }));
+  const other = await accountRoute.POST(ureq("/api/account", { method: "POST", ip: "203.0.113.61", body: JSON.stringify({ email: "bo@example.com", password: "bo-password", firstName: "Bo", country: "CA", region: "Ontario" }) }));
   const ocookie = (other.headers.get("set-cookie") ?? "").split(";")[0];
   check((await accFilm.GET(ureq(`/api/account/films/${firstId}`, { cookie: ocookie }), { params: Promise.resolve({ id: firstId }) })).status === 404, "another account can't open someone's intro");
   check((await accFilms.GET(ureq("/api/account/films"))).status === 401, "saved intros need a signed-in account");

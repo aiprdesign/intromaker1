@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { REFUND_DAYS } from "@/lib/stripe-links";
 import { describeLimits, PLAN_NAMES, type PlanId, type PlanLimits } from "@/lib/plans";
+import { countries, REGIONS, regionLabel } from "@/lib/regions";
 
 type User = {
   id: string;
   email: string;
   plan: PlanId;
+  firstName?: string;
   createdAt: number;
   upgradeRequestedAt?: number;
   mustChangePassword: boolean;
@@ -20,7 +22,7 @@ type Billing = { online: boolean; monthly?: string | null; yearly?: string | nul
 type Me = {
   user: User | null;
   limits: PlanLimits;
-  usage: { ai: number; imports: number };
+  usage: { ai: number; imports: number; exports: number };
   plans: Record<PlanId, PlanLimits>;
   proPrice: string | null;
   contactEmail: string | null;
@@ -49,6 +51,8 @@ const safeNext = (n: string | null) => {
 /** Came to buy Pro (from the pricing page): after signing in, go straight to the plans. */
 const wantsPro = () => typeof location !== "undefined" && new URLSearchParams(location.search).get("plan") === "pro";
 const showPlans = () => setTimeout(() => document.getElementById("plan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+/** The sign-up headline: the free videos, when Free has a set number. */
+const freeHeadline = (n: number) => (n >= 100_000 ? "Save your intros" : `${n} free video${n === 1 ? "" : "s"} for your business`);
 /** The limit after a usage count: "of 50", or "(no limit)" for the big ones. */
 const usageOf = (n: number) => (n >= 100_000 ? "(no limit)" : `of ${n}`);
 
@@ -69,15 +73,25 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Sign-up asks only for a first name, a country and, optionally, a state or region.
+  const [firstName, setFirstName] = useState("");
+  const [country, setCountry] = useState("");
+  const [region, setRegion] = useState("");
+  const [list, setList] = useState<[string, string][]>([]);
   useEffect(() => {
     if (new URLSearchParams(location.search).get("mode") === "in") setMode("in");
+    setList(countries());
+    // (The country from the browser's language, as a starting point: "en-US" → United States.)
+    const guess = (navigator.language.split("-")[1] ?? "").toUpperCase();
+    if (/^[A-Z]{2}$/.test(guess)) setCountry(guess);
   }, []);
+  const regions = REGIONS[country];
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await api(mode === "up" ? "/api/account" : "/api/account/session", { method: "POST", body: JSON.stringify({ email, password }) });
+      await api(mode === "up" ? "/api/account" : "/api/account/session", { method: "POST", body: JSON.stringify(mode === "up" ? { email, password, firstName, country, region } : { email, password }) });
       const next = safeNext(new URLSearchParams(location.search).get("next"));
       if (next) location.href = next;
       else onIn();
@@ -99,7 +113,14 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
               Sign in
             </button>
           </div>
-          <h1>{wantsPro() ? (mode === "up" ? "Create an account to get Pro" : "Sign in to get Pro") : mode === "up" ? "Save your intros" : "Welcome back"}</h1>
+          <h1>{wantsPro() ? (mode === "up" ? "Create an account to get Pro" : "Sign in to get Pro") : mode === "up" ? freeHeadline(me.plans.free.exports) : "Welcome back"}</h1>
+          {mode === "up" && !wantsPro() && me.plans.free.exports < 100_000 && <p className="hint">Sign up free: no card needed. Your free videos are yours to use for your business.</p>}
+          {mode === "up" && (
+            <label className="fld">
+              <span className="fld-cap">First name</span>
+              <input className="input" autoComplete="given-name" required maxLength={40} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </label>
+          )}
           <label className="fld">
             <span className="fld-cap">Email</span>
             <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -123,9 +144,53 @@ function SignIn({ me, onIn }: { me: Me; onIn: () => void }) {
               </button>
             </span>
           </label>
+          {mode === "up" && (
+            <div className="fld-row">
+              <label className="fld">
+                <span className="fld-cap">Country</span>
+                <select
+                  className="input"
+                  autoComplete="country"
+                  required
+                  value={country}
+                  onChange={(e) => {
+                    setCountry(e.target.value);
+                    setRegion("");
+                  }}
+                >
+                  <option value="">Choose…</option>
+                  {list.map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {country && (
+                <label className="fld">
+                  <span className="fld-cap">
+                    {regionLabel(country)} <em>optional</em>
+                  </span>
+                  {regions ? (
+                    <select className="input" autoComplete="address-level1" value={region} onChange={(e) => setRegion(e.target.value)}>
+                      <option value="">Choose…</option>
+                      {regions.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className="input" autoComplete="address-level1" maxLength={60} value={region} onChange={(e) => setRegion(e.target.value)} />
+                  )}
+                </label>
+              )}
+            </div>
+          )}
+          {mode === "up" && <p className="hint small">We ask only for what&apos;s above: your email to sign in, and your name, country and state to know who uses Prodintro.com. See the <Link href="/privacy">privacy page</Link>.</p>}
           {error && <p className="error">{error}</p>}
           <button className="btn btn-primary" disabled={busy}>
-            {busy ? "One moment…" : mode === "up" ? "Create free account" : "Sign in"}
+            {busy ? "One moment…" : mode === "up" ? (me.plans.free.exports < 100_000 ? `Get ${me.plans.free.exports} free videos` : "Create free account") : "Sign in"}
           </button>
           {mode === "in" && (
             <p className="hint">
@@ -355,6 +420,9 @@ function Dashboard({ me, reload }: { me: Me & { user: User }; reload: () => Prom
       <section className="account-plan" id="plan">
         <h2>Plan</h2>
         <div className="account-card usage">
+          <span>
+            Videos exported: <strong>{me.usage.exports}</strong> {usageOf(me.limits.exports)}
+          </span>
           <span>
             AI videos this month: <strong>{me.usage.ai}</strong> {usageOf(me.limits.aiPerMonth)}
           </span>

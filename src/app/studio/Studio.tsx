@@ -2040,17 +2040,48 @@ export default function Studio() {
   };
 
   // ── Account: who's signed in, their plan's limits, and saving films to it.
-  type Account = { user: { email: string; plan: "free" | "pro" } | null; limits: PlanLimits };
+  type Account = { user: { email: string; plan: "free" | "pro"; firstName?: string } | null; limits: PlanLimits; exports?: number };
   const [account, setAccount] = useState<Account | null>(null);
   useEffect(() => {
     fetch("/api/account")
       .then((r) => r.json())
       .then((a) => {
-        setAccount({ user: a.user, limits: a.limits });
+        setAccount({ user: a.user, limits: a.limits, exports: a.usage?.exports ?? 0 });
         if (a.user) loadAccountFilms();
       })
       .catch(() => setAccount(null));
   }, [loadAccountFilms]);
+  /**
+   * Exporting needs a free account (it carries the free videos, licensed for commercial use).
+   * Signed out: an invitation to sign up (the video on screen is kept in this browser meanwhile).
+   */
+  const canExport = () => {
+    if (account?.user) return true;
+    const n = account?.limits.exports ?? 3;
+    setToast({ text: n < 100_000 ? `Sign up free to export: ${n} videos for your business, no card needed.` : "Create a free account to export your video.", key: Date.now(), link: { label: "Sign up free", href: "/account?next=/studio" } });
+    return false;
+  };
+  /** Count this export against the account's free videos; false (with an upgrade offer) when they're used up. */
+  const reserveExport = async () => {
+    try {
+      const res = await fetch("/api/account/export", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as { used?: number; limit?: number; error?: string };
+      if (res.status === 401) return canExport();
+      if (!res.ok) {
+        setToast({ text: data.error ?? "You've used your free videos.", key: Date.now(), link: { label: "Upgrade to Pro", href: "/account?plan=pro#plan" } });
+        return false;
+      }
+      setAccount((a) => (a ? { ...a, exports: data.used } : a));
+      if (data.limit !== undefined && data.used !== undefined && data.limit < 100_000) {
+        const left = data.limit - data.used;
+        setToast({ text: left > 0 ? `Free video ${data.used} of ${data.limit}: ${left} left, for commercial use.` : `That's your last free video. Pro gives you unlimited videos.`, key: Date.now() });
+      }
+      return true;
+    } catch {
+      // (Offline: the export goes ahead; the count catches up next time.)
+      return true;
+    }
+  };
   const [saveState, setSavingState] = useState<"" | "saving" | "saved">("");
   const saveFilm = async () => {
     if (!account?.user) {
@@ -2898,6 +2929,7 @@ export default function Studio() {
               }}
               onSpeed={(k) => setGlobal({ speed: k === 1 ? undefined : k })}
               beforeExport={async () => {
+                if (!canExport()) return false;
                 // Slides still showing a placeholder instead of your picture.
                 const waiting = plan.scenes.map((x, k) => (needsPicture(x, plan) ? k + 1 : 0)).filter(Boolean);
                 if (
@@ -2911,8 +2943,10 @@ export default function Studio() {
                 if (keepClaimSafe() !== plan) await new Promise((r) => setTimeout(r, 60));
                 // Lines still recording are finished first, so the narration is in the file.
                 const film = await narration.ensure();
-                if (film) return film;
-                return window.confirm(`The voice-over couldn't be recorded${narration.failure() ? ` (${narration.failure()})` : ""}.\n\nExport without it?`) ? { ...playPlan, voiceover: undefined } : false;
+                const out = film ? film : window.confirm(`The voice-over couldn't be recorded${narration.failure() ? ` (${narration.failure()})` : ""}.\n\nExport without it?`) ? { ...playPlan, voiceover: undefined } : false;
+                // The video counts against the account's free videos as it starts.
+                if (!out || !(await reserveExport())) return false;
+                return out;
               }}
               onExported={(p, preset) => {
                 // Tell the owner's admin area what was made (ignored when it's off).

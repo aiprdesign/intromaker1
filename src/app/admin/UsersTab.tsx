@@ -2,19 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PLAN_NAMES, type PlanId } from "@/lib/plans";
+import { countryName } from "@/lib/regions";
 import { api, CopyButton, Kpi, Skeleton, useAdminUi, When } from "./ui";
 
 type AdminUser = {
   id: string;
   email: string;
   plan: PlanId;
+  firstName?: string;
+  country?: string;
+  region?: string;
   createdAt: number;
   lastLoginAt?: number;
   upgradeRequestedAt?: number;
   mustChangePassword: boolean;
   disabled: boolean;
   films: number;
-  usage: { aiMonth?: string; ai?: number };
+  usage: { aiMonth?: string; ai?: number; exports?: number };
   planSource?: "admin" | "stripe";
   billingStatus?: "active" | "past_due" | "canceling" | "canceled";
   periodEnd?: number;
@@ -128,7 +132,7 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
   const shown = data.users
     .filter(
       (u) =>
-        (!needle || u.email.includes(needle)) &&
+        (!needle || u.email.includes(needle) || (u.firstName ?? "").toLowerCase().includes(needle)) &&
         (only === "" || (only === "pro" ? u.plan === "pro" : only === "stripe" ? u.planSource === "stripe" : !!u.upgradeRequestedAt && u.plan !== "pro")),
     )
     .sort(SORTS[sort].fn);
@@ -196,8 +200,13 @@ export default function UsersTab({ onCounts, onShowFilms }: { onCounts: (request
           <div key={u.id} className={`admin-user${u.disabled ? " disabled" : ""}`}>
             <div className="who">
               <strong title={u.email}>{u.email}</strong>
+              {(u.firstName || u.country) && (
+                <span className="hint">
+                  {[u.firstName, [u.region, u.country && countryName(u.country)].filter(Boolean).join(", ")].filter(Boolean).join(" · ")}
+                </span>
+              )}
               <span className="hint">
-                joined <When t={u.createdAt} /> · last in {u.lastLoginAt ? <When t={u.lastLoginAt} /> : "not yet"} · {u.made?.made ?? 0} made · {u.films} saved
+                {u.usage?.exports ? `${u.usage.exports} exported · ` : ""}joined <When t={u.createdAt} /> · last in {u.lastLoginAt ? <When t={u.lastLoginAt} /> : "not yet"} · {u.made?.made ?? 0} made · {u.films} saved
                 {u.usage?.aiMonth === new Date().toISOString().slice(0, 7) ? ` · ${u.usage.ai ?? 0} AI videos this month` : ""}
               </span>
               <span className="film-tags">

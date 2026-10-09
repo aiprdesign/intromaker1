@@ -20,12 +20,16 @@ export interface PlanLimits {
   /** Largest export: long side in pixels, and frame rate. */
   maxLong: number;
   maxFps: number;
+  /** Videos an account can export, licensed for commercial use (counted over the account's life). */
+  exports: number;
 }
 
 /** Unlimited, for now: every plan gets everything (abuse rate limits and the AI budget still apply). */
-const UNLIMITED: PlanLimits = { savedFilms: 100_000, aiPerMonth: 1_000_000, importsPerDay: 100_000, watermark: false, maxLong: 3840, maxFps: 60 };
+const UNLIMITED: PlanLimits = { savedFilms: 100_000, aiPerMonth: 1_000_000, importsPerDay: 100_000, watermark: false, maxLong: 3840, maxFps: 60, exports: 100_000 };
+/** Free accounts export this many videos, for commercial use; Pro is unlimited. */
+export const FREE_EXPORTS = 3;
 export const DEFAULT_LIMITS: Record<PlanId, PlanLimits> = {
-  free: { ...UNLIMITED },
+  free: { ...UNLIMITED, exports: FREE_EXPORTS },
   pro: { ...UNLIMITED },
 };
 
@@ -39,10 +43,10 @@ export const WATERMARK = "Made with Prodintro.com";
  * (unlimited) defaults. Limits saved since are kept exactly, these values included.
  */
 const OLD_DEFAULTS: Record<PlanId, PlanLimits> = {
-  free: { savedFilms: 3, aiPerMonth: 0, importsPerDay: 3, watermark: true, maxLong: 1920, maxFps: 30 },
-  pro: { savedFilms: 200, aiPerMonth: 100, importsPerDay: 50, watermark: false, maxLong: 3840, maxFps: 60 },
+  free: { savedFilms: 3, aiPerMonth: 0, importsPerDay: 3, watermark: true, maxLong: 1920, maxFps: 30, exports: FREE_EXPORTS },
+  pro: { savedFilms: 200, aiPerMonth: 100, importsPerDay: 50, watermark: false, maxLong: 3840, maxFps: 60, exports: 100_000 },
 };
-const sameLimits = (a: Partial<PlanLimits>, b: PlanLimits) => (Object.keys(b) as (keyof PlanLimits)[]).every((k) => a[k] === b[k]);
+const sameLimits = (a: Partial<PlanLimits>, b: PlanLimits) => (Object.keys(b) as (keyof PlanLimits)[]).filter((k) => k !== "exports").every((k) => a[k] === b[k]);
 
 /** Saved plan tables carry this version; older files get the one-time migration above. */
 export const PLANS_VERSION = 2;
@@ -62,6 +66,7 @@ export function readLimits(raw: unknown, { legacy = false }: { legacy?: boolean 
       watermark: typeof o.watermark === "boolean" ? o.watermark : d.watermark,
       maxLong: [1280, 1920, 2560, 3840].includes(o.maxLong as number) ? (o.maxLong as number) : d.maxLong,
       maxFps: o.maxFps === 30 || o.maxFps === 60 ? o.maxFps : d.maxFps,
+      exports: num(o.exports, d.exports, 100_000),
     };
   };
   return { free: one("free"), pro: one("pro") };
@@ -71,6 +76,7 @@ export function readLimits(raw: unknown, { legacy = false }: { legacy?: boolean 
 export function describeLimits(l: PlanLimits): string[] {
   const res = l.maxLong >= 3840 ? "4K" : l.maxLong >= 2560 ? "1440p" : l.maxLong >= 1920 ? "1080p" : "720p";
   return [
+    l.exports >= 100_000 ? "Unlimited videos for commercial use" : `${l.exports} video${l.exports === 1 ? "" : "s"} free for commercial use`,
     l.savedFilms >= 100_000 ? "Unlimited saved intros" : `${l.savedFilms} saved intro${l.savedFilms === 1 ? "" : "s"}`,
     l.aiPerMonth >= 1_000_000 ? "Unlimited AI-directed videos" : l.aiPerMonth > 0 ? `AI director: ${l.aiPerMonth} videos a month` : "Built-in director (or your own AI key)",
     l.importsPerDay >= 100_000 ? "Unlimited website and listing imports" : `${l.importsPerDay} website import${l.importsPerDay === 1 ? "" : "s"} a day`,

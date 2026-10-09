@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     {
       user: u ? publicUser(u) : null,
       limits: await limitsFor(u),
-      usage: u ? usageOf(u) : { ai: 0, imports: 0 },
+      usage: u ? usageOf(u) : { ai: 0, imports: 0, exports: 0 },
       plans: await planLimits(),
       proPrice: settings.proPrice ?? null,
       contactEmail: settings.contactEmail ?? null,
@@ -42,14 +42,14 @@ export async function GET(req: Request) {
   );
 }
 
-/** Create an account: { email, password }. Signs in. */
+/** Create an account: { email, password, firstName, country, region }. Signs in. */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return Response.json({ error: "Cross-origin request refused" }, { status: 403 });
   const limited = rateLimit(req, "signup");
   if (limited) return limited;
-  const body = (await req.json().catch(() => null)) as { email?: unknown; password?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { email?: unknown; password?: unknown; firstName?: unknown; country?: unknown; region?: unknown } | null;
   try {
-    const u = await createUser(body?.email, body?.password);
+    const u = await createUser(body?.email, body?.password, { firstName: body?.firstName, country: body?.country, region: body?.region });
     const { token, maxAge } = await sessionFor(u);
     return Response.json({ user: publicUser(u) }, { headers: { ...noStore, "Set-Cookie": userCookie(req, token, maxAge) } });
   } catch (e) {

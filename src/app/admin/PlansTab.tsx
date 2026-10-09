@@ -56,7 +56,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
     setForm((f) => f && { ...f, plans: defaults });
   };
   const differs = (id: PlanId, key: keyof PlanLimits) => plans[id][key] !== defaults[id][key];
-  const num = (id: PlanId, key: "savedFilms" | "aiPerMonth" | "importsPerDay", label: string, hint?: string) => (
+  const num = (id: PlanId, key: "savedFilms" | "aiPerMonth" | "importsPerDay" | "exports", label: string, hint?: string) => (
     <label className="fld">
       <span className="fld-cap">
         {label} {hint && <em>{hint}</em>}
@@ -83,7 +83,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
           </p>
         )}
         <p className="hint">
-          Saved intros, the AI allowance and website imports are enforced by the server. The watermark and export size are applied in the browser, where videos are
+          Saved intros, the AI allowance, website imports and the videos an account may export are counted by the server. The watermark and export size are applied in the browser, where videos are
           rendered.
         </p>
       </div>
@@ -91,6 +91,7 @@ export default function PlansTab({ billingOn, onOpenBilling }: { billingOn: bool
         {(["free", "pro"] as PlanId[]).map((id) => (
           <div key={id} className="admin-card">
             <h2>{PLAN_NAMES[id]}</h2>
+            {num(id, "exports", "Videos to export", "for commercial use; 100000 = unlimited")}
             {num(id, "savedFilms", "Saved intros")}
             {num(id, "aiPerMonth", "AI videos a month", "0 = built-in director only")}
             {num(id, "importsPerDay", "Website imports a day")}

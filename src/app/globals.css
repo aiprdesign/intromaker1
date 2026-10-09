@@ -6516,3 +6516,18 @@ code.secret {
     grid-template-columns: 1fr;
   }
 }
+
+/* Sign-up: country and state side by side (stacked on phones). */
+.fld-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .fld-row {
+    grid-template-columns: 1fr;
+  }
+}
+.hint.small {
+  font-size: 12.5px;
+}

@@ -8,7 +8,8 @@ import { DEFAULT_LIMITS, describeLimits, type PlanId, type PlanLimits } from "@/
 type Info = { plans: Record<PlanId, PlanLimits>; contactEmail: string | null; proPrice: string | null; online: boolean };
 
 /**
- * The pricing section. Free and unlimited for now, with a commercial licence on request; once the
+ * The pricing section. Free accounts get a few videos for commercial use (sign-up asks for an email,
+ * a first name and a country), with a commercial licence on request for more; once the
  * owner sells Pro (Stripe links in Admin → Billing, a price, and limits Pro unlocks over Free) a
  * Pro card sits between them, its button going to sign-up and then straight to checkout.
  */
@@ -24,7 +25,9 @@ export default function PricingCards() {
   // Pro is only offered when it can be bought and is worth buying.
   const sellsPro = info.online && !!proPrice && JSON.stringify(plans.free) !== JSON.stringify(plans.pro);
   const f = plans.free;
-  const freeUnlimited = f.savedFilms >= 100_000 && f.aiPerMonth >= 1_000_000 && f.importsPerDay >= 100_000 && !f.watermark;
+  const freeUnlimited = f.savedFilms >= 100_000 && f.aiPerMonth >= 1_000_000 && f.importsPerDay >= 100_000 && !f.watermark && f.exports >= 100_000;
+  // Free accounts get a few videos for commercial use (sign-up: email, first name and country).
+  const freeVideos = f.exports < 100_000 ? f.exports : 0;
   const licenceHref = contactEmail ? `mailto:${contactEmail}?subject=${encodeURIComponent("Prodintro.com commercial licence")}` : "/license";
   return (
     <>
@@ -37,9 +40,11 @@ export default function PricingCards() {
           </>
         ) : (
           <>
-            <h2>{freeUnlimited ? "Free and unlimited, for now." : "Free to start."}</h2>
+            <h2>{freeVideos ? `${freeVideos} free videos for your business.` : freeUnlimited ? "Free and unlimited, for now." : "Free to start."}</h2>
             <p className="lead">
-              Prodintro.com is a portfolio project: try it free{freeUnlimited ? " and unlimited" : ""}, for personal and non-commercial use. Want to use it commercially? Contact us for a licence.
+              {freeVideos
+                ? `Sign up free with just your email, first name and country, and export ${freeVideos} videos you can use commercially. No card needed. Need more? Contact us for a licence.`
+                : `Prodintro.com is a portfolio project: try it free${freeUnlimited ? " and unlimited" : ""}, for personal and non-commercial use. Want to use it commercially? Contact us for a licence.`}
             </p>
           </>
         )}
@@ -48,15 +53,15 @@ export default function PricingCards() {
         <div className="price-card">
           <h3>Free</h3>
           <div className="price">
-            $0<small>{sellsPro || !freeUnlimited ? "to start" : "unlimited, for now"}</small>
+            $0<small>{freeVideos ? "sign up free" : sellsPro || !freeUnlimited ? "to start" : "unlimited, for now"}</small>
           </div>
           <ul>
-            {["167 motion skills", "Generated soundtrack and voice-over", ...describeLimits(plans.free), "For personal and non-commercial use"].map((f) => (
+            {["216 motion skills", "Generated soundtrack and voice-over", ...describeLimits(plans.free), freeVideos ? "No card needed" : "For personal and non-commercial use"].map((f) => (
               <li key={f}>{f}</li>
             ))}
           </ul>
-          <Link href="/studio" className="btn btn-ghost">
-            Start making videos
+          <Link href={freeVideos ? "/account" : "/studio"} className="btn btn-ghost">
+            {freeVideos ? `Get ${freeVideos} free videos` : "Start making videos"}
           </Link>
         </div>
         {sellsPro && (
@@ -84,7 +89,7 @@ export default function PricingCards() {
             Contact us<small></small>
           </div>
           <ul>
-            {["Use Prodintro.com for a business, a client or an agency", "Run it on your own servers or in your product", sellsPro ? "Pro features, for commercial work" : "The Free features, for commercial work", "Available on request"].map((f) => (
+            {["Use Prodintro.com for a business, a client or an agency", "Run it on your own servers or in your product", sellsPro ? "Pro features, for commercial work" : freeVideos ? "Unlimited videos for commercial work" : "The Free features, for commercial work", "Available on request"].map((f) => (
               <li key={f}>{f}</li>
             ))}
           </ul>
