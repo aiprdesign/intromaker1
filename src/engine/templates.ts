@@ -1477,7 +1477,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (pool && !scene.locked && (prev === skill || (pool.includes(skill) && used.has(skill)))) {
       // (A conversation suits quotes and questions, not a list of features.)
       const talk = (x: SkillId) => (x === "abs-chat" || x === "pro-duo") && !["quote", "solve", "support", "compare"].includes(role);
-      const rank = (x: SkillId) => (used.has(x) ? 2 : 0) + (few && !ITEMLESS.has(x) && pool.some((y) => ITEMLESS.has(y)) ? 1 : 0) + (talk(x) ? 0.5 : 0);
+      // (A slide with its own list, services or steps, wants a character slide that shows a list.)
+      const rank = (x: SkillId) => (used.has(x) ? 2 : 0) + (few && !ITEMLESS.has(x) && pool.some((y) => ITEMLESS.has(y)) ? 1 : 0) + (!few && !LIST_SLIDES.has(x) && pool.some((y) => LIST_SLIDES.has(y)) ? 1.5 : 0) + (talk(x) ? 0.5 : 0);
       const alt = pool.filter((x) => x !== skill && x !== prev).sort((a, b) => rank(a) - rank(b))[0];
       if (alt && (prev === skill || !used.has(alt))) skill = alt;
     }
@@ -1501,7 +1502,8 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     if (i > 0 && all[i - 1].skill === "product-teaser") transition = "flash";
     last = transition;
     // A word swap ("planned|built|shared") turned into a character slide keeps its first word.
-    const swapped = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && scene.text?.includes("|") ? scene.text.replace(/([^\s|]+)(?:\|[^\s|]+)+/g, "$1") : scene.text;
+    // (A swap is "prefix first|second|third", alternatives of any length: the first segment is the line.)
+    const swapped = CHARACTER_SLIDE.test(skill) && !CHARACTER_SLIDE.test(scene.skill) && scene.text?.includes("|") ? scene.text.split("|")[0].trim() : scene.text;
     // (One turned into a 3D device slide reads as a list: "planned, tracked and shared".)
     const text = skill.startsWith("d3-") && !scene.skill.startsWith("d3-") ? swapList(swapped) : swapped;
     return { ...scene, text, role, skill, duration, transition, ...(borrowed ? { items: borrowed } : {}), ...(uiLabel ? { subtext: undefined } : {}), base: { skill: scene.skill, text: scene.text, styled: skill, shown: text, ...(borrowed ? { items: scene.items, lent: borrowed } : {}), ...(uiLabel ? { subtext: scene.subtext } : {}) } };
@@ -1560,10 +1562,13 @@ const DEVICE_ROLES: Partial<Record<Role, SkillId>> = { meet: "d3-split", tour: "
 
 /** A word swap said as a list: "planned|tracked|shared" → "planned, tracked and shared". */
 function swapList<T extends string | undefined>(text: T): T {
-  return text?.replace(/[^\s|]+(?:\|[^\s|]+)+/g, (m) => {
-    const w = m.split("|");
-    return `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}`;
-  }) as T;
+  if (!text || !text.includes("|")) return text;
+  // "Your care, scheduled|recorded|followed up" → "Your care, scheduled, recorded and followed up".
+  const parts = text.split("|").map((p) => p.trim());
+  const head = parts[0].split(/\s+/);
+  const first = head.pop() ?? "";
+  const w = [first, ...parts.slice(1)].filter(Boolean);
+  return `${head.join(" ")} ${w.length > 1 ? `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}` : w[0]}`.trim() as T;
 }
 
 /** The parts of a software intro that suit a 3D device, best first. */

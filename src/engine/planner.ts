@@ -667,7 +667,7 @@ export function readBrief(prompt: string) {
       else if (/services|we offer/.test(key)) {
         features = list(body);
         services = true;
-      } else if (/how it works|steps|process/.test(key)) steps = list(body).slice(0, 4);
+      } else if (/how it works|steps|process/.test(key)) steps = list(body).slice(0, 4).map((x) => x.charAt(0).toUpperCase() + x.slice(1));
       // (Tone and audience aren't copy: the studio's style pick reads them from the prompt as typed.)
       continue;
     }
@@ -2087,7 +2087,10 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   } else if (demo.skill === "code-deploy") {
     demoScene = { role: "demo", skill: "code-deploy", text: demo.title, items: demo.items, eyebrow: demo.eyebrow, duration: beats(12), transition: "whip" };
   } else if (demo.skill === "kanban" || demo.skill === "live-cursors" || demo.skill === "click-flow" || demo.skill === "phone-tour" || demo.skill === "drop-zone") {
-    demoScene = { role: "demo", skill: demo.skill, text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(demo.skill === "kanban" ? 12 : demo.skill === "phone-tour" ? 11 : 10), transition: "whip" };
+    // (A phone tour's stock "Your work" takes the product's own noun: "Your goals, in your pocket".)
+    const own = concept.swap?.split(",")[0]?.trim();
+    const title = demo.skill === "phone-tour" && own && /^Your work,/.test(demo.title) ? demo.title.replace(/^Your work/, own) : demo.title;
+    demoScene = { role: "demo", skill: demo.skill, text: title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(demo.skill === "kanban" ? 12 : demo.skill === "phone-tour" ? 11 : 10), transition: "whip" };
   } else if (demo.skill === "chat-thread") {
     demoScene = { role: "demo", skill: "chat-thread", text: demo.title, subtext: demo.action, items: demo.items, eyebrow: demo.eyebrow, duration: beats(11), transition: "whip" };
   } else if (demo.skill === "comment-pins") {
@@ -2438,7 +2441,7 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
   const freeOffer = offersFree([site.cta ?? "", site.tagline, site.description, ...site.headlines, ...site.features].join(" "));
   // (With a button of its own, "Get in touch", the line doesn't name another action, "Book a demo".)
   const ownButton = cleanCta(site.cta);
-  const ACTION = /\b(demo|trial|download|account|install|sign up|subscribe|selling|shopping|building|shipping|creating|training|store)\b/i;
+  const ACTION = /\b(demo|trial|download|account|install|sign up|subscribe|selling|shopping|building|shipping|creating|training|store|order|book)\b/i;
   const otherAction = (l: string) => {
     const m = ownButton ? l.match(ACTION) : null;
     return !!m && !ownButton!.toLowerCase().includes(m[1].toLowerCase());
@@ -2450,7 +2453,8 @@ function planFromSiteSaas(site: SiteData, req: SiteRequest): VideoPlan {
     const button = norm(ctaLabel);
     const fresh = lines.filter((l) => {
       const n = norm(l);
-      return !button || !(button.startsWith(n) || n.startsWith(button) || n.split(" ").filter((wd) => button.includes(wd)).length >= 2);
+      // (Nor open on the button's own verb: "Book now" over "Book a walk".)
+      return !button || !(button.startsWith(n) || n.startsWith(button) || n.split(" ").filter((wd) => button.includes(wd)).length >= 2 || n.split(" ")[0] === button.split(" ")[0]);
     });
     cta.text = teamStat && !usedStat ? `Join *${teamStat.toLowerCase()}*` : pick(fresh.length ? fresh : lines);
     // Nothing to try yet: the line matches the waitlist button.

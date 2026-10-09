@@ -313,7 +313,7 @@ const TOPICS: Topic[] = [
     name: [["Granite", "Iron", "Summit", "Keystone"], [" Builders", " Construction", " Contracting"]],
     pitch: "a construction company",
     list: "Services",
-    items: ["commercial builds", "renovations", "project management", "site planning", "on-time handovers"],
+    items: ["commercial builds", "renovations", "new builds", "site planning", "on-time handovers"],
     steps: ["tell us about the project", "get a clear quote", "we build it"],
     audience: "property owners and developers",
     tones: ["strong and dependable", "bold and industrial"],

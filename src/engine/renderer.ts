@@ -16,6 +16,9 @@ import { isMovieStyle } from "./trailers";
 import { pairedSubFamily, setBrandFont, setSubFamily, subFont } from "./text";
 import { SKILL_MAP } from "./skills";
 import { LOGO_3D_IDS } from "./skills/logo3d";
+import { fastTypeSkills } from "./skills/fastype";
+import { speedSkills } from "./skills/speed";
+import { speedMoreSkills } from "./skills/speed2";
 import { saasBackground } from "./saasfx";
 import { setCrispText } from "./fx";
 import { liquidWipe, loadTransitions, renderTransition, transitionsReady } from "./gl";
@@ -165,6 +168,18 @@ function drawScene(
   return sc;
 }
 
+/** Slides that switch through a word-swap line's alternatives themselves. */
+const SWAP_SKILLS = new Set<string>(["word-swap", ...[...fastTypeSkills, ...speedSkills, ...speedMoreSkills].map((k) => k.id)]);
+
+/** "Your orders, placed|cooked|served" → "Your orders, placed, cooked and served". */
+function swapAsList(text: string) {
+  const parts = text.split("|").map((p) => p.trim());
+  const head = parts[0].split(/\s+/);
+  const first = head.pop() ?? "";
+  const w = [first, ...parts.slice(1)].filter(Boolean);
+  return `${head.join(" ")} ${w.length > 1 ? `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}` : w[0]}`.trim();
+}
+
 function drawSceneOnce(
   target: CanvasRenderingContext2D,
   scene: Scene,
@@ -190,6 +205,9 @@ function drawSceneOnce(
     (plan.style === "saas" &&
       (plan.scenes?.[index]?.skill === scene.skill ? contrastSlides(plan).has(index) : scene.contrast === true && canContrast(scene)));
   ({ scene, plan } = withPlaceholders(scene, plan));
+  // A word-swap line ("Your orders, placed|cooked|served") on a slide that doesn't switch words
+  // reads as a list ("placed, cooked and served"), never with its bars showing.
+  if (scene.text?.includes("|") && !SWAP_SKILLS.has(scene.skill)) scene = { ...scene, text: swapAsList(scene.text) };
   const base = brandPalette(plan.palette, plan.brand, schemeOf(plan));
   // Light and dark slides: some middle slides take the opposite tone of the style (contrast.ts).
   const tone = !flip && forceFlip === undefined && plan.style === "saas" && plan.scenes?.[index]?.skill === scene.skill && tonesOn(plan) && toneSlides(plan).has(index);

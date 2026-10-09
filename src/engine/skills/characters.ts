@@ -1122,7 +1122,12 @@ function charCheer(sc: SkillContext) {
   useToon(sc);
   saasBackground(sc, { beams: 0, aurora: 0.5 });
   const portrait = h > w;
-  const label = plain(scene.text) || "Get started";
+  // A short line under it is the button's own words ("Book a visit"): it goes on the button, and
+  // the headline ("Get started") above it.
+  const own = plain(scene.subtext ?? "");
+  const asButton = !!own && own.split(/\s+/).length <= 4;
+  const label = asButton ? own : plain(scene.text) || "Get started";
+  const headline = asButton ? plain(scene.text) : "";
   // Confetti: gentle, falling, in the palette's colours (no flashing).
   const r = rng(hashString(`confetti${seed}`));
   const cols = [palette.primary, palette.secondary, palette.accent, "#ffd166", "#ffffff"];
@@ -1174,7 +1179,29 @@ function charCheer(sc: SkillContext) {
   ctx.textBaseline = "middle";
   fillTextFit(ctx, label, w / 2, by + bh / 2, bw - 60 * u, { maxLines: 1, minScale: 0.5 });
   ctx.restore();
-  if (scene.subtext) {
+  if (headline) {
+    const a = ease.outCubic(range(t, 0.05, 0.5));
+    ctx.globalAlpha = (1 - ex) * a;
+    ctx.fillStyle = palette.text;
+    ctx.font = displayFont(saasFont(sc), (portrait ? 54 : 58) * u);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    fillTextFit(ctx, headline, w / 2, by - 34 * u + (1 - a) * 12 * u, portrait ? w * 0.86 : w * 0.6, { maxLines: 1, minScale: 0.5 });
+    ctx.globalAlpha = 1 - ex;
+  }
+  // The website and contact details under the button.
+  const info = asButton ? [sc.brand?.domain, sc.brand?.contact].filter(Boolean).join("  ·  ") : "";
+  if (info) {
+    const a = range(t, 0.7, 1.1);
+    ctx.globalAlpha = (1 - ex) * a;
+    ctx.fillStyle = rgba(palette.text, 0.75);
+    ctx.font = subFont((portrait ? 24 : 26) * u, 600);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    fillTextFit(ctx, info, w / 2, by + bh + 30 * u, portrait ? w * 0.86 : w * 0.6, { maxLines: 2, lineHeight: 1.3 });
+    ctx.globalAlpha = 1 - ex;
+  }
+  if (scene.subtext && !asButton) {
     const a = range(t, 0.7, 1.1);
     ctx.globalAlpha = (1 - ex) * a;
     ctx.fillStyle = rgba(palette.text, 0.8);
