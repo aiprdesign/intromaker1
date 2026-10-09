@@ -21,7 +21,7 @@
  */
 import { Texture, Transform, type Program } from "ogl";
 import { box, cylinder, gable, lathe, leaf, project, quad, render, rgb, slab, sphere, sphereCap, torus, world, type View, type World } from "../d3";
-import { clamp, ease, lerp, mixHex, range, TAU } from "../math";
+import { clamp, ease, hexToRgb, lerp, mixHex, range, TAU } from "../math";
 import { fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
@@ -37,6 +37,31 @@ const sine = (k: number) => 0.5 - Math.cos(Math.PI * clamp(k)) / 2;
 /* ───────────────────────── Look ───────────────────────── */
 
 const onLight = (p: Palette): Palette => (p.light ? p : { ...p, text: INK, light: true, bg0: "#f7f5f2", bg1: "#ffffff" });
+
+/** Materials by their 60-30-10 role in a home: walls, furnishings (with a shade each), accents. */
+interface Tones {
+  wall: Program[];
+  support: [Program, number][];
+  accent: Program[];
+}
+
+/**
+ * The intro's colours as a home's 60-30-10: 60% a warm neutral with a whisper of the brand (walls,
+ * siding), 30% the palette's support colour, softened for furniture (sofa, cushions, island,
+ * headboard, drapes, the roof), 10% the brand accent (the door, throws, pillows, towels).
+ */
+function homeTones(p: Palette) {
+  const accent = p.primary;
+  // The support colour: the palette's own (60-30-10) when it has one, else its secondary, brought
+  // to a furnishing's lightness (never near-black on a dark palette, never washed out).
+  let support = p.support ? mixHex(p.support, p.secondary, 0.45) : p.secondary;
+  const [r, g, b] = hexToRgb(support);
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  if (lum < 0.38) support = mixHex(support, "#ffffff", 0.45 - lum);
+  else if (lum > 0.8) support = mixHex(support, "#5b6270", 0.3);
+  support = mixHex(support, "#8f949c", 0.18);
+  return { neutral: mixHex("#efe8de", accent, 0.05), support, accent };
+}
 
 /** A golden-hour sky: deep blue overhead warming to a peach horizon. */
 function sky(sc: SkillContext, horizon = 0.62) {
@@ -175,6 +200,8 @@ interface HouseMats {
   trim: Program;
   roof: Program;
   door: Program;
+  /** The shutters (the door's colour in a named style; the 30% colour in the intro's own look). */
+  shutter: Program;
   stone: Program;
   glass: Program;
   garage: Program;
@@ -218,6 +245,7 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     trim: W.mat({ color: STYLES[0].trim, gloss: 0.4 }),
     roof: W.mat({ color: STYLES[0].roof, gloss: 0.3, kind: "shingle" }),
     door: W.mat({ color: "#7c5cff", gloss: 0.6 }),
+    shutter: W.mat({ color: "#7c5cff", gloss: 0.5 }),
     stone: W.mat({ color: STYLES[0].stone, gloss: 0.15, kind: "stone" }),
     glass: W.mat({ color: "#6f8db0", metal: 0.85, gloss: 0.97, emit: [0, 0, 0] }),
     garage: W.mat({ color: "#f4f2ee", gloss: 0.45 }),
@@ -280,7 +308,7 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     else {
       put(W, box(gl, ww + 0.44, 0.08, 0.22), mats.trim, walls, x, y - hh / 2 - 0.16, z + 0.08, false);
       for (const sx of [-1, 1]) {
-        put(W, box(gl, 0.38, hh + 0.2, 0.06), mats.door, walls, x + sx * (ww / 2 + 0.36), y, z + 0.02, false);
+        put(W, box(gl, 0.38, hh + 0.2, 0.06), mats.shutter, walls, x + sx * (ww / 2 + 0.36), y, z + 0.02, false);
         for (let k = -2; k <= 2; k++) put(W, box(gl, 0.3, 0.025, 0.07), mats.trim, walls, x + sx * (ww / 2 + 0.36), y + k * (hh / 5), z + 0.04, false);
       }
     }
@@ -575,13 +603,14 @@ function homeWorld(W: World): HomeParts {
 const gl0 = (W: World) => W.gl;
 
 /** The home in a style (colours eased from one style to the next by `k`), its door in the brand's colour unless the style has its own. */
-function styleHome(H: House, a: Style, b: Style, k: number, brand: string) {
+function styleHome(H: House, a: Style, b: Style, k: number, brand: string, shutter?: string) {
   const mix3 = (x: string, y: string) => rgb(mixHex(x, y, k));
   H.mats.siding.uniforms.uColor.value = mix3(a.siding, b.siding);
   H.mats.trim.uniforms.uColor.value = mix3(a.trim, b.trim);
   H.mats.roof.uniforms.uColor.value = mix3(a.roof, b.roof);
   H.mats.stone.uniforms.uColor.value = mix3(a.stone, b.stone);
   H.mats.door.uniforms.uColor.value = mix3(a.door ?? brand, b.door ?? brand);
+  H.mats.shutter.uniforms.uColor.value = shutter ? rgb(shutter) : mix3(a.door ?? brand, b.door ?? brand);
 }
 
 /** Lit windows: warm light inside as the evening comes on. */
@@ -594,7 +623,11 @@ function setup(H: House, sc: SkillContext, parts: Partial<Record<"solar" | "hvac
   H.hvac.visible = !!parts.hvac;
   H.insul.visible = !!parts.insul;
   for (const n of [H.solar, H.hvac, H.insul]) n.traverse((c) => void (c.visible = n.visible));
-  styleHome(H, STYLES[0], STYLES[0], 0, sc.palette.primary);
+  const T = homeTones(sc.palette);
+  // The home in the intro's 60-30-10: siding in the neutral, roof and trim in the support colour's
+  // deep shade, the door in the accent.
+  const own: Style = { ...STYLES[0], siding: mixHex("#f3f0e9", T.support, 0.06), roof: mixHex(T.support, "#24262c", 0.62), trim: mixHex(T.support, "#24262c", 0.45) };
+  styleHome(H, own, own, 0, T.accent, mixHex(T.support, "#24262c", 0.25));
 }
 
 function fallback(sc: SkillContext, top: number) {
@@ -1586,6 +1619,8 @@ interface InteriorParts {
   family: Person3[];
   dog: Dog3;
   throw: Program;
+  /** The rooms' 60-30-10 colour roles: walls (60), furnishings (30, each with its own shade), accents (10). */
+  tones: Tones;
   rooms: { name: string; eye: Num3; target: Num3 }[];
 }
 
@@ -1597,13 +1632,15 @@ interface InteriorParts {
 function interiorWorld(W: World): InteriorParts {
   const { gl } = W;
   ground(W);
-  const wallM = mc(W, "#ece3d6", 0.2);
+  const wallM = W.mat({ color: "#ece3d6", gloss: 0.2 });
+  const tones: Tones = { wall: [wallM], support: [], accent: [] };
   const trim = mc(W, "#ffffff", 0.45);
   const oak = mc(W, "#a8794f", 0.45);
   const wood = mc(W, "#8a6446", 0.4);
   const white = mc(W, "#f7f6f2", 0.4);
   const stoneTop = mc(W, "#2f3237", 0.75);
-  const fabric = mc(W, "#8b96a6", 0.2);
+  const fabric = W.mat({ color: "#8b96a6", gloss: 0.2 });
+  tones.support.push([fabric, 0]);
   const linen = mc(W, "#ece6dc", 0.15);
   const glass = mc(W, "#cfe3f2", 0.9, "#cfe3f2");
   const warm = mc(W, "#fff1d6", 0.2, "#ffe4b0");
@@ -1641,8 +1678,11 @@ function interiorWorld(W: World): InteriorParts {
   win(7.75, 0.8);
   // The front door, open, in a white frame (it takes the brand's colour).
   put(W, box(gl, 0.2, 2.5, 0.16), trim, W.scene, -14, 1.45, 2.3);
-  put(W, box(gl, 0.07, 2.3, 1.0), mc(W, "#7c5cff", 0.5), W.scene, -13.85, 1.35, 1.65);
-  furnish(W, { wood, oak, white, linen, fabric, stoneTop, glass, warm, throwM });
+  const doorM = W.mat({ color: "#7c5cff", gloss: 0.5 });
+  tones.accent.push(doorM);
+  put(W, box(gl, 0.07, 2.3, 1.0), doorM, W.scene, -13.85, 1.35, 1.65);
+  tones.accent.push(throwM);
+  furnish(W, { wood, oak, white, linen, fabric, stoneTop, glass, warm, throwM, tones });
   // Trees beyond the back fence.
   tree(W, W.scene, 15.5, -7.2, 1.2);
   tree(W, W.scene, 19.5, -8.5, 1.4);
@@ -1663,6 +1703,7 @@ function interiorWorld(W: World): InteriorParts {
     family,
     dog,
     throw: throwM,
+    tones,
     rooms: [
       { name: "Welcoming foyer", eye: [-15.4, 1.75, 3.7], target: [-11.2, 1.2, -1.6] },
       { name: "Open living room", eye: [-6.2, 1.7, 3.5], target: [-5, 0.95, -1.6] },
@@ -1683,6 +1724,7 @@ interface FurnishMats {
   glass: Program;
   warm: Program;
   throwM: Program;
+  tones: Tones;
 }
 
 /**
@@ -1701,8 +1743,17 @@ function furnish(W: World, M: FurnishMats) {
   const black = mc(W, "#141418", 0.8);
   const steel = mc(W, "#cfd3d9", 0.85);
   const brass = mc(W, "#c9a35a", 0.8);
-  const cushion = mc(W, "#a3adbb", 0.15);
-  const navy = mc(W, "#3d4f6b", 0.2);
+  // Furnishings in the 30% colour, each its own shade of it (see tintInterior).
+  const role = (color: string, shade: number, gloss = 0.2) => {
+    const m = W.mat({ color, gloss });
+    M.tones.support.push([m, shade]);
+    return m;
+  };
+  const cushion = role("#a3adbb", 0.22, 0.15);
+  const navy = role("#3d4f6b", -0.25);
+  const islandM = role("#5b6b7c", -0.3, 0.35);
+  const islandPanel = role("#6a7a8c", -0.18, 0.35);
+  const headM = role("#9a8f86", 0.12, 0.15);
   const rugA = mc(W, "#cdb89a", 0.08);
   const rugB = mc(W, "#efe6d6", 0.08);
   const leafA = W.mat({ color: "#2f7d43", color2: "#7fc464", gloss: 0.55, kind: "leaf" });
@@ -1756,7 +1807,7 @@ function furnish(W: World, M: FurnishMats) {
     colors.forEach((c, i) => bx((w - 0.3) / colors.length, h - 0.3 - (i % 2) * 0.12, 0.012, mc(W, c, 0.2), x - (w - 0.3) / 2 + ((i + 0.5) * (w - 0.3)) / colors.length, y - (i % 2) * 0.06, BACK + 0.058, 0, false));
   };
   // Curtains: soft folds hanging either side of a window, on a rod.
-  const drape = mc(W, "#9fb3b8", 0.15);
+  const drape = role("#9fb3b8", 0.38, 0.15);
   const curtains = (x: number, w: number, top = 2.6) => {
     cy(0.015, 0.015, w + 1.0, brass, x, top, BACK + 0.12, 8).rotation.z = Math.PI / 2;
     for (const sd of [-1, 1])
@@ -1975,10 +2026,10 @@ function furnish(W: World, M: FurnishMats) {
   for (const [dx, rz] of [[-0.02, 0.15], [0.02, -0.12], [0, 0.02]] as const) cy(0.008, 0.008, 0.3, M.wood, 4.3 + dx, F + 1.18, -3.7, 6).rotation.z = rz;
   plant(4.9, -3.7, 0.45, mc(W, "#c96f4a", 0.4));
   // The island: panelled sides, a waterfall stone top, a fruit bowl; stools with backs and footrings.
-  bx(3.0, 0.86, 1.1, mc(W, "#5b6b7c", 0.35), 3, F + 0.45, -0.9);
+  bx(3.0, 0.86, 1.1, islandM, 3, F + 0.45, -0.9);
   for (let i = 0; i < 3; i++) {
-    bx(0.9, 0.66, 0.02, mc(W, "#6a7a8c", 0.35), 2 + i, F + 0.45, -0.34, 0, false);
-    bx(0.8, 0.56, 0.012, mc(W, "#5b6b7c", 0.35), 2 + i, F + 0.45, -0.325, 0, false);
+    bx(0.9, 0.66, 0.02, islandPanel, 2 + i, F + 0.45, -0.34, 0, false);
+    bx(0.8, 0.56, 0.012, islandM, 2 + i, F + 0.45, -0.325, 0, false);
   }
   rb(3.15, 0.07, 1.25, 0.02, M.stoneTop, 3, F + 0.91, -0.9);
   for (const sx of [-1.54, 1.54]) bx(0.07, 0.9, 1.25, M.stoneTop, 3 + sx, F + 0.45, -0.9);
@@ -2006,7 +2057,7 @@ function furnish(W: World, M: FurnishMats) {
   /* Owner's suite: a tufted headboard, a bed with a duvet, pillows and a throw, nightstands with
      drawers and lamps, a dresser with a mirror, a bench, a rug, art, curtains and a plant. */
   const bedX = 10;
-  rb(2.5, 1.35, 0.16, 0.08, mc(W, "#9a8f86", 0.15), bedX, F + 0.95, -3.82);
+  rb(2.5, 1.35, 0.16, 0.08, headM, bedX, F + 0.95, -3.82);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) W.mesh(sphere(gl, 0.025, 8, 6), mc(W, "#7e746c", 0.3), W.scene, false).position.set(bedX - 1.0 + c * 0.4 + (r % 2) * 0.2, F + 0.72 + r * 0.3, -3.73);
   rb(2.2, 0.28, 2.3, 0.05, M.wood, bedX, F + 0.24, -2.72);
   for (const sx of [-1.02, 1.02]) for (const sz of [-1.08, 1.08]) cy(0.04, 0.03, 0.12, M.wood, bedX + sx, F + 0.05, -2.72 + sz, 10);
@@ -2174,9 +2225,12 @@ function indoorBack(sc: SkillContext) {
   ctx.fillRect(0, 0, w, h);
 }
 
-/** The brand's colour on the soft furnishings and the front door. */
+/** The rooms in the intro's 60-30-10 colours (see homeTones). */
 function tintInterior(P: InteriorParts, sc: SkillContext) {
-  P.throw.uniforms.uColor.value = rgb(mixHex(sc.palette.primary, "#ffffff", 0.15));
+  const T = homeTones(sc.palette);
+  for (const m of P.tones.wall) m.uniforms.uColor.value = rgb(T.neutral);
+  for (const [m, shade] of P.tones.support) m.uniforms.uColor.value = rgb(shade >= 0 ? mixHex(T.support, "#ffffff", shade) : mixHex(T.support, "#1d1b26", -shade));
+  for (const m of P.tones.accent) m.uniforms.uColor.value = rgb(T.accent);
 }
 
 /** A frosted caption plate at the lower left, sliding in by `k`. */
