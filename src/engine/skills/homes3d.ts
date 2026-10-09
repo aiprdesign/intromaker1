@@ -291,6 +291,14 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   put(W, box(gl, 3.0, 2.35, 0.08), mats.garage, walls, gx, b + 1.18, gz + 0.04);
   for (let i = 1; i < 4; i++) put(W, box(gl, 3.0, 0.03, 0.1), mats.trim, walls, gx, b + i * 0.59, gz + 0.05, false);
   put(W, box(gl, 3.24, 0.14, 0.12), mats.trim, walls, gx, b + 2.42, gz + 0.06);
+  // Corner boards up the siding and a frieze band under the eaves.
+  for (const [cx, cz, hh] of [[-MAIN.w / 2, fz, MAIN.h], [MAIN.w / 2, fz, MAIN.h], [-MAIN.w / 2, -fz, MAIN.h], [MAIN.w / 2 + GAR.w, gz, GAR.h], [MAIN.w / 2 + GAR.w, gz - GAR.d, GAR.h]] as const) put(W, box(gl, 0.2, hh - 0.95, 0.2), mats.trim, walls, cx, b + 0.95 + (hh - 0.95) / 2, cz, false);
+  put(W, box(gl, MAIN.w + 0.1, 0.18, 0.08), mats.trim, walls, 0, b + MAIN.h - 0.1, fz + 0.03, false);
+  put(W, box(gl, 0.08, 0.18, MAIN.d + 0.1), mats.trim, walls, -MAIN.w / 2 - 0.03, b + MAIN.h - 0.1, 0, false);
+  put(W, box(gl, GAR.w + 0.1, 0.16, 0.08), mats.trim, walls, gx, b + GAR.h - 0.09, gz + 0.03, false);
+  // A stone water table where the siding meets the stone base.
+  put(W, box(gl, MAIN.w + 0.2, 0.08, MAIN.d + 0.2), mats.trim, walls, 0, b + 0.97, 0, false);
+  put(W, box(gl, GAR.w + 0.2, 0.08, GAR.d + 0.2), mats.trim, walls, gx, b + 0.97, -(MAIN.d - GAR.d) / 2, false);
   const curtain = W.mat({ color: "#efe6d6", gloss: 0.08 });
   const win = (x: number, y: number, ww: number, hh: number, z: number, side = false) => {
     const fr = side ? box(gl, 0.1, hh + 0.24, ww + 0.24) : box(gl, ww + 0.24, hh + 0.24, 0.1);
@@ -392,6 +400,9 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   proof.rotation.x = 0.16;
   put(W, gable(gl, 2.6, 0.85, 0.7), mats.roof, porch, 1.35, floorTop + 3.25, fz + PD - 0.05);
   put(W, box(gl, 2.2, 0.55, 0.05), mats.trim, porch, 1.35, floorTop + 3.48, fz + PD + 0.3, false);
+  // The house number on the entry gable, facing the street; a GFCI outlet on the porch wall.
+  addressNumbers(W, porch, "124", 1.35, floorTop + 3.42, fz + PD + 0.34, mats.door, W.mat({ color: "#f4f1ea", gloss: 0.4 }));
+  put(W, box(gl, 0.1, 0.16, 0.03), W.mat({ color: "#e9e6e0", gloss: 0.4 }), walls, 2.75, floorTop + 0.45, fz + 0.03, false);
   // Railings between the columns (not across the steps) and down the sides.
   const rail = (x0: number, x1: number, z0: number, z1: number) => {
     const len = Math.hypot(x1 - x0, z1 - z0);
@@ -430,9 +441,10 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     const sh = W.mesh(sphere(gl, 0.28, 14, 10), fern, porch);
     sh.position.set(px, floorTop + 0.62, fz + PD - 0.55);
   }
+  const basket = W.mat({ color: "#8a6446", gloss: 0.2 });
   for (const hx of [-2.0, 3.0]) {
     put(W, box(gl, 0.015, 0.5, 0.015), lamp, porch, hx, floorTop + 2.65, fz + PD - 0.45, false);
-    const bk = W.mesh(cylinder(gl, 0.18, 0.12, 0.18, 14), W.mat({ color: "#8a6446", gloss: 0.2 }), porch);
+    const bk = W.mesh(cylinder(gl, 0.18, 0.12, 0.18, 14), basket, porch);
     bk.position.set(hx, floorTop + 2.3, fz + PD - 0.45);
     for (const [dx, dy, r] of [[0, 0.06, 0.24], [0.12, -0.08, 0.17], [-0.12, -0.1, 0.17]] as const) {
       const f = W.mesh(sphere(gl, r, 12, 8), fern, porch);
@@ -463,8 +475,41 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   }
   put(W, gable(gl, GAR.w + 0.6, 1.4, GAR.d + 0.6), mats.roof, roof, gx, b + GAR.h, -(MAIN.d - GAR.d) / 2);
   put(W, box(gl, GAR.w + 0.7, 0.1, GAR.d + 0.7), mats.trim, roof, gx, b + GAR.h + 0.02, -(MAIN.d - GAR.d) / 2, false);
-  put(W, box(gl, 0.75, 2.6, 0.75), mats.stone, roof, -2.1, b + MAIN.h + 1.2, -1.2);
-  put(W, box(gl, 0.95, 0.12, 0.95), mats.trim, roof, -2.1, b + MAIN.h + 2.55, -1.2, false);
+  // The chimney: two feet above the ridge (the 3-2-10 rule: above any roof within ten feet).
+  put(W, box(gl, 0.75, 3.25, 0.75), mats.stone, roof, -2.1, b + MAIN.h + 1.525, -1.2);
+  put(W, box(gl, 0.95, 0.12, 0.95), mats.trim, roof, -2.1, b + MAIN.h + 3.2, -1.2, false);
+  // Two clay chimney pots.
+  const clay = W.mat({ color: "#b86b4b", gloss: 0.3 });
+  for (const dx of [-0.15, 0.17]) {
+    const pot = W.mesh(cylinder(gl, 0.09, 0.11, 0.38, 12), clay, roof, false);
+    pot.position.set(-2.1 + dx, b + MAIN.h + 3.45, -1.2);
+  }
+  // A louvered vent in the garage gable.
+  const garFront = -(MAIN.d - GAR.d) / 2 + (GAR.d + 0.6) / 2;
+  put(W, box(gl, 0.8, 0.55, 0.06), mats.trim, roof, gx, b + GAR.h + 0.45, garFront + 0.02, false);
+  put(W, box(gl, 0.64, 0.4, 0.05), mats.shutter, roof, gx, b + GAR.h + 0.45, garFront + 0.03, false);
+  for (let i = 0; i < 4; i++) put(W, box(gl, 0.64, 0.025, 0.07), mats.trim, roof, gx, b + GAR.h + 0.31 + i * 0.095, garFront + 0.04, false);
+  // A cupola on the garage ridge with a weathervane.
+  const ridgeY = b + GAR.h + 1.4;
+  const cz0 = -(MAIN.d - GAR.d) / 2;
+  put(W, box(gl, 0.7, 0.75, 0.7), mats.trim, roof, gx, ridgeY + 0.05, cz0);
+  for (const dz of [-0.36, 0.36]) {
+    put(W, box(gl, 0.42, 0.36, 0.02), mats.shutter, roof, gx, ridgeY + 0.15, cz0 + dz, false);
+    for (let i = 0; i < 4; i++) put(W, box(gl, 0.42, 0.02, 0.03), mats.trim, roof, gx, ridgeY + 0.02 + i * 0.09, cz0 + dz, false);
+  }
+  put(W, box(gl, 0.84, 0.08, 0.84), mats.trim, roof, gx, ridgeY + 0.46, cz0, false);
+  const cap = W.mesh(cylinder(gl, 0.04, 0.6, 0.45, 4), mats.roof, roof);
+  cap.position.set(gx, ridgeY + 0.72, cz0);
+  cap.rotation.y = Math.PI / 4;
+  const vane = W.mat({ color: "#2a2c31", metal: 0.6, gloss: 0.6 });
+  const rod = W.mesh(cylinder(gl, 0.015, 0.015, 0.7, 6), vane, roof, false);
+  rod.position.set(gx, ridgeY + 1.25, cz0);
+  W.mesh(sphere(gl, 0.05, 10, 8), W.mat({ color: "#d9b45a", metal: 0.9, gloss: 0.8 }), roof, false).position.set(gx, ridgeY + 1.05, cz0);
+  put(W, box(gl, 0.6, 0.03, 0.03), vane, roof, gx, ridgeY + 1.45, cz0, false);
+  put(W, box(gl, 0.16, 0.14, 0.02), vane, roof, gx - 0.26, ridgeY + 1.45, cz0, false);
+  const tip = put(W, box(gl, 0.09, 0.09, 0.02), vane, roof, gx + 0.3, ridgeY + 1.45, cz0, false);
+  tip.rotation.z = Math.PI / 4;
+  for (const [dx, dz] of [[0.18, 0], [0, 0.18]] as const) put(W, box(gl, dx ? 0.36 : 0.02, 0.02, dz ? 0.36 : 0.02), vane, roof, gx, ridgeY + 1.3, cz0, false);
   // Gutters along the eaves, downspouts at the corners, a ridge cap.
   const gut = W.mat({ color: "#f1efea", metal: 0.3, gloss: 0.5 });
   for (const sx of [-1, 1]) {
@@ -523,9 +568,34 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   }
   put(W, box(gl, 0.1, 1.1, 0.1), mats.trim, land, 4.0, 0.55, 9.3);
   put(W, box(gl, 0.28, 0.3, 0.5), W.mat({ color: "#2a2c31", metal: 0.5, gloss: 0.6 }), land, 4.0, 1.2, 9.3);
+  // Brick edging along the walk, path lights either side, urns of boxwood by the steps.
+  const brick = W.mat({ color: "#a65a42", gloss: 0.2 });
+  for (const sx of [-0.66, 0.66]) {
+    put(W, box(gl, 0.14, 0.05, 4.6), brick, land, 1.35 + sx, 0.025, fz + 4.3, false);
+    for (let z = fz + 2.1; z < fz + 6.6; z += 0.3) put(W, box(gl, 0.15, 0.052, 0.015), W.mat({ color: "#8a4835", gloss: 0.2 }), land, 1.35 + sx, 0.026, z, false);
+  }
+  const pathLamp = W.mat({ color: "#2a2c31", metal: 0.6, gloss: 0.6 });
+  const pathGlow = W.mat({ color: "#ffe2a8", gloss: 0.4, emit: [0.9, 0.62, 0.3] });
+  for (const z of [fz + 3.0, fz + 6.2]) for (const sx of [-0.95, 0.95]) {
+    put(W, cylinder(gl, 0.03, 0.03, 0.42, 8) as ReturnType<typeof box>, pathLamp, land, 1.35 + sx, 0.21, z, false);
+    put(W, cylinder(gl, 0.07, 0.07, 0.09, 10) as ReturnType<typeof box>, pathGlow, land, 1.35 + sx, 0.46, z, false);
+    put(W, cylinder(gl, 0.03, 0.12, 0.06, 10) as ReturnType<typeof box>, pathLamp, land, 1.35 + sx, 0.53, z, false);
+  }
+  const urn = W.mat({ color: "#2f3540", gloss: 0.5 });
+  for (const ux of [0.25, 2.45]) {
+    W.mesh(lathe(gl, [[0, 0], [0.16, 0], [0.12, 0.08], [0.14, 0.2], [0.26, 0.48], [0.28, 0.54], [0, 0.54]], 20), urn, land).position.set(ux, 0, fz + PD + 0.55);
+    const bw = W.mesh(sphere(gl, 0.3, 14, 10), hedge, land);
+    bw.position.set(ux, 0.78, fz + PD + 0.55);
+  }
+  // Hydrangeas in blue and pink among the hedges.
+  const hyd = [W.mat({ color: "#8fa9e0", gloss: 0.3 }), W.mat({ color: "#d9a0c8", gloss: 0.3 }), W.mat({ color: "#b8c6ef", gloss: 0.3 })];
+  for (let i = 0; i < 7; i++) {
+    const h0 = W.mesh(sphere(gl, 0.17, 10, 8), hyd[i % 3], land, false);
+    h0.position.set(-3.0 + i * 0.47, 0.72 + (i % 2) * 0.1, fz + 2.62);
+  }
   tree(W, land, -8.6, 4.2, 1.15);
   tree(W, land, -7.6, -6.5, 0.95);
-  return { root, slab: slabT, frame: frameT, walls, roof, land, solar, hvac, insul, mats, rising: [mats.siding, mats.stone, mats.trim, mats.glass, mats.garage, mats.door, brass, porchFloor, ceiling, chairM, potM, fern] };
+  return { root, slab: slabT, frame: frameT, walls, roof, land, solar, hvac, insul, mats, rising: [mats.siding, mats.stone, mats.trim, mats.glass, mats.garage, mats.door, brass, porchFloor, ceiling, chairM, potM, fern, basket, lamp] };
 }
 
 let treeMats: { bark: Program; leaf: Program; leaf2: Program; pine: Program; pine2: Program } | undefined;
@@ -1292,6 +1362,48 @@ function mc(W: World, color: string, gloss = 0.3, emit?: string) {
   return p;
 }
 
+/**
+ * Code details (after the IRC, the US model code for homes): a GFCI receptacle on a wall facing +z,
+ * with its test and reset buttons, as required by kitchen counters, in bathrooms and outdoors.
+ */
+function outlet(W: World, x: number, y: number, z: number) {
+  const { gl } = W;
+  put(W, box(gl, 0.075, 0.12, 0.008), mc(W, "#f7f6f2", 0.5), W.scene, x, y, z, false);
+  for (const dy of [-0.032, 0.032]) put(W, box(gl, 0.046, 0.03, 0.01), mc(W, "#e6e4de", 0.5), W.scene, x, y + dy, z + 0.002, false);
+  put(W, box(gl, 0.04, 0.014, 0.012), mc(W, "#2a2c31", 0.4), W.scene, x, y, z + 0.003, false);
+}
+
+/** A combination smoke and CO alarm high on a wall facing +z (within a foot of the ceiling), its LED steady. */
+function alarm(W: World, x: number, y: number, z: number) {
+  const { gl } = W;
+  const d = W.mesh(cylinder(gl, 0.075, 0.08, 0.035, 20), mc(W, "#f7f6f2", 0.5), W.scene, false);
+  d.position.set(x, y, z + 0.018);
+  d.rotation.x = Math.PI / 2;
+  const r = W.mesh(torus(gl, 0.05, 0.005, Math.PI * 2, 24, 4), mc(W, "#d6d3cc", 0.4), W.scene, false);
+  r.position.set(x, y, z + 0.037);
+  W.mesh(sphere(gl, 0.008, 6, 4), mc(W, "#5bd16a", 0.3, "#5bd16a"), W.scene, false).position.set(x + 0.045, y + 0.02, z + 0.038);
+}
+
+/** Address numbers (seven-segment style, on a plaque), as US codes ask: plain to read from the street. */
+function addressNumbers(W: World, parent: Transform, digits: string, x: number, y: number, z: number, plate: Program, ink: Program) {
+  const { gl } = W;
+  const dw = 0.13;
+  const dh = 0.22;
+  const t = 0.028;
+  put(W, box(gl, digits.length * (dw + 0.06) + 0.12, dh + 0.14, 0.03), plate, parent, x, y, z, false);
+  // Segments a–g: top, upper right, lower right, bottom, lower left, upper left, middle.
+  const SEG: Record<string, string> = { "0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc", "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abfgcd" };
+  [...digits].forEach((ch, i) => {
+    const cx = x + (i - (digits.length - 1) / 2) * (dw + 0.06);
+    for (const sg of SEG[ch] ?? "") {
+      const horiz = "adg".includes(sg);
+      const sx = sg === "b" || sg === "c" ? dw / 2 : sg === "e" || sg === "f" ? -dw / 2 : 0;
+      const sy = sg === "a" ? dh / 2 : sg === "d" ? -dh / 2 : sg === "g" ? 0 : sg === "b" || sg === "f" ? dh / 4 : -dh / 4;
+      put(W, horiz ? box(gl, dw, t, 0.012) : box(gl, t, dh / 2, 0.012), ink, parent, cx + sx, y + sy, z + 0.02, false);
+    }
+  });
+}
+
 /** How a face looks: its mood (blinks come on their own). */
 type Mood = "smile" | "happy" | "joy" | "laugh" | "surprised";
 
@@ -1777,8 +1889,22 @@ function interiorWorld(W: World): InteriorParts {
   wall(-14, -4, 13, -4);
   wall(-14, -4, -14, 2.2);
   for (const x of [-9, -1, 7]) wall(x, -4, x, -1.6);
-  // Baseboards along the back wall.
+  // Baseboards along the back wall, crown molding along its top.
   put(W, box(gl, 27, 0.14, 0.04), trim, W.scene, -0.5, 0.27, -3.9, false);
+  put(W, box(gl, 27, 0.1, 0.1), trim, W.scene, -0.5, 2.95, -3.87, false);
+  put(W, box(gl, 27, 0.05, 0.16), trim, W.scene, -0.5, 2.98, -3.84, false);
+  // Oak planks: seams along the floor in staggered lengths.
+  const seamM = mc(W, "#8f6542", 0.3);
+  for (let z = -3.8, r = 0; z < 4.1; z += 0.22, r++) {
+    put(W, box(gl, 27, 0.004, 0.012), seamM, W.scene, -0.5, 0.201, z, false);
+    for (let x = -13.6 + (r % 3) * 0.6; x < 13; x += 1.8) put(W, box(gl, 0.012, 0.004, 0.22), seamM, W.scene, x, 0.201, z + 0.11, false);
+  }
+  // Board-and-batten wainscot in the foyer and the owner's suite.
+  for (const [x0, x1] of [[-13.9, -9.1], [7.1, 12.9]] as const) {
+    put(W, box(gl, x1 - x0, 0.06, 0.07), trim, W.scene, (x0 + x1) / 2, 0.98, -3.88, false);
+    put(W, box(gl, x1 - x0, 0.04, 0.05), trim, W.scene, (x0 + x1) / 2, 0.92, -3.89, false);
+    for (let x = x0 + 0.05; x <= x1; x += 0.48) put(W, box(gl, 0.07, 0.62, 0.03), trim, W.scene, x, 0.62, -3.9, false);
+  }
   // The patio doors: glass panels either side of an open slider.
   wall(13, -4, 13, -2.6);
   for (const z of [-2.4, -0.8]) put(W, box(gl, 0.06, 2.4, 1.5), glass, W.scene, 13, 1.4, z, false);
@@ -1788,6 +1914,12 @@ function interiorWorld(W: World): InteriorParts {
     put(W, box(gl, w + 0.18, hh + 0.18, 0.06), trim, W.scene, x, y, -3.9, false);
     put(W, box(gl, w, hh, 0.04), glass, W.scene, x, y, -3.86, false);
     put(W, box(gl, 0.05, hh, 0.07), trim, W.scene, x, y, -3.84, false);
+    // Grilles, a stool and apron under it, a casing header over it.
+    for (let k = 1; k < 3; k++) put(W, box(gl, w, 0.025, 0.065), trim, W.scene, x, y - hh / 2 + (k * hh) / 3, -3.845, false);
+    for (const dx of [-w / 4, w / 4]) put(W, box(gl, 0.025, hh, 0.065), trim, W.scene, x + dx, y, -3.845, false);
+    put(W, box(gl, w + 0.36, 0.05, 0.16), trim, W.scene, x, y - hh / 2 - 0.11, -3.82, false);
+    put(W, box(gl, w + 0.2, 0.1, 0.04), trim, W.scene, x, y - hh / 2 - 0.2, -3.88, false);
+    put(W, box(gl, w + 0.34, 0.12, 0.08), trim, W.scene, x, y + hh / 2 + 0.15, -3.86, false);
   };
   win(-6.5, 2.4);
   win(-3.5, 1.4);
@@ -1945,19 +2077,61 @@ function furnish(W: World, M: FurnishMats) {
       for (let i = 0; i < 5; i++) cy(0.06, 0.07, top - F - 0.05, drape, x + sd * (w / 2 + 0.12 + i * 0.09), F + (top - F) / 2, BACK + 0.14 + (i % 2) * 0.04, 10);
   };
 
-  /* Foyer: a console with drawers, a round mirror, a lamp and a bowl; a runner; a bench with shoes; coat hooks. */
-  rb(1.5, 0.05, 0.42, 0.03, M.wood, -11.5, F + 0.82, -3.66);
-  for (const sx of [-0.68, 0.68]) for (const sz of [-0.16, 0.16]) bx(0.05, 0.8, 0.05, M.wood, -11.5 + sx, F + 0.4, -3.66 + sz);
-  bx(1.36, 0.03, 0.34, M.wood, -11.5, F + 0.2, -3.66);
-  for (const dx of [-0.34, 0.34]) {
-    bx(0.62, 0.16, 0.02, mc(W, "#9a7253", 0.4), -11.5 + dx, F + 0.7, -3.44);
-    cy(0.018, 0.018, 0.03, brass, -11.5 + dx, F + 0.7, -3.42, 10).rotation.x = Math.PI / 2;
+  /* Foyer: a staircase with a newel post, balusters and a handrail; a console with drawers, a round
+     mirror, a lamp and a bowl; a runner; a bench with shoes; coat hooks. */
+  // The stairs rise along the back wall to code (IRC R311.7): fourteen 7½" risers on 10" treads with
+  // nosings, a handrail 35" above the nosings, balusters close enough that a 4⅜" sphere can't pass.
+  const RISE = 0.19;
+  const RUN = 0.255;
+  const N = 14;
+  const X0 = -10.52;
+  for (let i = 0; i < N; i++) {
+    const hh = (i + 1) * RISE;
+    const sx = X0 - i * RUN;
+    bx(RUN, hh, 1.0, M.white, sx, F + hh / 2, -3.42);
+    bx(RUN + 0.03, 0.03, 1.03, M.oak, sx - 0.015, F + hh + 0.015, -3.42);
+  }
+  const slopeK = RISE / RUN;
+  // The nosing line at a point along the run, and the rail 0.9 above it.
+  const nose = (x: number) => F + RISE + (X0 + RUN / 2 - x) * slopeK;
+  for (let i = 0; i < N; i++) {
+    const sx = X0 - i * RUN;
+    for (const dx of [-0.085, 0, 0.085]) {
+      const top = nose(sx + dx) + 0.9;
+      const base = F + (i + 1) * RISE + 0.03;
+      cy(0.014, 0.014, top - base, M.white, sx + dx, (top + base) / 2, -2.98, 8);
+    }
+  }
+  const stairAng = Math.atan(slopeK);
+  const runLen = Math.hypot(N * RUN, N * RISE);
+  const midX = X0 - ((N - 1) * RUN) / 2;
+  const skirt = bx(runLen + 0.1, 0.22, 0.04, M.white, midX, nose(midX) - 0.1, -2.9, 0);
+  skirt.rotation.z = -stairAng;
+  const handrail = bx(runLen + 0.1, 0.06, 0.08, M.wood, midX, nose(midX) + 0.92, -2.98, 0);
+  handrail.rotation.z = -stairAng;
+  // The newel post at the foot: a panelled post with a cap and a ball.
+  bx(0.16, 1.15, 0.16, M.white, X0 + 0.2, F + 0.575, -2.98);
+  bx(0.22, 0.06, 0.22, M.wood, X0 + 0.2, F + 1.18, -2.98);
+  W.mesh(sphere(gl, 0.07, 12, 8), M.wood, W.scene).position.set(X0 + 0.2, F + 1.27, -2.98);
+  // Panel moulding on the side of the stairs.
+  for (let i = 0; i < 4; i++) {
+    const px = X0 - 0.5 - i * 0.82;
+    const ph = Math.max(0.2, (nose(px + 0.3) - F) * 0.72);
+    bx(0.6, ph, 0.02, mc(W, "#e9e6e0", 0.4), px, F + 0.12 + ph / 2, -2.91, 0, false);
+    bx(0.54, ph - 0.06, 0.022, M.white, px, F + 0.12 + ph / 2, -2.905, 0, false);
+  }
+  rb(0.9, 0.05, 0.42, 0.03, M.wood, -9.75, F + 0.82, -3.66);
+  for (const sx of [-0.4, 0.4]) for (const sz of [-0.16, 0.16]) bx(0.05, 0.8, 0.05, M.wood, -9.75 + sx, F + 0.4, -3.66 + sz);
+  bx(0.8, 0.03, 0.34, M.wood, -9.75, F + 0.2, -3.66);
+  for (const dx of [-0.2, 0.2]) {
+    bx(0.36, 0.16, 0.02, mc(W, "#9a7253", 0.4), -9.75 + dx, F + 0.7, -3.44);
+    cy(0.018, 0.018, 0.03, brass, -9.75 + dx, F + 0.7, -3.42, 10).rotation.x = Math.PI / 2;
   }
   const mirror = W.mesh(torus(gl, 0.42, 0.03, Math.PI * 2, 40, 10), brass, W.scene);
-  mirror.position.set(-11.5, 1.85, BACK + 0.04);
-  cy(0.41, 0.41, 0.01, mc(W, "#d8e2ea", 0.95), -11.5, 1.85, BACK + 0.03, 32).rotation.x = Math.PI / 2;
-  lamp(-12.05, F + 0.845, -3.66, 0.9);
-  W.mesh(lathe(gl, [[0, 0], [0.1, 0], [0.16, 0.06], [0.15, 0.065], [0.09, 0.012], [0, 0.012]], 24), mc(W, "#2f6f73", 0.7), W.scene).position.set(-11.2, F + 0.845, -3.62);
+  mirror.position.set(-9.75, 1.85, BACK + 0.04);
+  cy(0.41, 0.41, 0.01, mc(W, "#d8e2ea", 0.95), -9.75, 1.85, BACK + 0.03, 32).rotation.x = Math.PI / 2;
+  lamp(-10.0, F + 0.845, -3.66, 0.9);
+  W.mesh(lathe(gl, [[0, 0], [0.1, 0], [0.16, 0.06], [0.15, 0.065], [0.09, 0.012], [0, 0.012]], 24), mc(W, "#2f6f73", 0.7), W.scene).position.set(-9.5, F + 0.845, -3.62);
   bx(1.4, 0.02, 3.4, mc(W, "#b86b4b", 0.1), -11.5, F + 0.01, -0.8, 0, false);
   bx(1.1, 0.025, 3.1, mc(W, "#d9a17e", 0.1), -11.5, F + 0.012, -0.8, 0, false);
   // The bench under the coat hooks, with a cushion and a pair of shoes beneath.
@@ -1980,7 +2154,7 @@ function furnish(W: World, M: FurnishMats) {
   cy(0.006, 0.006, 0.9, dark, -11.5, 2.65, -1.4, 6, W.scene, false);
   W.mesh(lathe(gl, [[0, 0.3], [0.08, 0.28], [0.22, 0.12], [0.26, 0], [0.24, 0], [0.2, 0.1], [0, 0.26]], 28), dark, W.scene, false).position.set(-11.5, 1.9, -1.4);
   W.mesh(sphere(gl, 0.07, 12, 8), M.warm, W.scene, false).position.set(-11.5, 1.95, -1.4);
-  plant(-9.6, -3.4, 1.2);
+  plant(-9.5, -1.4, 1.2);
 
   /* Living room: a rug, a cushioned sofa and armchair, a coffee table set for the day, a fireplace
      with its mantel and the TV, a stocked bookshelf, curtains, art, lamps and plants. */
@@ -2126,6 +2300,8 @@ function furnish(W: World, M: FurnishMats) {
   bx(runW, 0.62, 0.02, mc(W, "#e3eaee", 0.6), runC, F + 1.26, BACK + 0.02, 0, false);
   for (let r = 1; r < 4; r++) bx(runW, 0.008, 0.006, mc(W, "#c9d2d8", 0.3), runC, F + 0.95 + r * 0.155, BACK + 0.034, 0, false);
   for (let r = 0; r < 4; r++) for (let x = run0 + (r % 2 ? 0.15 : 0.3); x < run1; x += 0.3) bx(0.008, 0.155, 0.006, mc(W, "#c9d2d8", 0.3), x, F + 1.03 + r * 0.155, BACK + 0.034, 0, false);
+  // GFCI receptacles along the counter (no point on it more than 2 ft from one), clear of the range.
+  for (const ox of [run0 + 0.3, sinkX + 0.55, stoveX - 0.62, stoveX + 0.62, stoveX + 1.6, run1 - 0.35]) outlet(W, ox, F + 1.08, BACK + 0.032);
   // Wall cabinets either side of the hood, with door panels, handles and under-cabinet lights.
   for (const [x0, x1] of [[run0, stoveX - 0.45], [stoveX + 0.45, run1]] as const) {
     const cx = (x0 + x1) / 2;
@@ -2235,6 +2411,23 @@ function furnish(W: World, M: FurnishMats) {
   W.mesh(lathe(gl, [[0, 0], [0.05, 0], [0.07, 0.08], [0.04, 0.2], [0.03, 0.22], [0, 0.22]], 18), mc(W, "#e8889a", 0.6), dr).position.set(0.4, F + 0.905, 0.02);
   rb(0.36, 0.02, 0.22, 0.03, brass, -0.3, F + 0.915, 0.04, 0, 0, dr);
   art(bedX, 2.3, 1.6, 0.55, ["#c9a35a", "#7c8aa0", "#e6dccd", "#2f6f73"]);
+  // Smoke and CO alarms: in the bedroom, outside it, in the foyer.
+  alarm(W, 8.8, 2.78, BACK);
+  alarm(W, -2.0, 2.78, BACK);
+  alarm(W, -9.75, 2.75, BACK);
+  // A brass chandelier over the foot of the bed: a ring of candle arms on a chain.
+  cy(0.008, 0.008, 0.5, brass, bedX, 2.75, -1.9, 6, W.scene, false);
+  W.mesh(torus(gl, 0.32, 0.018, Math.PI * 2, 32, 6), brass, W.scene, false).position.set(bedX, 2.32, -1.9);
+  W.scene.children[W.scene.children.length - 1].rotation.x = Math.PI / 2;
+  W.mesh(sphere(gl, 0.06, 12, 8), brass, W.scene, false).position.set(bedX, 2.36, -1.9);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const cx2 = bedX + Math.cos(a) * 0.32;
+    const cz2 = -1.9 + Math.sin(a) * 0.32;
+    cy(0.035, 0.03, 0.04, brass, cx2, 2.35, cz2, 10, W.scene, false);
+    cy(0.016, 0.016, 0.12, M.white, cx2, 2.43, cz2, 8, W.scene, false);
+    W.mesh(sphere(gl, 0.025, 8, 6), M.warm, W.scene, false).position.set(cx2, 2.51, cz2);
+  }
   curtains(12.35, 0.9);
   curtains(7.75, 0.8);
   plant(12.55, -1.1, 1.0, mc(W, "#d9c2a0", 0.3));
@@ -2315,8 +2508,37 @@ function furnish(W: World, M: FurnishMats) {
   // Two steps down from the deck to the pool deck.
   for (let i = 0; i < 2; i++) bx(0.3, 0.09, 6.0, M.wood, 16.5 + i * 0.3, 0.17 - i * 0.07, -1.0);
   // The back boundary: a slatted fence on posts, a clipped hedge in front, planters at the corners.
-  for (let x = 13.2; x <= 24.1; x += 1.8) bx(0.12, 1.7, 0.12, slat, x, 0.85, -5.1);
-  for (let r = 0; r < 6; r++) bx(10.9, 0.18, 0.04, slat, 18.65, 0.3 + r * 0.24, -5.06, 0, false);
+  for (let x = 13.2; x <= 24.7; x += 1.15) bx(0.12, 1.7, 0.12, slat, x, 0.85, -5.1);
+  for (let r = 0; r < 6; r++) bx(11.5, 0.18, 0.04, slat, 18.95, 0.3 + r * 0.24, -5.06, 0, false);
+  // The pool barrier (to the US pool code): a glass fence 4 ft high round the pool deck, the house
+  // side included, with a self-closing, self-latching gate that opens out from the pool, its
+  // latch high on the pool side.
+  const gfence = W.mat({ color: "#dff0f7", alpha: 0.3, transparent: true, gloss: 0.9 });
+  const fenceH = 1.25;
+  const glassRun = (x0: number, z0: number, x1: number, z1: number, gap?: [number, number]) => {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const n = Math.max(1, Math.round(len / 1.2));
+    for (let i = 0; i < n; i++) {
+      const a = i / n;
+      const b2 = (i + 1) / n;
+      const ca = (a + b2) / 2;
+      if (gap && ca > gap[0] && ca < gap[1]) continue;
+      const cx = x0 + (x1 - x0) * ca;
+      const cz = z0 + (z1 - z0) * ca;
+      const pn = bx(len / n - 0.05, fenceH, 0.025, gfence, cx, 0.2 + fenceH / 2 + 0.05, cz, -Math.atan2(z1 - z0, x1 - x0), false);
+      void pn;
+      for (const e of [a + 0.08 / len, b2 - 0.08 / len]) bx(0.05, 0.12, 0.08, steel, x0 + (x1 - x0) * e, 0.26, z0 + (z1 - z0) * e, 0, false);
+    }
+  };
+  glassRun(17.0, -4.95, 17.0, 3.0, [0.62, 0.74]);
+  glassRun(17.0, 3.0, 24.6, 3.0);
+  glassRun(24.6, -4.95, 24.6, 3.0);
+  // The gate (between the deck steps and the loungers): a glass leaf on spring hinges, a latch box.
+  const gateZ0 = -4.95 + 7.95 * 0.62;
+  const gateZ1 = -4.95 + 7.95 * 0.74;
+  bx(0.025, fenceH - 0.05, gateZ1 - gateZ0 - 0.06, gfence, 17.0, 0.2 + fenceH / 2 + 0.07, (gateZ0 + gateZ1) / 2, 0, false);
+  for (const gy of [0.45, 1.25]) bx(0.06, 0.1, 0.06, steel, 17.0, gy, gateZ0 + 0.04, 0, false);
+  bx(0.07, 0.14, 0.07, steel, 17.06, 0.2 + fenceH - 0.08, gateZ1 - 0.05, 0, false);
   for (let x = 13.6; x < 24; x += 1.05) rb(1.0, 0.7, 0.6, 0.28, hedge, x, 0.55, -4.65);
   for (let z = -4.4; z < 2.6; z += 1.05) rb(0.6, 0.7, 1.0, 0.28, hedge, 24.2, 0.55, z);
   plant(23.4, 2.2, 1.1, mc(W, "#5b6b7c", 0.4));
@@ -2410,6 +2632,13 @@ function moreRoomsWorld(W: World): MoreRooms {
   // (Full walls round the basement rooms: downstairs is its own space.)
   for (const x of [6, 13]) wall(x, -4, x, 2.2);
   bx(27, 0.14, 0.04, trim, -0.5, F + 0.07, -3.9, 0, false);
+  // Crown molding upstairs, oak plank seams in the family room.
+  bx(20, 0.1, 0.1, trim, -4, 2.95, -3.87, 0, false);
+  bx(20, 0.05, 0.16, trim, -4, 2.98, -3.84, 0, false);
+  for (let z = -3.8, r = 0; z < 4.1; z += 0.22, r++) {
+    bx(7, 0.004, 0.012, mc(W, "#8f6542", 0.3), -3.5, F + 0.001, z, 0, false);
+    for (let x = -6.6 + (r % 3) * 0.6; x < 0; x += 1.8) bx(0.012, 0.004, 0.22, mc(W, "#8f6542", 0.3), x, F + 0.001, z + 0.11, 0, false);
+  }
   const win = (x: number, w: number, y = 1.75, hh = 1.2) => {
     bx(w + 0.18, hh + 0.18, 0.06, trim, x, y, -3.9, 0, false);
     bx(w, hh, 0.04, glass, x, y, -3.86, 0, false);
@@ -2687,21 +2916,32 @@ function moreRoomsWorld(W: World): MoreRooms {
      cue rack, a glowing sign, a bar with bottles and stools, an arcade cabinet, egress windows. */
   const GX = 9.5;
   const felt = accent("#2f7d55", 0.1, "felt");
-  // The stairs down from the main floor: treads and risers, a stringer, a rail.
-  for (let i = 0; i < 8; i++) {
-    const h = (i + 1) * 0.3;
-    bx(0.28, h, 1.0, white, 8.2 - i * 0.28, F + h / 2, BACK + 0.5);
-    bx(0.32, 0.04, 1.04, oak, 8.18 - i * 0.28, F + h + 0.02, BACK + 0.5);
+  // The stairs down from the main floor, to code: 7½" risers on 10" treads, a handrail 35" up,
+  // balusters under 4⅜" apart.
+  const BR = 0.19;
+  const BT = 0.255;
+  const BX0 = 9.55;
+  for (let i = 0; i < 14; i++) {
+    const h = (i + 1) * BR;
+    bx(BT, h, 1.0, white, BX0 - i * BT, F + h / 2, BACK + 0.5);
+    bx(BT + 0.03, 0.03, 1.03, oak, BX0 - i * BT - 0.015, F + h + 0.015, BACK + 0.5);
+    for (const dx of [-0.085, 0, 0.085]) {
+      const top = F + BR + (BX0 + BT / 2 - (BX0 - i * BT + dx)) * (BR / BT) + 0.9;
+      const base = F + h + 0.03;
+      bx(0.025, top - base, 0.025, black, BX0 - i * BT + dx, (top + base) / 2, BACK + 1.0, 0, false);
+    }
   }
-  const rl = bx(Math.hypot(2.24, 2.4) + 0.3, 0.06, 0.06, walnut, 7.22, F + 2.15, BACK + 1.04, 0);
-  rl.rotation.z = -Math.atan2(2.4, 2.24);
-  for (let i = 0; i < 8; i++) bx(0.03, 0.9, 0.03, black, 8.2 - i * 0.28, F + (i + 1) * 0.3 + 0.45, BACK + 1.04, 0, false);
-  // Egress windows high in the back wall.
-  for (const wx of [GX + 0.4, GX + 2.6]) {
-    bx(1.1, 0.56, 0.06, trim, wx, 2.62, -3.9, 0, false);
-    bx(0.96, 0.42, 0.04, glass, wx, 2.62, -3.86, 0, false);
-    bx(0.04, 0.42, 0.07, trim, wx, 2.62, -3.84, 0, false);
-  }
+  const bMid = BX0 - 6.5 * BT;
+  const rl = bx(Math.hypot(14 * BT, 14 * BR) + 0.1, 0.06, 0.07, walnut, bMid, F + BR + (BX0 + BT / 2 - bMid) * (BR / BT) + 0.92, BACK + 1.0, 0);
+  rl.rotation.z = -Math.atan(BR / BT);
+  // The egress window (IRC R310): a clear opening over 5.7 sq ft, its sill under 44" off the floor,
+  // a window well outside with its ladder.
+  const EW = GX + 1.75;
+  bx(1.06, 1.16, 0.06, trim, EW, F + 1.05 + 0.5, -3.9, 0, false);
+  bx(0.9, 1.0, 0.04, glass, EW, F + 1.05 + 0.5, -3.86, 0, false);
+  bx(0.04, 1.0, 0.07, trim, EW, F + 1.05 + 0.5, -3.84, 0, false);
+  bx(1.2, 0.05, 0.14, trim, EW, F + 1.0, -3.82, 0, false);
+  cy(0.02, 0.02, 0.05, brass, EW + 0.3, F + 1.12, -3.8, 8).rotation.x = Math.PI / 2;
   // The pool table: a walnut apron on turned legs, cushioned rails, felt, pockets, the balls racked.
   const PX = GX - 0.1;
   const PZ = -1.45;
@@ -2725,7 +2965,7 @@ function moreRoomsWorld(W: World): MoreRooms {
     W.mesh(sphere(gl, 0.06, 10, 8), warm, W.scene, false).position.set(PX + sx, 2.1, PZ);
   }
   // The dartboard (rings round the bull) and a cue rack.
-  const DX = GX - 0.35;
+  const DX = GX + 1.0;
   [[0.26, "#141418"], [0.22, "#2f8a4e"], [0.2, "#f3ead6"], [0.14, "#d6453a"], [0.12, "#f3ead6"], [0.04, "#2f8a4e"], [0.018, "#d6453a"]].forEach(([r, c], i) => {
     cy(r as number, r as number, 0.03, mc(W, c as string, 0.2), DX, 1.75, BACK + 0.03 + i * 0.004, 32, W.scene, false).rotation.x = Math.PI / 2;
   });
@@ -2733,24 +2973,25 @@ function moreRoomsWorld(W: World): MoreRooms {
     cy(0.006, 0.006, 0.12, black, DX + dx, 1.75 + dy, BACK + 0.1, 6, W.scene, false).rotation.x = Math.PI / 2;
     cy(0.02, 0.0, 0.04, accent("#7c5cff", 0.3), DX + dx, 1.75 + dy, BACK + 0.17, 4, W.scene, false).rotation.x = -Math.PI / 2;
   }
-  bx(0.56, 1.3, 0.04, walnut, GX + 0.85, F + 1.2, BACK + 0.02);
-  for (let i = 0; i < 4; i++) cy(0.009, 0.015, 1.2, i % 2 ? oak : walnut, GX + 0.66 + i * 0.13, F + 1.18, BACK + 0.08, 8);
+  bx(0.5, 1.3, 0.04, walnut, GX + 0.38, F + 1.25, BACK + 0.02);
+  for (let i = 0; i < 4; i++) cy(0.009, 0.015, 1.2, i % 2 ? oak : walnut, GX + 0.2 + i * 0.12, F + 1.23, BACK + 0.08, 8);
   // The bar along the wall: a counter, shelves of bottles and glasses, a glowing fridge, stools.
-  const RX = GX + 2.45;
-  bx(1.9, 1.0, 0.55, walnut, RX, F + 0.5, BACK + 0.28);
-  for (let i = 0; i < 5; i++) bx(0.012, 0.86, 0.02, dark, RX - 0.76 + i * 0.38, F + 0.5, BACK + 0.565, 0, false);
-  rb(2.0, 0.06, 0.62, 0.015, quartz, RX, F + 1.03, BACK + 0.3);
-  bx(0.5, 0.56, 0.02, glow("#fff1d6"), RX + 0.6, F + 0.38, BACK + 0.57, 0, false);
+  const RX = GX + 2.82;
+  bx(1.16, 1.0, 0.55, walnut, RX, F + 0.5, BACK + 0.28);
+  for (let i = 0; i < 3; i++) bx(0.012, 0.86, 0.02, dark, RX - 0.38 + i * 0.38, F + 0.5, BACK + 0.565, 0, false);
+  rb(1.24, 0.06, 0.62, 0.015, quartz, RX, F + 1.03, BACK + 0.3);
+  bx(0.4, 0.56, 0.02, glow("#fff1d6"), RX + 0.3, F + 0.38, BACK + 0.57, 0, false);
+  outlet(W, RX - 0.4, F + 1.2, BACK + 0.01);
   for (const sy of [1.65, 2.05]) {
-    rb(1.8, 0.04, 0.26, 0.01, walnut, RX, sy, BACK + 0.13);
-    for (let i = 0; i < 7; i++) {
+    rb(1.1, 0.04, 0.26, 0.01, walnut, RX, sy, BACK + 0.13);
+    for (let i = 0; i < 5; i++) {
       const c = ["#3f7d45", "#8a5a2a", "#cfe3f2", "#6a2f3a", "#c9a35a", "#2f5d7c", "#e8e2d8"][(i + (sy > 1.8 ? 3 : 0)) % 7];
-      W.mesh(lathe(gl, [[0, 0], [0.045, 0], [0.045, 0.16], [0.02, 0.22], [0.015, 0.3], [0, 0.3]], 14), mc(W, c, 0.85), W.scene).position.set(RX - 0.75 + i * 0.25, sy + 0.02, BACK + 0.13);
+      W.mesh(lathe(gl, [[0, 0], [0.045, 0], [0.045, 0.16], [0.02, 0.22], [0.015, 0.3], [0, 0.3]], 14), mc(W, c, 0.85), W.scene).position.set(RX - 0.44 + i * 0.22, sy + 0.02, BACK + 0.13);
     }
   }
-  W.mesh(torus(gl, 0.3, 0.025, Math.PI * 2, 40, 8), glow("#ffb4d9"), W.scene, false).position.set(RX, 2.55, BACK + 0.05);
-  W.mesh(sphere(gl, 0.1, 14, 10), glow("#fff1c1"), W.scene, false).position.set(RX, 2.55, BACK + 0.05);
-  for (const sx of [-0.6, 0.6]) {
+  W.mesh(torus(gl, 0.22, 0.022, Math.PI * 2, 40, 8), glow("#ffb4d9"), W.scene, false).position.set(RX, 2.55, BACK + 0.05);
+  W.mesh(sphere(gl, 0.08, 14, 10), glow("#fff1c1"), W.scene, false).position.set(RX, 2.55, BACK + 0.05);
+  for (const sx of [-0.32, 0.32]) {
     const st = node(W.scene);
     st.position.set(RX + sx, F, BACK + 1.0);
     cy(0.18, 0.18, 0.08, accent("#7c5cff", 0.4), 0, 0.78, 0, 20, st);
@@ -2841,6 +3082,15 @@ function moreRoomsWorld(W: World): MoreRooms {
   }
   for (const sx of [-0.18, 0.18]) cy(0.06, 0.06, 0.03, black, sx, 0.05, 0.22, 12, pc).rotation.z = Math.PI / 2;
 
+  // Code details: GFCI receptacles on the kitchen counter and by the vanity, a bath exhaust fan,
+  // smoke and CO alarms on both floors.
+  for (const ox of [-13.2, -11.9, -11.25, -9.7, -8.6]) outlet(W, ox, F + 1.13, BACK + 0.022);
+  for (const ox of [VX - 1.15, VX + 1.15]) outlet(W, ox, F + 1.06, BACK + 0.022);
+  bx(0.3, 0.3, 0.02, white, BX + 0.3, 2.62, BACK + 0.01, 0, false);
+  for (let i = 0; i < 5; i++) bx(0.24, 0.015, 0.025, grout, BX + 0.3, 2.52 + i * 0.05, BACK + 0.022, 0, false);
+  alarm(W, FX + 0.0, 2.78, BACK + 0.02);
+  alarm(W, GX + 0.4, 2.78, BACK);
+  alarm(W, 19.25, 2.8, BACK + 0.02);
   return {
     tones,
     rooms: [
