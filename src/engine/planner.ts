@@ -1292,6 +1292,18 @@ export function readSite(raw: unknown): SiteData | null {
     images: (Array.isArray(r.images) ? r.images : []).filter((v) => http(v) || isShot(v)).slice(0, 14) as string[],
     videos: (Array.isArray(r.videos) ? r.videos : []).filter(http).slice(0, 4) as string[],
     themeColor: typeof r.themeColor === "string" && /^#[0-9a-f]{3,8}$/i.test(r.themeColor) ? r.themeColor : null,
+    contact: (() => {
+      const c = (r.contact && typeof r.contact === "object" ? r.contact : null) as Record<string, unknown> | null;
+      if (!c) return undefined;
+      const phone = typeof c.phone === "string" && /^[\d+()\s.-]{7,24}$/.test(c.phone) ? c.phone : undefined;
+      const email = typeof c.email === "string" && /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(c.email) && c.email.length <= 80 ? c.email : undefined;
+      const socials = (Array.isArray(c.socials) ? c.socials : [])
+        .filter((x): x is { network: string; handle: string } => !!x && typeof x.network === "string" && typeof x.handle === "string" && /^[A-Za-z0-9_.-]{2,60}$/.test(x.handle))
+        .slice(0, 6)
+        .map((x) => ({ network: x.network.slice(0, 20), handle: x.handle }));
+      const apps = (Array.isArray(c.apps) ? c.apps : []).filter((x): x is string => x === "App Store" || x === "Google Play");
+      return phone || email || socials.length || apps.length ? { phone, email, socials: socials.length ? socials : undefined, apps: apps.length ? apps : undefined } : undefined;
+    })(),
     kind: r.kind === "product" ? "product" : undefined,
     marketplace: typeof r.marketplace === "string" ? r.marketplace.slice(0, 60) : undefined,
     partial: r.partial === true ? true : undefined,
@@ -1480,7 +1492,20 @@ export function planFromSite(site: SiteData, req: SiteRequest): VideoPlan {
         ? planFromSiteTrailer(input, req)
         : trimToTarget(planFromSiteSaas(input, req)),
   );
-  return noteShort(safe ? safePlan(plan) : healthPlan(plan), LENGTH_SECONDS[req.length], true);
+  const done = noteShort(safe ? safePlan(plan) : healthPlan(plan), LENGTH_SECONDS[req.length], true);
+  // The contact details the site links to (its phone, email, social handle, app stores) go on the end card.
+  const contact = siteContact(site.contact);
+  return contact && done.brand && !done.brand.contact ? { ...done, brand: { ...done.brand, contact } } : done;
+}
+
+/** A site's linked contact details as the end card's contact line: email · phone · @handle · app stores. */
+export function siteContact(c: SiteData["contact"]): string | undefined {
+  if (!c) return undefined;
+  // The handle used on the most networks (brands tend to use one everywhere), else the first.
+  const handles = (c.socials ?? []).filter((x) => x.network !== "LinkedIn").map((x) => x.handle.replace(/^@/, ""));
+  const handle = handles.sort((a, b) => handles.filter((h) => h.toLowerCase() === b.toLowerCase()).length - handles.filter((h) => h.toLowerCase() === a.toLowerCase()).length)[0];
+  const parts = [c.email, c.phone, handle && `@${handle}`, c.apps?.length ? c.apps.join(" & ") : undefined].filter(Boolean);
+  return parts.length ? parts.join("  ·  ") : undefined;
 }
 
 /**

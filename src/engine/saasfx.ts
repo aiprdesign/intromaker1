@@ -1197,7 +1197,7 @@ export function contactItems(domain?: string | null, contact?: string | null): {
 const iconRoom = (icon: string, ic: number) => (icon === "social" ? ic * 3.5 : ic);
 
 /** Simple marks for the social networks, drawn as plain shapes in one colour (no brand artwork). */
-function socialMarks(ctx: CanvasRenderingContext2D, x: number, y: number, ic: number, color: string) {
+export function socialMarks(ctx: CanvasRenderingContext2D, x: number, y: number, ic: number, color: string) {
   const s = ic * 0.92;
   ctx.save();
   ctx.strokeStyle = color;

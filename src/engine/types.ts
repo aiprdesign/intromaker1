@@ -366,6 +366,8 @@ export interface SiteData {
   images: string[];
   videos: string[];
   themeColor: string | null;
+  /** Contact details linked from the page (tel:, mailto:, social profiles, app store pages), for the end card. */
+  contact?: { phone?: string; email?: string; socials?: { network: string; handle: string }[]; apps?: string[] };
   /** "product": a physical product (a marketplace listing or uploaded product photos), filmed as a product video. */
   kind?: "site" | "product";
   /** The marketplace a listing came from ("Amazon", "eBay", or a store's domain). */

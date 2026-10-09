@@ -6,7 +6,7 @@
  * and a CTA lock-up with a clicked button.
  */
 import { exitT, lightSweep } from "../fx";
-import { clamp, ease, hashString, lerp, range, rgba, rng, TAU } from "../math";
+import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { tokens } from "../grid";
 import { drawAppIcon, drawLogo, lockupMark, logoMaxWidth, findHotspots, getImage, getMedia, mediaSize, pageBands, segmentShot, snapBands } from "../media";
 import {
@@ -18,6 +18,7 @@ import {
   contactItems,
   contactRow,
   drawIcon,
+  socialMarks,
   eyebrow,
   brandGlyph,
   iconConstellation,
@@ -1627,6 +1628,17 @@ function ctaLockup(sc: SkillContext) {
   ctx.translate(w / 2, h / 2);
   ctx.scale(push, push);
   ctx.translate(-w / 2, -h / 2);
+  // With contact details beyond the website, the end card lays them out on a card of their own:
+  // beside the call to action in a wide frame, under it in a tall or square one.
+  const details = brand?.contact?.trim() ? contactItems(brand?.domain, brand?.contact) : [];
+  const card = details.length >= 2;
+  const side = card && w > h * 1.2;
+  const shift = side ? -w * 0.2 : 0;
+  // (Over a card in a tall or square frame, the lock-up moves up to leave the card room.)
+  const tall = h > w * 1.2;
+  const lift = card && !side ? (tall ? 0.8 : 0.55) : 1;
+  ctx.save();
+  ctx.translate(shift, 0);
   const hasLogo = !!brand?.logo;
   if (imageless(sc)) iconConstellation(sc, { count: h > w ? 6 : 8, clear: 1.12, start: 0.2 });
   // Logo mark. A wide wordmark shows as the app icon (or the generated mark) with the name
@@ -1635,7 +1647,7 @@ function ctaLockup(sc: SkillContext) {
   const lm = lockupMark(brand);
   if (hasLogo && lm.stacked) {
     const size = Math.min(w, h) * 0.1 * S;
-    const iy = h * 0.18;
+    const iy = h * 0.18 * lift;
     ctx.save();
     ctx.globalAlpha = clamp(lk) * (1 - ex);
     ctx.translate(w / 2, iy);
@@ -1663,7 +1675,7 @@ function ctaLockup(sc: SkillContext) {
   } else if (hasLogo) {
     ctx.save();
     ctx.globalAlpha = clamp(lk) * (1 - ex);
-    ctx.translate(w / 2, h * 0.27);
+    ctx.translate(w / 2, h * 0.27 * lift);
     ctx.scale(0.85 + 0.15 * lk, 0.85 + 0.15 * lk);
     ctx.shadowColor = rgba(palette.primary, 0.8);
     ctx.shadowBlur = 40 * u;
@@ -1677,7 +1689,7 @@ function ctaLockup(sc: SkillContext) {
     ctx.font = `800 ${Math.round(size * 1.05)}px Inter, sans-serif`;
     const tw = ctx.measureText(brand.name).width;
     const gw = size + size * 0.4 + tw;
-    ctx.translate(w / 2, h * 0.25);
+    ctx.translate(w / 2, h * 0.25 * lift);
     ctx.scale(0.85 + 0.15 * lk, 0.85 + 0.15 * lk);
     const mx = -gw / 2;
     // The generated mark: a gradient tile with the product's icon.
@@ -1689,19 +1701,110 @@ function ctaLockup(sc: SkillContext) {
     fillTextMid(ctx, brand.name, mx + size * 1.4, 0);
     ctx.restore();
   }
-  const layout = sentence(sc, { text: accented(scene.text), cy: h * (hasLogo ? 0.44 : 0.4), sizeFrac: 0.1, widthFrac: 0.8, maxLines: 2 });
+  // (Beside a card the headline takes the left column; above one in a tall frame it sits higher.)
+  const cy = side ? h * (hasLogo ? 0.47 : 0.45) : card ? h * (tall ? (hasLogo ? 0.4 : 0.37) : hasLogo ? 0.33 : 0.31) : h * (hasLogo ? 0.44 : 0.4);
+  const layout = sentence(sc, { text: accented(scene.text), cy, sizeFrac: side ? 0.085 : card && !tall ? 0.08 : 0.1, widthFrac: side ? 0.5 : 0.8, maxLines: side ? 3 : 2 });
   blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt: d + 1 });
-  const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + 80 * u;
-  const button = ctaButton(sc, w / 2, by, S, T);
+  const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + (card && !side ? 64 : 80) * u;
+  const button = ctaButton(sc, w / 2, by, S, T, { info: !card });
   ctx.restore();
-  ctaCursor(sc, w / 2 + button.bw * 0.1, by + 4 * u, T);
+  if (card) {
+    // (Beside the call to action, centred on its column: lock-up to button.)
+    if (side) contactCard(sc, details, w * 0.71, null, (h * 0.2 + by + button.bh / 2) / 2, Math.min(w * 0.42, 760 * u), 1.3, T);
+    else contactCard(sc, details, w / 2, by + button.bh / 2 + 34 * u * S, null, Math.min(w * 0.86, 820 * u * S), S, T);
+  }
+  ctx.restore();
+  ctaCursor(sc, w / 2 + shift + button.bw * 0.1, by + 4 * u, T);
+}
+
+/** What each contact detail is, as the small label over it on the contact card. */
+const CONTACT_LABEL: Record<string, string> = { Globe: "Website", Phone: "Call", Mail: "Email", social: "Follow", Smartphone: "Get the app" };
+
+/**
+ * The end card's contact card: a frosted panel with a row per detail (website, phone, email,
+ * social handle, app stores), each an icon in a brand-coloured chip, a small label and the detail
+ * set large (the phone number largest). Rows slide in one after another as the button lands.
+ * Centred on `cx`; its top at `top`, or centred on `cy`.
+ */
+function contactCard(sc: SkillContext, items: { text: string; icon: string }[], cx: number, top: number | null, cy: number | null, cw: number, S: number, T: ReturnType<typeof ctaTiming>) {
+  const { ctx, t, u, h, palette } = sc;
+  const pad = 22 * u * S;
+  const rowH = 76 * u * S;
+  const rows = items.slice(0, 5);
+  const ch = pad * 2 + rows.length * rowH;
+  let y0 = top ?? (cy ?? h / 2) - ch / 2;
+  // (Kept inside the frame: a tall card in a short frame moves up rather than off the bottom.)
+  y0 = Math.min(y0, h - ch - 28 * u);
+  const x0 = cx - cw / 2;
+  const k = ease.outCubic(range(t, T.button + 0.05, T.button + 0.55));
+  if (k <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = k;
+  ctx.translate(0, (1 - k) * 18 * u);
+  ctx.shadowColor = "rgba(0,0,0,0.28)";
+  ctx.shadowBlur = 40 * u;
+  ctx.shadowOffsetY = 14 * u;
+  ctx.fillStyle = palette.light ? "rgba(255,255,255,0.82)" : rgba(mixHex(palette.bg0, "#ffffff", 0.06), 0.72);
+  ctx.beginPath();
+  ctx.roundRect(x0, y0, cw, ch, 26 * u * S);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.strokeStyle = rgba(palette.text, 0.14);
+  ctx.lineWidth = Math.max(1, 1.2 * u);
+  ctx.stroke();
+  rows.forEach((it, i) => {
+    const rk = ease.outCubic(range(t, T.button + 0.2 + i * 0.12, T.button + 0.65 + i * 0.12));
+    if (rk <= 0) return;
+    const ry = y0 + pad + rowH * (i + 0.5);
+    ctx.save();
+    ctx.globalAlpha = k * rk;
+    ctx.translate((1 - rk) * 24 * u, 0);
+    if (i > 0) {
+      ctx.fillStyle = rgba(palette.text, 0.08);
+      ctx.fillRect(x0 + pad, ry - rowH / 2, cw - pad * 2, Math.max(1, u));
+    }
+    // The icon chip.
+    const r = 23 * u * S;
+    const chx = x0 + pad + r;
+    const g = ctx.createLinearGradient(chx - r, ry - r, chx + r, ry + r);
+    g.addColorStop(0, palette.primary);
+    g.addColorStop(1, palette.secondary);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(chx, ry, r, 0, Math.PI * 2);
+    ctx.fill();
+    drawIcon(ctx, it.icon === "social" ? "AtSign" : it.icon, chx, ry, r * 0.95, "#ffffff");
+    // Label and value.
+    const tx = chx + r + 16 * u * S;
+    const room = x0 + cw - pad - tx;
+    const label = CONTACT_LABEL[it.icon] ?? "";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = subFont(15 * u * S, 600);
+    ctx.fillStyle = rgba(palette.text, 0.6);
+    fillTextMid(ctx, label.toUpperCase(), tx, ry - 15 * u * S);
+    // (A handle shows the networks it's on beside its label.)
+    if (it.icon === "social") socialMarks(ctx, tx + ctx.measureText(label.toUpperCase()).width + 10 * u * S, ry - 15 * u * S, 15 * u * S, rgba(palette.text, 0.6));
+    const vs = (it.icon === "Phone" ? 30 : 25) * u * S;
+    ctx.font = subFont(vs, 700);
+    const vw = ctx.measureText(it.text).width;
+    const fit = vw > room ? room / vw : 1;
+    ctx.fillStyle = palette.text;
+    ctx.save();
+    ctx.translate(tx, ry + 12 * u * S);
+    ctx.scale(fit, fit);
+    fillTextMid(ctx, it.text, 0, 0);
+    ctx.restore();
+    ctx.restore();
+  });
+  ctx.restore();
 }
 
 /**
  * The end card's button: springs in, glows on hover, presses on the click beat with a ripple and a
  * shimmer; the domain pill follows beneath. Returns its size.
  */
-export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T: ReturnType<typeof ctaTiming>) {
+export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T: ReturnType<typeof ctaTiming>, opts: { info?: boolean } = {}) {
   const { ctx, t, u, palette, scene, brand } = sc;
   const ex = 0;
   const label = scene.subtext || "Get started";
@@ -1745,7 +1848,8 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
   clickRipple(sc, cx + bw * 0.1, by, range(t, T.click, T.click + 0.6), "#ffffff");
   // Domain pill.
   const dk = ease.outCubic(range(t, T.click + 0.2, T.click + 0.7));
-  if (brand?.domain && dk > 0) {
+  const info = opts.info !== false;
+  if (info && brand?.domain && dk > 0) {
     ctx.save();
     ctx.globalAlpha = dk;
     // (A globe in front of the website.)
@@ -1762,8 +1866,8 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
   }
   // Contact details under the website: the phone number large (the one thing to call), then the
   // email, social handle and app stores in a smaller row, each with its icon.
-  const contact = brand?.contact?.trim();
-  let below = brand?.domain ? 58 : 0;
+  const contact = info ? brand?.contact?.trim() : undefined;
+  let below = info && brand?.domain ? 58 : 0;
   if (contact && dk > 0) {
     const items = contactItems(null, contact);
     const phone = items.find((x) => x.icon === "Phone");

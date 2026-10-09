@@ -603,6 +603,40 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
 
   const themeColor = meta(root, "theme-color", "msapplication-TileColor");
 
+  // Contact details the page links to: a phone (tel:), an email (mailto:), its social profiles and
+  // its app store pages, for the end card.
+  const contact: NonNullable<SiteData["contact"]> = {};
+  const socials: { network: string; handle: string }[] = [];
+  const apps = new Set<string>();
+  const SOCIAL: [string, RegExp][] = [
+    ["Instagram", /instagram\.com\/(?!p\/|reel|explore|accounts|stories)([A-Za-z0-9_.]{2,30})/i],
+    ["TikTok", /tiktok\.com\/@([A-Za-z0-9_.]{2,30})/i],
+    ["X", /(?:twitter|x)\.com\/(?!intent|share|home|i\/|search|hashtag)([A-Za-z0-9_]{2,15})(?:[/?#]|$)/i],
+    ["Facebook", /facebook\.com\/(?!sharer|share|dialog|plugins|profile\.php|groups|events|tr\b)([A-Za-z0-9.]{2,50})/i],
+    ["YouTube", /youtube\.com\/@([A-Za-z0-9_.-]{2,30})/i],
+    ["LinkedIn", /linkedin\.com\/company\/([A-Za-z0-9_-]{2,60})/i],
+  ];
+  for (const a of root.querySelectorAll("a[href]")) {
+    const href = (a.getAttribute("href") ?? "").trim();
+    if (/^tel:/i.test(href) && !contact.phone) {
+      const digits = decodeURIComponent(href.slice(4)).replace(/[^\d+]/g, "");
+      const us = digits.replace(/^\+?1(?=\d{10}$)/, "");
+      if (/^\d{10}$/.test(us)) contact.phone = `${us.slice(0, 3)}-${us.slice(3, 6)}-${us.slice(6)}`;
+      else if (digits.replace(/\D/g, "").length >= 7) contact.phone = clean(a.text) && /\d/.test(a.text) ? clean(a.text).slice(0, 24) : digits;
+    } else if (/^mailto:/i.test(href) && !contact.email) {
+      const mail = decodeURIComponent(href.slice(7).split("?")[0]).trim();
+      if (/^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(mail) && !/^(no-?reply|privacy|legal|abuse|security|dpo)@/i.test(mail)) contact.email = mail.toLowerCase();
+    } else if (/apps\.apple\.com\//i.test(href)) apps.add("App Store");
+    else if (/play\.google\.com\/store\/apps/i.test(href)) apps.add("Google Play");
+    else
+      for (const [network, re] of SOCIAL) {
+        const m = href.match(re);
+        if (m && !socials.some((x) => x.network === network)) socials.push({ network, handle: m[1].replace(/\/$/, "") });
+      }
+  }
+  if (socials.length) contact.socials = socials;
+  if (apps.size) contact.apps = [...apps];
+
   return {
     url: pageBase.toString(),
     domain: host.replace(/^www\./, ""),
@@ -624,5 +658,6 @@ export async function scrapeSite(rawUrl: string, opts: { live?: boolean } = {}):
     images,
     videos,
     themeColor: themeColor && /^#[0-9a-f]{3,8}$/i.test(themeColor) ? themeColor : null,
+    contact: Object.keys(contact).length ? contact : undefined,
   };
 }
