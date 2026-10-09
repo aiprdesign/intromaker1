@@ -23,6 +23,7 @@ import { Texture, Transform, type Program } from "ogl";
 import { bake, box, cylinder, gable, lathe, leaf, project, quad, render as draw3d, rgb, slab, sphere, sphereCap, torus, world, type View, type World } from "../d3";
 import { clamp, ease, hexToRgb, lerp, mixHex, range, TAU } from "../math";
 import { fillTextFit, subFont } from "../text";
+import { contactItems, contactRow, contactWidth } from "../saasfx";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage as stageAndHeadline } from "./beats";
 import { topHeadline } from "./saas";
@@ -3380,19 +3381,20 @@ function homeWelcome(sc0: SkillContext) {
     ctx.textBaseline = "middle";
     ctx.fillText(label0, x, y + 1);
     // The website and contact details under the button, on a frosted plate over the home.
-    const info = [sc.brand?.domain, sc.brand?.contact].filter(Boolean).join("  ·  ");
-    if (info) {
+    // (Each with its icon: a globe, an envelope, a phone.)
+    const info = contactItems(sc.brand?.domain, sc.brand?.contact);
+    if (info.length) {
       const fs = 18 * u * st.S;
       ctx.font = subFont(fs, 600);
-      const iw = ctx.measureText(info).width + fs * 1.6;
+      const iw = Math.min(contactWidth(ctx, info, fs), sc.w * 0.84) + fs * 1.8;
       const ih = fs * 1.9;
       const iy = y + th / 2 + ih * 0.5 + 10 * u;
       ctx.fillStyle = "rgba(255,255,255,0.84)";
       ctx.beginPath();
       ctx.roundRect(x - iw / 2, iy - ih / 2, iw, ih, ih / 2);
       ctx.fill();
-      ctx.fillStyle = INK;
-      ctx.fillText(info, x, iy + 1);
+      // (One line on the plate: too wide, it shrinks to fit rather than wrapping.)
+      contactRow(ctx, info, x, iy + 1, fs, INK, { maxWidth: sc.w * 0.84, wrap: false });
     }
     ctx.restore();
   }

@@ -18,6 +18,7 @@ export async function siteUrl(): Promise<string> {
 export const PUBLIC_PAGES: { path: string; priority: number }[] = [
   { path: "/", priority: 1 },
   { path: "/saas-video-maker", priority: 0.9 },
+  { path: "/showcase", priority: 0.8 },
   { path: "/skills", priority: 0.8 },
   { path: "/characters", priority: 0.7 },
   { path: "/studio", priority: 0.7 },

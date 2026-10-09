@@ -1182,6 +1182,51 @@ export function drawIcon(ctx: CanvasRenderingContext2D, kind: IconKind, cx: numb
   drawLucide(ctx, LEGACY[kind] ?? kind, cx, cy, size, color, { progress });
 }
 
+/** Contact details as icon + text items: a website (a globe), an email (an envelope), a phone number (a phone). */
+export function contactItems(domain?: string | null, contact?: string | null): { text: string; icon: string }[] {
+  return [domain, ...(contact ?? "").split(/\s*·\s*/)]
+    .map((x) => (x ?? "").trim())
+    .filter(Boolean)
+    .map((text) => ({ text, icon: text.includes("@") ? "Mail" : /\d{3}\D{0,3}\d{3}\D?\d{4}/.test(text) ? "Phone" : "Globe" }));
+}
+
+/** The width of a contact row at the current font (see contactRow). */
+export function contactWidth(ctx: CanvasRenderingContext2D, items: { text: string }[], size: number) {
+  const ic = size * 1.05;
+  return items.reduce((a, it) => a + ic + size * 0.45 + ctx.measureText(it.text).width, 0) + size * 1.4 * Math.max(0, items.length - 1);
+}
+
+/**
+ * Contact details centred on (cx, cy), each with its icon, in the current font. Too wide for
+ * `maxWidth`, the website goes on a line of its own above the rest (unless `wrap` is false), then
+ * a row still too wide shrinks to fit.
+ * Returns the height used.
+ */
+export function contactRow(ctx: CanvasRenderingContext2D, items: { text: string; icon: string }[], cx: number, cy: number, size: number, color: string, opts: { maxWidth?: number; iconColor?: string; wrap?: boolean } = {}) {
+  if (!items.length) return 0;
+  const rows = opts.wrap !== false && items.length > 1 && opts.maxWidth && contactWidth(ctx, items, size) > opts.maxWidth ? [items.slice(0, 1), items.slice(1)] : [items];
+  const lh = size * 1.6;
+  rows.forEach((row, ri) => {
+    const total = contactWidth(ctx, row, size);
+    const k = opts.maxWidth && total > opts.maxWidth ? opts.maxWidth / total : 1;
+    const ic = size * 1.05;
+    ctx.save();
+    ctx.translate(cx, cy + (ri - (rows.length - 1) / 2) * lh);
+    ctx.scale(k, k);
+    let x = -total / 2;
+    for (const it of row) {
+      drawIcon(ctx, it.icon, x + ic / 2, 0, ic, opts.iconColor ?? color);
+      ctx.fillStyle = color;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      fillTextMid(ctx, it.text, x + ic + size * 0.45, 0);
+      x += ic + size * 0.45 + ctx.measureText(it.text).width + size * 1.4;
+    }
+    ctx.restore();
+  });
+  return rows.length * lh;
+}
+
 /**
  * Word-by-word blur-in (the Apple/Linear reveal): each word rises, un-blurs and fades in on a
  * stagger. Words wrapped in *asterisks* get the brand gradient.

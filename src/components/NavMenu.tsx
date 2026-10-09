@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 const LINKS: [string, string][] = [
   ["/#product", "Product videos"],
+  ["/showcase", "Showcase"],
   ["/skills", "Skills"],
   ["/characters", "Characters"],
   ["/#how", "How it works"],

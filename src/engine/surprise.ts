@@ -8,8 +8,8 @@
  * random intro has no footage or photos to cut a trailer from.
  *
  * Every name and contact detail is made up: brands from word parts, websites and emails on the
- * reserved ".example" domain, phone numbers in the 555-0100 to 555-0199 range set aside for
- * fiction, so the intro never points at a real business.
+ * reserved ".example" domain, and the placeholder phone number 123-456-7890, so the intro
+ * doesn't point at a real business.
  */
 
 type Topic = {
@@ -118,7 +118,7 @@ const TOPICS: Topic[] = [
   {
     kind: "Fitness app",
     taglines: ["Your gym fits in your pocket", "Sweat now, brag later", "Small steps, loud results"],
-    looks: ["kinetic", "neon", "chrome", "liquid"],
+    looks: ["liquid", "kinetic", "neon", "chrome"],
     ask: "an energetic launch video",
     name: [["Stride", "Pulse", "Flex", "Peak", "Motion"], ["fit", "coach", "go", "move"]],
     pitch: "a fitness app on your phone",
@@ -201,7 +201,7 @@ const TOPICS: Topic[] = [
     taglines: ["Smiles made comfortable", "Gentle care, bright smiles", "The friendliest chair in town"],
     looks: ["frosted", "enterprise", "bloom"],
     ask: "a welcoming intro",
-    name: [["Bright", "Gentle", "Smile", "Pearl"], [" Dental", " Smiles", " Dental Studio"]],
+    name: [["Bright", "Gentle", "Pearl", "Maple"], [" Dental", " Family Dental", " Dental Studio"]],
     pitch: "a family dental clinic",
     list: "Services",
     items: ["check-ups", "gentle care for kids", "whitening", "evening appointments", "a friendly team"],
@@ -444,34 +444,46 @@ const TOPICS: Topic[] = [
 
 const OPENERS = ["Make", "Create", "I need", "Can you make", "Please make"];
 const TOWNS = ["Austin", "Denver", "Portland", "Raleigh", "Boise", "Nashville", "Tampa", "Madison"];
-// (Area codes with 555-01xx, the range kept for fiction.)
-const AREAS = ["512", "303", "503", "919", "208", "615", "813", "608"];
 
 /**
  * A random intro idea: the topic, its brief and a style that shows it off (`look`, a template id,
  * or none to leave the studio's pick). `rand` is Math.random by default (pass a seeded one for
  * repeatable picks).
  */
-export function randomIntro(rand: () => number = Math.random, avoid?: string): { kind: string; prompt: string; look?: string } {
+/** A random intro: its topic, made-up name, tagline, the brief, and a style that shows it off. */
+export type RandomIntro = { kind: string; name: string; tagline: string; prompt: string; look?: string };
+
+export function randomIntro(rand: () => number = Math.random, avoid?: string): RandomIntro {
   const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length) % xs.length];
   // (Not the same topic twice in a row.)
   const pool = TOPICS.filter((t) => t.kind !== avoid);
-  const t = pick(pool.length ? pool : TOPICS);
+  return brief(pick(pool.length ? pool : TOPICS), rand);
+}
+
+/** A brief on one topic (by its label), or undefined for an unknown topic. */
+export function introFor(kind: string, rand: () => number = Math.random) {
+  const t = TOPICS.find((x) => x.kind === kind);
+  return t ? brief(t, rand) : undefined;
+}
+
+function brief(t: Topic, rand: () => number): RandomIntro {
+  const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length) % xs.length];
   const name = pick(t.name[0]) + pick(t.name[1]);
   const slug = name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
   const items = [...t.items].sort(() => rand() - 0.5).slice(0, 4);
   const town = t.local ? pick(TOWNS) : undefined;
-  const area = town ? AREAS[TOWNS.indexOf(town)] : pick(AREAS);
-  const phone = `(${area}) 555-01${String(Math.floor(rand() * 100)).padStart(2, "0")}`;
+  // (A placeholder number, plainly not a real one.)
+  const phone = "123-456-7890";
   const contact = [
     t.contact.includes("web") ? `Website: ${slug}.example` : "",
     t.contact.includes("email") ? `Email: hello@${slug}.example` : "",
     t.contact.includes("phone") ? `Phone: ${phone}` : "",
   ].filter(Boolean);
   const cta = pick(t.ctas);
+  const tagline = pick(t.taglines);
   const lines = [
     `${pick(OPENERS)} ${t.ask} for "${name}", ${t.pitch}${town ? ` in ${town}` : ""}.`,
-    `Tagline: "${pick(t.taglines)}"`,
+    `Tagline: "${tagline}"`,
     `${t.list}: ${items.join(", ")}.`,
     ...(t.steps ? [`How it works: ${t.steps.join(", ")}.`] : []),
     `Audience: ${t.audience}.`,
@@ -479,7 +491,12 @@ export function randomIntro(rand: () => number = Math.random, avoid?: string): {
     `End with ${/^[aeiou]/i.test(cta) ? "an" : "a"} "${cta}" button.`,
     `Contact: ${contact.join(" · ")}`,
   ];
-  return { kind: t.kind, prompt: lines.join("\n"), look: t.looks?.length ? pick(t.looks) : undefined };
+  return { kind: t.kind, name, tagline, prompt: lines.join("\n"), look: t.looks?.length ? pick(t.looks) : undefined };
+}
+
+/** The styles that show a topic off (empty: the studio's own pick). */
+export function looksOf(kind: string): string[] {
+  return TOPICS.find((t) => t.kind === kind)?.looks ?? [];
 }
 
 /** The topics a random intro picks from. */

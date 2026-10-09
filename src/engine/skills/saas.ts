@@ -15,6 +15,8 @@ import {
   clickRipple,
   cursorLean,
   drawCursor,
+  contactItems,
+  contactRow,
   drawIcon,
   eyebrow,
   brandGlyph,
@@ -1746,11 +1748,16 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
   if (brand?.domain && dk > 0) {
     ctx.save();
     ctx.globalAlpha = dk;
-    pill(sc, brand.domain, cx, by + bh / 2 + 62 * u * S + (1 - dk) * 14 * u, {
-      size: 26 * u * S,
+    // (A globe in front of the website.)
+    const ps = 26 * u * S;
+    const py = by + bh / 2 + 62 * u * S + (1 - dk) * 14 * u;
+    const pw = pill(sc, brand.domain, cx, py, {
+      size: ps,
       fill: rgba(palette.light ? "#ffffff" : palette.bg0, 0.6),
       border: rgba(palette.text, 0.18),
+      lead: ps * 1.35,
     });
+    drawIcon(ctx, "Globe", cx - pw / 2 + ps * 0.9 + ps * 0.5, py, ps * 1.02, rgba(palette.text, 0.8));
     ctx.restore();
   }
   // Contact details (an email, a phone) under the website.
@@ -1759,10 +1766,8 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
     ctx.save();
     ctx.globalAlpha = dk * 0.85;
     ctx.font = subFont(21 * u * S, 500);
-    ctx.fillStyle = rgba(palette.text, 0.72);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    fillTextMid(ctx, contact, cx, by + bh / 2 + (brand?.domain ? 112 : 58) * u * S + (1 - dk) * 10 * u);
+    // (An envelope in front of the email, a phone in front of the number.)
+    contactRow(ctx, contactItems(null, contact), cx, by + bh / 2 + (brand?.domain ? 112 : 58) * u * S + (1 - dk) * 10 * u, 21 * u * S, rgba(palette.text, 0.72), { maxWidth: sc.w * 0.86 });
     ctx.restore();
   }
   const below = (brand?.domain ? 54 : 0) + (contact ? 44 : 0);

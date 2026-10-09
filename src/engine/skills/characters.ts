@@ -20,7 +20,7 @@
 import { clamp, ease, hashString, lerp, mixHex, range, rgba, rng, TAU } from "../math";
 import { drawTalk } from "./abspaint";
 import { solid } from "./solid";
-import { iconsFor, saasBackground, saasFont, spring } from "../saasfx";
+import { contactItems, contactRow, iconsFor, saasBackground, saasFont, spring } from "../saasfx";
 import { displayFont, fillTextFit, fitTextLines, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { exitOf, itemsOr, split, stage } from "./beats";
@@ -1190,15 +1190,16 @@ function charCheer(sc: SkillContext) {
     ctx.globalAlpha = 1 - ex;
   }
   // The website and contact details under the button.
-  const info = asButton ? [sc.brand?.domain, sc.brand?.contact].filter(Boolean).join("  ·  ") : "";
-  if (info) {
+  // (Each with its icon: a globe, an envelope, a phone.)
+  const info = asButton ? contactItems(sc.brand?.domain, sc.brand?.contact) : [];
+  if (info.length) {
     const a = range(t, 0.7, 1.1);
+    const fs = (portrait ? 24 : 26) * u;
     ctx.globalAlpha = (1 - ex) * a;
-    ctx.fillStyle = rgba(palette.text, 0.75);
-    ctx.font = subFont((portrait ? 24 : 26) * u, 600);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    fillTextFit(ctx, info, w / 2, by + bh + 30 * u, portrait ? w * 0.86 : w * 0.6, { maxLines: 2, lineHeight: 1.3 });
+    ctx.font = subFont(fs, 600);
+    const mw = portrait ? w * 0.86 : w * 0.6;
+    const two = info.length > 1 && ctx.measureText(info.map((x) => x.text).join("      ")).width + fs * 3 * info.length > mw;
+    contactRow(ctx, info, w / 2, by + bh + 30 * u + fs * (two ? 1.4 : 0.6), fs, rgba(palette.text, 0.75), { maxWidth: mw });
     ctx.globalAlpha = 1 - ex;
   }
   if (scene.subtext && !asButton) {

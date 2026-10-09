@@ -50,6 +50,11 @@ export default function Home() {
           <p>A SaaS launch, a speed promo, a product video and a trailer for imaginary brands, built from the slides that suit them. They play live in your browser, frame for frame what you export.</p>
         </div>
         <SampleFilms />
+        <div className="center">
+          <Link href="/showcase" className="btn btn-ghost btn-lg">
+            See the showcase →
+          </Link>
+        </div>
       </section>
 
       <section className="section" id="skills">

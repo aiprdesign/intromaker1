@@ -6398,3 +6398,121 @@ code.secret {
 .kind-picker .cd-tile canvas {
   border-radius: 8px;
 }
+
+/* ───────── Showcase gallery ───────── */
+.show-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 22px;
+}
+.show-filters {
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.show-play {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: #000;
+  cursor: zoom-in;
+}
+.show-skeleton .skill-canvas {
+  aspect-ratio: 16 / 9;
+  background: var(--panel-2, rgba(255, 255, 255, 0.04));
+}
+.show-skeleton .skill-meta {
+  height: 150px;
+}
+.show-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.show-tags span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.skill-meta p.show-tagline {
+  color: var(--text);
+  font-size: 15px;
+  font-style: italic;
+  margin: 12px 0 10px;
+}
+.show-brief {
+  margin-bottom: 12px;
+}
+.show-brief summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.show-brief pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+}
+.show-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+.show-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(3, 2, 10, 0.82);
+  backdrop-filter: blur(6px);
+}
+.show-modal-box {
+  width: min(1200px, 100%);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+}
+.show-modal-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.show-modal-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+.show-muted {
+  color: var(--muted);
+}
+.show-filters {
+  flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  .show-grid {
+    grid-template-columns: 1fr;
+  }
+}
