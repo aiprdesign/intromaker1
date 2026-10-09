@@ -1187,13 +1187,64 @@ export function contactItems(domain?: string | null, contact?: string | null): {
   return [domain, ...(contact ?? "").split(/\s*·\s*/)]
     .map((x) => (x ?? "").trim())
     .filter(Boolean)
-    .map((text) => ({ text, icon: text.includes("@") ? "Mail" : /\d{3}\D{0,3}\d{3}\D?\d{4}/.test(text) ? "Phone" : "Globe" }));
+    .map((text) => ({
+      text,
+      icon: /^@/.test(text) ? "social" : text.includes("@") ? "Mail" : /\d{3}\D{0,3}\d{3}\D?\d{4}/.test(text) ? "Phone" : /app store|google play/i.test(text) ? "Smartphone" : "Globe",
+    }));
+}
+
+/** Room an item's icon takes: a social handle has three small marks (Instagram, Facebook, TikTok). */
+const iconRoom = (icon: string, ic: number) => (icon === "social" ? ic * 3.5 : ic);
+
+/** Simple marks for the social networks, drawn as plain shapes in one colour (no brand artwork). */
+function socialMarks(ctx: CanvasRenderingContext2D, x: number, y: number, ic: number, color: string) {
+  const s = ic * 0.92;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(1, s * 0.11);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // A camera: a rounded square, a lens and a dot.
+  let cx = x + s / 2;
+  ctx.beginPath();
+  ctx.roundRect(cx - s * 0.42, y - s * 0.42, s * 0.84, s * 0.84, s * 0.24);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, y, s * 0.19, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx + s * 0.24, y - s * 0.24, s * 0.05, 0, Math.PI * 2);
+  ctx.fill();
+  // An "f" in a circle.
+  cx = x + ic * 1.25 + s / 2;
+  ctx.beginPath();
+  ctx.arc(cx, y, s * 0.44, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + s * 0.13, y - s * 0.24);
+  ctx.quadraticCurveTo(cx - s * 0.04, y - s * 0.26, cx - s * 0.04, y - s * 0.06);
+  ctx.lineTo(cx - s * 0.04, y + s * 0.32);
+  ctx.moveTo(cx - s * 0.17, y + s * 0.02);
+  ctx.lineTo(cx + s * 0.12, y + s * 0.02);
+  ctx.stroke();
+  // A music note.
+  cx = x + ic * 2.5 + s / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx + s * 0.02, y + s * 0.2);
+  ctx.lineTo(cx + s * 0.02, y - s * 0.4);
+  ctx.quadraticCurveTo(cx + s * 0.08, y - s * 0.16, cx + s * 0.36, y - s * 0.14);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx - s * 0.12, y + s * 0.22, s * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /** The width of a contact row at the current font (see contactRow). */
-export function contactWidth(ctx: CanvasRenderingContext2D, items: { text: string }[], size: number) {
+export function contactWidth(ctx: CanvasRenderingContext2D, items: { text: string; icon?: string }[], size: number) {
   const ic = size * 1.05;
-  return items.reduce((a, it) => a + ic + size * 0.45 + ctx.measureText(it.text).width, 0) + size * 1.4 * Math.max(0, items.length - 1);
+  return items.reduce((a, it) => a + iconRoom(it.icon ?? "", ic) + size * 0.45 + ctx.measureText(it.text).width, 0) + size * 1.4 * Math.max(0, items.length - 1);
 }
 
 /**
@@ -1215,12 +1266,14 @@ export function contactRow(ctx: CanvasRenderingContext2D, items: { text: string;
     ctx.scale(k, k);
     let x = -total / 2;
     for (const it of row) {
-      drawIcon(ctx, it.icon, x + ic / 2, 0, ic, opts.iconColor ?? color);
+      const room = iconRoom(it.icon, ic);
+      if (it.icon === "social") socialMarks(ctx, x, 0, ic, opts.iconColor ?? color);
+      else drawIcon(ctx, it.icon, x + ic / 2, 0, ic, opts.iconColor ?? color);
       ctx.fillStyle = color;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      fillTextMid(ctx, it.text, x + ic + size * 0.45, 0);
-      x += ic + size * 0.45 + ctx.measureText(it.text).width + size * 1.4;
+      fillTextMid(ctx, it.text, x + room + size * 0.45, 0);
+      x += room + size * 0.45 + ctx.measureText(it.text).width + size * 1.4;
     }
     ctx.restore();
   });

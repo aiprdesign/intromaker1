@@ -1749,8 +1749,8 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
     ctx.save();
     ctx.globalAlpha = dk;
     // (A globe in front of the website.)
-    const ps = 26 * u * S;
-    const py = by + bh / 2 + 62 * u * S + (1 - dk) * 14 * u;
+    const ps = 29 * u * S;
+    const py = by + bh / 2 + 64 * u * S + (1 - dk) * 14 * u;
     const pw = pill(sc, brand.domain, cx, py, {
       size: ps,
       fill: rgba(palette.light ? "#ffffff" : palette.bg0, 0.6),
@@ -1760,17 +1760,33 @@ export function ctaButton(sc: SkillContext, cx: number, by: number, S: number, T
     drawIcon(ctx, "Globe", cx - pw / 2 + ps * 0.9 + ps * 0.5, py, ps * 1.02, rgba(palette.text, 0.8));
     ctx.restore();
   }
-  // Contact details (an email, a phone) under the website.
+  // Contact details under the website: the phone number large (the one thing to call), then the
+  // email, social handle and app stores in a smaller row, each with its icon.
   const contact = brand?.contact?.trim();
+  let below = brand?.domain ? 58 : 0;
   if (contact && dk > 0) {
+    const items = contactItems(null, contact);
+    const phone = items.find((x) => x.icon === "Phone");
+    const rest = items.filter((x) => x !== phone);
+    let y = by + bh / 2 + (brand?.domain ? 122 : 62) * u * S + (1 - dk) * 10 * u;
     ctx.save();
-    ctx.globalAlpha = dk * 0.85;
-    ctx.font = subFont(21 * u * S, 500);
-    // (An envelope in front of the email, a phone in front of the number.)
-    contactRow(ctx, contactItems(null, contact), cx, by + bh / 2 + (brand?.domain ? 112 : 58) * u * S + (1 - dk) * 10 * u, 21 * u * S, rgba(palette.text, 0.72), { maxWidth: sc.w * 0.86 });
+    ctx.globalAlpha = dk;
+    if (phone) {
+      const ps = 34 * u * S;
+      ctx.font = subFont(ps, 700);
+      contactRow(ctx, [phone], cx, y, ps, palette.text, { maxWidth: sc.w * 0.86, iconColor: palette.primary });
+      y += 50 * u * S;
+      below += 52;
+    }
+    if (rest.length) {
+      const rs = 24 * u * S;
+      ctx.globalAlpha = dk * 0.85;
+      ctx.font = subFont(rs, 500);
+      const used = contactRow(ctx, rest, cx, y + (phone ? 0 : -4 * u * S), rs, rgba(palette.text, 0.72), { maxWidth: sc.w * 0.86 });
+      below += used / (u * S) + 12;
+    }
     ctx.restore();
   }
-  const below = (brand?.domain ? 54 : 0) + (contact ? 44 : 0);
   // Risk reversal: one reassurance line under the button ("Cancel anytime"), when the site says it.
   const sure = (scene.items ?? []).find((x) => x.trim())?.trim();
   if (sure && dk > 0) {

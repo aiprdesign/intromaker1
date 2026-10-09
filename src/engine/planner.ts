@@ -650,6 +650,8 @@ export function readBrief(prompt: string) {
     ?.toLowerCase();
   let cta: string | undefined;
   let tagline: string | undefined;
+  let social: string | undefined;
+  let app: string | undefined;
   let steps: string[] = [];
   let features: string[] = [];
   let services = false;
@@ -658,14 +660,17 @@ export function readBrief(prompt: string) {
   for (const raw of prompt.split(/(?<=[.!?])\s+(?=[A-Z"“])|\n+/)) {
     const line = raw.trim();
     if (!line) continue;
-    const label = line.match(/^(features|key features|what it does|services|our services|we offer|how it works|steps|the process|process|tone|vibe|style|look|audience|it'?s for|made for|contact|reach us|find us|website|tagline|slogan|hook|open with)\s*:\s*(.*)$/i);
+    const label = line.match(/^(features|key features|what it does|services|our services|we offer|how it works|steps|the process|process|tone|vibe|style|look|audience|it'?s for|made for|contact|reach us|find us|website|tagline|slogan|hook|open with|social|socials|follow us|app|get the app)\s*:\s*(.*)$/i);
     const end = line.match(/\b(?:end|close|finish)\s+(?:with|on)\s+(?:an?\s+|the\s+)?["“]([^"”]{2,32})["”](?:\s+(?:button|cta|call to action|link))?/i) ?? line.match(/^(?:cta|button|call to action)\s*:\s*["“]?([^"”.]{2,32})/i);
     if (end) cta = end[1].trim();
     if (label) {
       const key = label[1].toLowerCase();
       const body = label[2].replace(/[.]+$/, "");
       // A tagline, in quotes or not, opens the video ("Tagline: \"Skip the line, not the latte.\"").
-      if (/^(tagline|slogan|hook|open with)$/.test(key)) tagline = body.replace(/^["“'‘]+|["”'’]+$/g, "").replace(/[.!]+$/, "").trim() || undefined;
+      // Social handles ("@acme on Instagram and TikTok") and app stores go on the end card.
+      if (/^(social|socials|follow us)$/.test(key)) social = body.match(/@[\w.]{2,30}/)?.[0];
+      else if (/^(app|get the app)$/.test(key)) app = /app store|google play/i.test(body) ? [/app store/i.test(body) && "App Store", /google play/i.test(body) && "Google Play"].filter(Boolean).join(" & ") : undefined;
+      else if (/^(tagline|slogan|hook|open with)$/.test(key)) tagline = body.replace(/^["“'‘]+|["”'’]+$/g, "").replace(/[.!]+$/, "").trim() || undefined;
       else if (/^(features|key features|what it does)$/.test(key)) features = list(body);
       else if (/services|we offer/.test(key)) {
         features = list(body);
@@ -694,7 +699,7 @@ export function readBrief(prompt: string) {
     const feats = features.length > 1 ? `${features.slice(0, -1).join(", ")} and ${features[features.length - 1]}` : features[0];
     core = `${lead}: ${feats}.${tail ? ` ${tail}` : ""}`;
   }
-  return { core: core || prompt, steps, cta, tagline, domain, email, phone, services, features };
+  return { core: core || prompt, steps, cta, tagline, social, app, domain, email, phone, services, features };
 }
 
 export function parseSaasPrompt(prompt: string) {
@@ -826,6 +831,64 @@ export function contrastPairOf(text: string, fallback?: string): [string, string
   return undefined;
 }
 
+/** A brief about software rather than a shop, a trade or a studio. */
+const APPISH = /\b(apps?|software|platform|saas|dashboards?|api|extensions?|plugins?)\b/i;
+/** Slides that show software at work: a local business shows itself instead. */
+const SOFTWARE_SLIDES = new Set<string>(["click-flow", "notify-stack", "changelog", "ai-prompt", "kanban", "d3-desk", "d3-laptop", "d3-phone", "d3-popout", "d3-lineup", "d3-split", "chat-thread", "live-cursors", "phone-tour", "toggle-list", "calendar-drop", "inbox-sweep", "code-deploy", "table-fill", "comment-pins", "char-desk", "ui-tour", "product-tour"]);
+/** Concepts whose lines suit a local business of their kind (others are software lines: "Sell with…", "Your pipeline…"). */
+const LOCAL_CONCEPTS = new Set(["food", "booking", "pets", "realestate", "legal", "health", "education", "fitness", "general"]);
+/** The industry slide for a kind of local business, with its headline. */
+const LOCAL_KINDS: [RegExp, string, string][] = [
+  [/\b(law|legal|tax|accounting|bookkeeping|agency|insurance)\b/i, "ind-team", "How we *help*"],
+  [/\b(restaurants?|caf(e|é)s?|coffee|bak(ery|ehouse)|pizzas?|pizzeria|tacos?|ice cream|creamery|kitchen|diner|food truck|menu)\b/i, "ind-menu", "Fresh on the *menu*"],
+  [/\b(plumb|electric|roof|construction|contract|hvac|heating|landscap|renovat|builders?)/i, "ind-site", "On the *job*"],
+  [/\b(mov(ing|ers)|delivery|cleaning|cleaners|lawn)\b/i, "ind-route", "We come to *you*"],
+  [/\b(daycare|preschool|school|tutor|dance|lessons|classes)\b/i, "ind-lesson", "A day at *{name}*"],
+  [/\b(dental|dentists?|clinic)\b/i, "ind-care", "Your *visit*"],
+];
+
+/**
+ * A storefront story for a local business: software slides (click flows, notification stacks,
+ * device demos) give way to the business's own industry slide (a menu board, a job site, shop
+ * tags…) and its steps; lines from a software category that doesn't fit ("Sell with…", "Get your
+ * tickets") give way to plain local ones; and the close asks for the visit, the booking or the call.
+ */
+function localize(plan: VideoPlan, prompt: string, brief: Brief) {
+  const name = plan.brand?.name ?? plan.title;
+  const items = brief.features.map((f) => f.charAt(0).toUpperCase() + f.slice(1)).slice(0, 4);
+  const [, skill, head] = LOCAL_KINDS.find(([re]) => re.test(prompt)) ?? [null, "ind-shop", "Come on *in*"];
+  const concept = CONCEPT_MAP[plan.concept ?? ""];
+  const fits = !concept || LOCAL_CONCEPTS.has(concept.id);
+  const swapHead = concept?.swap.split(",")[0];
+  const STEPS = /^(steps|process-|arrow-rise|step-|node-graph)/;
+  let industry = false;
+  let steps = plan.scenes.some((s) => STEPS.test(s.skill));
+  const out: Scene[] = [];
+  for (const s of plan.scenes) {
+    if (SOFTWARE_SLIDES.has(s.skill)) {
+      if (!industry && items.length >= 2) {
+        industry = true;
+        out.push({ ...s, skill: skill as SkillId, text: head.replace("{name}", name), subtext: undefined, items, role: s.role === "demo" || s.role === "tour" ? "features" : s.role });
+      } else if (!steps && brief.steps.length >= 2) {
+        steps = true;
+        out.push({ ...s, skill: "steps" as SkillId, text: "How it *works*", subtext: undefined, items: brief.steps.slice(0, 4), role: "how" });
+      }
+      continue;
+    }
+    let text = s.text;
+    if (!fits && s.role !== "hook" && s.role !== "reveal") {
+      const bare = text.replace(/\*/g, "");
+      if (concept && (bare === concept.featuresTitle.replace(/\*/g, "") || (swapHead && bare.startsWith(swapHead)))) text = s.skill === "word-swap" && items.length >= 3 ? `Come in for ${items.slice(0, 3).join("|").toLowerCase()}` : "What we *offer*";
+    }
+    if (s.role === "cta") {
+      const b = (brief.cta ?? "").toLowerCase();
+      text = /\b(book|schedule|appointment|class|trial|tour|consult|session|stay|groom)/.test(b) ? `Book with *${name}*` : /\b(call|quote|inspection)\b/.test(b) ? `Call *${name}* today` : /\b(order|menu|flavours)\b/.test(b) ? `Order from *${name}*` : `Visit *${name}*`;
+    }
+    out.push(text === s.text ? s : { ...s, text });
+  }
+  plan.scenes = out;
+}
+
 function planFromPromptSaas(req: PlanRequest & { brief?: Brief }): VideoPlan {
   // A written brief gives up its steps, button and contact details; the parser reads the rest.
   const brief = req.brief ?? readBrief(req.prompt.trim());
@@ -902,6 +965,8 @@ function planFromPromptSaas(req: PlanRequest & { brief?: Brief }): VideoPlan {
     if (plan.brand) plan.brand = { ...plan.brand, name: reveal };
     plan.notes = [`No product name was found in the prompt, so the reveal says “${reveal}”. Type the name on that slide, or start the prompt with it (e.g. “Acme is a …”).`, ...(plan.notes ?? [])].slice(0, 3);
   }
+  // A local business (a phone number, no app or software in the brief) gets a storefront story.
+  if (brief.phone && !APPISH.test(prompt)) localize(plan, prompt, brief);
   // The brief's tagline is the opening line (a short one: it has to land in a second or two).
   const line = brief.tagline;
   if (line && line.split(/\s+/).length <= 9) {
@@ -909,8 +974,8 @@ function planFromPromptSaas(req: PlanRequest & { brief?: Brief }): VideoPlan {
     const i = at >= 0 ? at : 0;
     if (plan.scenes[i] && plan.scenes[i].role !== "reveal" && plan.scenes[i].role !== "cta") plan.scenes[i] = { ...plan.scenes[i], text: line };
   }
-  // The brief's email and phone go on the end card, under the website.
-  const contact = [brief.email, brief.phone].filter(Boolean).join("  ·  ");
+  // The brief's email, phone, social handle and app stores go on the end card, under the website.
+  const contact = [brief.email, brief.phone, brief.social, brief.app].filter(Boolean).join("  ·  ");
   if (contact && plan.brand) plan.brand = { ...plan.brand, contact };
   return { ...plan, title: plan.brand?.name ?? brand };
 }

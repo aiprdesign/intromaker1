@@ -870,6 +870,8 @@ export default function Studio() {
     variant?: number;
     /** The kind of video for this one, over the studio's pick (a random intro is never a trailer cut). */
     style?: StyleChoice;
+    /** Brand colours for a video made from a prompt (a random intro's niche colours). */
+    tint?: Brand["colors"];
     /** Cancels the request (the Stop button). */
     signal?: AbortSignal;
   };
@@ -1005,7 +1007,7 @@ export default function Studio() {
       pickedPendingRef.current = true;
     }
     // (A random intro has no footage or photos for a trailer cut: it's always a designed intro.)
-    void generate({ prompt: r.prompt, site: null, colors: undefined, seed: Math.floor(Math.random() * 1e9), style: "saas" });
+    void generate({ prompt: r.prompt, site: null, colors: undefined, seed: Math.floor(Math.random() * 1e9), style: "saas", tint: r.colors });
   };
   const generate = async (opts: GenOpts = {}) => {
     const { run, signal } = opts.signal ? { run: runRef.current, signal: opts.signal } : startRun();
@@ -1016,7 +1018,8 @@ export default function Studio() {
     // The film on screen and its versions, so making a new one can be undone.
     const before = { plan: planRef.current, takes, current, engine, engineLabel, prompt: promptRef.current, localId: localIdRef.current, savedId: savedIdRef.current, madeFrom: madeFromRef.current };
     try {
-      const take = await direct({ ...opts, signal });
+      let take = await direct({ ...opts, signal });
+      if (opts.tint && take.plan.brand) take = { ...take, plan: { ...take.plan, brand: { ...take.plan.brand, colors: opts.tint } } };
       if (!stillRunning(run)) return;
       // (Known before the take is shown, so its style suggestion reads this description.)
       promptRef.current = (opts.prompt ?? prompt).trim();
