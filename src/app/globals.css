@@ -6573,3 +6573,58 @@ code.secret {
     animation-duration: 3s;
   }
 }
+
+/* Showcase: icon tabs by business, scrolling sideways on a phone. */
+.show-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+  margin: 0 0 18px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.show-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 92px;
+  padding: 12px 12px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  background: var(--card, rgba(255, 255, 255, 0.04));
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.show-tab svg {
+  opacity: 0.8;
+}
+.show-tab em {
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.6;
+}
+.show-tab:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent, #7c5cff);
+}
+.show-tab.active {
+  background: var(--accent, #7c5cff);
+  border-color: var(--accent, #7c5cff);
+  color: #fff;
+}
+.show-tab.active svg,
+.show-tab.active em {
+  opacity: 1;
+}
+.show-tags .show-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}

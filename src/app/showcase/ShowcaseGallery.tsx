@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Icon from "@/components/Icon";
 import LoopCanvas from "@/components/LoopCanvas";
 import { encodePlan } from "@/engine/planner";
 import { totalDuration } from "@/engine/renderer";
-import { SHOWCASE_GROUPS, showcaseIntros, type ShowcaseGroup, type ShowcaseIntro } from "@/engine/showcase";
+import { GROUP_ICONS, SHOWCASE_GROUPS, showcaseIntros, type ShowcaseGroup, type ShowcaseIntro } from "@/engine/showcase";
 import { TEMPLATE_MAP } from "@/engine/templates";
 
 const secs = (plan: ShowcaseIntro["plan"]) => `${Math.round(totalDuration(plan))}s`;
@@ -28,12 +29,15 @@ export default function ShowcaseGallery() {
   }, [open]);
 
   const shown = (items ?? []).filter((x) => group === "Any" || x.group === group);
+  const count = (g: ShowcaseGroup | "Any") => (items ?? []).filter((x) => g === "Any" || x.group === g).length;
   return (
     <>
-      <div className="palette-row show-filters" role="tablist" aria-label="Filter the showcase">
+      <div className="show-tabs" role="tablist" aria-label="Sort the showcase by business">
         {(["Any", ...SHOWCASE_GROUPS] as const).map((g) => (
-          <button key={g} role="tab" aria-selected={group === g} className={`chip ${group === g ? "active" : ""}`} onClick={() => setGroup(g)}>
-            {g}
+          <button key={g} role="tab" aria-selected={group === g} className={`show-tab ${group === g ? "active" : ""}`} onClick={() => setGroup(g)}>
+            <Icon name={g === "Any" ? "LayoutGrid" : GROUP_ICONS[g]} size={18} />
+            <span>{g === "Any" ? "All businesses" : g}</span>
+            {items && <em>{count(g)}</em>}
           </button>
         ))}
       </div>
@@ -56,7 +60,10 @@ export default function ShowcaseGallery() {
                 <span className="skill-num">{secs(x.plan)}</span>
               </div>
               <div className="show-tags">
-                <span>{x.kind}</span>
+                <span className="show-kind">
+                  <Icon name={x.icon} size={13} />
+                  {x.kind}
+                </span>
                 {x.plan.template && TEMPLATE_MAP[x.plan.template] && <span>{TEMPLATE_MAP[x.plan.template].name}</span>}
               </div>
               <p className="show-tagline">“{x.tagline}”</p>

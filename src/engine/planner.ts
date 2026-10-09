@@ -841,15 +841,16 @@ const SOFTWARE_SLIDES = new Set<string>(["click-flow", "notify-stack", "changelo
 const LOCAL_CONCEPTS = new Set(["food", "booking", "pets", "realestate", "legal", "health", "education", "fitness", "general"]);
 /** The industry slide for a kind of local business, with its headline. */
 const LOCAL_KINDS: [RegExp, string, string][] = [
-  [/\b(law|legal|tax|accounting|bookkeeping|agency)\b/i, "ind-team", "How we *help*"],
+  [/\b(law|legal|tax|accounting|bookkeeping|agency|insurance|food banks?|food pantr(?:y|ies))\b/i, "ind-team", "How we *help*"],
   [/\b(restaurants?|caf(e|é)s?|coffee|bak(ery|ehouse)|pizzas?|pizzeria|tacos?|ice cream|creamery|kitchen|diner|food truck|menu|sushi|bbq|smokehouse|trattoria|osteria|buffets?|curr(?:y|ies)|noodles?|bistro)\b/i, "ind-menu", "Fresh on the *menu*"],
   [/\b(church|chapel|parish|congregation|fellowship)\b/i, "ind-team", "Life at *{name}*"],
   // (A plumber's own bathroom-and-pipes scene with its services tagged, not a building site.)
   [/\b(plumb(?:ers?|ing)|electricians?|electrical|hvac|heating|air condition\w*)\b/i, "ind-shop", "What we *fix*"],
   [/\b(roof|construction|contract|renovat|builders?)/i, "ind-site", "On the *job*"],
   [/\b(mov(ing|ers)|delivery|cleaning|cleaners|lawn|landscap\w*)\b/i, "ind-route", "We come to *you*"],
+  [/\b(music (?:teachers?|lessons?|schools?|studios?)|(?:piano|guitar|voice|singing|violin) (?:teachers?|lessons?))\b/i, "ind-lesson", "Learn to *play*"],
   [/\b(daycare|preschool|school|tutor|dance|lessons|classes)\b/i, "ind-lesson", "A day at *{name}*"],
-  [/\b(dental|dentists?|clinic)\b/i, "ind-care", "Your *visit*"],
+  [/\b(dental|dentists?|clinic|doctors?|physicians?|p(?:a)?ediatric\w*|urgent care|family medicine)\b/i, "ind-care", "Your *visit*"],
 ];
 
 /**

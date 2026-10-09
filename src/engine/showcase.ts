@@ -9,15 +9,34 @@ import { introFor, looksOf, RANDOM_TOPICS, type RandomIntro } from "./surprise";
 import { applyTemplate } from "./templates";
 import type { VideoPlan } from "./types";
 
-export const SHOWCASE_GROUPS = ["Food & drink", "Beauty & fitness", "Home & trades", "Local shops", "Professional", "Apps", "Tech & AI"] as const;
+export const SHOWCASE_GROUPS = ["Food & drink", "Beauty & wellness", "Health", "Home services", "Auto", "Shops", "Professional", "Community", "Arts & learning", "Apps", "Tech & AI"] as const;
 export type ShowcaseGroup = (typeof SHOWCASE_GROUPS)[number];
+
+/** Each group's icon (Lucide), for the gallery's tabs. */
+export const GROUP_ICONS: Record<ShowcaseGroup, string> = {
+  "Food & drink": "Utensils",
+  "Beauty & wellness": "Scissors",
+  Health: "Stethoscope",
+  "Home services": "Wrench",
+  Auto: "CarFront",
+  Shops: "Store",
+  Professional: "Briefcase",
+  Community: "HandHeart",
+  "Arts & learning": "Palette",
+  Apps: "Smartphone",
+  "Tech & AI": "Cpu",
+};
 
 const GROUPS: Record<ShowcaseGroup, string[]> = {
   "Food & drink": ["Restaurant", "Coffee shop", "Bakery", "Pizza place", "Chinese buffet", "Indian restaurant", "Sushi bar", "Thai kitchen", "Italian trattoria", "Mexican restaurant", "BBQ smokehouse", "Taco truck", "Ice cream shop"],
-  "Beauty & fitness": ["Barber shop", "Hair salon", "Nail salon", "Yoga studio", "Boxing gym", "Dance studio", "Tattoo studio"],
-  "Home & trades": ["Plumber", "Electrician", "Heating and cooling", "Landscaping", "Cleaning service", "Roofing company", "Moving company", "Auto repair shop", "Collision repair", "Phone repair shop", "Car wash", "Construction company", "Homebuilder"],
-  "Local shops": ["Florist", "Plant shop", "Bookstore", "Antique shop", "Thrift shop", "Music shop", "Community church", "Pet grooming", "Daycare", "Photography studio", "Bed and breakfast", "Dental clinic"],
-  Professional: ["Law firm", "Tax preparer", "Real estate agency", "Marketing agency", "Online course"],
+  "Beauty & wellness": ["Barber shop", "Hair salon", "Nail salon", "Tattoo studio", "Yoga studio", "Boxing gym", "Pet grooming"],
+  Health: ["Family doctor", "Dental clinic", "Eyeglasses shop"],
+  "Home services": ["Plumber", "Electrician", "Heating and cooling", "Landscaping", "Cleaning service", "Roofing company", "Moving company", "Construction company", "Homebuilder"],
+  Auto: ["Used car dealership", "New car dealership", "Auto repair shop", "Collision repair", "Car wash"],
+  Shops: ["Florist", "Plant shop", "Bookstore", "Antique shop", "Thrift shop", "Music shop", "Phone repair shop", "Bed and breakfast"],
+  Professional: ["Law firm", "Tax preparer", "Insurance agency", "Real estate agency", "Marketing agency"],
+  Community: ["Community church", "Food bank", "Family farm", "Daycare"],
+  "Arts & learning": ["Art studio", "Dance studio", "Music teacher", "Photography studio", "Online course"],
   Apps: ["Fitness app", "Budget app", "Travel app", "Language app", "Kids learning app", "Pet care app", "EV charging app", "Event ticketing app", "Recipe app", "Delivery service", "Smart home app"],
   "Tech & AI": ["Analytics app", "AI copilot", "Developer platform", "Cybersecurity platform", "Team chat app"],
 };
@@ -32,7 +51,8 @@ function galleryOrder() {
   return [...out, ...rest];
 }
 
-export type ShowcaseIntro = RandomIntro & { group: ShowcaseGroup; plan: VideoPlan };
+/** `icon`: the business's own icon (a cone, a wrench), else its group's, for the card's tag. */
+export type ShowcaseIntro = RandomIntro & { group: ShowcaseGroup; icon: string; plan: VideoPlan };
 
 export function showcaseIntros(): ShowcaseIntro[] {
   // A gallery of different looks: a topic takes the least-shown of its styles.
@@ -52,9 +72,10 @@ export function showcaseIntros(): ShowcaseIntro[] {
       if (pick) plan = applyTemplate({ ...plan, characters: pick.characters, setting: scenePick(r.prompt) }, pick.template);
     }
     // The business's own scene (a bakery, a barber shop…) for its industry slides.
-    plan = { ...plan, setting: plan.setting ?? scenePick(r.prompt), motifs: motifPick(r.prompt) };
+    plan = { ...plan, setting: scenePick(r.prompt) ?? plan.setting, motifs: motifPick(r.prompt) };
     // The niche's colours (cosy browns for a restaurant, red and yellow for pizza…).
     if (r.colors && plan.brand) plan = { ...plan, brand: { ...plan.brand, colors: r.colors } };
-    return { ...r, group: GROUP.get(kind) ?? "Apps", plan };
+    const group = GROUP.get(kind) ?? "Apps";
+    return { ...r, group, icon: plan.motifs?.[0] ?? GROUP_ICONS[group], plan };
   });
 }

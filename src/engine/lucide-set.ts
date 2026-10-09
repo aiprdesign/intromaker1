@@ -300,6 +300,8 @@ import {
   Baby,
   CarFront,
   Glasses,
+  Umbrella,
+  Tractor,
 } from "lucide";
 
 export type IconNode = [tag: string, attrs: Record<string, string | number | undefined>][];
@@ -605,4 +607,6 @@ export const LUCIDE = {
   Baby,
   CarFront,
   Glasses,
+  Umbrella,
+  Tractor,
 } as unknown as Record<string, IconNode>;

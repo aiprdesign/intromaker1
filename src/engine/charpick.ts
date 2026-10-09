@@ -59,10 +59,14 @@ export function themePick(prompt: string): CharacterPick | undefined {
  */
 export function scenePick(prompt: string): VideoPlan["setting"] {
   const p = prompt.toLowerCase();
+  // (An agency's own office before the homes it sells.)
+  if (/\b(real estate agen\w*|realtors?|realty|estate agents?|brokerages?)\b/.test(p)) return "realty";
   if (/\b(home ?builders?|house ?builders?|custom homes?|new homes?|new[- ]build|real estate|realtors?|estate agents?|propert(?:y|ies) (?:listings?|developers?|management)|homes? for sale|house hunting|mortgages?|interior design(?:ers?)?|show ?homes?)\b/.test(p)) return "house";
   // Professional services, each in its own place (before the broader salon, garage, clinic and office rules).
   if (/\b(tattoos?|tattoo (?:studios?|shops?|artists?)|piercings?)\b/.test(p)) return "tattoo";
-  if (/\b(pet grooming|dog grooming|groomers?|pet spa|dog wash)\b/.test(p)) return "petgroom";
+  if (/\b(pet grooming|dog grooming|(?:dog|cat|pet) and (?:dog|cat|pet) grooming|grooming salons?|groomers?|pet spa|dog wash)\b/.test(p)) return "petgroom";
+  // (A body shop details cars too, but it's a garage.)
+  if (/\b(collision|body shops?|auto repairs?|mechanics?)\b/.test(p)) return "garage";
   if (/\b(car wash(?:es)?|auto spa|detailing)\b/.test(p)) return "carwash";
   if (/\b(law (?:firms?|offices?|practices?)|lawyers?|attorneys?|solicitors?|legal (?:services?|advice|practice)|paralegals?|notar(?:y|ies)|estate planning|family law|personal injury)\b/.test(p)) return "law";
   if (/\b(dentists?|dental|orthodont\w*|teeth whitening|hygienists?)\b/.test(p)) return "dental";
@@ -71,11 +75,21 @@ export function scenePick(prompt: string): VideoPlan["setting"] {
   if (/\b(hvac|heating and (?:air|cooling)|heating|cooling|air condition\w*|furnaces?|heat pumps?|ac repairs?)\b/.test(p)) return "hvac";
   if (/\b(photographers?|photography (?:studios?|business(?:es)?|services?)|photo studios?|portrait studios?|headshots?|wedding photo\w*)\b/.test(p)) return "photo";
   if (/\b(movers?|moving (?:company|companies|services?|day|trucks?)|removals?|relocations?)\b/.test(p)) return "moving";
+  if (/\b(opticians?|optical|optometr\w*|eye ?glasses|eyewear|spectacles|eye exams?|contact lenses|frames and lenses)\b/.test(p)) return "optical";
+  if (/\b(family (?:doctors?|medicine|practices?|physicians?)|doctors?|physicians?|general practi\w*|p(?:a)?ediatric\w*|primary care|urgent care|walk-in clinics?|clinics?)\b/.test(p)) return "doctor";
+  if (/\b(insurance|insurers?)\b/.test(p)) return "insurance";
+  if (/\b(used cars?|pre-?owned|car lots?|used car (?:lots?|dealer\w*))\b/.test(p)) return "usedcars";
+  if (/\b(car dealer\w*|dealerships?|new cars?|auto (?:dealer\w*|sales)|showrooms?|test drives?)\b/.test(p)) return "showroom";
+  if (/\b(food banks?|food pantr(?:y|ies)|soup kitchens?|meal programs?|food drives?)\b/.test(p)) return "foodbank";
+  if (/\b(farms?|farmers?|farm stands?|orchards?|ranch(?:es)?|farmers'? markets?|produce boxes)\b/.test(p)) return "farm";
+  if (/\b(artists?|art (?:studios?|classes|galler(?:y|ies)|schools?|lessons)|paintings?|galler(?:y|ies)|ceramics|pottery|illustrators?)\b/.test(p)) return "art";
+  if (/\b(dance (?:studios?|classes|schools?|lessons|academy)|ballet|dancers?|dance|salsa (?:classes|dancing)|hip-?hop classes|tap and jazz)\b/.test(p)) return "dance";
   if (/\b(barbers?|barbershops?|hair ?salons?|salons?|hairdress(?:ers?|ing)|stylists?|nail (?:salons?|bars?|studios?)|manicures?|beauty|tattoo(?:s| studios?| shops?)?|pet grooming|groomers?)\b/.test(p)) return "salon";
   if (/\b(auto repair|mechanics?|garages?|car wash(?:es)?|detailing|oil changes?|tire|tyre|body shop|auto care)\b/.test(p)) return "garage";
   if (/\b(gyms?|boxing|crossfit|personal train(?:ing|ers?)|fitness (?:club|studio|centre|center)|martial arts|weight ?lifting)\b/.test(p)) return "gym";
   if (/\b(yoga|pilates|dance (?:studio|classes|school)|dance|ballet|meditation studio|barre)\b/.test(p)) return "yoga";
   if (/\b(florists?|flower shops?|flowers?|bouquets?|plant shops?|garden cent(?:re|er)s?)\b/.test(p)) return "florist";
+  if (/\b(thrift|second-?hand|consignment|resale|pre-?loved|op shops?|charity shops?)\b/.test(p)) return "thrift";
   if (/\b(bookstores?|bookshops?|books|used books|librar(?:y|ies)|book clubs?)\b/.test(p)) return "bookstore";
   if (/\b(hotels?|inns?|bed and breakfast|b&bs?|motels?|guest ?houses?|resorts?|lodges?|vacation rentals?)\b/.test(p)) return "hotel";
   if (/\b(roof(?:ers?|ing|s)?|shingles?|gutters?)\b/.test(p)) return "roofing";
@@ -84,11 +98,10 @@ export function scenePick(prompt: string): VideoPlan["setting"] {
   if (/\b(cleaning (?:company|service|services)|cleaners?|maid services?|janitorial|house ?keeping|deep cleans?|move-out cleans?)\b/.test(p)) return "cleaning";
   if (/\b(ice ?cream|gelato|frozen yogh?urt|creamer(?:y|ies)|sundaes?|scoops?)\b/.test(p)) return "icecream";
   if (/\b(churche?s?|chapels?|parish(?:es)?|congregations?|ministr(?:y|ies)|worship|sunday services?)\b/.test(p)) return "church";
-  if (/\b(music (?:shops?|stores?)|guitars?|instruments?|music lessons?|drums?|pianos?|vinyl|record (?:shops?|stores?))\b/.test(p)) return "music";
+  if (/\b(music (?:shops?|stores?|teachers?|schools?)|guitars?|instruments?|music lessons?|(?:piano|guitar|voice|singing|violin|drum) (?:teachers?|lessons?)|drums?|pianos?|vinyl|record (?:shops?|stores?))\b/.test(p)) return "music";
   if (/\b(phone repairs?|screen repairs?|cell ?phone|iphone|computer repairs?|laptop repairs?|electronics repairs?|device repairs?|tablet repairs?)\b/.test(p)) return "repair";
   if (/\b(chinese|sushi|thai|ramen|noodles?|dim sum|japanese|korean|vietnamese|pho|asian|buffets?|dumplings?)\b/.test(p)) return "asian";
   if (/\b(antiques?|vintage furniture|collectibles?|curiosit(?:y|ies))\b/.test(p)) return "antique";
-  if (/\b(thrift|second-?hand|consignment|resale|pre-?loved|op shops?|charity shops?)\b/.test(p)) return "thrift";
   if (/\b(bakery|bakeries|bakers?|bakehouse|pastr(?:y|ies)|cakes?|cupcakes?|donuts?|doughnuts?)\b/.test(p)) return "bakery";
   if (/\b(restaurants?|bistros?|diners?|pizzerias?|pizza|steakhouses?|smokehouses?|bbq|barbecue|trattorias?|dining|dinner|tacos?|grill)\b/.test(p)) return "restaurant";
   if (/\b(construction|builders?|building sites?|contractors?|renovations?|remodel(?:ing)?|roofing|plumb(?:ers?|ing)|electricians?|handyman|architects?|engineering firms?|civil engineering)\b/.test(p)) return "construction";
@@ -126,7 +139,13 @@ const MOTIFS: [RegExp, string[]][] = [
   [/\b(hair ?salons?|salons?|hairdress(?:ers?|ing)|stylists?|beauty|spa|lashes|brows)\b/, ["Scissors", "Sparkles", "Brush", "Heart"]],
   [/\b(pet groom\w*|groomers?|dog walk\w*|pet sitt\w*|vets?|veterinar\w*|kennels?)\b/, ["PawPrint", "Dog", "Cat", "Bone", "Heart"]],
   [/\b(dent(?:al|ists?)|orthodont\w*)\b/, ["Smile", "Sparkles", "CalendarCheck", "ShieldCheck"]],
-  [/\b(clinics?|doctors?|physio\w*|chiropract\w*|pharmac(?:y|ies))\b/, ["Stethoscope", "HeartPulse", "CalendarCheck", "Pill"]],
+  [/\b(opticians?|optical|optometr\w*|eye ?glasses|eyewear|spectacles|eye exams?|contact lenses)\b/, ["Glasses", "Eye", "Sparkles", "CalendarCheck"]],
+  [/\b(clinics?|doctors?|physicians?|p(?:a)?ediatric\w*|primary care|urgent care|physio\w*|chiropract\w*|pharmac(?:y|ies))\b/, ["Stethoscope", "HeartPulse", "CalendarCheck", "Pill"]],
+  [/\b(insurance|insurers?)\b/, ["Umbrella", "ShieldCheck", "House", "CarFront"]],
+  [/\b(car dealer\w*|dealerships?|used cars?|pre-?owned|new cars?|car lots?|auto (?:dealer\w*|sales)|test drives?|showrooms?)\b/, ["CarFront", "KeyRound", "Handshake", "BadgeCheck"]],
+  [/\b(food banks?|food pantr(?:y|ies)|soup kitchens?|meal programs?|food drives?)\b/, ["HandHeart", "Apple", "Heart", "Users"]],
+  [/\b(farms?|farmers?|farm stands?|orchards?|ranch(?:es)?|farmers'? markets?)\b/, ["Sprout", "Tractor", "Sun", "Apple"]],
+  [/\b(artists?|art (?:studios?|classes|galler(?:y|ies)|schools?|lessons)|paintings?|galler(?:y|ies)|ceramics|pottery|illustrators?)\b/, ["Palette", "Brush", "PenTool", "Image"]],
   [/\b(car wash(?:es)?|detailing)\b/, ["CarFront", "Droplets", "SprayCan", "Sparkles"]],
   [/\b(auto repair|mechanics?|garages?|collision|body shop|oil changes?|tires?|tyres?|auto care|brakes?)\b/, ["Wrench", "CarFront", "Settings", "Gauge"]],
   [/\b(phones? (?:and \w+ )?repairs?|(?:screen|tablet|device|electronics|computer|laptop) repairs?|cell ?phones?)\b/, ["Smartphone", "Wrench", "Settings", "Zap"]],
@@ -148,7 +167,7 @@ const MOTIFS: [RegExp, string[]][] = [
   [/\b(bookstores?|bookshops?|books|library)\b/, ["BookOpen", "Coffee", "Glasses", "Star"]],
   [/\b(antiques?|vintage furniture|collectibles?)\b/, ["Clock", "Watch", "Lamp", "Armchair", "Gem"]],
   [/\b(thrift|second-?hand|consignment|vintage|resale)\b/, ["Shirt", "Tag", "Recycle", "ShoppingBag"]],
-  [/\b(music (?:shop|store|lessons?|school)|guitars?|instruments?|pianos?|drums?)\b/, ["Guitar", "Piano", "Drum", "Music"]],
+  [/\b(music (?:shop|store|lessons?|school|teachers?)|(?:piano|guitar|voice|singing|violin) (?:teachers?|lessons?)|guitars?|instruments?|pianos?|drums?)\b/, ["Guitar", "Piano", "Drum", "Music"]],
   [/\b(church(?:es)?|parish|worship|congregation|ministr(?:y|ies)|chapel)\b/, ["Church", "Heart", "HandHeart", "Users"]],
   [/\b(bed and breakfast|b&b|hotels?|inns?|motels?|guest ?house|lodge)\b/, ["BedDouble", "Coffee", "KeyRound", "ConciergeBell"]],
   [/\b(tax(?:es)?|accountants?|accounting|bookkeep\w*|cpa)\b/, ["Calculator", "Receipt", "FileText", "Coins"]],
