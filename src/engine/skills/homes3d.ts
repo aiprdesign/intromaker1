@@ -301,6 +301,13 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
     const tran = side ? box(gl, 0.14, 0.05, ww) : box(gl, ww, 0.05, 0.14);
     put(W, mull, mats.trim, walls, x, y, z, false);
     put(W, tran, mats.trim, walls, x, y + hh * 0.1, z, false);
+    // Colonial grilles (six over six) and a crown header over the front windows.
+    if (!side) {
+      for (const dx of [-ww / 6, ww / 6]) put(W, box(gl, 0.03, hh, 0.13), mats.trim, walls, x + dx, y, z, false);
+      for (const dy of [hh * 0.32, -hh * 0.17]) put(W, box(gl, ww, 0.03, 0.13), mats.trim, walls, x, y + dy, z, false);
+      put(W, box(gl, ww + 0.5, 0.14, 0.18), mats.trim, walls, x, y + hh / 2 + 0.2, z + 0.04, false);
+      put(W, box(gl, ww + 0.36, 0.06, 0.2), mats.trim, walls, x, y + hh / 2 + 0.3, z + 0.05, false);
+    }
     // Soft curtains drawn to either side, read through the glass.
     if (!side) for (const k of [-1, 1]) put(W, box(gl, ww * 0.16, hh * 0.92, 0.012), curtain, walls, x + k * ww * 0.39, y - hh * 0.02, z + 0.086, false);
     // A sill under it, and on the front, shutters either side.
@@ -319,40 +326,141 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   win(-MAIN.w / 2 - 0.03, b + 4.15, 1.1, 1.4, -1.0, true);
   win(-MAIN.w / 2 - 0.03, b + 1.95, 1.3, 1.5, 1.2, true);
   win(-MAIN.w / 2 - 0.03, b + 1.95, 1.3, 1.5, -1.3, true);
-  // Front door with a transom, a covered porch on two columns, steps.
-  put(W, box(gl, 1.3, 2.55, 0.1), mats.trim, walls, 1.35, b + 1.28, fz + 0.03);
-  put(W, box(gl, 1.05, 2.3, 0.12), mats.door, walls, 1.35, b + 1.15, fz + 0.05);
-  put(W, box(gl, 0.08, 0.08, 0.06), W.mat({ color: "#d9b45a", metal: 0.9, gloss: 0.8 }), walls, 1.7, b + 1.1, fz + 0.13, false);
-  for (const [py, ph] of [
-    [b + 1.65, 0.75],
-    [b + 0.65, 0.75],
-  ]) for (const px of [1.12, 1.58]) put(W, box(gl, 0.34, ph, 0.03), W.mat({ color: "#000000", alpha: 0.12, transparent: true }), walls, px, py, fz + 0.115, false);
+  // The front door: a panelled door in the brand's colour between glass sidelights, under a
+  // transom, in a wide trimmed surround; a brass handle and kick plate.
+  const brass = W.mat({ color: "#d9b45a", metal: 0.9, gloss: 0.8 });
+  put(W, box(gl, 2.05, 2.95, 0.1), mats.trim, walls, 1.35, b + 1.48, fz + 0.03);
+  put(W, box(gl, 1.0, 2.3, 0.12), mats.door, walls, 1.35, b + 1.15, fz + 0.05);
+  for (const [py, ph] of [[b + 1.7, 0.7], [b + 0.62, 0.7]] as const) for (const px of [1.13, 1.57]) put(W, box(gl, 0.32, ph, 0.03), W.mat({ color: "#000000", alpha: 0.12, transparent: true }), walls, px, py, fz + 0.115, false);
+  for (let i = 0; i < 3; i++) put(W, box(gl, 0.22, 0.2, 0.03), mats.glass, walls, 1.11 + i * 0.24, b + 2.1, fz + 0.12, false);
+  put(W, box(gl, 0.07, 0.07, 0.06), brass, walls, 1.7, b + 1.1, fz + 0.13, false);
+  put(W, box(gl, 0.9, 0.18, 0.02), brass, walls, 1.35, b + 0.12, fz + 0.12, false);
+  for (const sx of [-1, 1]) {
+    put(W, box(gl, 0.3, 2.2, 0.06), mats.glass, walls, 1.35 + sx * 0.72, b + 1.12, fz + 0.09, false);
+    for (let k = 1; k < 4; k++) put(W, box(gl, 0.3, 0.025, 0.07), mats.trim, walls, 1.35 + sx * 0.72, b + k * 0.55, fz + 0.1, false);
+  }
+  put(W, box(gl, 1.75, 0.34, 0.06), mats.glass, walls, 1.35, b + 2.62, fz + 0.09, false);
+  for (let k = 1; k < 5; k++) put(W, box(gl, 0.025, 0.34, 0.07), mats.trim, walls, 1.35 - 0.875 + k * 0.35, b + 2.62, fz + 0.1, false);
   const lamp = W.mat({ color: "#2a2c31", metal: 0.6, gloss: 0.6 });
   const lampGlass = W.mat({ color: "#ffe2a8", gloss: 0.4, emit: [0.9, 0.62, 0.3] });
-  for (const lx of [0.55, 2.15, gx - 1.75, gx + 1.75]) {
+  for (const lx of [0.15, 2.55, gx - 1.75, gx + 1.75]) {
     const ly = lx > 3 ? b + 2.0 : b + 1.75;
     const lz = lx > 3 ? gz + 0.1 : fz + 0.1;
     put(W, box(gl, 0.2, 0.36, 0.14), lamp, walls, lx, ly, lz, false);
     put(W, box(gl, 0.13, 0.24, 0.15), lampGlass, walls, lx, ly - 0.02, lz + 0.01, false);
   }
-  put(W, box(gl, 0.5, 0.18, 0.04), mats.trim, walls, 2.2, b + 2.35, fz + 0.06, false);
-  // Garage door windows along the top panel.
-  for (let i = 0; i < 4; i++) put(W, box(gl, 0.55, 0.28, 0.04), mats.glass, walls, gx - 1.05 + i * 0.7, b + 2.0, gz + 0.1, false);
-  const porch = node(walls);
-  put(W, box(gl, 2.8, 0.2, 1.6), mats.trim, porch, 1.35, b + 2.95, fz + 0.8);
-  put(W, box(gl, 2.9, 0.06, 1.7), mats.roof, porch, 1.35, b + 3.08, fz + 0.8);
-  for (const x of [0.15, 2.55]) {
-    const col = W.mesh(cylinder(gl, 0.1, 0.12, 2.7, 20), mats.trim, porch);
-    col.position.set(x, b + 1.6, fz + 1.45);
+  // Carriage-style garage doors: vertical boards, a centre split, strap hinges and handles, the
+  // windows along the top, under a small pergola on brackets.
+  for (let i = 1; i < 12; i++) put(W, box(gl, 0.018, 2.3, 0.1), mats.trim, walls, gx - 1.5 + i * 0.25, b + 1.16, gz + 0.06, false);
+  put(W, box(gl, 0.05, 2.35, 0.11), lamp, walls, gx, b + 1.18, gz + 0.065, false);
+  for (const sx of [-1, 1]) {
+    for (const hy of [0.55, 1.6]) put(W, box(gl, 0.6, 0.05, 0.03), lamp, walls, gx + sx * 1.2, b + hy, gz + 0.12, false);
+    put(W, box(gl, 0.04, 0.32, 0.04), lamp, walls, gx + sx * 0.14, b + 1.15, gz + 0.13, false);
   }
-  put(W, box(gl, 2.8, 0.25, 1.6), mats.stone, porch, 1.35, b - 0.02, fz + 0.8);
-  put(W, box(gl, 1.6, 0.14, 0.5), mats.stone, porch, 1.35, 0.07, fz + 1.85);
+  for (let i = 0; i < 4; i++) put(W, box(gl, 0.55, 0.28, 0.04), mats.glass, walls, gx - 1.05 + i * 0.7, b + 2.0, gz + 0.1, false);
+  put(W, box(gl, 3.7, 0.14, 0.12), mats.trim, walls, gx, b + 2.72, gz + 0.62);
+  for (let i = 0; i < 9; i++) put(W, box(gl, 0.08, 0.13, 0.75), mats.trim, walls, gx - 1.75 + i * 0.4375, b + 2.82, gz + 0.36);
+  for (const sx of [-1.6, 1.6]) {
+    const br = put(W, box(gl, 0.08, 0.5, 0.08), mats.trim, walls, gx + sx, b + 2.55, gz + 0.32);
+    br.rotation.x = 0.8;
+  }
+  // A full-width front porch: a painted floor on a trimmed skirt, columns on stone piers, white
+  // railings with balusters, a pale blue ceiling, a gabled entry over wide steps; rocking chairs,
+  // hanging ferns, potted plants and a welcome mat.
+  const porch = node(walls);
+  const PW = MAIN.w + 0.3;
+  const PD = 1.9;
+  const pz = fz + PD / 2;
+  const floorTop = 0.42;
+  const porchFloor = W.mat({ color: "#8d939b", gloss: 0.35 });
+  const ceiling = W.mat({ color: "#cfe5ec", gloss: 0.2 });
+  put(W, box(gl, PW, floorTop, PD), porchFloor, porch, 0, floorTop / 2, pz);
+  put(W, box(gl, PW + 0.06, 0.2, 0.06), mats.trim, porch, 0, floorTop - 0.12, fz + PD + 0.01);
+  for (let i = 0; i < 3; i++) put(W, box(gl, 1.8, 0.14, 0.36), mats.stone, porch, 1.35, floorTop - 0.07 - i * 0.14, fz + PD + 0.18 + i * 0.36);
+  const cols = [-PW / 2 + 0.15, -1.0, 0.45, 2.25, PW / 2 - 0.15];
+  for (const x of cols) {
+    put(W, box(gl, 0.42, 0.85, 0.42), mats.stone, porch, x, floorTop + 0.42, fz + PD - 0.2);
+    put(W, box(gl, 0.48, 0.08, 0.48), mats.trim, porch, x, floorTop + 0.88, fz + PD - 0.2);
+    const col = W.mesh(cylinder(gl, 0.12, 0.17, 1.95, 4), mats.trim, porch);
+    col.position.set(x, floorTop + 1.9, fz + PD - 0.2);
+    col.rotation.y = Math.PI / 4;
+    put(W, box(gl, 0.36, 0.1, 0.36), mats.trim, porch, x, floorTop + 2.9, fz + PD - 0.2);
+  }
+  put(W, box(gl, PW + 0.1, 0.3, 0.3), mats.trim, porch, 0, floorTop + 3.08, fz + PD - 0.2);
+  put(W, box(gl, PW, 0.04, PD), ceiling, porch, 0, floorTop + 2.92, pz, false);
+  const proof = put(W, box(gl, PW + 0.5, 0.08, PD + 0.45), mats.roof, porch, 0, floorTop + 3.32, pz + 0.12);
+  proof.rotation.x = 0.16;
+  put(W, gable(gl, 2.6, 0.85, 0.7), mats.roof, porch, 1.35, floorTop + 3.25, fz + PD - 0.05);
+  put(W, box(gl, 2.2, 0.55, 0.05), mats.trim, porch, 1.35, floorTop + 3.48, fz + PD + 0.3, false);
+  // Railings between the columns (not across the steps) and down the sides.
+  const rail = (x0: number, x1: number, z0: number, z1: number) => {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const along = x1 !== x0;
+    for (const ry of [floorTop + 0.12, floorTop + 0.9]) put(W, along ? box(gl, len, 0.06, 0.08) : box(gl, 0.08, 0.06, len), mats.trim, porch, (x0 + x1) / 2, ry, (z0 + z1) / 2, false);
+    const n = Math.floor(len / 0.17);
+    for (let i = 1; i < n; i++) put(W, box(gl, 0.04, 0.76, 0.04), mats.trim, porch, x0 + ((x1 - x0) * i) / n, floorTop + 0.5, z0 + ((z1 - z0) * i) / n, false);
+  };
+  rail(cols[0] + 0.21, cols[1] - 0.21, fz + PD - 0.2, fz + PD - 0.2);
+  rail(cols[1] + 0.21, cols[2] - 0.21, fz + PD - 0.2, fz + PD - 0.2);
+  rail(cols[3] + 0.21, cols[4] - 0.21, fz + PD - 0.2, fz + PD - 0.2);
+  for (const sx of [-1, 1]) rail(sx * (PW / 2 - 0.15), sx * (PW / 2 - 0.15), fz + 0.1, fz + PD - 0.41);
+  // Two rocking chairs and a small table at the window end, a welcome mat, potted plants, ferns.
+  const chairM = W.mat({ color: "#f4f2ee", gloss: 0.35 });
+  for (const cx of [-2.45, -1.5]) {
+    const ch = node(porch);
+    ch.position.set(cx, floorTop, fz + 0.75);
+    put(W, box(gl, 0.5, 0.05, 0.46), chairM, ch, 0, 0.45, 0);
+    for (let i = 0; i < 4; i++) put(W, box(gl, 0.07, 0.6, 0.03), chairM, ch, -0.18 + i * 0.12, 0.8, -0.22);
+    put(W, box(gl, 0.52, 0.05, 0.04), chairM, ch, 0, 1.1, -0.22);
+    for (const sx of [-0.22, 0.22]) {
+      put(W, box(gl, 0.04, 0.45, 0.04), chairM, ch, sx, 0.22, 0.18);
+      put(W, box(gl, 0.04, 0.45, 0.04), chairM, ch, sx, 0.22, -0.2);
+      const rk = W.mesh(cylinder(gl, 0.02, 0.02, 0.62, 8), chairM, ch);
+      rk.position.set(sx, 0.03, 0);
+      rk.rotation.x = Math.PI / 2;
+      put(W, box(gl, 0.05, 0.04, 0.4), chairM, ch, sx, 0.62, 0.02);
+    }
+  }
+  put(W, cylinder(gl, 0.2, 0.2, 0.45, 16) as ReturnType<typeof box>, chairM, porch, -1.98, floorTop + 0.23, fz + 0.85);
+  put(W, box(gl, 0.9, 0.02, 0.55), W.mat({ color: "#7a5a3a", gloss: 0.1 }), porch, 1.35, floorTop + 0.01, fz + 0.45, false);
+  const potM = W.mat({ color: "#2f3540", gloss: 0.5 });
+  const fern = W.mat({ color: "#3f8f4e", gloss: 0.3 });
+  for (const px of [0.55, 2.15]) {
+    put(W, cylinder(gl, 0.2, 0.15, 0.42, 16) as ReturnType<typeof box>, potM, porch, px, floorTop + 0.21, fz + PD - 0.55);
+    const sh = W.mesh(sphere(gl, 0.28, 14, 10), fern, porch);
+    sh.position.set(px, floorTop + 0.62, fz + PD - 0.55);
+  }
+  for (const hx of [-2.0, 3.0]) {
+    put(W, box(gl, 0.015, 0.5, 0.015), lamp, porch, hx, floorTop + 2.65, fz + PD - 0.45, false);
+    const bk = W.mesh(cylinder(gl, 0.18, 0.12, 0.18, 14), W.mat({ color: "#8a6446", gloss: 0.2 }), porch);
+    bk.position.set(hx, floorTop + 2.3, fz + PD - 0.45);
+    for (const [dx, dy, r] of [[0, 0.06, 0.24], [0.12, -0.08, 0.17], [-0.12, -0.1, 0.17]] as const) {
+      const f = W.mesh(sphere(gl, r, 12, 8), fern, porch);
+      f.position.set(hx + dx, floorTop + 2.3 + dy, fz + PD - 0.45);
+      f.scale.set(1, 0.7, 1);
+    }
+  }
   // Roofs: a front gable over the main block (with a vent), one over the garage, and a chimney.
   const roof = node(root);
   const r1 = put(W, gable(gl, MAIN.w + 0.8, 2.5, MAIN.d + 0.7), mats.roof, roof, 0, b + MAIN.h, 0);
   void r1;
   put(W, box(gl, MAIN.w + 0.9, 0.12, MAIN.d + 0.8), mats.trim, roof, 0, b + MAIN.h + 0.02, 0, false);
-  put(W, box(gl, 0.6, 0.8, 0.06), mats.trim, roof, 0, b + MAIN.h + 1.1, MAIN.d / 2 + 0.36, false);
+  // An octagonal attic window in the front gable, and fascia boards along both gables' edges.
+  const oct = W.mesh(cylinder(gl, 0.42, 0.42, 0.08, 8), mats.trim, roof, false);
+  oct.position.set(0, b + MAIN.h + 1.0, MAIN.d / 2 + 0.36);
+  oct.rotation.set(Math.PI / 2, Math.PI / 8, 0);
+  const octG = W.mesh(cylinder(gl, 0.32, 0.32, 0.09, 8), mats.glass, roof, false);
+  octG.position.set(0, b + MAIN.h + 1.0, MAIN.d / 2 + 0.37);
+  octG.rotation.set(Math.PI / 2, Math.PI / 8, 0);
+  for (const [cx, cw, rise, gzF, y0] of [[0, MAIN.w + 0.8, 2.5, (MAIN.d + 0.7) / 2, b + MAIN.h], [gx, GAR.w + 0.6, 1.4, -(MAIN.d - GAR.d) / 2 + (GAR.d + 0.6) / 2, b + GAR.h]] as const) {
+    const half = cw / 2;
+    const ang = Math.atan2(rise, half);
+    const len = Math.hypot(half, rise);
+    for (const sx of [-1, 1]) {
+      const fb = put(W, box(gl, len + 0.1, 0.22, 0.07), mats.trim, roof, cx + (sx * half) / 2, y0 + rise / 2, gzF + 0.04, false);
+      fb.rotation.z = -sx * ang;
+    }
+  }
   put(W, gable(gl, GAR.w + 0.6, 1.4, GAR.d + 0.6), mats.roof, roof, gx, b + GAR.h, -(MAIN.d - GAR.d) / 2);
   put(W, box(gl, GAR.w + 0.7, 0.1, GAR.d + 0.7), mats.trim, roof, gx, b + GAR.h + 0.02, -(MAIN.d - GAR.d) / 2, false);
   put(W, box(gl, 0.75, 2.6, 0.75), mats.stone, roof, -2.1, b + MAIN.h + 1.2, -1.2);
@@ -392,22 +500,32 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   const hedge = W.mat({ color: "#3f7d45", gloss: 0.25 });
   for (let i = 0; i < 4; i++) {
     const s = W.mesh(sphere(gl, 0.55, 16, 12), hedge, land);
-    s.position.set(-2.7 + i * 0.85, 0.4, fz + 0.75);
+    s.position.set(-2.7 + i * 0.85, 0.4, fz + 2.45);
     s.scale.set(1, 0.75, 0.9);
   }
   // Flower beds along the front (mulch and blooms), a mailbox at the curb.
   const mulch = W.mat({ color: "#5a3e2b", gloss: 0.1 });
-  put(W, box(gl, 3.6, 0.06, 1.0), mulch, land, -1.5, 0.03, fz + 0.85, false);
+  put(W, box(gl, 3.6, 0.06, 1.0), mulch, land, -1.5, 0.03, fz + 2.55, false);
+  put(W, box(gl, 0.8, 0.06, 1.0), mulch, land, 2.75, 0.03, fz + 2.55, false);
+  for (const hx of [2.6, 3.0]) {
+    const sh = W.mesh(sphere(gl, 0.4, 14, 10), hedge, land);
+    sh.position.set(hx, 0.32, fz + 2.45);
+    sh.scale.set(1, 0.8, 0.9);
+  }
+  // A lamp post at the corner of the beds.
+  put(W, cylinder(gl, 0.05, 0.06, 2.0, 10) as ReturnType<typeof box>, W.mat({ color: "#2a2c31", metal: 0.6, gloss: 0.6 }), land, -3.75, 1.0, fz + 3.2);
+  put(W, box(gl, 0.26, 0.34, 0.26), W.mat({ color: "#ffe2a8", gloss: 0.4, emit: [0.9, 0.62, 0.3] }), land, -3.75, 2.15, fz + 3.2, false);
+  put(W, box(gl, 0.34, 0.06, 0.34), W.mat({ color: "#2a2c31", metal: 0.6, gloss: 0.6 }), land, -3.75, 2.35, fz + 3.2, false);
   const blooms = [W.mat({ color: "#f4f1ea", gloss: 0.3 }), W.mat({ color: "#e8a3b5", gloss: 0.3 }), W.mat({ color: "#f2c14e", gloss: 0.3 })];
   for (let i = 0; i < 9; i++) {
     const f = W.mesh(sphere(gl, 0.12, 8, 6), blooms[i % 3], land, false);
-    f.position.set(-3.1 + i * 0.38, 0.75 + (i % 2) * 0.08, fz + 1.2);
+    f.position.set(-3.1 + i * 0.38, 0.75 + (i % 2) * 0.08, fz + 2.85);
   }
   put(W, box(gl, 0.1, 1.1, 0.1), mats.trim, land, 4.0, 0.55, 9.3);
   put(W, box(gl, 0.28, 0.3, 0.5), W.mat({ color: "#2a2c31", metal: 0.5, gloss: 0.6 }), land, 4.0, 1.2, 9.3);
   tree(W, land, -8.6, 4.2, 1.15);
   tree(W, land, -7.6, -6.5, 0.95);
-  return { root, slab: slabT, frame: frameT, walls, roof, land, solar, hvac, insul, mats, rising: [mats.siding, mats.stone, mats.trim, mats.glass, mats.garage, mats.door] };
+  return { root, slab: slabT, frame: frameT, walls, roof, land, solar, hvac, insul, mats, rising: [mats.siding, mats.stone, mats.trim, mats.glass, mats.garage, mats.door, brass, porchFloor, ceiling, chairM, potM, fern] };
 }
 
 let treeMats: { bark: Program; leaf: Program; leaf2: Program; pine: Program; pine2: Program } | undefined;
