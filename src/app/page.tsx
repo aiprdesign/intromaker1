@@ -66,20 +66,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section" id="fast-type">
-        <div className="section-head">
-          <span className="eyebrow">Fast type</span>
-          <h2>Speed animations, on the beat.</h2>
-          <p>Twenty-six kinetic text slides that switch words on the half-beat (whips, crash zooms, jump cuts, stamps, gauges, dominoes, rallies, stomps) and then land your line. The cards below play live.</p>
-        </div>
-        <SkillGrid swipe group="Fast type" ids={["crash-zoom", "jump-cut", "speed-gauge", "rapid-fire", "letter-rush", "stack-stomp"]} />
-        <div className="center">
-          <Link href="/skills#fast-type" className="btn btn-ghost btn-lg">
-            See the 26 fast type slides →
-          </Link>
-        </div>
-      </section>
-
       <section className="section" id="how">
         <div className="section-head">
           <span className="eyebrow">How it works</span>

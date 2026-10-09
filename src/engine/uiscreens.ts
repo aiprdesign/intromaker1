@@ -68,6 +68,7 @@ function series(seed: number, n: number, lo = 0.25, hi = 0.85) {
 }
 
 function avatar(g: G, x: number, y: number, r: number, col: string, letter: string) {
+  g.save();
   g.fillStyle = mixHex(col, "#ffffff", 0.65);
   g.beginPath();
   g.arc(x, y, r, 0, Math.PI * 2);
@@ -77,6 +78,7 @@ function avatar(g: G, x: number, y: number, r: number, col: string, letter: stri
   g.textAlign = "center";
   g.textBaseline = "middle";
   g.fillText(letter, x, y + 1);
+  g.restore();
 }
 
 /** Icon-ish glyphs for nav and cards: simple geometric marks. */
