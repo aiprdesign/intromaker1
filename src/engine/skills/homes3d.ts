@@ -20,7 +20,7 @@
  * - home-welcome: the family and dog wave from the path of the home at golden hour; the button.
  */
 import { Texture, Transform, type Program } from "ogl";
-import { box, cylinder, gable, lathe, leaf, project, quad, render as draw3d, rgb, slab, sphere, sphereCap, torus, world, type View, type World } from "../d3";
+import { bake, box, cylinder, gable, lathe, leaf, project, quad, render as draw3d, rgb, slab, sphere, sphereCap, torus, world, type View, type World } from "../d3";
 import { clamp, ease, hexToRgb, lerp, mixHex, range, TAU } from "../math";
 import { fillTextFit, subFont } from "../text";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
@@ -65,7 +65,32 @@ function homeTones(p: Palette) {
 }
 
 /** A golden-hour sky: deep blue overhead warming to a peach horizon. */
+const skies = new Map<string, HTMLCanvasElement>();
+/**
+ * The sky behind the homes. It's still (it doesn't change over the slide), so it's painted once
+ * per size and colour and reused: its soft clouds take a blur filter per cloud puff, which costs a
+ * full-frame pass each.
+ */
 function sky(sc: SkillContext, horizon = 0.62) {
+  const { ctx, w, h, palette } = sc;
+  const key = `${Math.round(w)}x${Math.round(h)}|${palette.primary}|${horizon}|${sc.flat3d ? 1 : 0}`;
+  let cv = skies.get(key);
+  if (!cv && typeof document !== "undefined") {
+    cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(w));
+    cv.height = Math.max(1, Math.round(h));
+    const c2 = cv.getContext("2d");
+    if (c2) {
+      paintSky({ ...sc, ctx: c2 }, horizon);
+      if (skies.size > 8) skies.delete(skies.keys().next().value!);
+      skies.set(key, cv);
+    } else cv = undefined;
+  }
+  if (cv) ctx.drawImage(cv, 0, 0, w, h);
+  else paintSky(sc, horizon);
+}
+
+function paintSky(sc: SkillContext, horizon: number) {
   const { ctx, w, h, palette } = sc;
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, mixHex("#6e9fd6", palette.primary, 0.08));
@@ -630,6 +655,8 @@ function buildHouse(W: World, parent: Transform, withFrame: boolean): House {
   }
   tree(W, land, -8.6, 4.2, 1.15);
   tree(W, land, -7.6, -6.5, 0.95);
+  // Each part that moves, shows or hides on its own is drawn in a few calls (see bake).
+  for (const [n, skip] of [[slabT, []], [frameT, []], [walls, [insul]], [insul, []], [roof, [solar]], [solar, []], [hvac, []], [land, []]] as [Transform, Transform[]][]) bake(W, n, skip);
   return { root, slab: slabT, frame: frameT, walls, roof, land, solar, hvac, insul, mats, rising: [mats.siding, mats.stone, mats.trim, mats.glass, mats.garage, mats.door, brass, porchFloor, ceiling, chairM, potM, fern, basket, lamp] };
 }
 
@@ -821,6 +848,8 @@ function homeWorld(W: World): HomeParts {
     put(W, box(gl0(W), 0.75, 0.5, 0.06), sign, posts, x, 1.35, z);
     postAt.push([x, 1.7, z]);
   }
+  for (const n of [nb, path, posts]) bake(W, n);
+  bake(W, W.scene, [house.root, nb, path, posts]);
   return { house, path, posts, postAt, neighbours: nb };
 }
 const gl0 = (W: World) => W.gl;
@@ -992,6 +1021,7 @@ function communityWorld(W: World): CommunityParts {
   put(W, box(gl, 14, 3, 0.1), W.mat({ color: "#1b2330", metal: 0.2, gloss: 0.95, emit: [0.3, 0.2, 0.1] }), W.scene, club[0], 2.2, club[2] - 4.56, false);
   put(W, box(gl, 18, 0.08, 9), W.mat({ color: "#e2dbcf", gloss: 0.2 }), W.scene, club[0], 0.04, club[2] - 10, false);
   put(W, box(gl, 12, 0.1, 5), W.mat({ color: "#45b3d6", metal: 0.2, gloss: 0.98 }), W.scene, club[0], 0.07, club[2] - 10, false);
+  bake(W, W.scene, [], 20);
   return { spots: [[-18, 6, -14], park, [club[0], 3, club[2] - 6], [park[0] + 11.5, 0.5, park[2] - 5]] };
 }
 
@@ -1043,7 +1073,9 @@ interface BuildParts {
 function buildWorld(W: World): BuildParts {
   ground(W);
   street(W, 14);
-  return { house: buildHouse(W, W.scene, true) };
+  const house = buildHouse(W, W.scene, true);
+  bake(W, W.scene, [house.root]);
+  return { house };
 }
 
 const BUILD_POINTS = ["Foundation", "Framing", "Walls and windows", "Roof", "Move-in ready"];
@@ -1172,6 +1204,9 @@ function planWorld(W: World): PlanParts {
   ]) put(W, box(gl, 0.45, 0.5, 0.45), fab, furniture, cx, 0.5, cz);
   put(W, box(gl, 1.6, 0.55, 0.8), white, furniture, 0.5, 0.52, -3.9);
   put(W, box(gl, 0.9, 0.8, 0.5), woodM, furniture, 1.35, 0.62, -1.6);
+  bake(W, walls);
+  bake(W, furniture);
+  bake(W, W.scene, [walls, furniture]);
   return { walls, furniture, rooms: rooms.map((r) => ({ name: r.name, at: [r.at[0], 1.3, r.at[2]] as Num3 })) };
 }
 
@@ -1984,6 +2019,7 @@ function interiorWorld(W: World): InteriorParts {
   const dog = dog3d(W, W.scene, "#c98f4f", "#7a4f2a", "#7c5cff");
   dog.root.position.set(-4.0, 0.2, -0.2);
   dog.root.rotation.y = Math.PI * 0.85;
+  bake(W, W.scene, [...family.map((P) => P.root), dog.root], 4);
   return {
     family,
     dog,
@@ -3127,6 +3163,7 @@ function moreRoomsWorld(W: World): MoreRooms {
   alarm(W, FX + 0.0, 2.78, BACK + 0.02);
   alarm(W, GX + 0.4, 2.78, BACK);
   alarm(W, 19.25, 2.8, BACK + 0.02);
+  bake(W, W.scene, [], 4);
   return {
     tones,
     rooms: [

@@ -673,7 +673,11 @@ void main() {
   float stitch = smoothstep(0.016, 0.02, edgeD) * (1.0 - smoothstep(0.026, 0.03, edgeD)) * step(0.45, fract((vUv.x + vUv.y) * 90.0));
   base = mix(base, base * 1.45 + 0.05, stitch * 0.8);
 #endif
-  float sh = shadowAt();
+  // (Cartoon-flat views use no shadows, reflections or highlights: their pixels skip the shadow
+  // map's 25 taps and the studio reflections, a branch on a uniform, so it costs nothing.)
+  bool cel = uFlat > 1.5;
+  float sh = 1.0;
+  if (!cel) sh = shadowAt();
   // Soft contact darkening where surfaces meet the ground (a cheap ambient occlusion).
   if (uAO > 0.0) base *= mix(1.0 - uAO * (1.0 - smoothstep(0.5, 0.9, N.y)), 1.0, smoothstep(0.0, 0.9, vW.y));
   float ndl = max(dot(N, uSun), 0.0);
@@ -688,7 +692,8 @@ void main() {
   diff += base * uFill * fw * fw;
   vec3 F0 = mix(vec3(0.04), base, metal);
   vec3 F = F0 + (1.0 - F0) * fres;
-  vec3 col = diff * (1.0 - metal * 0.85) + env(R) * F * mix(0.25, 1.0, gloss) + uSunCol * spec * sh * mix(vec3(1.0), base, metal * 0.5);
+  vec3 col = base;
+  if (!cel) col = diff * (1.0 - metal * 0.85) + env(R) * F * mix(0.25, 1.0, gloss) + uSunCol * spec * sh * mix(vec3(1.0), base, metal * 0.5);
 #ifdef LEAF
   // Light through the leaf: lit from behind, it glows a brighter green.
   col += mix(uColor2, vec3(0.75, 1.0, 0.45), 0.35) * uSunCol * pow(max(dot(-N, uSun), 0.0), 1.5) * 0.45 * sh;
@@ -714,7 +719,8 @@ void main() {
   vec2 q = abs(vUv - 0.5) * vec2(uRound.y, 1.0) - (vec2(uRound.y, 1.0) * 0.5 - uRound.x);
   float mask = 1.0 - smoothstep(-0.002, 0.002, length(max(q, 0.0)) - uRound.x);
   vec3 dark = vec3(0.02, 0.022, 0.03);
-  col = mix(dark, img, uGlow) + env(R) * (0.015 + 0.5 * fres) * 0.6 + uSunCol * spec * 0.25;
+  col = mix(dark, img, uGlow);
+  if (!cel) col += env(R) * (0.015 + 0.5 * fres) * 0.6 + uSunCol * spec * 0.25;
   // A soft light sweep across the glass.
   float band = vUv.x * 0.8 + vUv.y * 0.6 - uSheen;
   col += vec3(1.0) * (exp(-band * band * 260.0) * 0.16 + exp(-band * band * 30.0) * 0.05) * step(-1.0, uSheen);
@@ -806,12 +812,52 @@ export interface World {
 
 const worlds = new Map<string, unknown>();
 
+const compiledBy = new WeakMap<OGLRenderingContext, Map<string, Program>>();
+let sharedId = 1e7;
+/**
+ * A material's program, sharing its compiled shaders: each material is its own Program (its own
+ * uniforms, blending and culling), but materials of the same kind use one compiled WebGL program
+ * between them, so a world of a hundred-odd materials compiles a dozen shaders instead of a
+ * hundred-odd (each compile costs the first frame a noticeable stall).
+ */
+function shared(gl: OGLRenderingContext, o: { vertex: string; fragment: string; uniforms: Record<string, { value: unknown }>; transparent: boolean; depthWrite: boolean; cullFace: number | false }) {
+  let cache = compiledBy.get(gl);
+  if (!cache) compiledBy.set(gl, (cache = new Map()));
+  const key = `${o.vertex}\u0000${o.fragment}`;
+  const master = cache.get(key);
+  if (!master) {
+    const p = new Program(gl, o as ConstructorParameters<typeof Program>[1]);
+    cache.set(key, p);
+    return p;
+  }
+  // A copy of the compiled program's handles and locations, with this material's own state.
+  // (Its own id, so switching materials uploads its uniforms; values are cached per location.)
+  const p = Object.assign(Object.create(Program.prototype) as Program, master, {
+    uniforms: o.uniforms,
+    id: sharedId++,
+    transparent: o.transparent,
+    cullFace: o.cullFace,
+    depthWrite: o.depthWrite,
+    blendFunc: {},
+    blendEquation: {},
+    stencilFunc: {},
+    stencilOp: {},
+  });
+  if (o.transparent) {
+    const r = (gl as unknown as { renderer: { premultipliedAlpha: boolean } }).renderer;
+    if (r.premultipliedAlpha) p.setBlendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    else p.setBlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  }
+  return p;
+}
+
 /**
  * The world for `key`, built once by `build` (geometry, materials and meshes) and cached for the
  * renderer. Null without WebGL.
  */
 export function world<T>(key: string, w: number, h: number, build: (W: World) => T): { W: World; parts: T } | null {
-  const renderer = glRenderer(w, h);
+  // (Sized by render, supersampled: not here as well.)
+  const renderer = glRenderer(w, h, false);
   if (!renderer) return null;
   const gl = renderer.gl;
   const k = `${key}`;
@@ -858,7 +904,7 @@ export function world<T>(key: string, w: number, h: number, build: (W: World) =>
     if (o.kind === "decal") uniforms.tMap = { value: blank };
     if (o.kind === "backdrop") Object.assign(uniforms, { uGlowA: { value: [1, 1, 1] }, uGlowB: { value: [1, 1, 1] } });
     const transparent = o.transparent ?? (o.kind === "floor" || o.kind === "screen" || o.kind === "decal" || (o.alpha ?? 1) < 1);
-    return new Program(gl, { vertex: VERT, fragment: defines + FRAG, uniforms, transparent, depthWrite: o.kind !== "floor", cullFace: o.doubleSided ? false : gl.BACK });
+    return shared(gl, { vertex: VERT, fragment: defines + FRAG, uniforms, transparent, depthWrite: o.kind !== "floor", cullFace: o.doubleSided ? false : gl.BACK });
   };
   const mesh = (g: Geometry, p: Program, parent: Transform = scene, cast = true) => {
     const m = new Mesh(gl, { geometry: g, program: p });
@@ -983,14 +1029,51 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   light.orthographic({ left: -size, right: size, bottom: -size, top: size, near: 0.1, far: size * 8 });
   light.position.set(c[0] + sun[0] * size * 3, c[1] + sun[1] * size * 3, c[2] + sun[2] * size * 3);
   light.lookAt(c);
+  // (The scene's matrices are brought up to date once per frame, for both passes.)
   scene.updateMatrixWorld();
   light.updateMatrixWorld();
-  // The shadow map starts at the far plane (white), so empty space casts no shadow.
-  renderer.gl.clearColor(1, 1, 1, 1);
-  shadow.render({ scene });
+  // Cartoon-flat views draw no shadows (the shader ignores the map), so they skip its pass.
+  if (!v.cel || v.flat) {
+    // The shadow map starts at the far plane (white), so empty space casts no shadow.
+    renderer.gl.clearColor(1, 1, 1, 1);
+    renderShadow(W);
+  }
   renderer.gl.clearColor(0, 0, 0, 0);
-  renderer.render({ scene, camera, clear: true });
+  renderer.render({ scene, camera, clear: true, update: false });
   return renderer.gl.canvas as HTMLCanvasElement;
+}
+
+const castersOf = new WeakMap<World, { n: number; set: Set<Transform> }>();
+/**
+ * The shadow (depth) pass, as OGL's Shadow.render does it, but finding the casting meshes in a
+ * Set: OGL searches its list for each node, which with a few thousand meshes costs millions of
+ * comparisons a frame.
+ */
+function renderShadow(W: World) {
+  const { shadow, scene, renderer } = W;
+  const list = (shadow as unknown as { castMeshes: Transform[] }).castMeshes;
+  let c = castersOf.get(W);
+  if (!c || c.n !== list.length) castersOf.set(W, (c = { n: list.length, set: new Set(list) }));
+  const casters = c.set;
+  type DrawNode = Transform & { draw?: unknown; program: Program; depthProgram: Program; colorProgram: Program; isForceVisibility?: boolean };
+  const hidden: DrawNode[] = [];
+  scene.traverse((node) => {
+    const n = node as DrawNode;
+    if (!n.draw) return;
+    if (casters.has(n)) n.program = n.depthProgram;
+    else {
+      n.isForceVisibility = n.visible;
+      n.visible = false;
+      hidden.push(n);
+    }
+  });
+  const sh = shadow as unknown as { light: Camera; target: unknown };
+  renderer.render({ scene, camera: sh.light, target: sh.target as never, update: false });
+  for (const n of casters) {
+    const d = n as DrawNode;
+    d.program = d.colorProgram;
+  }
+  for (const n of hidden) n.visible = !!n.isForceVisibility;
 }
 
 /** Set a screen material's picture: cover-fit `aspect` (w/h of the screen), scrolled `scroll` (0 → 1) down a tall image. */
@@ -1034,4 +1117,154 @@ export function setCrop(p: Program, tex: Texture, rect: [number, number, number,
   p.uniforms.uUv.value = [rect[2], rect[3], rect[0], rect[1]];
   p.uniforms.uGlow.value = glow;
   p.uniforms.uRound.value = [radius, aspect, 0];
+}
+
+/* ───────────────────────── Static batching ───────────────────────── */
+
+type Attr = { data: Float32Array | Uint16Array | Uint32Array };
+type GeoAttrs = { position?: Attr; normal?: Attr; uv?: Attr; index?: Attr };
+
+/**
+ * Merge the static meshes under `root` into one mesh per material (and per casting), so a world of
+ * a few thousand modelled pieces draws in a few dozen calls. Each piece's transform (relative to
+ * `root`) is baked into its vertices, normals with the inverse transpose and mirrored pieces with
+ * their winding turned back. Left as they are: subtrees in `skip` (parts that move, show or hide
+ * on their own), transparent materials (drawn sorted back to front), hidden meshes and meshes
+ * with children. `root` itself may move: the merged meshes are its children. With `cell`, pieces
+ * batch by where they stand along x (in cells that wide), so a long line of rooms still culls the
+ * rooms out of view.
+ */
+export function bake(W: World, root: Transform, skip: Transform[] = [], cell = 0) {
+  const { gl, shadow } = W;
+  root.updateMatrixWorld(true);
+  const rootInv = invert4(root.worldMatrix as unknown as number[]);
+  const skipSet = new Set(skip);
+  const castList = (shadow as unknown as { castMeshes: Mesh[] }).castMeshes;
+  const casters = new Set(castList);
+  const groups = new Map<string, { program: Program; cast: Mesh[]; still: Mesh[] }>();
+  const visit = (n: Transform) => {
+    if (skipSet.has(n)) return;
+    for (const c of [...n.children]) visit(c);
+    if (n === root || !(n instanceof Mesh) || n.children.length || !n.visible) return;
+    const p = n.program;
+    const a = n.geometry.attributes as GeoAttrs;
+    if (p.transparent || !a.position || !a.normal || !a.uv || !a.index) return;
+    const at = cell > 0 ? Math.floor((n.worldMatrix as unknown as number[])[12] / cell) : 0;
+    const key = `${p.id}|${at}`;
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = { program: p, cast: [], still: [] }));
+    (casters.has(n) ? g.cast : g.still).push(n);
+  };
+  visit(root);
+  const merged = new Set<Mesh>();
+  for (const g of groups.values()) {
+    const program = g.program;
+    for (const [list, cast] of [[g.cast, true], [g.still, false]] as const) {
+      if (list.length < 2) continue;
+      let pos: number[] = [];
+      let nor: number[] = [];
+      let uv: number[] = [];
+      let idx: number[] = [];
+      const flush = () => {
+        if (!idx.length) return;
+        W.mesh(new Geometry(gl, { position: { size: 3, data: new Float32Array(pos) }, normal: { size: 3, data: new Float32Array(nor) }, uv: { size: 2, data: new Float32Array(uv) }, index: { data: new Uint16Array(idx) } }), program, root, cast);
+        pos = [];
+        nor = [];
+        uv = [];
+        idx = [];
+      };
+      for (const m of list) {
+        const a = m.geometry.attributes as GeoAttrs;
+        const P = a.position!.data;
+        const Nn = a.normal!.data;
+        const U = a.uv!.data;
+        const I = a.index!.data;
+        const nv = P.length / 3;
+        if (nv > 65535) continue;
+        if (pos.length / 3 + nv > 65535) flush();
+        const M = mul4(rootInv, m.worldMatrix as unknown as number[]);
+        const Nm = normalMat(M);
+        const flip = det3(M) < 0;
+        const base = pos.length / 3;
+        for (let i = 0; i < nv; i++) {
+          const x = P[i * 3];
+          const y = P[i * 3 + 1];
+          const z = P[i * 3 + 2];
+          pos.push(M[0] * x + M[4] * y + M[8] * z + M[12], M[1] * x + M[5] * y + M[9] * z + M[13], M[2] * x + M[6] * y + M[10] * z + M[14]);
+          const nx = Nn[i * 3];
+          const ny = Nn[i * 3 + 1];
+          const nz = Nn[i * 3 + 2];
+          const tx = Nm[0] * nx + Nm[3] * ny + Nm[6] * nz;
+          const ty = Nm[1] * nx + Nm[4] * ny + Nm[7] * nz;
+          const tz = Nm[2] * nx + Nm[5] * ny + Nm[8] * nz;
+          const l = Math.hypot(tx, ty, tz) || 1;
+          nor.push(tx / l, ty / l, tz / l);
+          uv.push(U[i * 2], U[i * 2 + 1]);
+        }
+        for (let i = 0; i < I.length; i += 3) {
+          if (flip) idx.push(base + I[i], base + I[i + 2], base + I[i + 1]);
+          else idx.push(base + I[i], base + I[i + 1], base + I[i + 2]);
+        }
+        merged.add(m);
+      }
+      flush();
+    }
+  }
+  if (!merged.size) return;
+  // Take the merged pieces out of the scene and the shadow pass; free a geometry's buffers once
+  // nothing else in the world draws it.
+  const users = new Map<Geometry, number>();
+  W.scene.traverse((n) => void (n instanceof Mesh && users.set(n.geometry, (users.get(n.geometry) ?? 0) + 1)));
+  for (const m of merged) {
+    m.setParent(null);
+    const left = (users.get(m.geometry) ?? 1) - 1;
+    users.set(m.geometry, left);
+    if (left === 0) m.geometry.remove();
+  }
+  const kept = castList.filter((m) => !merged.has(m));
+  castList.length = 0;
+  castList.push(...kept);
+}
+
+function mul4(a: number[], b: number[]) {
+  const o = new Array(16).fill(0);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  return o;
+}
+
+function det3(m: number[]) {
+  return m[0] * (m[5] * m[10] - m[9] * m[6]) - m[4] * (m[1] * m[10] - m[9] * m[2]) + m[8] * (m[1] * m[6] - m[5] * m[2]);
+}
+
+/** The normal matrix (inverse transpose of the upper 3×3), column-major. */
+function normalMat(m: number[]) {
+  const [a, b, c, d, e, f, g, h, i] = [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]];
+  const A = e * i - f * h;
+  const B = -(d * i - f * g);
+  const C = d * h - e * g;
+  const det = a * A + b * B + c * C || 1;
+  // Cofactor matrix / det (the inverse transpose), laid out column-major like the input.
+  return [A / det, B / det, C / det, -(b * i - c * h) / det, (a * i - c * g) / det, -(a * h - b * g) / det, (b * f - c * e) / det, -(a * f - c * d) / det, (a * e - b * d) / det];
+}
+
+function invert4(m: number[]) {
+  const inv = new Array(16);
+  inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+  inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+  inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+  inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+  inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+  inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+  inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+  inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+  inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+  inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+  inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+  inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+  inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+  inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+  inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+  inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+  const det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12] || 1;
+  return inv.map((v) => v / det);
 }

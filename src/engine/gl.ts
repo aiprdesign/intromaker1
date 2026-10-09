@@ -14,8 +14,12 @@ import type { Drawable } from "./media";
 
 let renderer: Renderer | null | undefined;
 
-/** The shared renderer, sized to `w`×`h` (null when WebGL isn't available). */
-export function glRenderer(w: number, h: number): Renderer | null {
+/**
+ * The shared renderer, sized to `w`×`h` (null when WebGL isn't available). `resize = false` leaves
+ * its size alone for a caller that sets its own (the 3D engine renders supersampled): resizing
+ * reallocates the drawing buffer, so sizing it twice a frame would cost that twice.
+ */
+export function glRenderer(w: number, h: number, resize = true): Renderer | null {
   if (renderer === undefined) {
     try {
       renderer = typeof document === "undefined" ? null : new Renderer({ width: w, height: h, dpr: 1, alpha: true, premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: true });
@@ -25,6 +29,7 @@ export function glRenderer(w: number, h: number): Renderer | null {
     }
   }
   if (!renderer) return null;
+  if (!resize) return renderer;
   const cw = Math.max(1, Math.round(w));
   const ch = Math.max(1, Math.round(h));
   if (renderer.gl.canvas.width !== cw || renderer.gl.canvas.height !== ch) renderer.setSize(cw, ch);
