@@ -191,7 +191,7 @@ export const CONCEPTS: Concept[] = [
     id: "ecommerce",
     name: "E-commerce",
     // (A coffee shop or a barber shop is a local business, not a store; "order ahead" is a café's.)
-    keywords: /\b((?<!(?:coffee|barber|flower|repair|bike|tattoo|print|pet|gift|thrift|sweet|cake|donut|tea) )shops?|stores?|e-?commerce|checkout|carts?|orders?(?! ahead)|inventory|merchants?|sell(ing)? online|shopify|retail|fulfil(l)?ment|shipping)\b/g,
+    keywords: /\b((?<!(?:coffee|barber|flower|plant|repair|bike|tattoo|print|pet|gift|thrift|sweet|cake|donut|tea) )shops?|stores?|e-?commerce|checkout|carts?|orders?(?! ahead)|inventory|merchants?|sell(ing)? online|shopify|retail|fulfil(l)?ment|shipping)\b/g,
     icons: ["Store", "ShoppingCart", "Truck", "CreditCard", "Tag", "Boxes"],
     orbit: ["CreditCard", "Truck", "Mail", "Megaphone", "Boxes", "ChartPie", "Image", "Receipt"],
     arc: ["hook", "reveal", "tour", "features", "cards", "quote", "logos", "how", "integrations", "pain", "bento", "meet", "cta"],

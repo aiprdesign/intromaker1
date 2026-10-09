@@ -868,6 +868,8 @@ export default function Studio() {
     angle?: Angle;
     /** Remake number: other slides for each section (0 = the director's best fit). */
     variant?: number;
+    /** The kind of video for this one, over the studio's pick (a random intro is never a trailer cut). */
+    style?: StyleChoice;
     /** Cancels the request (the Stop button). */
     signal?: AbortSignal;
   };
@@ -897,7 +899,7 @@ export default function Studio() {
     const pal = opts.palette ?? palette;
     const len = opts.length ?? length;
     const template = templateRef.current;
-    const style = styleRef.current;
+    const style = opts.style ?? styleRef.current;
     const trailerStyle = trailerStyleRef.current !== "auto" ? trailerStyleRef.current : undefined;
     const angle = opts.angle ?? (storyRef.current !== "auto" ? storyRef.current : undefined);
     const label = ANGLES.find((x) => x.id === opts.angle)?.name ?? "Take";
@@ -994,7 +996,16 @@ export default function Studio() {
     setSiteUrl("");
     setBrandColors(undefined);
     setImportError(null);
-    void generate({ prompt: r.prompt, site: null, colors: undefined, seed: Math.floor(Math.random() * 1e9) });
+    // A style that shows the topic off (liquid, 3D, sci-fi…), picked for this video only: the next
+    // website or prompt goes back to its own best style.
+    if (r.look && TEMPLATE_MAP[r.look]) {
+      setAuto(false);
+      setTemplate(r.look);
+      templateRef.current = r.look;
+      pickedPendingRef.current = true;
+    }
+    // (A random intro has no footage or photos for a trailer cut: it's always a designed intro.)
+    void generate({ prompt: r.prompt, site: null, colors: undefined, seed: Math.floor(Math.random() * 1e9), style: "saas" });
   };
   const generate = async (opts: GenOpts = {}) => {
     const { run, signal } = opts.signal ? { run: runRef.current, signal: opts.signal } : startRun();

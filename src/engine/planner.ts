@@ -649,6 +649,7 @@ export function readBrief(prompt: string) {
     .match(/\b(?:https?:\/\/)?((?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|io|app|co|ai|dev|net|org|shop|studio|example)(?:\.[a-z]{2})?)\b/i)?.[1]
     ?.toLowerCase();
   let cta: string | undefined;
+  let tagline: string | undefined;
   let steps: string[] = [];
   let features: string[] = [];
   let services = false;
@@ -657,13 +658,15 @@ export function readBrief(prompt: string) {
   for (const raw of prompt.split(/(?<=[.!?])\s+(?=[A-Z"“])|\n+/)) {
     const line = raw.trim();
     if (!line) continue;
-    const label = line.match(/^(features|key features|what it does|services|our services|we offer|how it works|steps|the process|process|tone|vibe|style|audience|it'?s for|made for|contact|reach us|find us|website)\s*:\s*(.*)$/i);
+    const label = line.match(/^(features|key features|what it does|services|our services|we offer|how it works|steps|the process|process|tone|vibe|style|look|audience|it'?s for|made for|contact|reach us|find us|website|tagline|slogan|hook|open with)\s*:\s*(.*)$/i);
     const end = line.match(/\b(?:end|close|finish)\s+(?:with|on)\s+(?:an?\s+|the\s+)?["“]([^"”]{2,32})["”](?:\s+(?:button|cta|call to action|link))?/i) ?? line.match(/^(?:cta|button|call to action)\s*:\s*["“]?([^"”.]{2,32})/i);
     if (end) cta = end[1].trim();
     if (label) {
       const key = label[1].toLowerCase();
       const body = label[2].replace(/[.]+$/, "");
-      if (/^(features|key features|what it does)$/.test(key)) features = list(body);
+      // A tagline, in quotes or not, opens the video ("Tagline: \"Skip the line, not the latte.\"").
+      if (/^(tagline|slogan|hook|open with)$/.test(key)) tagline = body.replace(/^["“'‘]+|["”'’]+$/g, "").replace(/[.!]+$/, "").trim() || undefined;
+      else if (/^(features|key features|what it does)$/.test(key)) features = list(body);
       else if (/services|we offer/.test(key)) {
         features = list(body);
         services = true;
@@ -691,7 +694,7 @@ export function readBrief(prompt: string) {
     const feats = features.length > 1 ? `${features.slice(0, -1).join(", ")} and ${features[features.length - 1]}` : features[0];
     core = `${lead}: ${feats}.${tail ? ` ${tail}` : ""}`;
   }
-  return { core: core || prompt, steps, cta, domain, email, phone, services, features };
+  return { core: core || prompt, steps, cta, tagline, domain, email, phone, services, features };
 }
 
 export function parseSaasPrompt(prompt: string) {
@@ -827,7 +830,7 @@ function planFromPromptSaas(req: PlanRequest & { brief?: Brief }): VideoPlan {
   // A written brief gives up its steps, button and contact details; the parser reads the rest.
   const brief = req.brief ?? readBrief(req.prompt.trim());
   // (The ask in front of the name, "a welcoming intro for", "a homebuilder video for", isn't the pitch.)
-  const prompt = (req.brief ? req.prompt.trim() : brief.core).replace(/^(?:an?\s+)?(?:[\w'-]+\s+){0,4}?(?:video|intro|film|teaser|trailer|promo|opener|launch|showreel)\s+for\s+(?=["“])/i, "");
+  const prompt = (req.brief ? req.prompt.trim() : brief.core).replace(/^(?:an?\s+)?(?:[\w'-]+,?\s+){0,5}?(?:video|intro|film|teaser|trailer|promo|opener|launch|showreel)\s+for\s+(?=["“])/i, "");
   const seed = (req.seed ?? hashString(prompt)) >>> 0;
   const parsed = parseSaasPrompt(prompt);
   const brand = parsed.brand ?? "Your product";
@@ -899,6 +902,13 @@ function planFromPromptSaas(req: PlanRequest & { brief?: Brief }): VideoPlan {
     if (plan.brand) plan.brand = { ...plan.brand, name: reveal };
     plan.notes = [`No product name was found in the prompt, so the reveal says “${reveal}”. Type the name on that slide, or start the prompt with it (e.g. “Acme is a …”).`, ...(plan.notes ?? [])].slice(0, 3);
   }
+  // The brief's tagline is the opening line (a short one: it has to land in a second or two).
+  const line = brief.tagline;
+  if (line && line.split(/\s+/).length <= 9) {
+    const at = plan.scenes.findIndex((s) => s.role === "hook");
+    const i = at >= 0 ? at : 0;
+    if (plan.scenes[i] && plan.scenes[i].role !== "reveal" && plan.scenes[i].role !== "cta") plan.scenes[i] = { ...plan.scenes[i], text: line };
+  }
   // The brief's email and phone go on the end card, under the website.
   const contact = [brief.email, brief.phone].filter(Boolean).join("  ·  ");
   if (contact && plan.brand) plan.brand = { ...plan.brand, contact };
@@ -955,7 +965,7 @@ export function planFromPrompt(req0: PlanRequest): VideoPlan {
   const req: PlanRequest & { brief?: Brief } = {
     ...req0,
     prompt: brief.core,
-    brief: { ...brief, steps: brief.steps.map((x) => okLine(x)).filter((x): x is string => !!x), cta: okLine(brief.cta) },
+    brief: { ...brief, steps: brief.steps.map((x) => okLine(x)).filter((x): x is string => !!x), cta: okLine(brief.cta), tagline: okLine(brief.tagline) },
   };
   if (req.safe === false) {
     const prompt = req.prompt.split(/,(?!\d{3})|;|(?<=[.!?])\s+/).filter((part) => !isHealthClaim(part)).join(", ");
@@ -968,15 +978,22 @@ export function planFromPrompt(req0: PlanRequest): VideoPlan {
     .map((part) => (isNumericClaim(part) || isUnsafe(part) ? "" : safeCopy(part.trim())))
     .filter((part) => part.replace(/[^a-z0-9]/gi, "").length > 1)
     .join(", ");
-  return withBriefCta(noteShort(safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt }))), LENGTH_SECONDS[req.length], false), req.brief?.cta);
+  return withBriefCta(noteShort(safePlan(writeVoiceover(planFromPromptRaw({ ...req, prompt: prompt || req.prompt }))), LENGTH_SECONDS[req.length], false), req.brief?.cta, req.brief?.tagline);
 }
 
-/** A trailer ends on the brief's own button words ("Wishlist now"), as a product film's end card does. */
-function withBriefCta(plan: VideoPlan, cta: string | undefined): VideoPlan {
-  if (!cta || plan.style === "saas") return plan;
-  const last = plan.scenes[plan.scenes.length - 1];
-  if (!last || last.subtext === undefined) return plan;
-  return { ...plan, scenes: [...plan.scenes.slice(0, -1), { ...last, subtext: cta }] };
+/**
+ * A trailer ends on the brief's own button words ("Wishlist now"), as a product film's end card
+ * does, and its title card (the first one naming the title) carries the brief's tagline.
+ */
+function withBriefCta(plan: VideoPlan, cta: string | undefined, tagline?: string): VideoPlan {
+  if (plan.style === "saas") return plan;
+  let scenes = plan.scenes;
+  const title = plan.title?.toUpperCase();
+  const at = tagline && title && tagline.split(/\s+/).length <= 8 ? scenes.findIndex((s, i) => i < scenes.length - 1 && s.text.replace(/\*/g, "").toUpperCase() === title) : -1;
+  if (at >= 0) scenes = scenes.map((s, i) => (i === at ? { ...s, subtext: tagline!.toUpperCase() } : s));
+  const last = scenes[scenes.length - 1];
+  if (cta && last && last.subtext !== undefined) scenes = [...scenes.slice(0, -1), { ...last, subtext: cta }];
+  return scenes === plan.scenes ? plan : { ...plan, scenes };
 }
 
 /**
