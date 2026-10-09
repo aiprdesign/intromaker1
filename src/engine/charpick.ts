@@ -60,6 +60,15 @@ export function themePick(prompt: string): CharacterPick | undefined {
 export function scenePick(prompt: string): VideoPlan["setting"] {
   const p = prompt.toLowerCase();
   if (/\b(home ?builders?|house ?builders?|custom homes?|new homes?|new[- ]build|real estate|realtors?|estate agents?|propert(?:y|ies) (?:listings?|developers?|management)|homes? for sale|house hunting|mortgages?|interior design(?:ers?)?|show ?homes?)\b/.test(p)) return "house";
+  if (/\b(barbers?|barbershops?|hair ?salons?|salons?|hairdress(?:ers?|ing)|stylists?|nail (?:salons?|bars?|studios?)|manicures?|beauty|tattoo(?:s| studios?| shops?)?|pet grooming|groomers?)\b/.test(p)) return "salon";
+  if (/\b(auto repair|mechanics?|garages?|car wash(?:es)?|detailing|oil changes?|tire|tyre|body shop|auto care)\b/.test(p)) return "garage";
+  if (/\b(gyms?|boxing|crossfit|personal train(?:ing|ers?)|fitness (?:club|studio|centre|center)|martial arts|weight ?lifting)\b/.test(p)) return "gym";
+  if (/\b(yoga|pilates|dance (?:studio|classes|school)|dance|ballet|meditation studio|barre)\b/.test(p)) return "yoga";
+  if (/\b(florists?|flower shops?|flowers?|bouquets?|plant shops?|garden cent(?:re|er)s?)\b/.test(p)) return "florist";
+  if (/\b(bookstores?|bookshops?|books|used books|librar(?:y|ies)|book clubs?)\b/.test(p)) return "bookstore";
+  if (/\b(hotels?|inns?|bed and breakfast|b&bs?|motels?|guest ?houses?|resorts?|lodges?|vacation rentals?)\b/.test(p)) return "hotel";
+  if (/\b(bakery|bakeries|bakers?|bakehouse|pastr(?:y|ies)|cakes?|cupcakes?|donuts?|doughnuts?)\b/.test(p)) return "bakery";
+  if (/\b(restaurants?|bistros?|diners?|pizzerias?|pizza|steakhouses?|trattorias?|dining|dinner|tacos?|grill)\b/.test(p)) return "restaurant";
   if (/\b(construction|builders?|building sites?|contractors?|renovations?|remodel(?:ing)?|roofing|plumb(?:ers?|ing)|electricians?|handyman|architects?|engineering firms?|civil engineering)\b/.test(p)) return "construction";
   if (/\b(hospitals?|clinics?|clinical|doctors?|nurses?|nursing|patients?|medical|health ?care|telehealth|dentists?|dental|pharmac(?:y|ies|ists?)|physio(?:therapy)?|caregivers?|care homes?)\b/.test(p)) return "hospital";
   if (/\b(classrooms?|schools?|teachers?|teaching|tutors?|tutoring|homework|lessons?|pupils|students?|study|studying|flashcards?|kindergarten|universit(?:y|ies)|college)\b/.test(p)) return "classroom";

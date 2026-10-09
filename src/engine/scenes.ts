@@ -9,7 +9,7 @@
 import { clamp, ease, mixHex, rgba, rng, TAU } from "./math";
 import type { Palette, SkillContext } from "./types";
 
-export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house"] as const;
+export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house", "salon", "restaurant", "bakery", "garage", "gym", "yoga", "florist", "bookstore", "hotel"] as const;
 export type SceneBackdrop = (typeof SCENES)[number];
 
 type C = CanvasRenderingContext2D;
@@ -23,6 +23,8 @@ type C = CanvasRenderingContext2D;
 let brand: Palette | undefined;
 /** The slide brings its own board or sign: leave the scene's out (see sceneStage). */
 let bare = false;
+/** The scene being drawn is a room (set by room()), so it gets the indoor finishing light. */
+let indoor = false;
 const wallT = (hex: string) => (brand ? mixHex(hex, mixHex(brand.primary, "#ffffff", 0.55), 0.3) : hex);
 const floorT = (hex: string) => (brand ? mixHex(hex, brand.secondary, 0.16) : hex);
 const skyT = (hex: string) => (brand ? mixHex(hex, brand.primary, 0.14) : hex);
@@ -52,6 +54,83 @@ function room(ctx: C, w: number, h: number, fy: number, wall: [string, string], 
   ctx.fillRect(0, fy, w, h - fy);
   ctx.fillStyle = mixHex(wall[1], "#000000", 0.08);
   ctx.fillRect(0, fy - 8 * u, w, 8 * u);
+  indoor = true;
+  // A soft wallpaper texture: faint vertical stripes.
+  for (let x = 0, i = 0; x < w; x += 34 * u, i++) {
+    ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.022)";
+    ctx.fillRect(x, 0, 34 * u, fy - 8 * u);
+  }
+  // Warm wall-wash lights pooling down from the ceiling.
+  for (const fx of [0.22, 0.78]) {
+    const lg = ctx.createRadialGradient(w * fx, 0, 0, w * fx, 0, fy * 0.95);
+    lg.addColorStop(0, "rgba(255,244,222,0.3)");
+    lg.addColorStop(0.55, "rgba(255,244,222,0.06)");
+    lg.addColorStop(1, "rgba(255,244,222,0)");
+    ctx.fillStyle = lg;
+    ctx.fillRect(0, 0, w, fy);
+  }
+  // Crown moulding along the ceiling line.
+  ctx.fillStyle = mixHex(wall[0], "#ffffff", 0.5);
+  ctx.fillRect(0, 0, w, 10 * u);
+  ctx.fillStyle = "rgba(0,0,0,0.06)";
+  ctx.fillRect(0, 10 * u, w, 3 * u);
+  // The floor: a polished sheen under the wall, a contact shadow at the baseboard, darker toward the front.
+  const sheen = ctx.createLinearGradient(0, fy, 0, fy + (h - fy) * 0.45);
+  sheen.addColorStop(0, "rgba(255,255,255,0.2)");
+  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, fy, w, (h - fy) * 0.45);
+  ctx.fillStyle = "rgba(0,0,0,0.08)";
+  ctx.fillRect(0, fy, w, 4 * u);
+  const front = ctx.createLinearGradient(0, fy, 0, h);
+  front.addColorStop(0.4, "rgba(0,0,0,0)");
+  front.addColorStop(1, "rgba(0,0,0,0.1)");
+  ctx.fillStyle = front;
+  ctx.fillRect(0, fy, w, h - fy);
+}
+
+/**
+ * The finishing light over an indoor scene: slow sunbeams slanting in from the upper left with dust
+ * motes drifting in them, and a gentle vignette, so the room has depth and air.
+ */
+function finishIndoor(sc: SkillContext) {
+  const { ctx, w, h, u } = sc;
+  const T = sc.globalT ?? sc.t;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 3; i++) {
+    const x0 = w * (0.08 + i * 0.13) + Math.sin(T * 0.15 + i) * w * 0.01;
+    const bw = w * (0.05 + i * 0.015);
+    const g = ctx.createLinearGradient(x0, 0, x0 + w * 0.32, h);
+    g.addColorStop(0, "rgba(255,236,200,0.035)");
+    g.addColorStop(1, "rgba(255,236,200,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x0, 0);
+    ctx.lineTo(x0 + bw, 0);
+    ctx.lineTo(x0 + bw + w * 0.34, h);
+    ctx.lineTo(x0 + w * 0.3, h);
+    ctx.fill();
+  }
+  // Dust motes catching the light.
+  const r = rng(91);
+  for (let i = 0; i < 16; i++) {
+    const bx = w * (0.08 + r() * 0.45);
+    const by = h * r();
+    const x = bx + ((T * (6 + r() * 6) * u + by * 0.3) % (w * 0.15));
+    const y = (by + T * (4 + r() * 5) * u) % h;
+    ctx.fillStyle = `rgba(255,245,225,${0.18 + 0.15 * Math.sin(T * 1.3 + i)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, (1.2 + r() * 1.6) * u, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+  // A gentle vignette.
+  const v = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.35, w / 2, h * 0.5, Math.max(w, h) * 0.75);
+  v.addColorStop(0, "rgba(30,20,10,0)");
+  v.addColorStop(1, "rgba(30,20,10,0.2)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
 }
 
 /** A window with sky (and drifting clouds) or a skyline behind it. */
@@ -1021,7 +1100,541 @@ function house(sc: SkillContext) {
   drawDog(ctx, w * (port ? 0.78 : 0.62), ground + h * 0.08, h * 0.09, T, "#d9a066", -1);
 }
 
-const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house };
+
+/* ───────────────────────── Local businesses ───────────────────────── */
+
+/** A pendant lamp hanging from the top at `x`, with a warm glow. */
+function pendant(ctx: C, x: number, h: number, u: number, T: number, drop = 0.12) {
+  ctx.fillStyle = "#3a3f4c";
+  ctx.fillRect(x - 1.5 * u, 0, 3 * u, h * drop);
+  ctx.beginPath();
+  ctx.arc(x, h * (drop + 0.03), 22 * u, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,222,140,${0.55 + Math.sin(T * 2 + x) * 0.05})`;
+  ctx.beginPath();
+  ctx.arc(x, h * (drop + 0.035), 10 * u, 0, TAU);
+  ctx.fill();
+}
+
+/** A barber shop or hair salon: mirror stations with bulbs, a chair, a turning barber pole, products. */
+function salon(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#fbf3f2", "#f2e3e1"], ["#efe9e4", "#e2dad2"], u);
+  // A checkerboard floor.
+  const tile = 46 * u;
+  ctx.fillStyle = "rgba(40,40,52,0.16)";
+  for (let y = fy, r = 0; y < h; y += tile, r++) for (let x = (r % 2) * tile; x < w; x += tile * 2) ctx.fillRect(x, y, tile, tile);
+  // Mirror stations with bulbs round them, and a chair in front of the first.
+  for (const x of [w * 0.03, w * 0.16]) {
+    const mw = w * 0.11;
+    const mh = h * 0.34;
+    const my = h * 0.18;
+    box(ctx, x - 6 * u, my - 6 * u, mw + 12 * u, mh + 12 * u, 14 * u, "#d8c3a5");
+    const g = ctx.createLinearGradient(x, my, x + mw, my + mh);
+    g.addColorStop(0, "#dff1f7");
+    g.addColorStop(1, "#b8d6e2");
+    box(ctx, x, my, mw, mh, 10 * u, g as unknown as string);
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.beginPath();
+    ctx.moveTo(x + mw * 0.2, my);
+    ctx.lineTo(x + mw * 0.45, my);
+    ctx.lineTo(x + mw * 0.1, my + mh);
+    ctx.lineTo(x - mw * 0.05, my + mh);
+    ctx.fill();
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = "rgba(255,236,170,0.95)";
+      ctx.beginPath();
+      ctx.arc(x - 3 * u, my + mh * (0.12 + i * 0.25), 6 * u, 0, TAU);
+      ctx.arc(x + mw + 3 * u, my + mh * (0.12 + i * 0.25), 6 * u, 0, TAU);
+      ctx.fill();
+    }
+    box(ctx, x - 4 * u, my + mh + 14 * u, mw + 8 * u, 10 * u, 4 * u, "#c8b49a");
+  }
+  // The barber chair.
+  const cx = w * 0.1;
+  box(ctx, cx - 8 * u, fy - h * 0.02, 16 * u, h * 0.02, 2 * u, "#9aa0ad");
+  box(ctx, cx - w * 0.04, fy - h * 0.03, w * 0.08, 10 * u, 5 * u, "#8a909c");
+  box(ctx, cx - w * 0.045, fy - h * 0.11, w * 0.09, h * 0.06, 10 * u, palette.primary);
+  box(ctx, cx - w * 0.04, fy - h * 0.2, w * 0.08, h * 0.1, 12 * u, mixHex(palette.primary, "#000000", 0.15));
+  // A barber pole with turning stripes.
+  const px = w * 0.93;
+  const pw = 26 * u;
+  const py = h * 0.16;
+  const ph = h * 0.26;
+  box(ctx, px - pw / 2 - 4 * u, py - 14 * u, pw + 8 * u, 14 * u, 6 * u, "#c9ccd4");
+  box(ctx, px - pw / 2 - 4 * u, py + ph, pw + 8 * u, 14 * u, 6 * u, "#c9ccd4");
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(px - pw / 2, py, pw, ph, 8 * u);
+  ctx.clip();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(px - pw / 2, py, pw, ph);
+  const off = (T * 40 * u) % (36 * u);
+  for (let y = py - 72 * u + off, i = 0; y < py + ph + 36 * u; y += 18 * u, i++) {
+    ctx.fillStyle = i % 2 ? "#d7263d" : "#2b59c3";
+    ctx.beginPath();
+    ctx.moveTo(px - pw / 2, y);
+    ctx.lineTo(px + pw / 2, y - 22 * u);
+    ctx.lineTo(px + pw / 2, y - 14 * u);
+    ctx.lineTo(px - pw / 2, y + 8 * u);
+    ctx.fill();
+  }
+  ctx.restore();
+  // A shelf of products in the brand's colours.
+  const colors = brandColors(palette);
+  box(ctx, w * 0.78, h * 0.5, w * 0.12, 8 * u, 3 * u, "#b48a66");
+  for (let i = 0; i < 5; i++) box(ctx, w * 0.785 + i * w * 0.023, h * 0.5 - (26 + (i % 2) * 10) * u, w * 0.016, (26 + (i % 2) * 10) * u, 4 * u, colors[i % colors.length]);
+  plant(ctx, w * 0.84, fy, h * 0.14, T, "#e8d8c8");
+}
+
+/** A restaurant dining room: panelled walls, tables laid with cloths and candles, pendant lamps, framed art. */
+function restaurant(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f6ebdf", "#ead7c4"], ["#9a6b4b", "#85583b"], u);
+  // Wood panelling on the lower wall.
+  box(ctx, 0, fy - h * 0.2, w, h * 0.2, 0, mixHex(wallT("#c9a27e"), "#000000", 0.05));
+  ctx.fillStyle = "rgba(0,0,0,0.07)";
+  for (let x = 20 * u; x < w; x += 90 * u) ctx.fillRect(x, fy - h * 0.18, 70 * u, h * 0.15);
+  box(ctx, 0, fy - h * 0.205, w, 8 * u, 0, "#a87b57");
+  // Framed art on the wall, at the sides.
+  for (const [x, c] of [[w * 0.05, palette.primary], [w * 0.86, palette.accent]] as const) {
+    box(ctx, x, h * 0.16, w * 0.09, h * 0.14, 4 * u, "#8a6142");
+    box(ctx, x + 6 * u, h * 0.16 + 6 * u, w * 0.09 - 12 * u, h * 0.14 - 12 * u, 2 * u, mixHex(c, "#ffffff", 0.5));
+    ctx.fillStyle = mixHex(c, "#000000", 0.1);
+    ctx.beginPath();
+    ctx.arc(x + w * 0.045, h * 0.25, h * 0.03, Math.PI, 0);
+    ctx.fill();
+  }
+  // Tables with cloths, plates and a flickering candle, with pendant lamps above.
+  for (const x of [w * 0.12, w * 0.88]) {
+    pendant(ctx, x, h, u, T, 0.36);
+    const tw = w * 0.14;
+    box(ctx, x - tw / 2, fy - h * 0.15, tw, h * 0.05, 8 * u, "#ffffff");
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.moveTo(x - tw / 2, fy - h * 0.11);
+    ctx.lineTo(x + tw / 2, fy - h * 0.11);
+    ctx.lineTo(x + tw / 2 + 6 * u, fy - h * 0.05);
+    ctx.lineTo(x - tw / 2 - 6 * u, fy - h * 0.05);
+    ctx.fill();
+    box(ctx, x - 4 * u, fy - h * 0.06, 8 * u, h * 0.06, 2 * u, "#6b4a33");
+    for (const dx of [-0.28, 0.28]) {
+      ctx.fillStyle = "#f2f2f2";
+      ctx.beginPath();
+      ctx.ellipse(x + tw * dx, fy - h * 0.152, tw * 0.13, 5 * u, 0, 0, TAU);
+      ctx.fill();
+    }
+    box(ctx, x - 4 * u, fy - h * 0.19, 8 * u, h * 0.04, 2 * u, "#fff6e0");
+    ctx.fillStyle = "rgba(255,190,90,0.95)";
+    ctx.beginPath();
+    ctx.ellipse(x, fy - h * 0.2 - Math.sin(T * 9 + x) * u, 4 * u, 8 * u, 0, 0, TAU);
+    ctx.fill();
+    // Chairs either side.
+    for (const dx of [-1, 1]) {
+      const chx = x + dx * (tw / 2 + 22 * u);
+      box(ctx, chx - 14 * u, fy - h * 0.2, 28 * u, h * 0.13, 6 * u, mixHex(palette.secondary, "#4a3424", 0.55));
+      box(ctx, chx - 18 * u, fy - h * 0.08, 36 * u, 10 * u, 4 * u, mixHex(palette.secondary, "#4a3424", 0.45));
+      box(ctx, chx - 14 * u, fy - h * 0.07, 5 * u, h * 0.07, 2 * u, "#4a3424");
+      box(ctx, chx + 9 * u, fy - h * 0.07, 5 * u, h * 0.07, 2 * u, "#4a3424");
+    }
+  }
+}
+
+/** A bakery: bread shelves with loaves, a tiled wall, a glass display case of cakes and pastries. */
+function bakery(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#fff6ea", "#f6e6d0"], ["#d9c2a3", "#c9ae8b"], u);
+  // White tiles behind the shelves.
+  ctx.strokeStyle = "rgba(170,140,110,0.18)";
+  ctx.lineWidth = 1.5 * u;
+  for (let y = h * 0.14; y < fy - h * 0.02; y += 24 * u) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w * 0.26, y);
+    ctx.moveTo(w * 0.74, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  // Bread shelves on the left: loaves and baguettes.
+  for (let r = 0; r < 3; r++) {
+    const y = h * (0.26 + r * 0.14);
+    box(ctx, w * 0.02, y, w * 0.22, 8 * u, 3 * u, "#a87b57");
+    for (let i = 0; i < 4; i++) {
+      const x = w * 0.04 + i * w * 0.05;
+      ctx.fillStyle = ["#c98a4b", "#b5733a", "#d9a066", "#a8642f"][(i + r) % 4];
+      ctx.beginPath();
+      if ((i + r) % 3 === 0) ctx.ellipse(x + w * 0.015, y - 9 * u, w * 0.024, 9 * u, -0.2, 0, TAU);
+      else ctx.ellipse(x + w * 0.015, y - 14 * u, w * 0.02, 14 * u, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,240,210,0.6)";
+      ctx.lineWidth = 2 * u;
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.006, y - 14 * u);
+      ctx.lineTo(x + w * 0.012, y - 20 * u);
+      ctx.moveTo(x + w * 0.018, y - 14 * u);
+      ctx.lineTo(x + w * 0.024, y - 20 * u);
+      ctx.stroke();
+    }
+  }
+  // A glass display case on the right with cakes in the brand's colours.
+  const cx = w * 0.72;
+  const cw = w * 0.26;
+  box(ctx, cx, fy - h * 0.2, cw, h * 0.2, 8 * u, "#e9d9c4");
+  box(ctx, cx + 8 * u, fy - h * 0.19, cw - 16 * u, h * 0.12, 6 * u, "rgba(220,240,250,0.85)");
+  const colors = brandColors(palette);
+  for (let i = 0; i < 4; i++) {
+    const x = cx + 24 * u + i * (cw - 48 * u) / 4;
+    box(ctx, x, fy - h * 0.12, (cw - 48 * u) / 4 - 10 * u, h * 0.045, 6 * u, colors[i % colors.length]);
+    box(ctx, x, fy - h * 0.13, (cw - 48 * u) / 4 - 10 * u, h * 0.014, 4 * u, "#fff8ee");
+    ctx.fillStyle = "#d7263d";
+    ctx.beginPath();
+    ctx.arc(x + ((cw - 48 * u) / 4 - 10 * u) / 2, fy - h * 0.138, 4 * u, 0, TAU);
+    ctx.fill();
+  }
+  box(ctx, cx - 4 * u, fy - h * 0.21, cw + 8 * u, 10 * u, 4 * u, "#c9a27e");
+  pendant(ctx, w * 0.85, h, u, T, 0.1);
+  clock(ctx, w * 0.8, h * 0.28, 28 * u, T, u);
+}
+
+/** An auto repair garage: a roll-up door, a car, a tyre stack and a pegboard of tools. */
+function garage(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eef1f5", "#dde2ea"], ["#bfc4cc", "#aab0ba"], u);
+  // Yellow bay lines on the floor.
+  ctx.fillStyle = "rgba(245,190,40,0.8)";
+  ctx.fillRect(w * 0.02, fy + h * 0.06, w * 0.3, 6 * u);
+  ctx.fillRect(w * 0.68, fy + h * 0.06, w * 0.3, 6 * u);
+  // A roll-up door (slats) behind the car, on the left.
+  box(ctx, w * 0.02, h * 0.14, w * 0.3, fy - h * 0.14, 6 * u, "#c8cdd6");
+  ctx.fillStyle = "rgba(0,0,0,0.07)";
+  for (let y = h * 0.16; y < fy; y += 18 * u) ctx.fillRect(w * 0.025, y, w * 0.29, 3 * u);
+  // A car side on, in the brand's main colour.
+  const cx = w * 0.17;
+  const cy = fy + h * 0.02;
+  const cw = w * 0.26;
+  const body = palette.primary;
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.roundRect(cx - cw / 2, cy - h * 0.11, cw, h * 0.08, 14 * u);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - cw * 0.3, cy - h * 0.11);
+  ctx.quadraticCurveTo(cx - cw * 0.18, cy - h * 0.19, cx, cy - h * 0.19);
+  ctx.quadraticCurveTo(cx + cw * 0.2, cy - h * 0.19, cx + cw * 0.3, cy - h * 0.11);
+  ctx.fill();
+  ctx.fillStyle = "rgba(220,240,250,0.9)";
+  ctx.beginPath();
+  ctx.moveTo(cx - cw * 0.24, cy - h * 0.115);
+  ctx.quadraticCurveTo(cx - cw * 0.14, cy - h * 0.175, cx - cw * 0.02, cy - h * 0.175);
+  ctx.lineTo(cx - cw * 0.02, cy - h * 0.115);
+  ctx.moveTo(cx + cw * 0.02, cy - h * 0.115);
+  ctx.lineTo(cx + cw * 0.02, cy - h * 0.175);
+  ctx.quadraticCurveTo(cx + cw * 0.16, cy - h * 0.175, cx + cw * 0.24, cy - h * 0.115);
+  ctx.fill();
+  for (const dx of [-0.3, 0.3]) {
+    ctx.fillStyle = "#2b2f38";
+    ctx.beginPath();
+    ctx.arc(cx + cw * dx, cy - h * 0.03, h * 0.042, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#c9ccd4";
+    ctx.beginPath();
+    ctx.arc(cx + cw * dx, cy - h * 0.03, h * 0.018, 0, TAU);
+    ctx.fill();
+  }
+  // A stack of tyres.
+  for (let i = 0; i < 3; i++) box(ctx, w * 0.36, fy - h * (0.06 + i * 0.055), w * 0.06, h * 0.05, 14 * u, i % 2 ? "#30343e" : "#3a3f4b");
+  // A pegboard of tools on the right.
+  box(ctx, w * 0.74, h * 0.16, w * 0.22, h * 0.3, 6 * u, "#d8b98f");
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  for (let y = h * 0.18; y < h * 0.45; y += 16 * u) for (let x = w * 0.75; x < w * 0.95; x += 16 * u) ctx.fillRect(x, y, 3 * u, 3 * u);
+  ctx.strokeStyle = "#4a5165";
+  ctx.lineWidth = 6 * u;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const x = w * (0.77 + i * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(x, h * 0.22);
+    ctx.lineTo(x, h * 0.36 - (i % 2) * h * 0.04);
+    ctx.stroke();
+    ctx.fillStyle = [palette.primary, "#e0a030", "#4a5165", palette.accent][i];
+    ctx.beginPath();
+    ctx.arc(x, h * 0.22, 9 * u, 0, TAU);
+    ctx.fill();
+  }
+  box(ctx, w * 0.76, fy - h * 0.16, w * 0.2, h * 0.16, 6 * u, mixHex(palette.secondary, "#3a3f4c", 0.5));
+  for (let i = 0; i < 3; i++) box(ctx, w * 0.77, fy - h * (0.145 - i * 0.05), w * 0.18, h * 0.035, 3 * u, mixHex(palette.secondary, "#ffffff", 0.2));
+}
+
+/** A gym: mirrors, a swinging punching bag, a dumbbell rack and kettlebells on rubber flooring. */
+function gym(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eef0f4", "#dfe3ea"], ["#4a4f5c", "#3d424e"], u);
+  // A brand-coloured stripe along the wall.
+  box(ctx, 0, h * 0.5, w, 12 * u, 0, palette.primary);
+  // A punching bag on the left, swinging gently.
+  const bx = w * 0.12;
+  const sw = Math.sin(T * 1.6) * 0.05;
+  ctx.save();
+  ctx.translate(bx, h * 0.04);
+  ctx.rotate(sw);
+  ctx.strokeStyle = "#5a5f6b";
+  ctx.lineWidth = 3 * u;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, h * 0.18);
+  ctx.stroke();
+  box(ctx, -w * 0.035, h * 0.18, w * 0.07, h * 0.34, 18 * u, mixHex(palette.primary, "#000000", 0.25));
+  box(ctx, -w * 0.035, h * 0.24, w * 0.07, 8 * u, 0, "rgba(255,255,255,0.35)");
+  box(ctx, -w * 0.035, h * 0.44, w * 0.07, 8 * u, 0, "rgba(255,255,255,0.35)");
+  ctx.restore();
+  // A dumbbell rack on the right.
+  box(ctx, w * 0.72, fy - h * 0.16, w * 0.25, 10 * u, 3 * u, "#2b2f38");
+  box(ctx, w * 0.72, fy - h * 0.08, w * 0.25, 10 * u, 3 * u, "#2b2f38");
+  box(ctx, w * 0.73, fy - h * 0.16, 8 * u, h * 0.16, 2 * u, "#2b2f38");
+  box(ctx, w * 0.95, fy - h * 0.16, 8 * u, h * 0.16, 2 * u, "#2b2f38");
+  for (const row of [0.16, 0.08]) for (let i = 0; i < 5; i++) {
+    const x = w * (0.75 + i * 0.043);
+    const r = (10 + i * 1.5) * u;
+    ctx.fillStyle = "#1f2229";
+    ctx.beginPath();
+    ctx.arc(x, fy - h * row - r, r, 0, TAU);
+    ctx.arc(x + w * 0.022, fy - h * row - r, r, 0, TAU);
+    ctx.fill();
+    box(ctx, x, fy - h * row - r - 3 * u, w * 0.022, 6 * u, 2 * u, "#8a909c");
+  }
+  // Kettlebells on the floor.
+  for (let i = 0; i < 3; i++) {
+    const x = w * (0.3 + i * 0.05);
+    ctx.fillStyle = [palette.primary, palette.accent, "#2b2f38"][i];
+    ctx.beginPath();
+    ctx.arc(x, fy + h * 0.06, 16 * u, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = ctx.fillStyle;
+    ctx.lineWidth = 5 * u;
+    ctx.beginPath();
+    ctx.arc(x, fy + h * 0.035, 10 * u, Math.PI, 0);
+    ctx.stroke();
+  }
+  // Wall mirrors at the sides, high up.
+  for (const x of [w * 0.24, w * 0.66]) box(ctx, x, h * 0.16, w * 0.1, h * 0.28, 6 * u, "rgba(200,225,238,0.75)");
+}
+
+/** A yoga or dance studio: a wood floor, a mirror wall with a barre, a window, rolled mats and plants. */
+function yoga(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f6f3fb", "#ebe5f4"], ["#e2c8a4", "#d2b28a"], u);
+  // Floorboards.
+  ctx.strokeStyle = "rgba(120,80,40,0.16)";
+  ctx.lineWidth = 2 * u;
+  for (let x = 0; x < w; x += 70 * u) {
+    ctx.beginPath();
+    ctx.moveTo(x, fy);
+    ctx.lineTo(x - (x - w / 2) * 0.35, h);
+    ctx.stroke();
+  }
+  // A tall window on the left.
+  windowPane(ctx, w * 0.04, h * 0.14, w * 0.14, h * 0.38, u, T);
+  // A mirror wall on the right with a barre.
+  box(ctx, w * 0.72, h * 0.12, w * 0.26, fy - h * 0.14, 6 * u, "rgba(205,225,238,0.8)");
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.beginPath();
+  ctx.moveTo(w * 0.76, h * 0.12);
+  ctx.lineTo(w * 0.82, h * 0.12);
+  ctx.lineTo(w * 0.74, fy - h * 0.02);
+  ctx.lineTo(w * 0.72, fy - h * 0.02);
+  ctx.fill();
+  box(ctx, w * 0.7, h * 0.48, w * 0.3, 8 * u, 4 * u, "#c79b74");
+  for (const x of [w * 0.74, w * 0.94]) box(ctx, x, h * 0.48, 6 * u, h * 0.05, 2 * u, "#a87b57");
+  // Rolled mats in a basket, in the brand's colours.
+  const colors = brandColors(palette);
+  box(ctx, w * 0.2, fy - h * 0.1, w * 0.08, h * 0.1, 8 * u, "#c9a87c");
+  for (let i = 0; i < 4; i++) box(ctx, w * (0.205 + i * 0.018), fy - h * 0.2, w * 0.016, h * 0.12, 6 * u, colors[i % colors.length]);
+  plant(ctx, w * 0.66, fy, h * 0.16, T, "#ffffff");
+}
+
+/** A flower shop: buckets of flowers swaying, hanging plants and a wrapping counter. */
+function florist(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eff8f2", "#e0efe5"], ["#d7a98a", "#c79474"], u);
+  const colors = [palette.primary, mixHex(palette.secondary, "#ffffff", 0.1), palette.accent, "#ffd166", "#ff8fab", "#ffffff"];
+  // Buckets of flowers at both sides, on two tiers.
+  const bucket = (x: number, y: number, s: number, k: number) => {
+    const sway = Math.sin(T * 1.4 + x * 0.01) * s * 0.06;
+    ctx.strokeStyle = "#4caf6a";
+    ctx.lineWidth = 3 * u;
+    for (let i = 0; i < 5; i++) {
+      const fx = x + (i - 2) * s * 0.16 + sway;
+      const fyy = y - s * (0.75 + (i % 2) * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(x + (i - 2) * s * 0.06, y);
+      ctx.lineTo(fx, fyy);
+      ctx.stroke();
+      ctx.fillStyle = colors[(i + k) % colors.length];
+      for (let p = 0; p < 5; p++) {
+        ctx.beginPath();
+        ctx.arc(fx + Math.cos((p / 5) * TAU) * s * 0.06, fyy + Math.sin((p / 5) * TAU) * s * 0.06, s * 0.055, 0, TAU);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#ffd166";
+      ctx.beginPath();
+      ctx.arc(fx, fyy, s * 0.04, 0, TAU);
+      ctx.fill();
+    }
+    box(ctx, x - s * 0.24, y - s * 0.05, s * 0.48, s * 0.42, s * 0.06, "#9aa5b1");
+    box(ctx, x - s * 0.26, y - s * 0.07, s * 0.52, s * 0.06, s * 0.03, "#b8c0ca");
+  };
+  const s = h * 0.2;
+  box(ctx, w * 0.01, fy - h * 0.2, w * 0.27, 10 * u, 3 * u, "#b48a66");
+  box(ctx, w * 0.72, fy - h * 0.2, w * 0.27, 10 * u, 3 * u, "#b48a66");
+  [0.05, 0.14, 0.23].forEach((f, i) => bucket(w * f, fy - h * 0.2, s * 0.8, i));
+  [0.77, 0.86, 0.95].forEach((f, i) => bucket(w * f, fy - h * 0.2, s * 0.8, i + 3));
+  [0.08, 0.2].forEach((f, i) => bucket(w * f, fy + h * 0.04, s, i + 1));
+  [0.82, 0.93].forEach((f, i) => bucket(w * f, fy + h * 0.04, s, i + 4));
+  // Hanging plants at the top corners.
+  for (const x of [w * 0.06, w * 0.94]) {
+    ctx.strokeStyle = "#8a6142";
+    ctx.lineWidth = 2 * u;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h * 0.08);
+    ctx.stroke();
+    plant(ctx, x, h * 0.16, h * 0.1, T, "#e9c9a8");
+  }
+}
+
+/** A bookstore: tall shelves of colourful spines at both sides, a ladder, a reading chair and a lamp. */
+function bookstore(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f6efe4", "#ecdfcc"], ["#a8794f", "#93653f"], u);
+  const spines = [...brandColors(palette), "#8a5a44", "#3d5a80", "#e0c27a", "#5b8c5a", "#c26a5a"];
+  const shelf = (x: number, sw: number) => {
+    box(ctx, x, h * 0.08, sw, fy - h * 0.08, 6 * u, "#7a5236");
+    const rows = 5;
+    const rh = (fy - h * 0.12) / rows;
+    const r = rng(Math.round(x));
+    for (let k = 0; k < rows; k++) {
+      const y = h * 0.1 + k * rh;
+      box(ctx, x + 6 * u, y + rh - 8 * u, sw - 12 * u, 6 * u, 2 * u, "#5c3c27");
+      let bxx = x + 10 * u;
+      while (bxx < x + sw - 20 * u) {
+        const bw = (8 + r() * 10) * u;
+        const bh = rh - (14 + r() * 18) * u;
+        box(ctx, bxx, y + rh - 8 * u - bh, bw, bh, 2 * u, spines[Math.floor(r() * spines.length)]);
+        bxx += bw + 2 * u;
+      }
+    }
+  };
+  shelf(w * 0.02, w * 0.22);
+  shelf(w * 0.76, w * 0.22);
+  // A rolling ladder against the right shelves.
+  ctx.strokeStyle = "#c79b74";
+  ctx.lineWidth = 6 * u;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.79, h * 0.12);
+  ctx.lineTo(w * 0.76, fy);
+  ctx.moveTo(w * 0.84, h * 0.12);
+  ctx.lineTo(w * 0.81, fy);
+  for (let i = 1; i < 7; i++) {
+    const f = i / 7;
+    ctx.moveTo(w * (0.79 - 0.03 * f), h * 0.12 + f * (fy - h * 0.12));
+    ctx.lineTo(w * (0.84 - 0.03 * f), h * 0.12 + f * (fy - h * 0.12));
+  }
+  ctx.stroke();
+  // A reading chair and a floor lamp at the left.
+  box(ctx, w * 0.27, fy - h * 0.16, w * 0.09, h * 0.16, 14 * u, mixHex(palette.primary, "#5a3a2a", 0.4));
+  box(ctx, w * 0.26, fy - h * 0.09, w * 0.11, h * 0.07, 12 * u, mixHex(palette.primary, "#5a3a2a", 0.3));
+  ctx.fillStyle = "#3a3f4c";
+  ctx.fillRect(w * 0.39, fy - h * 0.32, 4 * u, h * 0.32);
+  ctx.beginPath();
+  ctx.moveTo(w * 0.39 - 22 * u, fy - h * 0.32);
+  ctx.lineTo(w * 0.39 + 26 * u, fy - h * 0.32);
+  ctx.lineTo(w * 0.39 + 14 * u, fy - h * 0.38);
+  ctx.lineTo(w * 0.39 - 10 * u, fy - h * 0.38);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,222,140,${0.35 + Math.sin(T * 2) * 0.04})`;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.39 - 22 * u, fy - h * 0.32);
+  ctx.lineTo(w * 0.39 + 26 * u, fy - h * 0.32);
+  ctx.lineTo(w * 0.39 + 60 * u, fy - h * 0.16);
+  ctx.lineTo(w * 0.39 - 56 * u, fy - h * 0.16);
+  ctx.fill();
+}
+
+/** A hotel or inn lobby: a marble floor, a reception desk with a bell, palms and a luggage cart. */
+function hotel(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f6f0e6", "#e9dfd1"], ["#ece7df", "#d9d1c5"], u);
+  // A marble sheen on the floor.
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  for (let x = 0; x < w; x += 120 * u) ctx.fillRect(x, fy, 2 * u, h - fy);
+  ctx.fillRect(0, fy + h * 0.1, w, 2 * u);
+  // Wall sconces at the sides.
+  for (const x of [w * 0.3, w * 0.7]) {
+    box(ctx, x - 6 * u, h * 0.2, 12 * u, 26 * u, 4 * u, "#c9a227");
+    ctx.fillStyle = `rgba(255,222,140,${0.4 + Math.sin(T * 2 + x) * 0.05})`;
+    ctx.beginPath();
+    ctx.arc(x, h * 0.2, 24 * u, 0, TAU);
+    ctx.fill();
+  }
+  // The reception desk on the right with a bell and a key board behind.
+  box(ctx, w * 0.78, h * 0.16, w * 0.18, h * 0.22, 6 * u, "#8a6142");
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+    box(ctx, w * (0.795 + c * 0.04), h * (0.19 + r * 0.06), w * 0.025, h * 0.04, 3 * u, "#6b4a33");
+    ctx.fillStyle = "#e0c27a";
+    ctx.beginPath();
+    ctx.arc(w * (0.807 + c * 0.04), h * (0.205 + r * 0.06), 3 * u, 0, TAU);
+    ctx.fill();
+  }
+  box(ctx, w * 0.7, fy - h * 0.17, w * 0.3, h * 0.17, 8 * u, mixHex(palette.primary, "#5a3a2a", 0.55));
+  box(ctx, w * 0.69, fy - h * 0.185, w * 0.32, h * 0.02, 4 * u, "#efe6d6");
+  ctx.fillStyle = "#c9a227";
+  ctx.beginPath();
+  ctx.arc(w * 0.76, fy - h * 0.185, 12 * u, Math.PI, 0);
+  ctx.fill();
+  // A luggage cart on the left with suitcases in the brand's colours.
+  const lx = w * 0.12;
+  ctx.strokeStyle = "#c9a227";
+  ctx.lineWidth = 4 * u;
+  ctx.beginPath();
+  ctx.moveTo(lx - w * 0.06, fy - h * 0.3);
+  ctx.quadraticCurveTo(lx, fy - h * 0.38, lx + w * 0.06, fy - h * 0.3);
+  ctx.moveTo(lx - w * 0.06, fy - h * 0.3);
+  ctx.lineTo(lx - w * 0.06, fy - h * 0.02);
+  ctx.moveTo(lx + w * 0.06, fy - h * 0.3);
+  ctx.lineTo(lx + w * 0.06, fy - h * 0.02);
+  ctx.stroke();
+  box(ctx, lx - w * 0.07, fy - h * 0.03, w * 0.14, 8 * u, 3 * u, "#c9a227");
+  const colors = brandColors(palette);
+  box(ctx, lx - w * 0.05, fy - h * 0.13, w * 0.1, h * 0.1, 8 * u, colors[0]);
+  box(ctx, lx - w * 0.04, fy - h * 0.21, w * 0.07, h * 0.08, 8 * u, colors[2]);
+  for (const dx of [-0.05, 0.05]) {
+    ctx.fillStyle = "#3a3f4c";
+    ctx.beginPath();
+    ctx.arc(lx + w * dx, fy + 4 * u, 8 * u, 0, TAU);
+    ctx.fill();
+  }
+  plant(ctx, w * 0.3, fy, h * 0.2, T, "#c9a227");
+  plant(ctx, w * 0.64, fy, h * 0.18, T, "#c9a227");
+}
+
+const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house, salon, restaurant, bakery, garage, gym, yoga, florist, bookstore, hotel };
 
 /** Draw a cartoon scene background, if `backdrop` is one. Returns whether it drew. */
 export function sceneStage(sc: SkillContext, backdrop: string | undefined, opts: { bare?: boolean } = {}) {
@@ -1030,7 +1643,10 @@ export function sceneStage(sc: SkillContext, backdrop: string | undefined, opts:
   sc.ctx.save();
   brand = sc.palette;
   bare = !!opts.bare;
+  indoor = false;
   f(sc);
+  if (indoor) finishIndoor(sc);
+  indoor = false;
   bare = false;
   brand = undefined;
   sc.ctx.restore();

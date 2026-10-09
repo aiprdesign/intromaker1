@@ -652,6 +652,7 @@ export function readBrief(prompt: string) {
   let tagline: string | undefined;
   let social: string | undefined;
   let app: string | undefined;
+  let audience: string | undefined;
   let steps: string[] = [];
   let features: string[] = [];
   let services = false;
@@ -667,6 +668,7 @@ export function readBrief(prompt: string) {
       const key = label[1].toLowerCase();
       const body = label[2].replace(/[.]+$/, "");
       // A tagline, in quotes or not, opens the video ("Tagline: \"Skip the line, not the latte.\"").
+      if (/^(audience|it'?s for|made for)$/.test(key)) audience = body.trim() || undefined;
       // Social handles ("@acme on Instagram and TikTok") and app stores go on the end card.
       if (/^(social|socials|follow us)$/.test(key)) social = body.match(/@[\w.]{2,30}/)?.[0];
       else if (/^(app|get the app)$/.test(key)) app = /app store|google play/i.test(body) ? [/app store/i.test(body) && "App Store", /google play/i.test(body) && "Google Play"].filter(Boolean).join(" & ") : undefined;
@@ -699,7 +701,7 @@ export function readBrief(prompt: string) {
     const feats = features.length > 1 ? `${features.slice(0, -1).join(", ")} and ${features[features.length - 1]}` : features[0];
     core = `${lead}: ${feats}.${tail ? ` ${tail}` : ""}`;
   }
-  return { core: core || prompt, steps, cta, tagline, social, app, domain, email, phone, services, features };
+  return { core: core || prompt, steps, cta, tagline, social, app, audience, domain, email, phone, services, features };
 }
 
 export function parseSaasPrompt(prompt: string) {
@@ -868,10 +870,10 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
     if (SOFTWARE_SLIDES.has(s.skill)) {
       if (!industry && items.length >= 2) {
         industry = true;
-        out.push({ ...s, skill: skill as SkillId, text: head.replace("{name}", name), subtext: undefined, items, role: s.role === "demo" || s.role === "tour" ? "features" : s.role });
+        out.push({ ...s, skill: skill as SkillId, text: head.replace("{name}", name), subtext: undefined, items, eyebrow: skill === "ind-menu" ? "On the menu" : "What we do", role: s.role === "demo" || s.role === "tour" ? "features" : s.role });
       } else if (!steps && brief.steps.length >= 2) {
         steps = true;
-        out.push({ ...s, skill: "steps" as SkillId, text: "How it *works*", subtext: undefined, items: brief.steps.slice(0, 4), role: "how" });
+        out.push({ ...s, skill: "steps" as SkillId, text: "How it *works*", subtext: undefined, items: brief.steps.slice(0, 4), eyebrow: "How it works", role: "how" });
       }
       continue;
     }
@@ -885,6 +887,30 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
       text = /\b(book|schedule|appointment|class|trial|tour|consult|session|stay|groom)/.test(b) ? `Book with *${name}*` : /\b(call|quote|inspection)\b/.test(b) ? `Call *${name}* today` : /\b(order|menu|flavours)\b/.test(b) ? `Order from *${name}*` : `Visit *${name}*`;
     }
     out.push(text === s.text ? s : { ...s, text });
+  }
+  // An About us slide after the name: what the business is, who it's for and a couple of its
+  // services, with its town pinned to the picture.
+  const pitch = prompt.match(/["“][^"”]+["”],\s*([^.:]{6,120}?)\s*(?:[.:]|$)/)?.[1]?.trim();
+  if (pitch) {
+    const town = pitch.match(/\bin ([A-Z][a-z]+(?: [A-Z][a-z]+)?)$/)?.[1];
+    const what = town ? pitch.replace(/\s+in [A-Z][a-z]+(?: [A-Z][a-z]+)?$/, "") : pitch;
+    // (Lower-cased for the sentence, but not an acronym: "AC installs".)
+    const lower = items.map((x) => (/^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x));
+    // A shop, a café or a studio is somewhere to come in to; a trade or a firm offers its services.
+    const verb = ["ind-menu", "ind-shop", "ind-lesson"].includes(skill) ? "Come in for" : "We offer";
+    const about = `${name} is ${what}${town ? ` in ${town}` : ""}${brief.audience ? `, for ${brief.audience.replace(/[.]+$/, "")}` : ""}.${lower.length >= 2 ? ` ${verb} ${lower[0]} and ${lower[1]}.` : ""}`;
+    const at = out.findIndex((s) => s.role === "reveal");
+    const next = out[at + 1] ?? out[out.length - 1];
+    out.splice(at >= 0 ? at + 1 : 1, 0, {
+      skill: "ind-about" as SkillId,
+      text: "About *us*",
+      subtext: about,
+      items: [town ? `Based in ${town}` : "", ...items.slice(0, 2)].filter(Boolean),
+      eyebrow: "About us",
+      role: "meet",
+      duration: 5,
+      transition: next?.transition ?? "cut",
+    });
   }
   plan.scenes = out;
 }
@@ -1030,7 +1056,7 @@ export function planFromPrompt(req0: PlanRequest): VideoPlan {
   const req: PlanRequest & { brief?: Brief } = {
     ...req0,
     prompt: brief.core,
-    brief: { ...brief, steps: brief.steps.map((x) => okLine(x)).filter((x): x is string => !!x), cta: okLine(brief.cta), tagline: okLine(brief.tagline) },
+    brief: { ...brief, steps: brief.steps.map((x) => okLine(x)).filter((x): x is string => !!x), cta: okLine(brief.cta), tagline: okLine(brief.tagline), audience: okLine(brief.audience) },
   };
   if (req.safe === false) {
     const prompt = req.prompt.split(/,(?!\d{3})|;|(?<=[.!?])\s+/).filter((part) => !isHealthClaim(part)).join(", ");

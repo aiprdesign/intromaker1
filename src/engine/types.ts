@@ -97,6 +97,7 @@ export const SKILL_IDS = [
   "ind-lesson",
   "ind-team",
   "ind-route",
+  "ind-about",
   "d3-laptop",
   "d3-phone",
   "d3-lineup",
@@ -523,7 +524,7 @@ export interface VideoPlan {
   /** How the 3D slides are drawn: real 3D (unset) or flat, as a 2D illustration. */
   render3d?: "flat";
   /** Where a flat Cartoon style's characters are (an office, a hospital…), from the intro's theme (see scenes.ts). */
-  setting?: "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe" | "kitchen" | "bedroom" | "bathroom" | "house";
+  setting?: "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe" | "kitchen" | "bedroom" | "bathroom" | "house" | "salon" | "restaurant" | "bakery" | "garage" | "gym" | "yoga" | "florist" | "bookstore" | "hotel";
 }
 
 /**
@@ -597,7 +598,7 @@ export interface Look {
   /** Vignette strength multiplier. */
   vignette?: number;
   /** Stage behind the content: fine grid (default), dot matrix, soft colour blobs, CRT scanlines, plain, synthwave horizon, stars, the clean-epic stages (eclipse rim, studio sweep, silk ribbons, light beam, colour bloom), or the sci-fi stages (light-speed warp, ringed planet, wormhole, data rain, quantum mesh). */
-  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow" | "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe" | "kitchen" | "bedroom" | "bathroom" | "house";
+  backdrop?: "grid" | "dots" | "blobs" | "scanlines" | "plain" | "horizon" | "stars" | "eclipse" | "studio" | "ribbon" | "beam" | "bloom" | "warp" | "planet" | "wormhole" | "rain" | "plexus" | "meadow" | "office" | "city" | "construction" | "hospital" | "classroom" | "home" | "shop" | "cafe" | "kitchen" | "bedroom" | "bathroom" | "house" | "salon" | "restaurant" | "bakery" | "garage" | "gym" | "yoga" | "florist" | "bookstore" | "hotel";
   /** How cartoon characters are drawn (character slides): flat, comic ink with cel shading, soft clay, or hand-drawn doodle. */
   toon?: "flat" | "comic" | "soft" | "doodle";
   /** How generated abstract characters are drawn (unset: from toon). Your own characters keep theirs. */
@@ -655,6 +656,8 @@ export interface SkillContext {
   app?: boolean;
   /** Product concept id (see concepts.ts) for on-brand icon choices. */
   concept?: string;
+  /** Where the intro is set (VideoPlan.setting): industry slides stand in the business's own scene. */
+  setting?: VideoPlan["setting"];
   /** A physical product film: product photos are shown cut out of their white backgrounds. */
   product?: boolean;
   /** The score at this moment, so motion can hit with the music (full-film renders only). */

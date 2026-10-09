@@ -79,6 +79,7 @@ export interface RenderOptions {
 type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   bpm?: number;
   brand?: VideoPlan["brand"];
+  setting?: VideoPlan["setting"];
   product?: boolean;
   cast?: VideoPlan["cast"];
   characters?: VideoPlan["characters"];
@@ -239,6 +240,7 @@ function drawSceneOnce(
     look: flip || tone ? { ...(plan.look ?? NO_LOOK), shader: undefined, ...(plan.textFx ? { text: plan.textFx } : {}) } : plan.textFx ? { ...(plan.look ?? NO_LOOK), text: plan.textFx } : plan.look,
     globalT,
     concept: plan.concept,
+    setting: plan.setting,
     product: plan.product,
     music,
     genre: plan.style === "trailer" ? plan.trailerStyle?.replace(/^film-/, "") : undefined,

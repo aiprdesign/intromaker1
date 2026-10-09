@@ -51,6 +51,8 @@ export function showcaseIntros(): ShowcaseIntro[] {
       const pick = WANTS_CHARACTERS.test(r.prompt) ? cartoonPick(r.prompt) : themePick(r.prompt);
       if (pick) plan = applyTemplate({ ...plan, characters: pick.characters, setting: scenePick(r.prompt) }, pick.template);
     }
+    // The business's own scene (a bakery, a barber shop…) for its industry slides.
+    plan = { ...plan, setting: plan.setting ?? scenePick(r.prompt) };
     // The niche's colours (cosy browns for a restaurant, red and yellow for pizza…).
     if (r.colors && plan.brand) plan = { ...plan, brand: { ...plan.brand, colors: r.colors } };
     return { ...r, group: GROUP.get(kind) ?? "Apps", plan };

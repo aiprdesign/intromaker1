@@ -1310,6 +1310,7 @@ export const SKILL_ROLE: Partial<Record<SkillId, Role>> = {
   "ind-lesson": "how",
   "ind-team": "features",
   "ind-route": "how",
+  "ind-about": "meet",
   "d3-laptop": "meet",
   "d3-phone": "tour",
   "d3-lineup": "reach",
@@ -1460,7 +1461,7 @@ export function applyTemplate(plan: VideoPlan, templateId: string, opts: { palet
     // A tour of the website's own sections (no product footage to zoom into) stays one.
     if (role === "tour" && scene.skill === "site-scroll") skill = scene.skill;
     // Signature text moments the director chose on purpose (video in text, node graph) stay.
-    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "ind-hometour", "ind-build", "ind-site", "ind-care", "ind-menu", "ind-shop", "ind-lesson", "ind-team", "ind-route", "d3-laptop", "d3-phone", "d3-lineup", "d3-dive", "d3-desk", "d3-popout", "d3-macro", "d3-split", "d3-wall", "home-hero", "home-aerial", "home-build3d", "home-plan", "home-energy", "home-choice", "home-journey", "home-walkthrough", "home-rooms", "home-family", "home-welcome", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser", "contrast-split", "problem-solution"].includes(scene.skill) && !(CHARACTER_SLIDE.test(scene.skill) && CHARACTER_SLIDE.test(skill)) && !cartoonOver) skill = scene.skill;
+    if (["type-mask", "node-graph", "gallery-flow", "carousel-3d", "photo-fan", "card-spread", "photo-drop", "tilt-wall", "world-map", "feature-slides", "showreel", "card-system", "type-rows", "type-poster", "poster-grid", "poster-split", "type-echo", "type-slots", "rapid-fire", "flip-switch", "zoom-through", "slice-switch", "style-shuffle", "split-flap", "whip-pan", "stack-stomp", "speed-ticker", "cube-spin", "speed-type", "bar-wipe", "crash-zoom", "word-grid", "orbit-text", "tape-rush", "jump-cut", "letter-rush", "stamp-rush", "rally", "spiral-in", "speed-gauge", "domino", "slipstream", "stretch-snap", "rack-focus", "spotlight", "device-trio", "exploded-ui", "card-stack", "contact-sheet", "spec-sheet", "widget-set", "qr-end", "liquid-logo", "logo-extrude", "logo-spin", "logo-shatter", "logo-orbit", "logo-stage", "logo-layers", "logo-tunnel", "logo-flip", "logo-draw", "logo-wipe", "logo-pop", "logo-morph", "logo-slices", "logo-dots", "logo-type", "logo-shapes", "arrow-rise", "process-chevrons", "process-cycle", "step-stairs", "services", "step-portals", "light-trail", "step-cards", "service-orbit", "service-carousel", "service-hex", "service-cube", "service-bloom", "service-fan", "service-board", "service-bento", "service-spotlight", "char-hello", "char-presenter", "char-team", "char-aha", "char-desk", "char-cheer", "pro-walk", "pro-explainer", "pro-duo", "pro-thinker", "pro-unveil", "pro-highfive", "abs-hello", "abs-crowd", "abs-features", "abs-parade", "abs-chat", "abs-cheer", "ind-hometour", "ind-build", "ind-site", "ind-care", "ind-menu", "ind-shop", "ind-lesson", "ind-team", "ind-route", "ind-about", "d3-laptop", "d3-phone", "d3-lineup", "d3-dive", "d3-desk", "d3-popout", "d3-macro", "d3-split", "d3-wall", "home-hero", "home-aerial", "home-build3d", "home-plan", "home-energy", "home-choice", "home-journey", "home-walkthrough", "home-rooms", "home-family", "home-welcome", "product-hero", "product-end", "product-spin", "product-zoom", "product-teaser", "contrast-split", "problem-solution"].includes(scene.skill) && !(CHARACTER_SLIDE.test(scene.skill) && CHARACTER_SLIDE.test(skill)) && !cartoonOver) skill = scene.skill;
     if (dev) skill = dev;
     // The flat device mock-up becomes the real 3D lineup (it shows the same screenshots).
     if (skill === "device-trio") skill = "d3-lineup";
@@ -1625,6 +1626,15 @@ const INDUSTRY_ROLES: Partial<Record<NonNullable<VideoPlan["setting"]>, Partial<
   classroom: { how: "ind-lesson", features: "ind-lesson" },
   office: { features: "ind-team", how: "ind-team" },
   city: { how: "ind-route", promise: "ind-route" },
+  restaurant: { features: "ind-menu", demo: "ind-menu" },
+  bakery: { features: "ind-menu", demo: "ind-menu" },
+  salon: { features: "ind-shop", demo: "ind-shop" },
+  florist: { features: "ind-shop", demo: "ind-shop" },
+  bookstore: { features: "ind-shop", demo: "ind-shop" },
+  hotel: { features: "ind-shop", demo: "ind-shop" },
+  garage: { features: "ind-shop", demo: "ind-shop" },
+  gym: { how: "ind-lesson", features: "ind-lesson" },
+  yoga: { how: "ind-lesson", features: "ind-lesson" },
 };
 
 /** Character slides that read well without a list of points (a crowd under the headline, a sign). */

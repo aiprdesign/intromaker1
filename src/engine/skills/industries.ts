@@ -18,9 +18,10 @@
  * Characters are generated (or your own cast), now and then a wheelchair user; headlines are dark
  * on these light scenes whatever the palette.
  */
-import { clamp, ease, lerp, mixHex, rgba, TAU } from "../math";
+import { clamp, ease, lerp, mixHex, range, rgba, TAU } from "../math";
 import { drawDog, drawHouse, sceneStage, type SceneBackdrop } from "../scenes";
-import { fillTextFit, subFont } from "../text";
+import { displayFont, fillTextFit, subFont } from "../text";
+import { drawIcon, saasBackground, saasFont } from "../saasfx";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { bounceIn, drawAbstract, idle, person, waveArm, type AbsRig } from "./abstract";
 import { exitOf, itemsOr, split, stage } from "./beats";
@@ -541,8 +542,19 @@ function drawBoard(sc: SkillContext, kind: BoardKind, x: number, y: number, bw: 
   return { top, lineH, pad };
 }
 
+/** The business scenes a board suits: a menu in a restaurant or bakery, shop tags in a salon or florist… */
+const BOARD_SCENES: Record<BoardKind, SceneBackdrop[]> = {
+  menu: ["cafe", "restaurant", "bakery"],
+  tags: ["shop", "salon", "florist", "bookstore", "hotel", "garage"],
+  chalk: ["classroom", "gym", "yoga"],
+  clipboard: ["hospital"],
+  sticky: ["office"],
+};
+
 function boardSlide(sc0: SkillContext, B: BoardSpec) {
-  const sc = scenic(sc0, B.backdrop, true);
+  // (In the intro's own setting when the board suits it: a menu board in the bakery.)
+  const own = sc0.setting as SceneBackdrop | undefined;
+  const sc = scenic(sc0, own && BOARD_SCENES[B.board].includes(own) ? own : B.backdrop, true);
   const { ctx, w, h, t, u, palette, scene, seed } = sc;
   const st = stage(sc);
   const { S, narrow, ex } = st;
@@ -796,11 +808,159 @@ function deliveryRoute(sc0: SkillContext) {
   void rgba;
 }
 
+
+/* ───────────────────────── About us ───────────────────────── */
+
+const ABOUT_POINTS = ["Based in your town", "Friendly local team", "Open six days a week"];
+
+/**
+ * About us: a picture of the business's own place (its bakery, barber shop, gym…) in a frame
+ * beside a few lines about it: the name small (no big logo), the headline, a short paragraph and
+ * a few facts with ticks. A "Based in …" point becomes a pinned caption on the picture.
+ */
+function aboutUs(sc: SkillContext) {
+  const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
+  saasBackground(sc, { beams: 0 });
+  const tall = h > w * 1.2;
+  const wide = w > h * 1.3;
+  const S = tall ? 1.45 : wide ? 1 : 1.12;
+  const out = 1 - ease.inCubic(range(t, d - 0.45, d));
+  const points = itemsOr(scene, ABOUT_POINTS, 4, 1).map((x) => plain(split(x).title));
+  const place = points.find((x) => /^based in\b|^in the heart of\b|^serving\b/i.test(x));
+  const facts = points.filter((x) => x !== place).slice(0, 3);
+  // The picture: the right half of a wide frame, the top of a tall or square one.
+  const fw = wide ? w * 0.4 : w * 0.84;
+  const fh = wide ? h * 0.66 : h * (tall ? 0.42 : 0.4);
+  const fx = wide ? w * 0.54 : (w - fw) / 2;
+  const fy = wide ? (h - fh) / 2 : h * 0.07;
+  const pk = ease.outCubic(range(t, 0.1, 0.8));
+  const r = 26 * u * S;
+  ctx.save();
+  ctx.globalAlpha = pk * out;
+  ctx.translate(0, (1 - pk) * 36 * u);
+  ctx.shadowColor = "rgba(10,10,30,0.3)";
+  ctx.shadowBlur = 44 * u;
+  ctx.shadowOffsetY = 16 * u;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(fx - 10 * u, fy - 10 * u, fw + 20 * u, fh + 20 * u, r + 8 * u);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.beginPath();
+  ctx.roundRect(fx, fy, fw, fh, r);
+  ctx.clip();
+  // (A slow push into the picture while the slide holds.)
+  const push = 1.04 + 0.04 * range(t, 0, d);
+  ctx.translate(fx + fw / 2, fy + fh / 2);
+  ctx.scale(push, push);
+  ctx.translate(-(fx + fw / 2), -(fy + fh / 2));
+  const own = sc.setting as SceneBackdrop | undefined;
+  const pal = palette.light ? palette : { ...palette, text: INK, light: true };
+  sceneIn({ ...sc, palette: pal }, own && own !== "house" ? own : "shop", fx, fy, fw, fh);
+  ctx.restore();
+  // The pinned place caption on the picture.
+  if (place) {
+    const ck = ease.outBack(range(t, 0.7, 1.1));
+    const cs = 19 * u * S;
+    ctx.save();
+    ctx.globalAlpha = clamp(ck) * out;
+    ctx.font = subFont(cs, 700);
+    const cw = ctx.measureText(place).width + cs * 3;
+    const cx = fx + 18 * u;
+    const cy = fy + fh - cs * 2.4 - 14 * u;
+    ctx.translate(cx, cy + cs);
+    ctx.scale(0.8 + 0.2 * ck, 0.8 + 0.2 * ck);
+    ctx.fillStyle = "rgba(255,255,255,0.94)";
+    ctx.beginPath();
+    ctx.roundRect(0, -cs, cw, cs * 2, cs);
+    ctx.fill();
+    drawIcon(ctx, "MapPin", cs * 1.1, 0, cs * 1.05, palette.primary);
+    ctx.fillStyle = INK;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(place, cs * 2, 1 * u);
+    ctx.restore();
+  }
+  // The words: beside the picture in a wide frame, under it otherwise.
+  const tx = wide ? w * 0.07 : fx;
+  const tw = wide ? w * 0.42 : fw;
+  let y = wide ? h * 0.2 : fy + fh + h * (tall ? 0.05 : 0.045);
+  const T2 = wide ? 1.3 : 1;
+  const line = (delay: number) => ease.outCubic(range(t, delay, delay + 0.6));
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  // The name, small: a brand-coloured dot and the name in capitals.
+  const nk = line(0.25);
+  const ns = 18 * u * S * T2;
+  ctx.globalAlpha = nk * out;
+  ctx.fillStyle = palette.primary;
+  ctx.beginPath();
+  ctx.roundRect(tx, y + ns * 0.1, ns * 0.9, ns * 0.9, ns * 0.25);
+  ctx.fill();
+  ctx.font = subFont(ns, 700);
+  ctx.fillStyle = rgba(palette.text, 0.72);
+  const name = (brand?.name ?? "").toUpperCase();
+  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = `${(ns * 0.14).toFixed(1)}px`;
+  ctx.fillText(name, tx + ns * 1.5, y);
+  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px";
+  y += ns * 2.2;
+  // The headline, with a short rule under it.
+  const hk = line(0.4);
+  const hs = (wide ? 84 : 58) * u * S;
+  ctx.globalAlpha = hk * out;
+  ctx.font = displayFont(saasFont(sc), hs);
+  ctx.fillStyle = palette.text;
+  const hn = fillTextFit(ctx, plain(scene.text || "About us"), tx, y + (1 - hk) * 14 * u, tw, { maxLines: 2, lineHeight: 1.08, minScale: 0.6 });
+  y += hs * 1.08 * hn + hs * 0.25;
+  ctx.fillStyle = palette.primary;
+  ctx.fillRect(tx, y, 64 * u * S * hk, 5 * u * S);
+  y += 26 * u * S;
+  // The paragraph.
+  const about = plain(scene.subtext || "");
+  if (about) {
+    const pk2 = line(0.6);
+    const ps = 25 * u * S * T2;
+    ctx.globalAlpha = pk2 * out;
+    ctx.font = subFont(ps, 500);
+    ctx.fillStyle = rgba(palette.text, 0.8);
+    const pn = fillTextFit(ctx, about, tx, y + (1 - pk2) * 12 * u, tw, { maxLines: tall ? 5 : 4, lineHeight: 1.45, minScale: 0.75 });
+    y += ps * 1.45 * pn + ps * 0.9;
+  }
+  // The facts, with ticks, one after another.
+  const fs = 22 * u * S * T2;
+  facts.forEach((f, i) => {
+    const fk = ease.outBack(range(t, 0.9 + i * 0.18, 1.3 + i * 0.18));
+    if (fk <= 0) return;
+    ctx.globalAlpha = clamp(fk) * out;
+    ctx.fillStyle = mixHex(palette.primary, palette.light ? "#ffffff" : palette.bg0, 0.82);
+    ctx.beginPath();
+    ctx.arc(tx + fs * 0.6, y + fs * 0.6, fs * 0.6, 0, TAU);
+    ctx.fill();
+    drawIcon(ctx, "Check", tx + fs * 0.6, y + fs * 0.6, fs * 0.75, palette.primary);
+    ctx.font = subFont(fs, 600);
+    ctx.fillStyle = palette.text;
+    ctx.fillText(f, tx + fs * 1.6 + (1 - clamp(fk)) * 10 * u, y + fs * 0.08);
+    y += fs * 1.75;
+  });
+  ctx.restore();
+}
+
 /* ───────────────────────── Registry ───────────────────────── */
 
 const pops = (n: number, start = 0.8) => (scene: Scene) => pointTimes(scene, n, start).map((ti) => at(ti, "pop"));
 
 export const industrySkills: Skill[] = [
+  {
+    id: "ind-about",
+    name: "About Us",
+    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline, a short paragraph and a few ticked facts; a 'Based in …' point pins to the picture.",
+    bestFor: "Local businesses and services: who they are in a few lines (the text under the headline), with 1–3 short facts; no big logo.",
+    sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
+    itemsHint: "1–3 short facts (a 'Based in …' point pins to the picture)",
+    render: aboutUs,
+    sfx: (scene) => [at(0.1, "whoosh"), ...pointTimes(scene, 3, 0.9).map((ti) => at(ti, "pop"))],
+  },
   {
     id: "ind-hometour",
     name: "Home Tour",
