@@ -1543,7 +1543,9 @@ function isHomeBusiness(site: SiteData) {
   return HOME_BIZ.test(t) && !PROPTECH.test(t);
 }
 
-const HOME_ROOMS = /\b(room|kitchen|suite|bed(?:room)?s?|bath(?:room)?s?|dining|living|office|den|loft|study|pantry|laundry|garage|porch|patio|foyer|entry|closet|backyard|yard|garden|deck|nook)\b/i;
+const HOME_ROOMS = /\b(room|kitchen|suite|bed(?:room)?s?|bath(?:room)?s?|dining|living|office|den|loft|study|pantry|laundry|garage|porch|patio|foyer|entry|closet|backyard|yard|garden|deck|nook|basement|theaters?|theatres?|cinema|bar|gym|bonus)\b/i;
+/** Spaces the second line of rooms shows (bath, family room, basement, game room, theater). */
+const MORE_ROOMS = /\b(bath(?:room)?s?|family room|basements?|game ?rooms?|rec(?:reation)? rooms?|theaters?|theatres?|cinema|media rooms?|bonus rooms?|wet bar)\b/i;
 
 /**
  * Re-tell a home business's film as a home's story (in place): hook → brand → room to room → life
@@ -1555,13 +1557,19 @@ function homeStory(scenes: Scene[], site: SiteData, beats: (n: number) => number
   const close = scenes[scenes.length - 1];
   // Their own pictures stay (one, after life at home).
   const photo = scenes.find((sc) => sc.media && sc !== hook && sc !== reveal && sc !== close);
-  const rooms = [...site.headlines, ...site.features].map((x) => x.split(/\s+[—–]\s+/)[0].trim()).filter((x) => x.length < 34 && HOME_ROOMS.test(x)).slice(0, 5);
+  const named = [...site.headlines, ...site.features].map((x) => x.split(/\s+[—–]\s+/)[0].trim()).filter((x) => x.length < 34 && HOME_ROOMS.test(x));
+  const rooms = named.filter((x) => !MORE_ROOMS.test(x)).slice(0, 5);
+  const more = named.filter((x) => MORE_ROOMS.test(x)).slice(0, 5);
+  // The bonus spaces get their own glide when the site talks about them.
+  const siteText = [site.tagline, site.description, ...site.headlines, ...site.features].join(" ");
+  const bonus = more.length >= 1 || MORE_ROOMS.test(siteText);
   const steps = site.steps.map((x) => x.split(/\s+[—–]\s+/)[0].trim()).filter((x) => x.length < 30).slice(0, 4);
   // The length decides how much of the story fits: room to room always; life at home from 20s;
   // their photo, the community and the path home in longer films.
   const roomy = target >= 30;
   const middle: Scene[] = ([
     { role: "tour", skill: "home-walkthrough", text: "Step *inside*", items: rooms.length >= 2 ? rooms : undefined, duration: beats(18), transition: "dolly", why: "One seamless walk from room to room, so viewers picture living there" },
+    ...(bonus && target >= 25 ? [{ role: "tour", skill: "home-rooms", text: "Room for *more*", items: more.length >= 2 ? more : undefined, duration: beats(18), transition: "dolly", why: "The bonus spaces the site talks about: bath, family room, basement game room, home theater" } as Scene] : []),
     { role: "promise", skill: "home-family", text: "Made for *real life*", subtext: "Room to grow, together", duration: beats(10), transition: "dissolve", why: "Life at home: the family and the dog, the feeling the home is for" },
     ...(photo && roomy ? [photo] : []),
     ...(roomy

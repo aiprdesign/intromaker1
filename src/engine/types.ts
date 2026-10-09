@@ -114,6 +114,7 @@ export const SKILL_IDS = [
   "home-choice",
   "home-journey",
   "home-walkthrough",
+  "home-rooms",
   "home-family",
   "home-welcome",
   "service-spotlight",

@@ -1832,27 +1832,12 @@ function interiorWorld(W: World): InteriorParts {
   };
 }
 
-interface FurnishMats {
-  wood: Program;
-  oak: Program;
-  white: Program;
-  linen: Program;
-  fabric: Program;
-  stoneTop: Program;
-  glass: Program;
-  warm: Program;
-  throwM: Program;
-  tones: Tones;
-}
-
 /**
- * The rooms' furniture, appliances and decor, modelled piece by piece: cushioned seating, a stocked
- * bookshelf, a fireplace with its mantel, a working kitchen (range, hood, sink and faucet, a
- * French-door fridge, panelled cabinets with handles, an island with stools under pendants), a
- * tufted bed with bedding, nightstands and a dresser, the foyer's console, mirror and bench, and a
- * furnished patio. The back wall's inner face is at z = -3.92; floors are at y = 0.2.
+ * The furniture kit shared by the interiors: metals, a 30%-colour material maker (each its own
+ * shade, see tintInterior), leaves and soil, and pieces placed in the scene: a box, a rounded box,
+ * a cylinder, a table lamp, a potted plant and a framed print on the back wall (at z = -3.92).
  */
-function furnish(W: World, M: FurnishMats) {
+function kit(W: World, tones: Tones, white: Program, warm: Program) {
   const { gl } = W;
   const F = 0.2;
   const BACK = -3.92;
@@ -1864,16 +1849,9 @@ function furnish(W: World, M: FurnishMats) {
   // Furnishings in the 30% colour, each its own shade of it (see tintInterior).
   const role = (color: string, shade: number, gloss = 0.2) => {
     const m = W.mat({ color, gloss });
-    M.tones.support.push([m, shade]);
+    tones.support.push([m, shade]);
     return m;
   };
-  const cushion = role("#a3adbb", 0.22, 0.15);
-  const navy = role("#3d4f6b", -0.25);
-  const islandM = role("#5b6b7c", -0.3, 0.35);
-  const islandPanel = role("#6a7a8c", -0.18, 0.35);
-  const headM = role("#9a8f86", 0.12, 0.15);
-  const rugA = mc(W, "#cdb89a", 0.08);
-  const rugB = mc(W, "#efe6d6", 0.08);
   const leafA = W.mat({ color: "#2f7d43", color2: "#7fc464", gloss: 0.55, kind: "leaf" });
   const leafB = W.mat({ color: "#3e9550", color2: "#9ad37a", gloss: 0.55, kind: "leaf" });
   const soil = mc(W, "#3a2a20", 0.05);
@@ -1900,13 +1878,13 @@ function furnish(W: World, M: FurnishMats) {
     return me;
   };
   // A lamp: a turned base, a stem and a lit fabric shade.
-  const lamp = (x: number, y: number, z: number, s = 1, base: Program = M.white) => {
+  const lamp = (x: number, y: number, z: number, s = 1, base: Program = white) => {
     W.mesh(lathe(gl, [[0, 0], [0.09 * s, 0], [0.11 * s, 0.05 * s], [0.07 * s, 0.24 * s], [0.03 * s, 0.3 * s], [0, 0.3 * s]], 24), base, W.scene).position.set(x, y, z);
     cy(0.012 * s, 0.012 * s, 0.16 * s, brass, x, y + 0.36 * s, z, 8);
-    W.mesh(lathe(gl, [[0.1 * s, 0.38 * s], [0.18 * s, 0.38 * s], [0.13 * s, 0.6 * s], [0.07 * s, 0.6 * s]], 28), M.warm, W.scene, false).position.set(x, y, z);
+    W.mesh(lathe(gl, [[0.1 * s, 0.38 * s], [0.18 * s, 0.38 * s], [0.13 * s, 0.6 * s], [0.07 * s, 0.6 * s]], 28), warm, W.scene, false).position.set(x, y, z);
   };
   // A potted plant: a glazed pot with soil and arching leaves.
-  const plant = (x: number, z: number, s = 1, pot: Program = M.white) => {
+  const plant = (x: number, z: number, s = 1, pot: Program = white) => {
     W.mesh(lathe(gl, [[0, 0], [0.16 * s, 0], [0.19 * s, 0.03 * s], [0.24 * s, 0.42 * s], [0.27 * s, 0.44 * s], [0.27 * s, 0.48 * s], [0.23 * s, 0.48 * s], [0.22 * s, 0.44 * s]], 28), pot, W.scene).position.set(x, F, z);
     cy(0.225 * s, 0.225 * s, 0.02, soil, x, F + 0.43 * s, z, 20, W.scene, false);
     const g = node(W.scene);
@@ -1924,6 +1902,41 @@ function furnish(W: World, M: FurnishMats) {
     bx(w - 0.06, h - 0.06, 0.02, mc(W, "#f6f3ee", 0.2), x, y, BACK + 0.045, 0, false);
     colors.forEach((c, i) => bx((w - 0.3) / colors.length, h - 0.3 - (i % 2) * 0.12, 0.012, mc(W, c, 0.2), x - (w - 0.3) / 2 + ((i + 0.5) * (w - 0.3)) / colors.length, y - (i % 2) * 0.06, BACK + 0.058, 0, false));
   };
+  return { metal, dark, black, steel, brass, role, leafA, leafB, soil, bx, rb, cy, lamp, plant, art };
+}
+
+interface FurnishMats {
+  wood: Program;
+  oak: Program;
+  white: Program;
+  linen: Program;
+  fabric: Program;
+  stoneTop: Program;
+  glass: Program;
+  warm: Program;
+  throwM: Program;
+  tones: Tones;
+}
+
+/**
+ * The rooms' furniture, appliances and decor, modelled piece by piece: cushioned seating, a stocked
+ * bookshelf, a fireplace with its mantel, a working kitchen (range, hood, sink and faucet, a
+ * French-door fridge, panelled cabinets with handles, an island with stools under pendants), a
+ * tufted bed with bedding, nightstands and a dresser, the foyer's console, mirror and bench, and a
+ * furnished patio. The back wall's inner face is at z = -3.92; floors are at y = 0.2.
+ */
+function furnish(W: World, M: FurnishMats) {
+  const { gl } = W;
+  const F = 0.2;
+  const BACK = -3.92;
+  const { metal, dark, black, steel, brass, role, leafA, leafB, soil, bx, rb, cy, lamp, plant, art } = kit(W, M.tones, M.white, M.warm);
+  const cushion = role("#a3adbb", 0.22, 0.15);
+  const navy = role("#3d4f6b", -0.25);
+  const islandM = role("#5b6b7c", -0.3, 0.35);
+  const islandPanel = role("#6a7a8c", -0.18, 0.35);
+  const headM = role("#9a8f86", 0.12, 0.15);
+  const rugA = mc(W, "#cdb89a", 0.08);
+  const rugB = mc(W, "#efe6d6", 0.08);
   // Curtains: soft folds hanging either side of a window, on a rod.
   const drape = role("#9fb3b8", 0.38, 0.15);
   const curtains = (x: number, w: number, top = 2.6) => {
@@ -2330,6 +2343,517 @@ function spline(pts: Num3[], s: number): Num3 {
   return out;
 }
 
+/* ───────────────────────── More rooms ───────────────────────── */
+
+interface MoreRooms {
+  /** The rooms' 60-30-10 colour roles (see tintInterior). */
+  tones: Tones;
+  rooms: { name: string; eye: Num3; target: Num3 }[];
+}
+
+/**
+ * More of the home in a second line of cut-away rooms: a farmhouse kitchen, the family room, a
+ * spa-style bathroom, then downstairs a basement game room and a home theater. The back wall's
+ * inner face is at z = -3.92; floors are at y = 0.2.
+ */
+function moreRoomsWorld(W: World): MoreRooms {
+  const { gl } = W;
+  ground(W);
+  const H = 2.8;
+  const F = 0.2;
+  const BACK = -3.92;
+  const wallM = W.mat({ color: "#ece3d6", gloss: 0.2 });
+  const tones: Tones = { wall: [wallM], support: [], accent: [] };
+  const white = mc(W, "#f7f6f2", 0.4);
+  const warm = mc(W, "#fff1d6", 0.2, "#ffe4b0");
+  const { metal, dark, black, brass, role, bx, rb, cy, lamp, plant, art } = kit(W, tones, white, warm);
+  // Accents in the 10% colour.
+  const accent = (color: string, gloss = 0.3, kind?: "felt") => {
+    const m = W.mat({ color, gloss, ...(kind ? { kind } : {}) });
+    tones.accent.push(m);
+    return m;
+  };
+  const trim = mc(W, "#ffffff", 0.45);
+  const oak = mc(W, "#a8794f", 0.45);
+  const wood = mc(W, "#8a6446", 0.4);
+  const walnut = mc(W, "#5e4130", 0.45);
+  const glass = mc(W, "#cfe3f2", 0.9, "#cfe3f2");
+  const clear = W.mat({ color: "#dff0f7", alpha: 0.3, transparent: true, gloss: 0.9 });
+  const ceramic = W.mat({ color: "#fbfaf7", gloss: 0.75, kind: "ceramic" });
+  const quartz = mc(W, "#f1efea", 0.7);
+  const grout = mc(W, "#d3cdc3", 0.2);
+  const glow = (c: string) => mc(W, c, 0.2, c);
+  // A tiled floor: a slab with grout lines both ways.
+  const tiles = (x0: number, x1: number, m: Program, step: number) => {
+    put(W, box(gl, x1 - x0, 0.02, 8), m, W.scene, (x0 + x1) / 2, F + 0.01, 0, false);
+    for (let x = x0 + step; x < x1 - 0.01; x += step) bx(0.012, 0.022, 8, grout, x, F + 0.011, 0, 0, false);
+    for (let z = -4 + step; z < 4; z += step) bx(x1 - x0, 0.022, 0.012, grout, (x0 + x1) / 2, F + 0.011, z, 0, false);
+  };
+  // Floors: oak through the house, tile in the kitchen and bath, a basement floor and the theater's carpet.
+  put(W, box(gl, 34.4, 0.2, 8.2), oak, W.scene, 3, 0.1, 0, false);
+  tiles(-14, -7, mc(W, "#e3ddd3", 0.5), 0.6);
+  tiles(0, 6, mc(W, "#ebe8e3", 0.6), 0.5);
+  put(W, box(gl, 7, 0.02, 8), mc(W, "#8c847b", 0.35), W.scene, 9.5, F + 0.01, 0, false);
+  for (let z = -3.8; z < 4; z += 0.4) bx(7, 0.022, 0.012, mc(W, "#756d65", 0.3), 9.5, F + 0.011, z, 0, false);
+  const carpet = role("#3a3346", -0.6, 0.05);
+  put(W, box(gl, 7, 0.03, 8), carpet, W.scene, 16.5, F + 0.015, 0, false);
+  // Walls: the back wall, the end walls and half walls between the rooms, baseboards.
+  const wall = (x0: number, z0: number, x1: number, z1: number, hh = H) => {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const m = put(W, box(gl, len, hh, 0.16), wallM, W.scene, (x0 + x1) / 2, hh / 2 + 0.2, (z0 + z1) / 2);
+    m.rotation.y = -Math.atan2(z1 - z0, x1 - x0);
+  };
+  wall(-14, -4, 20, -4);
+  wall(-14, -4, -14, 2.2);
+  wall(20, -4, 20, 2.2);
+  for (const x of [-7, 0]) wall(x, -4, x, -1.6);
+  // (Full walls round the basement rooms: downstairs is its own space.)
+  for (const x of [6, 13]) wall(x, -4, x, 2.2);
+  bx(27, 0.14, 0.04, trim, -0.5, F + 0.07, -3.9, 0, false);
+  const win = (x: number, w: number, y = 1.75, hh = 1.2) => {
+    bx(w + 0.18, hh + 0.18, 0.06, trim, x, y, -3.9, 0, false);
+    bx(w, hh, 0.04, glass, x, y, -3.86, 0, false);
+    bx(0.05, hh, 0.07, trim, x, y, -3.84, 0, false);
+    bx(w, 0.05, 0.07, trim, x, y, -3.84, 0, false);
+  };
+
+  /* Farmhouse kitchen: shaker base cabinets with a farmhouse sink under the window, a range under a
+     plaster hood, open shelves of dishes, a panelled fridge, and an island with stools under lanterns. */
+  const KX = -10.5;
+  const cab = role("#7d8c99", -0.08, 0.35);
+  const cabPanel = role("#8d9ba7", 0.04, 0.35);
+  const islandM = role("#4f5d6b", -0.35, 0.35);
+  bx(5.36, 0.1, 0.56, dark, KX - 0.2, F + 0.05, BACK + 0.28, 0, false);
+  bx(5.4, 0.8, 0.62, cab, KX - 0.2, F + 0.5, BACK + 0.31);
+  rb(5.5, 0.05, 0.68, 0.015, quartz, KX - 0.2, F + 0.925, BACK + 0.34);
+  for (const x of [-13.15, -11.85, -11.3, -9.75, -9.2, -8.5]) {
+    bx(0.46, 0.15, 0.02, cabPanel, x, F + 0.78, BACK + 0.63, 0, false);
+    bx(0.46, 0.52, 0.02, cabPanel, x, F + 0.39, BACK + 0.63, 0, false);
+    bx(0.34, 0.4, 0.015, cab, x, F + 0.39, BACK + 0.645, 0, false);
+    bx(0.16, 0.02, 0.02, brass, x, F + 0.78, BACK + 0.66, 0, false);
+    cy(0.016, 0.016, 0.03, brass, x + 0.17, F + 0.56, BACK + 0.66, 8).rotation.x = Math.PI / 2;
+  }
+  // The farmhouse sink (an apron front), a bridge faucet, and the window over it with a valance.
+  bx(0.86, 0.3, 0.68, ceramic, KX, F + 0.78, BACK + 0.35);
+  bx(0.74, 0.02, 0.5, grout, KX, F + 0.935, BACK + 0.35, 0, false);
+  cy(0.02, 0.025, 0.3, brass, KX, F + 1.1, BACK + 0.08, 10);
+  const spout = W.mesh(torus(gl, 0.1, 0.016, Math.PI, 20, 8), brass, W.scene);
+  spout.position.set(KX, F + 1.25, BACK + 0.18);
+  spout.rotation.set(0, Math.PI / 2, Math.PI / 2);
+  for (const sx of [-0.14, 0.14]) cy(0.025, 0.025, 0.06, brass, KX + sx, F + 1.0, BACK + 0.08, 10);
+  win(KX, 1.2);
+  rb(1.5, 0.26, 0.08, 0.04, accent("#7c5cff", 0.15), KX, 2.42, BACK + 0.12);
+  // Subway tile between the counter and the shelves, full height behind the range.
+  bx(5.4, 0.36, 0.02, white, KX - 0.2, F + 1.13, BACK + 0.01, 0, false);
+  for (let i = 1; i < 4; i++) bx(5.4, 0.008, 0.024, grout, KX - 0.2, F + 0.95 + i * 0.09, BACK + 0.012, 0, false);
+  bx(1.0, 0.9, 0.02, white, -12.6, F + 1.75, BACK + 0.01, 0, false);
+  for (let i = 1; i < 10; i++) bx(1.0, 0.008, 0.024, grout, -12.6, F + 1.3 + i * 0.09, BACK + 0.012, 0, false);
+  // The range: a steel front, an oven window and bar handle, knobs, a black cooktop with grates.
+  bx(0.92, 0.92, 0.68, metal, -12.6, F + 0.46, BACK + 0.34);
+  bx(0.7, 0.36, 0.02, black, -12.6, F + 0.4, BACK + 0.69, 0, false);
+  cy(0.016, 0.016, 0.72, metal, -12.6, F + 0.68, BACK + 0.74, 8).rotation.z = Math.PI / 2;
+  for (let i = 0; i < 5; i++) cy(0.03, 0.03, 0.04, black, -12.92 + i * 0.16, F + 0.83, BACK + 0.7, 12).rotation.x = Math.PI / 2;
+  bx(0.9, 0.03, 0.62, black, -12.6, F + 0.935, BACK + 0.34, 0, false);
+  for (const gx of [-12.82, -12.38]) for (const gz of [BACK + 0.18, BACK + 0.5]) W.mesh(torus(gl, 0.09, 0.012, Math.PI * 2, 18, 6), dark, W.scene, false).position.set(gx, F + 0.955, gz);
+  // The plaster hood: a tapered canopy on a wood band, its chimney to the top of the wall.
+  const hood = W.mesh(cylinder(gl, 0.3, 0.66, 0.62, 4), white, W.scene);
+  hood.position.set(-12.6, F + 2.06, BACK + 0.2);
+  hood.rotation.y = Math.PI / 4;
+  hood.scale.set(1, 1, 0.75);
+  bx(1.0, 0.08, 0.52, walnut, -12.6, F + 1.77, BACK + 0.26);
+  bx(0.44, 0.3, 0.32, white, -12.6, F + 2.5, BACK + 0.16);
+  // Open shelves on brackets, set with plates, bowls and jars.
+  for (const sy of [1.7, 2.12]) {
+    rb(1.4, 0.05, 0.28, 0.012, walnut, -8.75, sy, BACK + 0.14);
+    for (const sx of [-0.55, 0.55]) bx(0.03, 0.14, 0.2, black, -8.75 + sx, sy - 0.09, BACK + 0.11, 0, false);
+  }
+  for (let i = 0; i < 5; i++) cy(0.11, 0.11, 0.015, ceramic, -9.3 + i * 0.07, 1.83, BACK + 0.12, 24).rotation.x = Math.PI / 2 - 0.12;
+  for (let i = 0; i < 3; i++) W.mesh(lathe(gl, [[0, 0], [0.05, 0], [0.11, 0.06], [0.1, 0.065], [0.045, 0.008], [0, 0.008]], 20), ceramic, W.scene).position.set(-8.6, 1.73 + i * 0.05, BACK + 0.14);
+  ["#c9a35a", "#b0573a", "#6f8a6e"].forEach((c, i) => {
+    cy(0.07, 0.07, 0.2, clear, -9.25 + i * 0.22, 2.25, BACK + 0.14, 16);
+    cy(0.06, 0.06, 0.12, mc(W, c, 0.3), -9.25 + i * 0.22, 2.21, BACK + 0.14, 14);
+    cy(0.072, 0.072, 0.03, walnut, -9.25 + i * 0.22, 2.36, BACK + 0.14, 16);
+  });
+  for (let i = 0; i < 4; i++) cy(0.1, 0.1, 0.015, ceramic, -8.55 + i * 0.06, 2.25, BACK + 0.12, 24).rotation.x = Math.PI / 2 - 0.12;
+  // A cookbook shelf over the counter, and herbs on the sill.
+  rb(0.7, 0.04, 0.24, 0.01, walnut, -11.6, 1.75, BACK + 0.12);
+  ["#3d4f6b", "#b0573a", "#efe6d6", "#6f8a6e", "#c9a35a"].forEach((c, i) => bx(0.06, 0.24 - (i % 2) * 0.04, 0.18, mc(W, c, 0.3), -11.82 + i * 0.08, 1.89 - (i % 2) * 0.02, BACK + 0.12));
+  for (const dx of [-0.35, 0, 0.35]) {
+    cy(0.06, 0.05, 0.1, mc(W, "#b86b4b", 0.3), KX + dx, F + 1.0, BACK + 0.14, 14);
+    W.mesh(sphere(gl, 0.08, 10, 8), mc(W, "#4f8a4a", 0.3), W.scene).position.set(KX + dx, F + 1.1, BACK + 0.14);
+  }
+  // The panelled fridge column with long brass pulls.
+  bx(0.82, 2.2, 0.66, cab, -7.5, F + 1.1, BACK + 0.33);
+  for (const [py, ph] of [[F + 1.55, 1.2], [F + 0.45, 0.8]] as const) {
+    bx(0.74, ph, 0.02, cabPanel, -7.5, py, BACK + 0.67, 0, false);
+    cy(0.012, 0.012, ph * 0.6, brass, -7.2, py, BACK + 0.71, 8);
+  }
+  // A striped runner by the sink.
+  rb(2.6, 0.02, 0.62, 0.03, mc(W, "#d9cbb4", 0.1), KX, F + 0.012, -2.6);
+  for (const dz of [-0.2, 0.2]) bx(2.5, 0.024, 0.06, accent("#7c5cff", 0.1), KX, F + 0.014, -2.6 + dz, 0, false);
+  // The island: shiplap sides, a quartz top on turned corner posts, a bowl of lemons, flowers, stools.
+  bx(2.1, 0.82, 0.84, islandM, KX, F + 0.47, -1.4);
+  for (let i = 1; i < 6; i++) bx(2.12, 0.012, 0.86, dark, KX, F + 0.06 + i * 0.14, -1.4, 0, false);
+  for (const sx of [-1.08, 1.08]) for (const sz of [-0.45, 0.45]) W.mesh(lathe(gl, [[0, 0], [0.06, 0], [0.06, 0.08], [0.04, 0.14], [0.05, 0.4], [0.035, 0.62], [0.05, 0.86], [0, 0.86]], 14), islandM, W.scene).position.set(KX + sx, F, -1.4 + sz);
+  rb(2.4, 0.06, 1.04, 0.02, quartz, KX, F + 0.9, -1.4);
+  W.mesh(lathe(gl, [[0, 0], [0.08, 0], [0.17, 0.08], [0.16, 0.085], [0.07, 0.01], [0, 0.01]], 22), walnut, W.scene).position.set(KX - 0.5, F + 0.93, -1.45);
+  for (const [dx, dz] of [[0, 0], [0.07, 0.04], [-0.06, 0.05], [0.02, -0.07]] as const) W.mesh(sphere(gl, 0.05, 10, 8), mc(W, "#f2d14e", 0.4), W.scene).position.set(KX - 0.5 + dx, F + 1.0, -1.45 + dz);
+  W.mesh(lathe(gl, [[0, 0], [0.05, 0], [0.07, 0.08], [0.04, 0.2], [0.05, 0.24], [0.04, 0.24]], 18), ceramic, W.scene).position.set(KX + 0.55, F + 0.93, -1.5);
+  for (const [dx, c] of [[0, "#ffffff"], [0.05, "#e8a3b5"], [-0.05, "#f2c14e"]] as const) {
+    cy(0.005, 0.005, 0.2, mc(W, "#4f8a4a", 0.3), KX + 0.55 + dx, F + 1.25, -1.5, 6, W.scene, false);
+    W.mesh(sphere(gl, 0.05, 10, 8), mc(W, c, 0.3), W.scene).position.set(KX + 0.55 + dx, F + 1.36, -1.5);
+  }
+  for (const sx of [-0.7, 0, 0.7]) {
+    const st = node(W.scene);
+    st.position.set(KX + sx, F, -0.62);
+    cy(0.19, 0.19, 0.06, walnut, 0, 0.66, 0, 20, st);
+    for (const [lx, lz] of [[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]] as const) cy(0.018, 0.018, 0.64, black, lx, 0.32, lz, 8, st);
+    W.mesh(torus(gl, 0.16, 0.012, Math.PI * 2, 20, 6), black, st).position.set(0, 0.24, 0);
+    st.children[st.children.length - 1].rotation.x = Math.PI / 2;
+    for (const lx of [-0.13, 0.13]) cy(0.014, 0.014, 0.36, black, lx, 0.86, 0.15, 8, st);
+    rb(0.3, 0.1, 0.03, 0.02, walnut, 0, 1.02, 0.15, 0, 0, st);
+  }
+  // Two lanterns over the island: a cord, a black cage round a warm glass.
+  for (const sx of [-0.6, 0.6]) {
+    cy(0.006, 0.006, 0.7, dark, KX + sx, 2.65, -1.4, 6, W.scene, false);
+    cy(0.1, 0.1, 0.36, warm, KX + sx, 2.1, -1.4, 14, W.scene, false);
+    for (let i = 0; i < 4; i++) bx(0.016, 0.4, 0.016, black, KX + sx + Math.cos(i * 1.5708 + 0.785) * 0.13, 2.1, -1.4 + Math.sin(i * 1.5708 + 0.785) * 0.13, 0, false);
+    cy(0.06, 0.16, 0.06, black, KX + sx, 2.31, -1.4, 4, W.scene, false).rotation.y = Math.PI / 4;
+    cy(0.14, 0.14, 0.03, black, KX + sx, 1.9, -1.4, 4, W.scene, false).rotation.y = Math.PI / 4;
+  }
+  plant(-13.55, -3.3, 1.0);
+
+  /* Family room: a white built-in media wall (the TV between bookshelves), an L-shaped sectional
+     facing it, a tufted ottoman with a board game, a reading chair, a floor lamp, toys in a basket. */
+  const FX = -3.5;
+  const sofaM = role("#8b96a6", 0, 0.15);
+  const cushion = role("#a3adbb", 0.22, 0.15);
+  const ottoM = role("#5b6b7c", -0.3, 0.2);
+  rb(4.6, 0.025, 3.4, 0.08, mc(W, "#cdb89a", 0.08), FX, F + 0.012, -1.3);
+  rb(4.2, 0.03, 3.0, 0.06, mc(W, "#efe6d6", 0.08), FX, F + 0.016, -1.3);
+  // The built-in: base cabinets, towers of shelves either side, the TV and soundbar.
+  bx(4.4, 0.62, 0.46, white, FX, F + 0.31, BACK + 0.23);
+  for (let i = 0; i < 6; i++) {
+    bx(0.66, 0.46, 0.02, trim, FX - 1.85 + i * 0.74, F + 0.31, BACK + 0.47, 0, false);
+    cy(0.015, 0.015, 0.03, brass, FX - 1.6 + i * 0.74, F + 0.42, BACK + 0.49, 8).rotation.x = Math.PI / 2;
+  }
+  rb(4.5, 0.05, 0.5, 0.01, oak, FX, F + 0.645, BACK + 0.25);
+  for (const tx of [FX - 1.75, FX + 1.75]) {
+    bx(0.9, 1.9, 0.04, white, tx, F + 1.62, BACK + 0.02, 0, false);
+    for (const sx of [-0.44, 0.44]) bx(0.04, 1.9, 0.34, white, tx + sx, F + 1.62, BACK + 0.17);
+    for (let k = 0; k < 4; k++) {
+      const sy = F + 0.67 + k * 0.5;
+      bx(0.88, 0.04, 0.34, white, tx, sy, BACK + 0.17);
+      if (k === 3) continue;
+      const cols = ["#3d4f6b", "#c9a35a", "#b0573a", "#efe6d6", "#6f8a6e", "#7c8aa0", "#2b2a30"];
+      const n = 4 + ((k + (tx > FX ? 1 : 0)) % 3);
+      for (let j = 0; j < n; j++) bx(0.07, 0.3 - ((j * 7 + k) % 3) * 0.04, 0.24, mc(W, cols[(j + k * 2) % cols.length], 0.3), tx - 0.36 + j * 0.08, sy + 0.17 - ((j * 7 + k) % 3) * 0.02, BACK + 0.17);
+      W.mesh(lathe(gl, [[0, 0], [0.05, 0], [0.08, 0.08], [0.05, 0.2], [0.04, 0.22]], 18), k % 2 ? ceramic : mc(W, "#2f6f73", 0.7), W.scene).position.set(tx + 0.24, sy + 0.02, BACK + 0.17);
+    }
+  }
+  bx(2.3, 1.36, 0.06, black, FX, F + 1.62, BACK + 0.05);
+  // On the TV: a sunny landscape (bright, steady).
+  bx(2.16, 0.7, 0.02, glow("#9fd3f2"), FX, F + 1.92, BACK + 0.09, 0, false);
+  bx(2.16, 0.52, 0.02, glow("#7fc464"), FX, F + 1.21, BACK + 0.09, 0, false);
+  put(W, gable(gl, 1.2, 0.4, 0.01), glow("#5aa25a"), W.scene, FX - 0.5, F + 1.47, BACK + 0.1, false);
+  put(W, gable(gl, 1.4, 0.32, 0.01), glow("#4c9150"), W.scene, FX + 0.45, F + 1.47, BACK + 0.1, false);
+  cy(0.12, 0.12, 0.01, glow("#fff1c1"), FX + 0.6, F + 2.06, BACK + 0.1, 20, W.scene, false).rotation.x = Math.PI / 2;
+  rb(1.4, 0.08, 0.1, 0.03, dark, FX, F + 0.72, BACK + 0.3);
+  // The sectional, its back to us: a long sofa and a chaise reaching toward the TV.
+  const SZ = -0.2;
+  rb(3.0, 0.3, 0.95, 0.07, sofaM, FX + 0.2, F + 0.27, SZ);
+  rb(3.0, 0.62, 0.22, 0.08, sofaM, FX + 0.2, F + 0.6, SZ + 0.4);
+  rb(0.22, 0.42, 0.95, 0.08, sofaM, FX + 1.75, F + 0.5, SZ);
+  rb(0.95, 0.3, 1.7, 0.07, sofaM, FX - 1.3, F + 0.27, SZ - 0.38);
+  rb(0.22, 0.42, 1.95, 0.08, sofaM, FX - 1.85, F + 0.5, SZ - 0.25);
+  for (let i = 0; i < 3; i++) {
+    rb(0.82, 0.14, 0.76, 0.06, cushion, FX - 0.25 + i * 0.84, F + 0.49, SZ - 0.05);
+    rb(0.8, 0.5, 0.2, 0.08, cushion, FX - 0.25 + i * 0.84, F + 0.8, SZ + 0.24, 0, 0.12);
+  }
+  rb(0.82, 0.14, 1.5, 0.06, cushion, FX - 1.3, F + 0.49, SZ - 0.42);
+  for (const [x, m, r] of [[FX - 1.5, white, 0.3], [FX + 1.4, accent("#7c5cff", 0.15), -0.25]] as const) rb(0.42, 0.4, 0.13, 0.11, m, x, F + 0.86, SZ + 0.12, r, 0.2);
+  rb(0.04, 0.5, 0.9, 0.02, accent("#7c5cff", 0.15), FX + 1.88, F + 0.55, SZ);
+  // The tufted ottoman: a board game, two cups and a bowl of popcorn.
+  cy(0.55, 0.55, 0.38, ottoM, FX + 0.3, F + 0.21, -1.5, 32);
+  for (let i = 0; i < 8; i++) W.mesh(sphere(gl, 0.02, 6, 4), dark, W.scene, false).position.set(FX + 0.3 + Math.cos(i * 0.785) * 0.3, F + 0.405, -1.5 + Math.sin(i * 0.785) * 0.3);
+  bx(0.42, 0.015, 0.42, mc(W, "#efe6d6", 0.3), FX + 0.2, F + 0.41, -1.55, 0.3, false);
+  for (let i = 0; i < 4; i++) bx(0.08, 0.02, 0.08, mc(W, ["#b0573a", "#3d4f6b", "#f2c14e", "#6f8a6e"][i], 0.4), FX + 0.12 + (i % 2) * 0.16, F + 0.425, -1.62 + Math.floor(i / 2) * 0.16, 0.3, false);
+  W.mesh(lathe(gl, [[0, 0], [0.06, 0], [0.13, 0.08], [0.12, 0.085], [0.05, 0.01], [0, 0.01]], 20), accent("#7c5cff", 0.5), W.scene).position.set(FX + 0.6, F + 0.4, -1.3);
+  for (let i = 0; i < 9; i++) W.mesh(sphere(gl, 0.025, 6, 4), mc(W, "#fff4d6", 0.2), W.scene, false).position.set(FX + 0.6 + Math.cos(i * 2.4) * 0.06 * (i % 3), F + 0.47 + (i % 2) * 0.02, -1.3 + Math.sin(i * 2.4) * 0.06 * (i % 3));
+  for (const dx of [-0.05, 0.12]) W.mesh(lathe(gl, [[0, 0], [0.035, 0], [0.04, 0.1], [0.035, 0.1], [0.03, 0.008], [0, 0.008]], 14), ceramic, W.scene).position.set(FX - 0.05 + dx, F + 0.4, -1.25);
+  // A reading chair turned toward the room, a floor lamp and side table, a basket of toys.
+  const chair = node(W.scene);
+  chair.position.set(FX + 2.2, 0, -2.3);
+  chair.rotation.y = -0.6;
+  rb(0.85, 0.28, 0.85, 0.07, ottoM, 0, F + 0.26, 0, 0, 0, chair);
+  rb(0.85, 0.65, 0.18, 0.07, ottoM, 0, F + 0.62, -0.36, 0, -0.12, chair);
+  for (const sx of [-0.4, 0.4]) rb(0.13, 0.34, 0.85, 0.06, ottoM, sx, F + 0.47, 0, 0, 0, chair);
+  rb(0.66, 0.13, 0.7, 0.06, cushion, 0, F + 0.45, 0.04, 0, 0, chair);
+  for (const sx of [-0.36, 0.36]) for (const sz of [-0.36, 0.36]) cy(0.025, 0.02, 0.12, wood, sx, F + 0.06, sz, 8, chair);
+  W.mesh(lathe(gl, [[0, 0], [0.16, 0], [0.16, 0.03], [0, 0.03]], 20), dark, W.scene).position.set(FX - 2.35, F, 0.4);
+  cy(0.014, 0.014, 1.4, brass, FX - 2.35, F + 0.72, 0.4, 8);
+  W.mesh(lathe(gl, [[0.17, 1.38], [0.22, 1.38], [0.22, 1.68], [0.17, 1.68]], 28), warm, W.scene, false).position.set(FX - 2.35, F, 0.4);
+  cy(0.22, 0.22, 0.03, oak, FX + 2.1, F + 0.55, -0.4, 20);
+  cy(0.025, 0.025, 0.54, walnut, FX + 2.1, F + 0.27, -0.4, 8);
+  lamp(FX + 2.1, F + 0.565, -0.4, 0.75);
+  W.mesh(lathe(gl, [[0, 0], [0.18, 0], [0.22, 0.3], [0.2, 0.3], [0.16, 0.02], [0, 0.02]], 20), mc(W, "#c9a879", 0.2), W.scene).position.set(FX - 2.1, F, -2.9);
+  for (let i = 0; i < 5; i++) bx(0.1, 0.1, 0.1, mc(W, ["#e05a47", "#3d8fd1", "#f2c14e", "#5bb36a", "#7c5cff"][i], 0.4), FX - 2.15 + (i % 3) * 0.06, F + 0.34 + Math.floor(i / 3) * 0.08, -2.92 + (i % 2) * 0.05, i * 0.4);
+  for (let i = 0; i < 3; i++) bx(0.12, 0.12, 0.12, mc(W, ["#3d8fd1", "#f2c14e", "#e05a47"][i], 0.4), FX - 1.35, F + 0.08 + i * 0.12, -2.4, i * 0.3);
+  art(FX - 1.75, 2.62, 0.7, 0.36, ["#c9a35a", "#7c8aa0"]);
+  art(FX + 1.75, 2.62, 0.7, 0.36, ["#b0573a", "#efe6d6"]);
+  plant(-6.4, -3.35, 1.1);
+
+  /* Spa bathroom: tile wainscot, a double vanity with vessel sinks, arched mirrors and sconces, a
+     freestanding tub with a floor-mounted filler, a glass shower with a rain head, a towel ladder. */
+  const BX = 3;
+  const vanity = role("#5f7180", -0.2, 0.35);
+  const vanityPanel = role("#6f8191", -0.08, 0.35);
+  const showerTile = role("#8fb0b8", 0.2, 0.6);
+  bx(5.84, 1.2, 0.02, white, BX, F + 0.6, BACK + 0.01, 0, false);
+  for (let i = 1; i < 10; i++) bx(5.84, 0.008, 0.024, grout, BX, F + i * 0.12, BACK + 0.012, 0, false);
+  bx(5.86, 0.05, 0.05, trim, BX, F + 1.22, BACK + 0.03, 0, false);
+  // The vanity on brass feet: doors and drawers with pulls, a quartz top, two vessel sinks, faucets.
+  const VX = BX - 1.1;
+  bx(2.6, 0.72, 0.56, vanity, VX, F + 0.5, BACK + 0.28);
+  for (const sx of [-1.25, 1.25]) for (const sz of [0.05, 0.5]) cy(0.025, 0.02, 0.14, brass, VX + sx, F + 0.07, BACK + sz, 8);
+  for (const dx of [-0.95, -0.42, 0.42, 0.95]) {
+    bx(0.48, 0.56, 0.02, vanityPanel, VX + dx, F + 0.48, BACK + 0.57, 0, false);
+    bx(0.36, 0.44, 0.015, vanity, VX + dx, F + 0.48, BACK + 0.585, 0, false);
+    // (The pulls sit by the meeting edges of each pair of doors.)
+    const toward = Math.abs(dx) > 0.6 ? -Math.sign(dx) : Math.sign(dx);
+    cy(0.01, 0.01, 0.18, brass, VX + dx + toward * 0.17, F + 0.5, BACK + 0.6, 8);
+  }
+  for (let k = 0; k < 3; k++) {
+    bx(0.3, 0.16, 0.02, vanityPanel, VX, F + 0.29 + k * 0.18, BACK + 0.57, 0, false);
+    bx(0.12, 0.02, 0.02, brass, VX, F + 0.29 + k * 0.18, BACK + 0.59, 0, false);
+  }
+  rb(2.7, 0.05, 0.6, 0.015, quartz, VX, F + 0.885, BACK + 0.3);
+  for (const sx of [-0.65, 0.65]) {
+    W.mesh(lathe(gl, [[0, 0], [0.1, 0], [0.2, 0.06], [0.22, 0.14], [0.2, 0.14], [0.18, 0.07], [0.09, 0.02], [0, 0.02]], 28), ceramic, W.scene).position.set(VX + sx, F + 0.91, BACK + 0.3);
+    cy(0.02, 0.02, 0.24, brass, VX + sx, F + 1.18, BACK + 0.13, 10).rotation.x = Math.PI / 2;
+    cy(0.015, 0.015, 0.06, brass, VX + sx, F + 1.15, BACK + 0.24, 8);
+    // An arched mirror in a brass frame, a sconce beside it.
+    rb(0.78, 1.08, 0.03, 0.38, brass, VX + sx, F + 1.86, BACK + 0.03);
+    rb(0.7, 1.0, 0.03, 0.34, mc(W, "#d8e2ea", 0.95), VX + sx, F + 1.86, BACK + 0.05);
+  }
+  for (const sx of [-1.25, 0, 1.25]) {
+    cy(0.05, 0.05, 0.02, brass, VX + sx, F + 1.95, BACK + 0.03, 14).rotation.x = Math.PI / 2;
+    cy(0.012, 0.012, 0.12, brass, VX + sx, F + 1.95, BACK + 0.1, 8).rotation.x = Math.PI / 2;
+    W.mesh(lathe(gl, [[0.04, 0], [0.07, 0.03], [0.07, 0.16], [0.04, 0.19]], 16), warm, W.scene, false).position.set(VX + sx, F + 1.88, BACK + 0.17);
+  }
+  // On the vanity: a soap pump, a tray with rolled towels, a bud vase.
+  cy(0.035, 0.035, 0.12, ceramic, VX - 0.25, F + 0.97, BACK + 0.2, 14);
+  cy(0.008, 0.008, 0.06, brass, VX - 0.25, F + 1.06, BACK + 0.2, 6);
+  rb(0.36, 0.02, 0.18, 0.02, walnut, VX + 0.1, F + 0.92, BACK + 0.24);
+  for (const dx of [-0.08, 0.08]) cy(0.05, 0.05, 0.16, white, VX + 0.1 + dx, F + 0.98, BACK + 0.24, 14).rotation.z = Math.PI / 2;
+  // The shower: tiled in the 30% colour, a glass screen and door, a rain head, a niche of bottles.
+  const SX = 4.8;
+  bx(2.1, 2.3, 0.02, showerTile, SX, F + 1.15, BACK + 0.025, 0, false);
+  for (let i = 1; i < 10; i++) bx(0.008, 2.3, 0.03, grout, SX - 1.05 + i * 0.21, F + 1.15, BACK + 0.03, 0, false);
+  for (let i = 1; i < 6; i++) bx(2.1, 0.008, 0.03, grout, SX, F + i * 0.38, BACK + 0.03, 0, false);
+  bx(2.1, 0.04, 1.3, showerTile, SX, F + 0.02, BACK + 0.65, 0, false);
+  bx(2.1, 0.08, 0.06, quartz, SX, F + 0.04, BACK + 1.3, 0, false);
+  bx(0.03, 2.05, 1.3, clear, SX - 1.05, F + 1.08, BACK + 0.65, 0, false);
+  bx(1.2, 2.05, 0.03, clear, SX - 0.42, F + 1.08, BACK + 1.31, 0, false);
+  bx(0.03, 0.03, 1.3, brass, SX - 1.05, F + 2.11, BACK + 0.65, 0, false);
+  bx(2.1, 0.03, 0.03, brass, SX, F + 2.11, BACK + 1.31, 0, false);
+  cy(0.012, 0.012, 0.36, brass, SX - 0.2, F + 1.1, BACK + 1.35, 8);
+  cy(0.015, 0.015, 0.4, brass, SX + 0.3, F + 2.12, BACK + 0.22, 8).rotation.x = Math.PI / 2;
+  cy(0.16, 0.16, 0.025, brass, SX + 0.3, F + 2.1, BACK + 0.42, 24);
+  cy(0.04, 0.04, 0.04, brass, SX + 0.3, F + 1.1, BACK + 0.05, 14).rotation.x = Math.PI / 2;
+  bx(0.6, 0.32, 0.02, mc(W, "#5e7d85", 0.4), SX + 0.55, F + 1.3, BACK + 0.04, 0, false);
+  ["#efe6d6", "#c9a35a", "#2f6f73"].forEach((c, i) => cy(0.04, 0.04, 0.2 - i * 0.02, mc(W, c, 0.6), SX + 0.38 + i * 0.16, F + 1.25 - i * 0.01, BACK + 0.08, 12));
+  // The freestanding tub on brass feet, water in it, a filler beside it, a mat in front.
+  const TX = BX + 1.6;
+  rb(1.75, 0.62, 0.86, 0.3, ceramic, TX, F + 0.4, -1.45);
+  rb(1.55, 0.04, 0.66, 0.02, mc(W, "#bfe3ec", 0.9), TX, F + 0.66, -1.45);
+  for (const sx of [-0.65, 0.65]) for (const sz of [-0.3, 0.3]) W.mesh(sphere(gl, 0.05, 10, 8), brass, W.scene).position.set(TX + sx, F + 0.05, -1.45 + sz);
+  cy(0.02, 0.025, 1.0, brass, TX + 1.1, F + 0.5, -1.45, 10);
+  const filler = W.mesh(torus(gl, 0.12, 0.016, Math.PI, 20, 8), brass, W.scene);
+  filler.position.set(TX + 0.98, F + 1.0, -1.45);
+  for (const dz of [-0.06, 0.06]) cy(0.02, 0.02, 0.04, brass, TX + 1.1, F + 0.82, -1.45 + dz, 8).rotation.x = Math.PI / 2;
+  rb(1.1, 0.02, 0.6, 0.06, accent("#7c5cff", 0.1), TX, F + 0.012, -0.55);
+  // A towel ladder against the wall, towels on it; a plant.
+  const lad = node(W.scene);
+  lad.position.set(BX + 0.55, F, BACK + 0.25);
+  lad.rotation.x = -0.14;
+  for (const sx of [-0.2, 0.2]) cy(0.02, 0.02, 1.7, walnut, sx, 0.85, 0, 8, lad);
+  for (let i = 0; i < 5; i++) cy(0.012, 0.012, 0.4, walnut, 0, 0.35 + i * 0.3, 0, 8, lad).rotation.z = Math.PI / 2;
+  rb(0.32, 0.5, 0.05, 0.02, white, 0, 1.1, 0.04, 0, 0, lad);
+  rb(0.3, 0.4, 0.05, 0.02, accent("#7c5cff", 0.15), 0, 0.55, 0.04, 0, 0, lad);
+  plant(BX - 2.5, -1.2, 0.9);
+
+  /* Basement game room: stairs coming down, a pool table under a billiard light, a dartboard and
+     cue rack, a glowing sign, a bar with bottles and stools, an arcade cabinet, egress windows. */
+  const GX = 9.5;
+  const felt = accent("#2f7d55", 0.1, "felt");
+  // The stairs down from the main floor: treads and risers, a stringer, a rail.
+  for (let i = 0; i < 8; i++) {
+    const h = (i + 1) * 0.3;
+    bx(0.28, h, 1.0, white, 8.2 - i * 0.28, F + h / 2, BACK + 0.5);
+    bx(0.32, 0.04, 1.04, oak, 8.18 - i * 0.28, F + h + 0.02, BACK + 0.5);
+  }
+  const rl = bx(Math.hypot(2.24, 2.4) + 0.3, 0.06, 0.06, walnut, 7.22, F + 2.15, BACK + 1.04, 0);
+  rl.rotation.z = -Math.atan2(2.4, 2.24);
+  for (let i = 0; i < 8; i++) bx(0.03, 0.9, 0.03, black, 8.2 - i * 0.28, F + (i + 1) * 0.3 + 0.45, BACK + 1.04, 0, false);
+  // Egress windows high in the back wall.
+  for (const wx of [GX + 0.4, GX + 2.6]) {
+    bx(1.1, 0.56, 0.06, trim, wx, 2.62, -3.9, 0, false);
+    bx(0.96, 0.42, 0.04, glass, wx, 2.62, -3.86, 0, false);
+    bx(0.04, 0.42, 0.07, trim, wx, 2.62, -3.84, 0, false);
+  }
+  // The pool table: a walnut apron on turned legs, cushioned rails, felt, pockets, the balls racked.
+  const PX = GX - 0.1;
+  const PZ = -1.45;
+  bx(2.4, 0.24, 1.3, walnut, PX, F + 0.68, PZ);
+  for (const sx of [-1.05, 1.05]) for (const sz of [-0.5, 0.5]) W.mesh(lathe(gl, [[0, 0], [0.09, 0], [0.09, 0.06], [0.06, 0.12], [0.08, 0.3], [0.05, 0.5], [0.07, 0.58], [0, 0.58]], 14), walnut, W.scene).position.set(PX + sx, F, PZ + sz);
+  bx(2.26, 0.04, 1.16, felt, PX, F + 0.81, PZ, 0, false);
+  for (const sz of [-0.62, 0.62]) rb(2.5, 0.08, 0.14, 0.03, walnut, PX, F + 0.84, PZ + sz);
+  for (const sx of [-1.19, 1.19]) rb(0.14, 0.08, 1.38, 0.03, walnut, PX + sx, F + 0.84, PZ);
+  for (const sx of [-1.12, 0, 1.12]) for (const sz of [-0.55, 0.55]) cy(0.055, 0.055, 0.02, black, PX + sx, F + 0.84, PZ + sz, 14, W.scene, false);
+  const ballC = ["#f2c14e", "#2f5fb3", "#d6453a", "#6a3d9a", "#e8822f", "#2f8a4e", "#8a2f2f", "#141418", "#f2c14e", "#2f5fb3"];
+  let bi = 0;
+  for (let r = 0; r < 4; r++) for (let c = 0; c <= r; c++) W.mesh(sphere(gl, 0.04, 12, 8), mc(W, ballC[bi++ % ballC.length], 0.8), W.scene).position.set(PX + 0.45 + r * 0.07, F + 0.87, PZ + (c - r / 2) * 0.082);
+  W.mesh(sphere(gl, 0.04, 12, 8), mc(W, "#fbfaf7", 0.8), W.scene).position.set(PX - 0.55, F + 0.87, PZ);
+  const cue = cy(0.008, 0.016, 1.4, oak, PX - 0.1, F + 0.88, PZ + 0.25, 8);
+  cue.rotation.set(0, 0.3, Math.PI / 2);
+  // The billiard light: a bar with three shades over the table.
+  for (const sx of [-0.7, 0.7]) cy(0.005, 0.005, 0.7, dark, PX + sx, 2.65, PZ, 6, W.scene, false);
+  bx(1.8, 0.04, 0.06, black, PX, 2.3, PZ, 0, false);
+  for (const sx of [-0.6, 0, 0.6]) {
+    W.mesh(lathe(gl, [[0, 0.22], [0.05, 0.21], [0.2, 0.05], [0.22, 0], [0.2, 0], [0.18, 0.04], [0, 0.18]], 24), felt, W.scene, false).position.set(PX + sx, 2.05, PZ);
+    W.mesh(sphere(gl, 0.06, 10, 8), warm, W.scene, false).position.set(PX + sx, 2.1, PZ);
+  }
+  // The dartboard (rings round the bull) and a cue rack.
+  const DX = GX - 0.35;
+  [[0.26, "#141418"], [0.22, "#2f8a4e"], [0.2, "#f3ead6"], [0.14, "#d6453a"], [0.12, "#f3ead6"], [0.04, "#2f8a4e"], [0.018, "#d6453a"]].forEach(([r, c], i) => {
+    cy(r as number, r as number, 0.03, mc(W, c as string, 0.2), DX, 1.75, BACK + 0.03 + i * 0.004, 32, W.scene, false).rotation.x = Math.PI / 2;
+  });
+  for (const [dx, dy] of [[0.05, 0.03], [-0.08, -0.06]] as const) {
+    cy(0.006, 0.006, 0.12, black, DX + dx, 1.75 + dy, BACK + 0.1, 6, W.scene, false).rotation.x = Math.PI / 2;
+    cy(0.02, 0.0, 0.04, accent("#7c5cff", 0.3), DX + dx, 1.75 + dy, BACK + 0.17, 4, W.scene, false).rotation.x = -Math.PI / 2;
+  }
+  bx(0.56, 1.3, 0.04, walnut, GX + 0.85, F + 1.2, BACK + 0.02);
+  for (let i = 0; i < 4; i++) cy(0.009, 0.015, 1.2, i % 2 ? oak : walnut, GX + 0.66 + i * 0.13, F + 1.18, BACK + 0.08, 8);
+  // The bar along the wall: a counter, shelves of bottles and glasses, a glowing fridge, stools.
+  const RX = GX + 2.45;
+  bx(1.9, 1.0, 0.55, walnut, RX, F + 0.5, BACK + 0.28);
+  for (let i = 0; i < 5; i++) bx(0.012, 0.86, 0.02, dark, RX - 0.76 + i * 0.38, F + 0.5, BACK + 0.565, 0, false);
+  rb(2.0, 0.06, 0.62, 0.015, quartz, RX, F + 1.03, BACK + 0.3);
+  bx(0.5, 0.56, 0.02, glow("#fff1d6"), RX + 0.6, F + 0.38, BACK + 0.57, 0, false);
+  for (const sy of [1.65, 2.05]) {
+    rb(1.8, 0.04, 0.26, 0.01, walnut, RX, sy, BACK + 0.13);
+    for (let i = 0; i < 7; i++) {
+      const c = ["#3f7d45", "#8a5a2a", "#cfe3f2", "#6a2f3a", "#c9a35a", "#2f5d7c", "#e8e2d8"][(i + (sy > 1.8 ? 3 : 0)) % 7];
+      W.mesh(lathe(gl, [[0, 0], [0.045, 0], [0.045, 0.16], [0.02, 0.22], [0.015, 0.3], [0, 0.3]], 14), mc(W, c, 0.85), W.scene).position.set(RX - 0.75 + i * 0.25, sy + 0.02, BACK + 0.13);
+    }
+  }
+  W.mesh(torus(gl, 0.3, 0.025, Math.PI * 2, 40, 8), glow("#ffb4d9"), W.scene, false).position.set(RX, 2.55, BACK + 0.05);
+  W.mesh(sphere(gl, 0.1, 14, 10), glow("#fff1c1"), W.scene, false).position.set(RX, 2.55, BACK + 0.05);
+  for (const sx of [-0.6, 0.6]) {
+    const st = node(W.scene);
+    st.position.set(RX + sx, F, BACK + 1.0);
+    cy(0.18, 0.18, 0.08, accent("#7c5cff", 0.4), 0, 0.78, 0, 20, st);
+    cy(0.03, 0.03, 0.76, metal, 0, 0.38, 0, 10, st);
+    cy(0.2, 0.2, 0.03, metal, 0, 0.015, 0, 20, st);
+    W.mesh(torus(gl, 0.15, 0.012, Math.PI * 2, 20, 6), metal, st).position.set(0, 0.32, 0);
+    st.children[st.children.length - 1].rotation.x = Math.PI / 2;
+  }
+  // The arcade cabinet, angled to the room: a glowing screen and marquee, a stick and buttons.
+  const arc = node(W.scene);
+  arc.position.set(6.9, F, -1.6);
+  arc.rotation.y = 0.45;
+  const arcM = role("#2c2a3a", -0.6, 0.4);
+  put(W, box(gl, 0.72, 1.8, 0.7), arcM, arc, 0, 0.9, 0);
+  const scr = put(W, box(gl, 0.56, 0.46, 0.02), glow("#7fd0ff"), arc, 0, 1.3, 0.3, false);
+  scr.rotation.x = -0.25;
+  put(W, box(gl, 0.6, 0.18, 0.02), glow("#ffd36b"), arc, 0, 1.68, 0.36, false);
+  const pnl = put(W, box(gl, 0.72, 0.05, 0.34), dark, arc, 0, 0.98, 0.42);
+  pnl.rotation.x = 0.3;
+  cy(0.012, 0.012, 0.1, black, -0.18, 1.06, 0.44, 8, arc);
+  W.mesh(sphere(gl, 0.035, 10, 8), mc(W, "#d6453a", 0.6), arc).position.set(-0.18, 1.12, 0.44);
+  for (let i = 0; i < 4; i++) cy(0.025, 0.025, 0.02, mc(W, ["#f2c14e", "#3d8fd1", "#5bb36a", "#e05a47"][i], 0.6), 0.02 + (i % 2) * 0.09, 1.02 + Math.floor(i / 2) * 0.03, 0.4 + Math.floor(i / 2) * 0.08, 12, arc);
+  for (const sx of [-0.37, 0.37]) put(W, box(gl, 0.02, 1.4, 0.5), accent("#7c5cff", 0.4), arc, sx, 0.9, 0.05, false);
+
+  /* Home theater: dark walls with fabric panels, a big screen with a sunset landscape, speakers,
+     two rows of recliners (the back row on a lit riser), sconces, a popcorn cart. */
+  const TH = 16.5;
+  const thWall = role("#2c2a3a", -0.62, 0.15);
+  const panel = role("#3d3a52", -0.45, 0.1);
+  const leather = role("#4a3a3a", -0.3, 0.45);
+  const seam = role("#3a2e2e", -0.5, 0.4);
+  bx(6.84, H, 0.02, thWall, TH, F + H / 2, BACK + 0.01, 0, false);
+  for (const x of [13.09, 19.91]) bx(0.02, H, 2.4, thWall, x, F + H / 2, -2.8, 0, false);
+  for (const x of [13.5, 14.0, 19.0, 19.5]) {
+    rb(0.44, 1.3, 0.06, 0.04, panel, x, F + 1.65, BACK + 0.05);
+  }
+  // The screen: a black frame round a bright, steady sunset over the mountains.
+  const SCZ = BACK + 0.08;
+  bx(4.6, 2.2, 0.06, black, TH, F + 1.75, BACK + 0.04);
+  bx(4.4, 0.9, 0.02, glow("#9fc9ef"), TH, F + 2.3, SCZ, 0, false);
+  bx(4.4, 0.6, 0.02, glow("#f7c59f"), TH, F + 1.55, SCZ, 0, false);
+  bx(4.4, 0.5, 0.02, glow("#5a8a6a"), TH, F + 0.9, SCZ, 0, false);
+  cy(0.28, 0.28, 0.01, glow("#fff1c1"), TH + 0.8, F + 1.9, SCZ + 0.005, 28, W.scene, false).rotation.x = Math.PI / 2;
+  put(W, gable(gl, 2.4, 0.75, 0.01), glow("#6b7fa8"), W.scene, TH - 0.9, F + 1.15, SCZ + 0.01, false);
+  put(W, gable(gl, 2.0, 0.55, 0.01), glow("#55699a"), W.scene, TH + 1.1, F + 1.15, SCZ + 0.01, false);
+  put(W, gable(gl, 4.0, 0.2, 0.01), glow("#4c7d5e"), W.scene, TH, F + 1.15, SCZ + 0.015, false);
+  // Tower speakers either side and a centre speaker under the screen.
+  for (const sx of [-2.75, 2.75]) {
+    bx(0.36, 1.2, 0.36, black, TH + sx, F + 0.6, BACK + 0.4);
+    for (const [dy, r] of [[0.95, 0.06], [0.7, 0.12], [0.35, 0.12]] as const) cy(r, r, 0.02, dark, TH + sx, F + dy, BACK + 0.59, 20, W.scene, false).rotation.x = Math.PI / 2;
+  }
+  bx(1.0, 0.18, 0.3, black, TH, F + 0.5, BACK + 0.3);
+  for (const sx of [-2.6, 2.6]) {
+    W.mesh(lathe(gl, [[0.03, 0], [0.12, 0.04], [0.12, 0.2], [0.03, 0.24]], 16), warm, W.scene, false).position.set(TH + sx, F + 2.25, BACK + 0.1);
+  }
+  // The riser for the back row, its edge lit with step lights.
+  bx(6.8, 0.36, 1.6, carpet, TH, F + 0.18, 0.15);
+  bx(6.8, 0.04, 0.04, dark, TH, F + 0.35, -0.65, 0, false);
+  for (let i = 0; i < 8; i++) bx(0.12, 0.04, 0.02, glow("#ffd9a0"), TH - 3.0 + i * 0.86, F + 0.1, -0.66, 0, false);
+  // Recliners: a seat, a high back with a headrest, padded arms with cup holders (backs to us).
+  const recliners = (z: number, y: number) => {
+    for (let i = 0; i < 4; i++) {
+      const x = TH - 1.5 + i * 1.0;
+      rb(0.8, 0.42, 0.85, 0.08, leather, x, y + 0.21, z);
+      rb(0.7, 0.78, 0.24, 0.16, leather, x, y + 0.62, z + 0.36, 0, 0.12);
+      rb(0.5, 0.2, 0.1, 0.08, seam, x, y + 0.9, z + 0.5, 0, 0.12);
+    }
+    for (let i = 0; i < 5; i++) {
+      const x = TH - 2.0 + i * 1.0;
+      rb(0.2, 0.52, 0.9, 0.07, seam, x, y + 0.26, z + 0.02);
+      cy(0.045, 0.045, 0.02, black, x, y + 0.525, z - 0.25, 12, W.scene, false);
+    }
+  };
+  recliners(-1.65, F);
+  recliners(0.05, F + 0.36);
+  // The popcorn cart.
+  const pc = node(W.scene);
+  pc.position.set(19.35, F, -1.9);
+  const red = mc(W, "#c8372d", 0.5);
+  put(W, box(gl, 0.5, 0.7, 0.4), red, pc, 0, 0.35, 0);
+  put(W, box(gl, 0.46, 0.46, 0.36), warm, pc, 0, 0.95, 0, false);
+  for (const [sx, sz] of [[-0.24, -0.19], [0.24, -0.19], [-0.24, 0.19], [0.24, 0.19]] as const) put(W, box(gl, 0.03, 0.48, 0.03), red, pc, sx, 0.95, sz, false);
+  put(W, box(gl, 0.54, 0.08, 0.44), red, pc, 0, 1.22, 0);
+  put(W, gable(gl, 0.54, 0.14, 0.44), red, pc, 0, 1.26, 0);
+  for (let i = 0; i < 14; i++) {
+    const p = W.mesh(sphere(gl, 0.035, 6, 4), mc(W, "#fff4d6", 0.2), pc, false);
+    p.position.set(-0.15 + (i % 5) * 0.075, 0.76 + Math.floor(i / 5) * 0.05, -0.08 + (i % 3) * 0.08);
+  }
+  for (const sx of [-0.18, 0.18]) cy(0.06, 0.06, 0.03, black, sx, 0.05, 0.22, 12, pc).rotation.z = Math.PI / 2;
+
+  return {
+    tones,
+    rooms: [
+      // (Each room seen straight on from the front, the theater from a little higher, over the seats.)
+      { name: "Farmhouse kitchen", eye: [KX, 1.7, 4.4], target: [KX, 1.15, -1.6] },
+      { name: "Family room", eye: [FX, 1.6, 4.4], target: [FX, 1.05, -1.6] },
+      { name: "Spa bathroom", eye: [BX, 1.65, 4.3], target: [BX, 1.1, -1.8] },
+      { name: "Basement game room", eye: [GX, 1.75, 4.4], target: [GX, 1.1, -1.6] },
+      { name: "Home theater", eye: [TH, 2.9, 4.8], target: [TH, 1.3, -1.6] },
+    ],
+  };
+}
+
 /** The interior's light: soft daylight from above the cut-away, warm lamps. */
 const INDOOR: Partial<View> = { sun: [0.18, 1, 0.4], sunCol: [1, 0.92, 0.8], sky: [0.86, 0.84, 0.82], gnd: [0.55, 0.48, 0.42], exposure: 0.98, ao: 0.25 };
 
@@ -2344,7 +2868,7 @@ function indoorBack(sc: SkillContext) {
 }
 
 /** The rooms in the intro's 60-30-10 colours (see homeTones). */
-function tintInterior(P: InteriorParts, sc: SkillContext) {
+function tintInterior(P: { tones: Tones }, sc: SkillContext) {
   const T = homeTones(sc.palette);
   for (const m of P.tones.wall) m.uniforms.uColor.value = rgb(T.neutral);
   for (const [m, shade] of P.tones.support) m.uniforms.uColor.value = rgb(shade >= 0 ? mixHex(T.support, "#ffffff", shade) : mixHex(T.support, "#1d1b26", -shade));
@@ -2377,9 +2901,28 @@ function caption(sc: SkillContext, txt: string, y: number, size: number, k: numb
   ctx.restore();
 }
 
-const ROOM_WORDS = /\b(room|kitchen|suite|bed|bath|dining|living|office|den|loft|study|pantry|laundry|garage|porch|patio|foyer|entry|closet|primary|owner|backyard|yard|garden|deck|nook|flex|media)\b/i;
+const ROOM_WORDS = /\b(room|kitchen|suite|bed|bath|bathroom|dining|living|office|den|loft|study|pantry|laundry|garage|porch|patio|foyer|entry|closet|primary|owner|backyard|yard|garden|deck|nook|flex|media|basement|theater|theatre|cinema|bar|gym|bonus)\b/i;
+/** Room names that point to the second line of rooms (bath, family room, basement, game room, theater) or the first. */
+const MORE_WORDS = /\b(bath|bathroom|family|basement|game|games|theater|theatre|cinema|media|rec|bar|bonus)\b/i;
+const MAIN_WORDS = /\b(foyer|entry|living|great|owner|primary|suite|bed|bedroom|backyard|yard|pool|patio|deck|dining)\b/i;
 
 function homeWalkthrough(sc0: SkillContext) {
+  // Your room names choose the line of rooms: the second when they mostly name its rooms.
+  const own = (sc0.scene.items ?? []).map((x) => plain(split(x).title)).filter((x) => ROOM_WORDS.test(x));
+  const hits = (re: RegExp) => own.filter((x) => re.test(x)).length;
+  glide(sc0, hits(MORE_WORDS) > hits(MAIN_WORDS));
+}
+
+function homeRooms(sc0: SkillContext) {
+  glide(sc0, true);
+}
+
+/**
+ * One continuous glide through a line of rooms, slowing (never stopping) at each, the room named
+ * as the camera arrives: the first line (foyer, living room with the family, kitchen, suite, pool)
+ * or the second (farmhouse kitchen, family room, bath, basement game room, home theater).
+ */
+function glide(sc0: SkillContext, more: boolean) {
   const sc = { ...sc0, palette: onLight(sc0.palette) };
   const { t, d, u, scene } = sc;
   indoorBack(sc);
@@ -2388,23 +2931,35 @@ function homeWalkthrough(sc0: SkillContext) {
   // Your room names when the points name rooms; the home's own otherwise.
   const own = (scene.items ?? []).map((x) => plain(split(x).title)).filter((x) => ROOM_WORDS.test(x));
   let names: string[] = [];
-  // One continuous glide, slowing (never stopping) at each room; a short slide visits fewer rooms.
+  // A short slide visits fewer rooms.
   const n = d >= 8 ? 5 : d >= 6 ? 4 : 3;
   const k = range(t, 0.2, d - 0.3);
   const seg = k * (n - 1);
   const i0 = Math.floor(seg);
   const s = Math.min(n - 1, i0 + sine(seg - i0) * 0.72 + (seg - i0) * 0.28);
   const cv = frame(sc, top, (w, h) => {
-    const R = world("interior", w, h, interiorWorld);
-    if (!R) return null;
-    const { W, parts } = R;
-    tintInterior(parts, sc);
-    names = parts.rooms.map((r, i) => own[i] ?? r.name);
-    parts.family.forEach((P, i) => happy(P, t, i * 1.7, i === 1 ? clamp((t - 1.0) / 0.4) : 0));
-    wag(parts.dog, t, 1);
+    let W: World;
+    let rooms: { name: string; eye: Num3; target: Num3 }[];
+    if (more) {
+      const R = world("more-rooms", w, h, moreRoomsWorld);
+      if (!R) return null;
+      W = R.W;
+      rooms = R.parts.rooms;
+      tintInterior(R.parts, sc);
+    } else {
+      const R = world("interior", w, h, interiorWorld);
+      if (!R) return null;
+      const { parts } = R;
+      W = R.W;
+      rooms = parts.rooms;
+      tintInterior(parts, sc);
+      parts.family.forEach((P, i) => happy(P, t, i * 1.7, i === 1 ? clamp((t - 1.0) / 0.4) : 0));
+      wag(parts.dog, t, 1);
+    }
+    names = rooms.map((r, i) => own[i] ?? r.name);
     const F = fitBack(sc, top);
-    const eye = spline(parts.rooms.slice(0, n).map((r) => r.eye), s);
-    const target = spline(parts.rooms.slice(0, n).map((r) => r.target), s);
+    const eye = spline(rooms.slice(0, n).map((r) => r.eye), s);
+    const target = spline(rooms.slice(0, n).map((r) => r.target), s);
     const back: Num3 = [eye[0], eye[1] + (F - 1) * 0.8, eye[2] + (F - 1) * 3];
     return render(W, { ...INDOOR, flat: !!sc.flat3d, cel: true, eye: back, target, fov: 46, shadowSize: 9, shadowAt: [eye[0] + 1, 0, -1.5] }, w, h);
   });
@@ -2586,6 +3141,16 @@ export const homes3dSkills: Skill[] = [
     sample: { text: "Step *inside*", items: ["Welcoming foyer", "Open living room", "Chef-inspired kitchen", "Owner's suite", "Backyard and pool"] },
     itemsHint: "0–5 room names",
     render: homeWalkthrough,
+    sfx: () => [at(0.2, "whoosh")],
+  },
+  {
+    id: "home-rooms",
+    name: "More Rooms",
+    tagline: "A second seamless 3D glide through more of the home: a farmhouse kitchen, the family room, a spa-style bathroom, then down to a basement game room and a home theater, the rooms named as you arrive.",
+    bestFor: "Model homes and listings with bonus spaces (bath, family room, basement, game room, theater): up to 5 room names (else the home's own).",
+    sample: { text: "Room for *more*", items: ["Farmhouse kitchen", "Family room", "Spa bathroom", "Basement game room", "Home theater"] },
+    itemsHint: "0–5 room names",
+    render: homeRooms,
     sfx: () => [at(0.2, "whoosh")],
   },
   {
