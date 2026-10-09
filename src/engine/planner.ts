@@ -841,8 +841,9 @@ const SOFTWARE_SLIDES = new Set<string>(["click-flow", "notify-stack", "changelo
 const LOCAL_CONCEPTS = new Set(["food", "booking", "pets", "realestate", "legal", "health", "education", "fitness", "general"]);
 /** The industry slide for a kind of local business, with its headline. */
 const LOCAL_KINDS: [RegExp, string, string][] = [
-  [/\b(law|legal|tax|accounting|bookkeeping|agency|insurance)\b/i, "ind-team", "How we *help*"],
-  [/\b(restaurants?|caf(e|é)s?|coffee|bak(ery|ehouse)|pizzas?|pizzeria|tacos?|ice cream|creamery|kitchen|diner|food truck|menu)\b/i, "ind-menu", "Fresh on the *menu*"],
+  [/\b(law|legal|tax|accounting|bookkeeping|agency)\b/i, "ind-team", "How we *help*"],
+  [/\b(restaurants?|caf(e|é)s?|coffee|bak(ery|ehouse)|pizzas?|pizzeria|tacos?|ice cream|creamery|kitchen|diner|food truck|menu|sushi|bbq|smokehouse|trattoria|osteria|buffets?|curr(?:y|ies)|noodles?|bistro)\b/i, "ind-menu", "Fresh on the *menu*"],
+  [/\b(church|chapel|parish|congregation|fellowship)\b/i, "ind-team", "Life at *{name}*"],
   [/\b(plumb|electric|roof|construction|contract|hvac|heating|landscap|renovat|builders?)/i, "ind-site", "On the *job*"],
   [/\b(mov(ing|ers)|delivery|cleaning|cleaners|lawn)\b/i, "ind-route", "We come to *you*"],
   [/\b(daycare|preschool|school|tutor|dance|lessons|classes)\b/i, "ind-lesson", "A day at *{name}*"],
@@ -895,7 +896,7 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
     const town = pitch.match(/\bin ([A-Z][a-z]+(?: [A-Z][a-z]+)?)$/)?.[1];
     const what = town ? pitch.replace(/\s+in [A-Z][a-z]+(?: [A-Z][a-z]+)?$/, "") : pitch;
     // (Lower-cased for the sentence, but not an acronym: "AC installs".)
-    const lower = items.map((x) => (/^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x));
+    const lower = items.map((x) => (/^[A-Z][a-z]/.test(x) && !/^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Christmas|Easter)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x));
     // A shop, a café or a studio is somewhere to come in to; a trade or a firm offers its services.
     const verb = ["ind-menu", "ind-shop", "ind-lesson"].includes(skill) ? "Come in for" : "We offer";
     const about = `${name} is ${what}${town ? ` in ${town}` : ""}${brief.audience ? `, for ${brief.audience.replace(/[.]+$/, "")}` : ""}.${lower.length >= 2 ? ` ${verb} ${lower[0]} and ${lower[1]}.` : ""}`;

@@ -13,10 +13,10 @@ export const SHOWCASE_GROUPS = ["Food & drink", "Beauty & fitness", "Home & trad
 export type ShowcaseGroup = (typeof SHOWCASE_GROUPS)[number];
 
 const GROUPS: Record<ShowcaseGroup, string[]> = {
-  "Food & drink": ["Restaurant", "Coffee shop", "Bakery", "Pizza place", "Taco truck", "Ice cream shop"],
+  "Food & drink": ["Restaurant", "Coffee shop", "Bakery", "Pizza place", "Chinese buffet", "Indian restaurant", "Sushi bar", "Thai kitchen", "Italian trattoria", "Mexican restaurant", "BBQ smokehouse", "Taco truck", "Ice cream shop"],
   "Beauty & fitness": ["Barber shop", "Hair salon", "Nail salon", "Yoga studio", "Boxing gym", "Dance studio", "Tattoo studio"],
-  "Home & trades": ["Plumber", "Electrician", "Heating and cooling", "Landscaping", "Cleaning service", "Roofing company", "Moving company", "Auto repair shop", "Car wash", "Construction company", "Homebuilder"],
-  "Local shops": ["Florist", "Plant shop", "Bookstore", "Pet grooming", "Daycare", "Photography studio", "Bed and breakfast", "Dental clinic"],
+  "Home & trades": ["Plumber", "Electrician", "Heating and cooling", "Landscaping", "Cleaning service", "Roofing company", "Moving company", "Auto repair shop", "Collision repair", "Phone repair shop", "Car wash", "Construction company", "Homebuilder"],
+  "Local shops": ["Florist", "Plant shop", "Bookstore", "Antique shop", "Thrift shop", "Music shop", "Community church", "Pet grooming", "Daycare", "Photography studio", "Bed and breakfast", "Dental clinic"],
   Professional: ["Law firm", "Tax preparer", "Real estate agency", "Marketing agency", "Online course"],
   Apps: ["Fitness app", "Budget app", "Travel app", "Language app", "Kids learning app", "Pet care app", "EV charging app", "Event ticketing app", "Recipe app", "Delivery service", "Smart home app"],
   "Tech & AI": ["Analytics app", "AI copilot", "Developer platform", "Cybersecurity platform", "Team chat app"],

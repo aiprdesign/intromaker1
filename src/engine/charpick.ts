@@ -67,6 +67,12 @@ export function scenePick(prompt: string): VideoPlan["setting"] {
   if (/\b(florists?|flower shops?|flowers?|bouquets?|plant shops?|garden cent(?:re|er)s?)\b/.test(p)) return "florist";
   if (/\b(bookstores?|bookshops?|books|used books|librar(?:y|ies)|book clubs?)\b/.test(p)) return "bookstore";
   if (/\b(hotels?|inns?|bed and breakfast|b&bs?|motels?|guest ?houses?|resorts?|lodges?|vacation rentals?)\b/.test(p)) return "hotel";
+  if (/\b(churche?s?|chapels?|parish(?:es)?|congregations?|ministr(?:y|ies)|worship|sunday services?)\b/.test(p)) return "church";
+  if (/\b(music (?:shops?|stores?)|guitars?|instruments?|music lessons?|drums?|pianos?|vinyl|record (?:shops?|stores?))\b/.test(p)) return "music";
+  if (/\b(phone repairs?|screen repairs?|cell ?phone|iphone|computer repairs?|laptop repairs?|electronics repairs?|device repairs?|tablet repairs?)\b/.test(p)) return "repair";
+  if (/\b(chinese|sushi|thai|ramen|noodles?|dim sum|japanese|korean|vietnamese|pho|asian|buffets?|dumplings?)\b/.test(p)) return "asian";
+  if (/\b(antiques?|vintage furniture|collectibles?|curiosit(?:y|ies))\b/.test(p)) return "antique";
+  if (/\b(thrift|second-?hand|consignment|resale|pre-?loved|op shops?|charity shops?)\b/.test(p)) return "thrift";
   if (/\b(bakery|bakeries|bakers?|bakehouse|pastr(?:y|ies)|cakes?|cupcakes?|donuts?|doughnuts?)\b/.test(p)) return "bakery";
   if (/\b(restaurants?|bistros?|diners?|pizzerias?|pizza|steakhouses?|trattorias?|dining|dinner|tacos?|grill)\b/.test(p)) return "restaurant";
   if (/\b(construction|builders?|building sites?|contractors?|renovations?|remodel(?:ing)?|roofing|plumb(?:ers?|ing)|electricians?|handyman|architects?|engineering firms?|civil engineering)\b/.test(p)) return "construction";

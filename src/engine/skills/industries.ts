@@ -544,11 +544,11 @@ function drawBoard(sc: SkillContext, kind: BoardKind, x: number, y: number, bw: 
 
 /** The business scenes a board suits: a menu in a restaurant or bakery, shop tags in a salon or florist… */
 const BOARD_SCENES: Record<BoardKind, SceneBackdrop[]> = {
-  menu: ["cafe", "restaurant", "bakery"],
-  tags: ["shop", "salon", "florist", "bookstore", "hotel", "garage"],
+  menu: ["cafe", "restaurant", "bakery", "asian"],
+  tags: ["shop", "salon", "florist", "bookstore", "hotel", "garage", "antique", "thrift", "music", "repair"],
   chalk: ["classroom", "gym", "yoga"],
   clipboard: ["hospital"],
-  sticky: ["office"],
+  sticky: ["office", "church"],
 };
 
 function boardSlide(sc0: SkillContext, B: BoardSpec) {

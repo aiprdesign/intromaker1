@@ -9,7 +9,7 @@
 import { clamp, ease, mixHex, rgba, rng, TAU } from "./math";
 import type { Palette, SkillContext } from "./types";
 
-export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house", "salon", "restaurant", "bakery", "garage", "gym", "yoga", "florist", "bookstore", "hotel"] as const;
+export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house", "salon", "restaurant", "bakery", "garage", "gym", "yoga", "florist", "bookstore", "hotel", "asian", "antique", "thrift", "music", "repair", "church"] as const;
 export type SceneBackdrop = (typeof SCENES)[number];
 
 type C = CanvasRenderingContext2D;
@@ -1634,7 +1634,475 @@ function hotel(sc: SkillContext) {
   plant(ctx, w * 0.64, fy, h * 0.18, T, "#c9a227");
 }
 
-const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house, salon, restaurant, bakery, garage, gym, yoga, florist, bookstore, hotel };
+/** An Asian restaurant: red paper lanterns swaying, a lattice window, round tables and bamboo. */
+function asian(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f7ece0", "#ecdcc8"], ["#7a3b2e", "#652f24"], u);
+  // A dark wood rail and a lattice window on each side.
+  box(ctx, 0, fy - h * 0.2, w, 8 * u, 0, "#5a2a20");
+  for (const x of [w * 0.04, w * 0.82]) {
+    const ww = w * 0.14;
+    const wh = h * 0.3;
+    const wy = h * 0.16;
+    box(ctx, x - 6 * u, wy - 6 * u, ww + 12 * u, wh + 12 * u, 6 * u, "#5a2a20");
+    box(ctx, x, wy, ww, wh, 4 * u, "rgba(255,236,200,0.9)");
+    ctx.strokeStyle = "#5a2a20";
+    ctx.lineWidth = 4 * u;
+    for (let i = 1; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + (ww * i) / 4, wy);
+      ctx.lineTo(x + (ww * i) / 4, wy + wh);
+      ctx.moveTo(x, wy + (wh * i) / 4);
+      ctx.lineTo(x + ww, wy + (wh * i) / 4);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(x + ww / 2, wy + wh / 2, Math.min(ww, wh) * 0.22, 0, TAU);
+    ctx.stroke();
+  }
+  // Red paper lanterns along the top, swaying, with gold tassels and a warm glow.
+  for (let i = 0; i < 7; i++) {
+    const x = w * (0.06 + i * 0.148);
+    if (x > w * 0.3 && x < w * 0.7 && i % 2) continue;
+    const drop = h * (0.06 + (i % 3) * 0.035);
+    const sw = Math.sin(T * 1.2 + i) * 0.06;
+    ctx.save();
+    ctx.translate(x, 0);
+    ctx.rotate(sw);
+    ctx.strokeStyle = "#3a2a20";
+    ctx.lineWidth = 2 * u;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, drop);
+    ctx.stroke();
+    const lw = 34 * u;
+    const lh = 42 * u;
+    const glow = ctx.createRadialGradient(0, drop + lh / 2, 0, 0, drop + lh / 2, lw * 1.6);
+    glow.addColorStop(0, "rgba(255,120,80,0.35)");
+    glow.addColorStop(1, "rgba(255,120,80,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(-lw * 1.6, drop + lh / 2 - lw * 1.6, lw * 3.2, lw * 3.2);
+    ctx.fillStyle = "#d62828";
+    ctx.beginPath();
+    ctx.ellipse(0, drop + lh / 2, lw / 2, lh / 2, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(120,20,20,0.45)";
+    ctx.lineWidth = 1.5 * u;
+    for (const k of [-0.25, 0, 0.25]) {
+      ctx.beginPath();
+      ctx.ellipse(0, drop + lh / 2, (lw / 2) * Math.abs(k) * 2 || 1, lh / 2, 0, 0, TAU);
+      ctx.stroke();
+    }
+    box(ctx, -lw * 0.28, drop - 3 * u, lw * 0.56, 7 * u, 2 * u, "#f2b705");
+    box(ctx, -lw * 0.28, drop + lh - 4 * u, lw * 0.56, 7 * u, 2 * u, "#f2b705");
+    ctx.fillStyle = "#f2b705";
+    ctx.fillRect(-1.5 * u, drop + lh + 3 * u, 3 * u, 16 * u);
+    ctx.restore();
+  }
+  // Round tables with bowls and chopsticks at the sides.
+  for (const x of [w * 0.14, w * 0.86]) {
+    ctx.fillStyle = "#4a2219";
+    ctx.beginPath();
+    ctx.ellipse(x, fy - h * 0.1, w * 0.07, h * 0.022, 0, 0, TAU);
+    ctx.fill();
+    box(ctx, x - 5 * u, fy - h * 0.1, 10 * u, h * 0.1, 3 * u, "#3a1a14");
+    for (const dx of [-0.03, 0.03]) {
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(x + w * dx, fy - h * 0.115, 10 * u, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = palette.primary;
+      ctx.fillRect(x + w * dx - 10 * u, fy - h * 0.118, 20 * u, 3 * u);
+    }
+  }
+  // Bamboo in tall planters.
+  for (const x of [w * 0.3, w * 0.7]) {
+    ctx.strokeStyle = "#6a994e";
+    ctx.lineWidth = 6 * u;
+    for (let k = -1; k <= 1; k++) {
+      ctx.beginPath();
+      ctx.moveTo(x + k * 10 * u, fy - h * 0.08);
+      ctx.lineTo(x + k * 16 * u + Math.sin(T + k) * 3 * u, fy - h * 0.42);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#8ab17d";
+    for (let k = 0; k < 6; k++) {
+      ctx.beginPath();
+      ctx.ellipse(x + (k % 2 ? 18 : -18) * u, fy - h * (0.2 + k * 0.04), 16 * u, 5 * u, k % 2 ? 0.5 : -0.5, 0, TAU);
+      ctx.fill();
+    }
+    box(ctx, x - 22 * u, fy - h * 0.08, 44 * u, h * 0.08, 6 * u, "#2b2d42");
+  }
+}
+
+/** An antique shop: a grandfather clock, an armoire, framed pictures, a gramophone and lamps. */
+function antique(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#efe3cf", "#e0cfb3"], ["#7a5236", "#6a4630"], u);
+  // A gallery wall of gilt frames at both sides.
+  const frames: [number, number, number, number][] = [[0.03, 0.14, 0.07, 0.1], [0.11, 0.12, 0.06, 0.14], [0.04, 0.27, 0.05, 0.07], [0.84, 0.13, 0.08, 0.11], [0.93, 0.15, 0.05, 0.07], [0.86, 0.28, 0.06, 0.08]];
+  frames.forEach(([fx, fyy, fw, fh], i) => {
+    box(ctx, w * fx, h * fyy, w * fw, h * fh, 3 * u, "#b8902f");
+    box(ctx, w * fx + 5 * u, h * fyy + 5 * u, w * fw - 10 * u, h * fh - 10 * u, 2 * u, [mixHex(palette.primary, "#d9c9a8", 0.6), "#5f7a6a", "#8a6142", mixHex(palette.accent, "#d9c9a8", 0.6)][i % 4]);
+  });
+  // A grandfather clock with a swinging pendulum.
+  const gx = w * 0.2;
+  box(ctx, gx - w * 0.035, fy - h * 0.5, w * 0.07, h * 0.5, 6 * u, "#5c3c27");
+  ctx.fillStyle = "#f3ead7";
+  ctx.beginPath();
+  ctx.arc(gx, fy - h * 0.42, w * 0.024, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#3a2a20";
+  ctx.lineWidth = 2 * u;
+  ctx.beginPath();
+  ctx.moveTo(gx, fy - h * 0.42);
+  ctx.lineTo(gx + Math.sin(T) * w * 0.015, fy - h * 0.435);
+  ctx.stroke();
+  box(ctx, gx - w * 0.022, fy - h * 0.34, w * 0.044, h * 0.2, 4 * u, "rgba(240,220,170,0.25)");
+  const a = Math.sin(T * 2.4) * 0.35;
+  ctx.strokeStyle = "#b8902f";
+  ctx.lineWidth = 3 * u;
+  ctx.beginPath();
+  ctx.moveTo(gx, fy - h * 0.33);
+  ctx.lineTo(gx + Math.sin(a) * h * 0.14, fy - h * 0.33 + Math.cos(a) * h * 0.14);
+  ctx.stroke();
+  ctx.fillStyle = "#b8902f";
+  ctx.beginPath();
+  ctx.arc(gx + Math.sin(a) * h * 0.14, fy - h * 0.33 + Math.cos(a) * h * 0.14, 9 * u, 0, TAU);
+  ctx.fill();
+  // An armoire on the right with a gramophone and a lamp on the side table.
+  box(ctx, w * 0.8, fy - h * 0.4, w * 0.13, h * 0.4, 6 * u, "#6b4a33");
+  box(ctx, w * 0.81, fy - h * 0.37, w * 0.05, h * 0.3, 4 * u, "#7d5a3f");
+  box(ctx, w * 0.87, fy - h * 0.37, w * 0.05, h * 0.3, 4 * u, "#7d5a3f");
+  box(ctx, w * 0.66, fy - h * 0.12, w * 0.12, h * 0.02, 3 * u, "#5c3c27");
+  box(ctx, w * 0.67, fy - h * 0.1, 6 * u, h * 0.1, 2 * u, "#5c3c27");
+  box(ctx, w * 0.77 - 6 * u, fy - h * 0.1, 6 * u, h * 0.1, 2 * u, "#5c3c27");
+  box(ctx, w * 0.685, fy - h * 0.16, w * 0.04, h * 0.04, 4 * u, "#3a2a20");
+  ctx.fillStyle = "#b8902f";
+  ctx.beginPath();
+  ctx.moveTo(w * 0.705, fy - h * 0.16);
+  ctx.lineTo(w * 0.69, fy - h * 0.27);
+  ctx.quadraticCurveTo(w * 0.72, fy - h * 0.3, w * 0.75, fy - h * 0.26);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = mixHex(palette.primary, "#e9d8b0", 0.5);
+  ctx.beginPath();
+  ctx.moveTo(w * 0.755, fy - h * 0.25);
+  ctx.lineTo(w * 0.79, fy - h * 0.25);
+  ctx.lineTo(w * 0.78, fy - h * 0.29);
+  ctx.lineTo(w * 0.765, fy - h * 0.29);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,222,140,0.4)";
+  ctx.beginPath();
+  ctx.arc(w * 0.772, fy - h * 0.25, 22 * u, 0, Math.PI);
+  ctx.fill();
+  // A worn rug.
+  ctx.fillStyle = mixHex(palette.primary, "#8a3b2e", 0.6);
+  ctx.beginPath();
+  ctx.ellipse(w * 0.5, fy + h * 0.1, w * 0.22, h * 0.06, 0, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(240,210,150,0.5)";
+  ctx.lineWidth = 3 * u;
+  ctx.beginPath();
+  ctx.ellipse(w * 0.5, fy + h * 0.1, w * 0.19, h * 0.045, 0, 0, TAU);
+  ctx.stroke();
+}
+
+/** A thrift shop: clothes racks of colourful garments, a mannequin, crates of records and a hand-lettered price tag look. */
+function thrift(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f2f5f0", "#e3ebe1"], ["#c9b28f", "#b89e79"], u);
+  const colors = [...brandColors(palette), "#e9c46a", "#2a9d8f", "#e76f51", "#8ab17d", "#b5838d"];
+  // Clothes racks with hangers and swaying garments.
+  const rack = (x: number, rw: number, seed: number) => {
+    const ry = h * 0.3;
+    ctx.fillStyle = "#5a5f6b";
+    ctx.fillRect(x, ry, rw, 5 * u);
+    ctx.fillRect(x, ry, 5 * u, fy - ry);
+    ctx.fillRect(x + rw - 5 * u, ry, 5 * u, fy - ry);
+    const r = rng(seed);
+    for (let i = 0; i < 7; i++) {
+      const gx = x + 16 * u + (i * (rw - 32 * u)) / 7;
+      const gw = (rw - 32 * u) / 7 + 6 * u;
+      const sw = Math.sin(T * 1.1 + i + seed) * 2 * u;
+      ctx.strokeStyle = "#5a5f6b";
+      ctx.lineWidth = 2 * u;
+      ctx.beginPath();
+      ctx.moveTo(gx + gw / 2, ry);
+      ctx.lineTo(gx + gw / 2, ry + 10 * u);
+      ctx.stroke();
+      const gh = h * (0.16 + r() * 0.12);
+      ctx.fillStyle = colors[Math.floor(r() * colors.length)];
+      ctx.beginPath();
+      ctx.moveTo(gx + sw, ry + 12 * u);
+      ctx.lineTo(gx + gw + sw, ry + 12 * u);
+      ctx.lineTo(gx + gw + 4 * u + sw * 1.5, ry + 12 * u + gh);
+      ctx.lineTo(gx - 4 * u + sw * 1.5, ry + 12 * u + gh);
+      ctx.fill();
+    }
+  };
+  rack(w * 0.02, w * 0.24, 7);
+  rack(w * 0.74, w * 0.24, 13);
+  // A mannequin in a patterned dress.
+  const mx = w * 0.32;
+  ctx.fillStyle = "#e9dcc7";
+  ctx.beginPath();
+  ctx.arc(mx, fy - h * 0.42, 14 * u, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = palette.primary;
+  ctx.beginPath();
+  ctx.moveTo(mx - 20 * u, fy - h * 0.38);
+  ctx.lineTo(mx + 20 * u, fy - h * 0.38);
+  ctx.lineTo(mx + 38 * u, fy - h * 0.14);
+  ctx.lineTo(mx - 38 * u, fy - h * 0.14);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.arc(mx - 20 * u + (i % 3) * 20 * u, fy - h * (0.3 - Math.floor(i / 3) * 0.08), 4 * u, 0, TAU);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#5a5f6b";
+  ctx.fillRect(mx - 2 * u, fy - h * 0.14, 4 * u, h * 0.14);
+  ctx.fillRect(mx - 18 * u, fy - 4 * u, 36 * u, 4 * u);
+  // Crates of records and a stack of books on the right.
+  for (let i = 0; i < 2; i++) {
+    const cx = w * (0.62 + i * 0.07);
+    box(ctx, cx, fy - h * 0.09, w * 0.06, h * 0.09, 3 * u, "#c79b74");
+    for (let k = 0; k < 5; k++) box(ctx, cx + 4 * u + k * w * 0.011, fy - h * 0.13, w * 0.009, h * 0.06, 1 * u, ["#2b2d42", colors[k % colors.length]][k % 2]);
+  }
+  // A hand-painted sign shape with a hanger icon (no words).
+  box(ctx, w * 0.44, h * 0.08, w * 0.12, h * 0.05, 8 * u, mixHex(palette.secondary, "#ffffff", 0.3));
+  ctx.strokeStyle = "#3a3f4c";
+  ctx.lineWidth = 3 * u;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.47, h * 0.115);
+  ctx.lineTo(w * 0.5, h * 0.095);
+  ctx.lineTo(w * 0.53, h * 0.115);
+  ctx.closePath();
+  ctx.stroke();
+}
+
+/** A guitar side on: body, sound hole, neck and head, in `color`, `s` tall, standing on `y`. */
+function guitar(ctx: C, x: number, y: number, s: number, color: string, tilt = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tilt);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(0, -s * 0.16, s * 0.15, s * 0.16, 0, 0, TAU);
+  ctx.ellipse(0, -s * 0.38, s * 0.11, s * 0.12, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.beginPath();
+  ctx.arc(0, -s * 0.3, s * 0.045, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#4a3424";
+  ctx.fillRect(-s * 0.02, -s * 0.92, s * 0.04, s * 0.5);
+  ctx.fillRect(-s * 0.035, -s * 1.0, s * 0.07, s * 0.1);
+  ctx.restore();
+}
+
+/** A music shop: a wall of guitars, amps, a drum kit, vinyl crates and a neon note. */
+function music(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#2f2b3a", "#26222f"], ["#5a3d2b", "#4a3223"], u);
+  // Acoustic panels on the wall.
+  for (let x = w * 0.02; x < w; x += w * 0.08) for (let y = h * 0.14; y < h * 0.5; y += h * 0.12) box(ctx, x, y, w * 0.07, h * 0.1, 4 * u, "rgba(255,255,255,0.035)");
+  // A wall of guitars on both sides, gently swaying on their hooks.
+  const colors = [palette.primary, "#d9a066", "#c1121f", palette.accent, "#2b2d42", "#e9c46a"];
+  [0.04, 0.1, 0.16, 0.22].forEach((f, i) => guitar(ctx, w * f, h * 0.56, h * 0.36, colors[i % colors.length], Math.sin(T * 0.8 + i) * 0.02));
+  [0.78, 0.84, 0.9, 0.96].forEach((f, i) => guitar(ctx, w * f, h * 0.56, h * 0.36, colors[(i + 2) % colors.length], Math.sin(T * 0.8 + i + 2) * 0.02));
+  // Amps along the floor.
+  for (const x of [w * 0.03, w * 0.15, w * 0.8]) {
+    box(ctx, x, fy - h * 0.13, w * 0.1, h * 0.13, 4 * u, "#1d1b24");
+    box(ctx, x + 6 * u, fy - h * 0.11, w * 0.1 - 12 * u, h * 0.08, 3 * u, "#3a3646");
+    for (let k = 0; k < 4; k++) {
+      ctx.fillStyle = "#c9a227";
+      ctx.beginPath();
+      ctx.arc(x + 14 * u + k * 12 * u, fy - h * 0.122, 3 * u, 0, TAU);
+      ctx.fill();
+    }
+  }
+  // A drum kit, centre right, low.
+  const dx = w * 0.67;
+  ctx.fillStyle = palette.primary;
+  ctx.beginPath();
+  ctx.arc(dx, fy - h * 0.07, h * 0.07, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "#f3f0e8";
+  ctx.beginPath();
+  ctx.arc(dx, fy - h * 0.07, h * 0.05, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = mixHex(palette.primary, "#000000", 0.2);
+  ctx.fillRect(dx - w * 0.06, fy - h * 0.17, w * 0.04, h * 0.05);
+  ctx.strokeStyle = "#c9a227";
+  ctx.lineWidth = 3 * u;
+  ctx.beginPath();
+  ctx.moveTo(dx + w * 0.03, fy);
+  ctx.lineTo(dx + w * 0.05, fy - h * 0.22);
+  ctx.stroke();
+  ctx.fillStyle = "#e0b84a";
+  ctx.beginPath();
+  ctx.ellipse(dx + w * 0.05, fy - h * 0.22, w * 0.03, 5 * u, -0.15, 0, TAU);
+  ctx.fill();
+  // A neon note on the wall, softly pulsing.
+  const pulse = 0.75 + 0.25 * Math.sin(T * 2.2);
+  ctx.save();
+  ctx.shadowColor = palette.accent;
+  ctx.shadowBlur = 24 * u * pulse;
+  ctx.strokeStyle = mixHex(palette.accent, "#ffffff", 0.3);
+  ctx.lineWidth = 5 * u;
+  const nx = w * 0.7;
+  const ny = h * 0.2;
+  ctx.beginPath();
+  ctx.moveTo(nx, ny + 50 * u);
+  ctx.lineTo(nx, ny);
+  ctx.lineTo(nx + 44 * u, ny - 10 * u);
+  ctx.lineTo(nx + 44 * u, ny + 40 * u);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(nx - 10 * u, ny + 52 * u, 11 * u, 0, TAU);
+  ctx.arc(nx + 34 * u, ny + 42 * u, 11 * u, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A phone and electronics repair shop: a workbench with a lamp, phones opened up, tools and parts drawers. */
+function repair(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eef3f7", "#dde6ee"], ["#c7ccd4", "#b5bbc5"], u);
+  // A wall of phone cases and accessories on the left.
+  const colors = brandColors(palette);
+  box(ctx, w * 0.02, h * 0.14, w * 0.24, h * 0.4, 6 * u, "#d3d9e1");
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) {
+    const x = w * (0.035 + c * 0.044);
+    const y = h * (0.17 + r * 0.12);
+    box(ctx, x, y, w * 0.032, h * 0.095, 6 * u, colors[(r * 5 + c) % colors.length]);
+    box(ctx, x + w * 0.006, y + h * 0.008, w * 0.01, h * 0.018, 3 * u, "rgba(0,0,0,0.25)");
+  }
+  // The repair bench on the right: a mat, an opened phone, a magnifier lamp and tools.
+  const bx = w * 0.66;
+  box(ctx, bx, fy - h * 0.15, w * 0.32, h * 0.02, 3 * u, "#8a909c");
+  box(ctx, bx + 6 * u, fy - h * 0.13, 8 * u, h * 0.13, 2 * u, "#6b717d");
+  box(ctx, bx + w * 0.32 - 14 * u, fy - h * 0.13, 8 * u, h * 0.13, 2 * u, "#6b717d");
+  box(ctx, bx + w * 0.02, fy - h * 0.165, w * 0.2, h * 0.016, 3 * u, mixHex(palette.primary, "#2a9d8f", 0.5));
+  box(ctx, bx + w * 0.05, fy - h * 0.2, w * 0.04, h * 0.035, 5 * u, "#2b2f38");
+  box(ctx, bx + w * 0.1, fy - h * 0.2, w * 0.04, h * 0.035, 5 * u, "#3a3f4b");
+  ctx.fillStyle = "#7bdff2";
+  ctx.fillRect(bx + w * 0.105, fy - h * 0.195, w * 0.03, h * 0.025);
+  ctx.strokeStyle = "#c9a227";
+  ctx.lineWidth = 2 * u;
+  for (let k = 0; k < 3; k++) {
+    ctx.beginPath();
+    ctx.moveTo(bx + w * (0.055 + k * 0.01), fy - h * 0.19);
+    ctx.lineTo(bx + w * (0.06 + k * 0.01), fy - h * 0.175);
+    ctx.stroke();
+  }
+  // The magnifier lamp, with its ring of light.
+  ctx.strokeStyle = "#4a5165";
+  ctx.lineWidth = 5 * u;
+  ctx.beginPath();
+  ctx.moveTo(bx + w * 0.27, fy - h * 0.165);
+  ctx.lineTo(bx + w * 0.26, fy - h * 0.34);
+  ctx.lineTo(bx + w * 0.16, fy - h * 0.38);
+  ctx.stroke();
+  ctx.fillStyle = `rgba(255,250,230,${0.65 + Math.sin(T * 3) * 0.03})`;
+  ctx.beginPath();
+  ctx.arc(bx + w * 0.14, fy - h * 0.36, 26 * u, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#4a5165";
+  ctx.lineWidth = 6 * u;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,250,230,0.12)";
+  ctx.beginPath();
+  ctx.moveTo(bx + w * 0.12, fy - h * 0.34);
+  ctx.lineTo(bx + w * 0.16, fy - h * 0.34);
+  ctx.lineTo(bx + w * 0.2, fy - h * 0.17);
+  ctx.lineTo(bx + w * 0.06, fy - h * 0.17);
+  ctx.fill();
+  // Parts drawers above the bench.
+  box(ctx, bx + w * 0.04, h * 0.14, w * 0.24, h * 0.18, 6 * u, "#c9ced6");
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) {
+    box(ctx, bx + w * (0.05 + c * 0.037), h * (0.155 + r * 0.055), w * 0.03, h * 0.042, 3 * u, "#eef2f6");
+    box(ctx, bx + w * (0.058 + c * 0.037), h * (0.172 + r * 0.055), w * 0.014, 4 * u, 2 * u, colors[(r + c) % colors.length]);
+  }
+}
+
+/** A church hall: arched stained-glass windows glowing, rows of pews, a lectern and candles. */
+function church(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f4eee4", "#e6dccb"], ["#9b7653", "#86633f"], u);
+  // Tall arched stained-glass windows, with coloured light falling across the floor.
+  const glass = [palette.primary, "#e9c46a", "#2a9d8f", palette.accent, "#e76f51", "#7b9acc"];
+  for (const x of [w * 0.05, w * 0.18, w * 0.75, w * 0.88]) {
+    const ww = w * 0.08;
+    const wy = h * 0.14;
+    const wh = h * 0.36;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, wy + wh);
+    ctx.lineTo(x, wy + ww / 2);
+    ctx.arc(x + ww / 2, wy + ww / 2, ww / 2, Math.PI, 0);
+    ctx.lineTo(x + ww, wy + wh);
+    ctx.closePath();
+    ctx.fillStyle = "#5c4a3a";
+    ctx.fill();
+    ctx.clip();
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 2; c++) {
+      ctx.fillStyle = mixHex(glass[(r + c + Math.round(x)) % glass.length], "#ffffff", 0.25 + 0.08 * Math.sin(T * 0.8 + r + c));
+      ctx.fillRect(x + c * ww / 2 + 2 * u, wy + r * wh / 6 + 2 * u, ww / 2 - 4 * u, wh / 6 - 4 * u);
+    }
+    ctx.restore();
+    const beam = ctx.createLinearGradient(x, wy + wh, x + ww * 1.6, fy + h * 0.2);
+    beam.addColorStop(0, rgba(glass[Math.round(x) % glass.length], 0.16));
+    beam.addColorStop(1, rgba(glass[Math.round(x) % glass.length], 0));
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(x, wy + wh);
+    ctx.lineTo(x + ww, wy + wh);
+    ctx.lineTo(x + ww * 2.4, fy + h * 0.2);
+    ctx.lineTo(x + ww * 0.6, fy + h * 0.2);
+    ctx.fill();
+  }
+  // Rows of pews at both sides.
+  for (const side of [-1, 1]) for (let r = 0; r < 3; r++) {
+    const pw = w * (0.2 + r * 0.03);
+    const px = side < 0 ? w * 0.02 - r * w * 0.01 : w * 0.98 - pw + r * w * 0.01;
+    const py = fy - h * 0.08 + r * h * 0.07;
+    box(ctx, px, py - h * 0.08, pw, h * 0.08, 6 * u, "#7a5236");
+    box(ctx, px, py - h * 0.02, pw, h * 0.03, 4 * u, "#6a4630");
+  }
+  // A lectern and candles, low and central.
+  box(ctx, w * 0.47, fy - h * 0.16, w * 0.06, h * 0.16, 4 * u, "#7a5236");
+  box(ctx, w * 0.455, fy - h * 0.18, w * 0.09, h * 0.03, 4 * u, "#8a6142");
+  for (const x of [w * 0.4, w * 0.6]) {
+    box(ctx, x - 5 * u, fy - h * 0.12, 10 * u, h * 0.12, 3 * u, "#f3ead7");
+    ctx.fillStyle = "rgba(255,190,90,0.95)";
+    ctx.beginPath();
+    ctx.ellipse(x, fy - h * 0.13 - Math.sin(T * 8 + x) * u, 4 * u, 9 * u, 0, 0, TAU);
+    ctx.fill();
+    const gl = ctx.createRadialGradient(x, fy - h * 0.13, 0, x, fy - h * 0.13, 40 * u);
+    gl.addColorStop(0, "rgba(255,200,120,0.35)");
+    gl.addColorStop(1, "rgba(255,200,120,0)");
+    ctx.fillStyle = gl;
+    ctx.fillRect(x - 40 * u, fy - h * 0.13 - 40 * u, 80 * u, 80 * u);
+  }
+}
+
+const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house, salon, restaurant, bakery, garage, gym, yoga, florist, bookstore, hotel, asian, antique, thrift, music, repair, church };
 
 /** Draw a cartoon scene background, if `backdrop` is one. Returns whether it drew. */
 export function sceneStage(sc: SkillContext, backdrop: string | undefined, opts: { bare?: boolean } = {}) {
