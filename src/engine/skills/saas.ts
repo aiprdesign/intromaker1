@@ -1821,7 +1821,8 @@ function stopSections(secs: { y: number; h: number }[], iw: number, d: number) {
  */
 /**
  * What a scrolling slide scrolls: the slide's own picture when it's a tall page; else the site's
- * full-page capture (a one-screen screenshot has nothing below it to scroll to); else the picture.
+ * full-page capture (a one-screen screenshot has nothing below it to scroll to); else the picture,
+ * else the site's capture however short.
  */
 function scrollSrc(sc: SkillContext): string | undefined {
   const { scene, brand } = sc;
@@ -1831,7 +1832,9 @@ function scrollSrc(sc: SkillContext): string | undefined {
   if (own && tall(ownImg)) return own;
   const page = brand?.page?.src;
   if (page && page !== own && tall(getImage(page))) return page;
-  return own;
+  // A short page (a one-screen landing page) still beats nothing: it's the site, as captured, and
+  // the scroll stops at its end. Only with no capture at all does the slide draw its stand-in.
+  return own ?? page ?? brand?.shot;
 }
 
 function siteScroll(sc: SkillContext) {

@@ -295,7 +295,9 @@ export function withPlaceholders<P extends Partial<VideoPlan>>(scene: Scene, pla
 
 /** Does this slide show a placeholder (it needs a picture and has none of its own)? */
 export function needsPicture(scene: Scene, plan: Partial<VideoPlan>) {
-  return withPlaceholders(scene, plan).scene !== scene;
+  // (A slide showing the website's own screenshot in its place has a picture.)
+  const src = withPlaceholders(scene, plan).scene.media?.src;
+  return src !== scene.media?.src && !!src && Array.from(cache.values()).includes(src);
 }
 
 function placeholdersFor<P extends Partial<VideoPlan>>(scene: Scene, plan: P): { scene: Scene; plan: P } {
@@ -306,6 +308,12 @@ function placeholdersFor<P extends Partial<VideoPlan>>(scene: Scene, plan: P): {
   // the film's pictures that works, and placeholders stand in only when none do.
   const ownBroken = !!scene.media && imageFailed(scene.media.src);
   if (scene.media && !ownBroken) return { scene, plan };
+  // A captured website's own screenshots come first: the page (for scrolling) or the first screen,
+  // so a slide never shows a stand-in while the site's real pictures are there.
+  if (!isProduct && kind !== "photo") {
+    const shot = [kind === "page" ? plan.brand?.page?.src : plan.brand?.shot, plan.brand?.shot, plan.brand?.page?.src].find((x) => !!x && !imageFailed(x));
+    if (shot) return ownBroken || kind !== "page" ? { scene: { ...scene, media: { src: shot, kind: "image" } }, plan } : { scene, plan };
+  }
   const all = plan.brand?.images ?? [];
   const good = all.filter((x) => !imageFailed(x));
   if (good.length) {

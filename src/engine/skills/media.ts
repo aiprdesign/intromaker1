@@ -363,7 +363,9 @@ function screenWall(sc: SkillContext) {
   const { ctx, w, h, t, palette, u, brand } = sc;
   ctx.fillStyle = palette.bg0;
   ctx.fillRect(0, 0, w, h);
-  const imgs = (brand?.images ?? []).map((s) => getImage(s));
+  // The site's pictures, else its captured screens (the first screen, the page, the phone view).
+  const pics = brand?.images?.length ? brand.images : [brand?.shot, brand?.page?.src, brand?.mobile].filter((x): x is string => !!x);
+  const imgs = pics.map((s) => getImage(s));
   const ex = ease.inCubic(exitT(sc, 0.45));
   const k = ease.outExpo(range(t, 0, 1.2));
 
