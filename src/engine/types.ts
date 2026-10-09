@@ -266,7 +266,7 @@ export const PALETTE_IDS = [
 export type PaletteId = (typeof PALETTE_IDS)[number];
 
 /** Background shape sets (or watermark text) for SaaS slides; see shapes.ts. */
-export const SHAPE_SETS = ["geometric", "soft", "tech", "sparkle", "lines", "text"] as const;
+export const SHAPE_SETS = ["geometric", "soft", "tech", "sparkle", "lines", "motif", "text"] as const;
 export type ShapeSet = (typeof SHAPE_SETS)[number];
 
 /** The mouse pointer's look in product moments: "auto" is white on dark styles, graphite on light. */
@@ -507,8 +507,10 @@ export interface VideoPlan {
   pointer?: PointerStyle;
   /** Animated geometric shapes behind SaaS slides. On by default; false turns them off. */
   shapes?: boolean;
-  /** Which background shapes (default geometric), or "text" for watermark text. */
+  /** Which background shapes (default: the business's icons when it has some, else geometric), or "text" for watermark text. */
   shapeSet?: ShapeSet;
+  /** The business's own icons (Lucide names, from the prompt; see charpick motifPick): a pizza, a wrench… */
+  motifs?: string[];
   /** The watermark line for the "text" set (default: the brand's name). */
   watermark?: string;
   /** Headline text effect chosen in the studio; overrides the template's (look.text). */
@@ -668,6 +670,8 @@ export interface SkillContext {
   shapes?: number;
   /** Which background shapes, or watermark text. */
   shapeSet?: ShapeSet;
+  /** The business's own icons (VideoPlan.motifs). */
+  motifs?: string[];
   watermark?: string;
   /** The mouse pointer's look (unset: auto). */
   pointer?: PointerStyle;

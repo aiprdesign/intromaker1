@@ -6,6 +6,8 @@
  * - tech:      code brackets, braces, chevrons, a cursor, linked nodes, a prompt and a hash.
  * - sparkle:   four-point sparkles, stars, twinkles, small rings and plus signs.
  * - lines:     waves, concentric arcs, parallel strokes, dashed rings and spirals.
+ * - motif:     the business's own icons (VideoPlan.motifs: a cone, a wrench, scissors…) as large
+ *              thin line drawings, a few soft discs behind them: the trade reads at a glance.
  * - text:      watermark text: the brand's name (or any line) in big outlined rows drifting across
  *              the frame, alternate rows in opposite directions.
  *
@@ -16,6 +18,7 @@
  * default for SaaS videos (VideoPlan.shapes = false turns them off).
  */
 import { clamp, noise1, rgba, rng, TAU } from "./math";
+import { drawLucide } from "./icons";
 import { subFont } from "./text";
 import { SHAPE_SETS, type ShapeSet, type SkillContext } from "./types";
 
@@ -26,7 +29,7 @@ type Kind =
   | "sparkle" | "star" | "twinkle"
   | "wave" | "arcs" | "strokes" | "dashed" | "spiral";
 
-const SETS: Record<Exclude<ShapeSet, "text">, Kind[]> = {
+const SETS: Record<Exclude<ShapeSet, "text" | "motif">, Kind[]> = {
   geometric: ["ring", "triangle", "plus", "square", "dots", "hex", "arc", "zigzag", "disc"],
   soft: ["blob", "pill", "half", "squiggle", "bubble", "disc", "blob", "pill"],
   tech: ["code", "braces", "chevron", "cursor", "nodes", "prompt", "hash", "dots"],
@@ -41,14 +44,18 @@ export const SHAPE_SET_INFO: Record<ShapeSet, { name: string; note: string }> = 
   tech: { name: "Tech", note: "Code brackets, chevrons, nodes, a cursor" },
   sparkle: { name: "Sparkles", note: "Sparkles, stars and twinkles" },
   lines: { name: "Lines", note: "Waves, arcs, dashed rings, spirals" },
+  motif: { name: "Business icons", note: "Your trade's icons: a cone, a wrench, scissors" },
   text: { name: "Watermark text", note: "Your name in big rows drifting by" },
 };
 
-export function geoShapes(sc: SkillContext) {
+export function geoShapes(sc: SkillContext, opts: { scene?: boolean } = {}) {
   const seed = sc.shapes;
   if (seed === undefined) return;
-  const set: ShapeSet = sc.shapeSet && (SHAPE_SETS as readonly string[]).includes(sc.shapeSet) ? sc.shapeSet : "geometric";
+  // Unchosen: the business's own icons when it has some, else geometric shapes.
+  const set: ShapeSet = sc.shapeSet && (SHAPE_SETS as readonly string[]).includes(sc.shapeSet) ? sc.shapeSet : sc.motifs?.length ? "motif" : "geometric";
   if (set === "text") return watermark(sc);
+  // (Over an illustrated room the room itself says what the business is: no icons on top.)
+  if (set === "motif") return opts.scene ? undefined : motifs(sc, seed);
   const kinds = SETS[set];
   const { ctx, w, h, u, palette, music } = sc;
   const T = sc.globalT ?? sc.t;
@@ -92,6 +99,59 @@ export function geoShapes(sc: SkillContext) {
     ctx.restore();
   }
   ctx.restore();
+}
+
+/** Stand-in icons for the Business icons set before a prompt names a business. */
+const MOTIF_SAMPLE = ["Store", "Heart", "Star", "MapPin"];
+
+/**
+ * The business's icons: a handful of large line drawings in the brand's colours around the edges
+ * (the middle stays clear for the words), some on a soft tinted disc, drifting and turning a touch
+ * on the film's clock. Thin, even strokes and few of them, so the stage reads clean and modern
+ * and says what the business is before a word is read.
+ */
+function motifs(sc: SkillContext, seed: number) {
+  const { ctx, w, h, u, palette, music } = sc;
+  const T = sc.globalT ?? sc.t;
+  const icons = sc.motifs?.length ? sc.motifs : MOTIF_SAMPLE;
+  const light = !!palette.light;
+  const r = rng((seed ^ 0x3a17) >>> 0);
+  const portrait = h > w;
+  const n = portrait ? 6 : 7;
+  const kick = music && Number.isFinite(music.kick) ? Math.exp(-music.kick * 10) * music.energy : 0;
+  const fadeIn = clamp(T / 0.8);
+  const cols = [palette.primary, palette.secondary, palette.accent];
+  const m = Math.min(w, h);
+  for (let i = 0; i < n; i++) {
+    // Spread evenly round an ellipse in the outer band, starting at a random turn.
+    const a = (i / n) * TAU + r() * 0.5 + 0.3;
+    const depth = r();
+    const size = m * (0.11 + depth * 0.09);
+    const phase = r() * 100;
+    const icon = icons[i % icons.length];
+    const col = cols[i % cols.length];
+    const reach = (16 + depth * 26) * u;
+    const bx = portrait ? 0.4 : 0.43;
+    const by = portrait ? 0.43 : 0.4;
+    const x = w * (0.5 + Math.cos(a) * bx) + noise1(T * 0.06 + phase) * reach;
+    const y = h * (0.5 + Math.sin(a) * by) + noise1(T * 0.05 + phase + 31) * reach;
+    const s = size * (1 + kick * 0.06) * (0.97 + 0.03 * Math.sin(T * 0.8 + phase));
+    const alpha = (light ? 0.4 : 0.38) * (0.6 + 0.4 * depth) * fadeIn;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(T * 0.25 + phase) * 0.12 + (r() - 0.5) * 0.3);
+    // Every other icon sits on a soft disc of its colour.
+    if (i % 2 === 0) {
+      ctx.fillStyle = rgba(col, (light ? 0.1 : 0.08) * fadeIn);
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.78, 0, TAU);
+      ctx.fill();
+    }
+    // An even, fine stroke whatever the icon's size (Lucide draws on a 24-unit grid at 2 units).
+    const weight = (1.7 + depth * 0.6) * u / ((2 * s) / 24);
+    drawLucide(ctx, icon, 0, 0, s, rgba(col, alpha), { weight });
+    ctx.restore();
+  }
 }
 
 /**

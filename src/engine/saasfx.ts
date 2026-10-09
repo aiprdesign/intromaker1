@@ -310,6 +310,8 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
     ctx.restore();
   }
 
+  // (Whether an illustrated room or shop is the stage.)
+  let scened = false;
   if (backdrop === "eclipse") eclipseStage(sc, glowOp);
   else if (backdrop === "studio") studioStage(sc);
   else if (backdrop === "ribbon") ribbonStage(sc);
@@ -321,7 +323,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   else if (backdrop === "rain") rainStage(sc, glowOp);
   else if (backdrop === "plexus") plexusStage(sc, glowOp);
   else if (backdrop === "meadow") meadowStage(sc);
-  else sceneStage(sc, backdrop);
+  else scened = sceneStage(sc, backdrop);
 
   if (backdrop === "grid" && opts.grid !== false && look?.grid !== false) {
     // Over a shader stage the grid lives on its own layer, masked to fade at the edges;
@@ -418,7 +420,7 @@ export function saasBackground(sc: SkillContext, opts: { grid?: boolean; beams?:
   }
 
   // Animated geometric shapes floating around the edges (when the film has them on).
-  geoShapes(sc);
+  geoShapes(sc, { scene: scened });
 
   // Spotlight cone from above.
   if (light || backdrop === "plain" || backdrop === "scanlines" || backdrop === "beam" || backdrop === "studio") return;
@@ -1168,12 +1170,14 @@ const LEGACY: Record<string, string> = {
 };
 
 /** Pick the icon for a feature's wording (falls back to the product concept's icon family). */
-export function iconFor(label: string, i: number, sc?: Pick<SkillContext, "concept">): IconKind {
+export function iconFor(label: string, i: number, sc?: Pick<SkillContext, "concept" | "motifs">): IconKind {
+  if (sc?.motifs?.length) return lucideFor(label, i, sc.motifs, true);
   return lucideFor(label, i, CONCEPT_MAP[sc?.concept ?? "general"]?.icons);
 }
 
 /** Distinct icons for labels shown together in one scene. */
-export function iconsFor(labels: string[], sc?: Pick<SkillContext, "concept">): IconKind[] {
+export function iconsFor(labels: string[], sc?: Pick<SkillContext, "concept" | "motifs">): IconKind[] {
+  if (sc?.motifs?.length) return lucideIconsFor(labels, sc.motifs, true);
   return lucideIconsFor(labels, CONCEPT_MAP[sc?.concept ?? "general"]?.icons);
 }
 
@@ -1802,11 +1806,13 @@ export function imageless(sc: SkillContext) {
 
 /** The product's mark: its concept's lead icon (the same on every slide, like a logo). */
 export function brandIcon(sc: SkillContext): IconKind {
+  if (sc.motifs?.length) return sc.motifs[0];
   return (CONCEPT_MAP[sc.concept ?? "general"] ?? CONCEPT_MAP.general).icons[0] as IconKind;
 }
 
-/** The concept's icon family, with the brand's own icon first. */
+/** The concept's icon family, with the brand's own icon first (a local business: its own icons). */
 export function conceptIcons(sc: SkillContext): IconKind[] {
+  if (sc.motifs?.length) return sc.motifs;
   const set = (CONCEPT_MAP[sc.concept ?? "general"]?.icons ?? CONCEPT_MAP.general.icons) as IconKind[];
   const first = brandIcon(sc);
   return [first, ...set.filter((i) => i !== first)];
@@ -1854,6 +1860,8 @@ export function brandGlyph(sc: SkillContext, cx: number, cy: number, size: numbe
  */
 export function iconConstellation(sc: SkillContext, opts: { count?: number; start?: number; fade?: number; clear?: number } = {}) {
   const { ctx, w, h, t, u, palette, seed } = sc;
+  // (The business's icons already float behind the slide: no second set in tiles.)
+  if (sc.motifs?.length && sc.shapes !== undefined && (!sc.shapeSet || sc.shapeSet === "motif")) return;
   const icons = conceptIcons(sc);
   const n = opts.count ?? (h > w ? 7 : 9);
   const fade = 1 - (opts.fade ?? 0);

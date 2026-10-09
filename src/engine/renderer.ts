@@ -95,6 +95,7 @@ type PlanLike = Pick<VideoPlan, "palette" | "font" | "seed"> & {
   glow?: VideoPlan["glow"];
   shapes?: VideoPlan["shapes"];
   shapeSet?: VideoPlan["shapeSet"];
+  motifs?: VideoPlan["motifs"];
   watermark?: VideoPlan["watermark"];
   pointer?: VideoPlan["pointer"];
   title?: VideoPlan["title"];
@@ -247,6 +248,7 @@ function drawSceneOnce(
     // One set of shapes for the whole film, so they carry on across cuts.
     shapes: plan.style === "saas" && plan.shapes !== false ? plan.seed >>> 0 : undefined,
     shapeSet: plan.shapeSet,
+    motifs: plan.motifs,
     watermark: plan.shapeSet === "text" ? watermarkText(plan) : undefined,
     pointer: plan.pointer,
     cast: plan.cast,

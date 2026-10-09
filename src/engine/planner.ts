@@ -6,7 +6,7 @@ import { CONCEPT_MAP, CONCEPTS, detectConcept, rankMoments } from "./concepts";
 import { ownMoment } from "./momentitems";
 import { playSpeed } from "./speed";
 import { DEMO_SKILLS } from "./templates";
-import { hasSpecificIcon } from "./icons";
+import { hasIcon, hasSpecificIcon } from "./icons";
 import { writeVoiceover } from "./script";
 import { isClaimWord, isHealthClaim, isNumericClaim, isUnsafe, mentionsOffer, offerSafe, safeCopy } from "./claims";
 import { applyTemplate, DEFAULT_TEMPLATE, fitLength, TEMPLATE_MAP } from "./templates";
@@ -844,8 +844,10 @@ const LOCAL_KINDS: [RegExp, string, string][] = [
   [/\b(law|legal|tax|accounting|bookkeeping|agency)\b/i, "ind-team", "How we *help*"],
   [/\b(restaurants?|caf(e|é)s?|coffee|bak(ery|ehouse)|pizzas?|pizzeria|tacos?|ice cream|creamery|kitchen|diner|food truck|menu|sushi|bbq|smokehouse|trattoria|osteria|buffets?|curr(?:y|ies)|noodles?|bistro)\b/i, "ind-menu", "Fresh on the *menu*"],
   [/\b(church|chapel|parish|congregation|fellowship)\b/i, "ind-team", "Life at *{name}*"],
-  [/\b(plumb|electric|roof|construction|contract|hvac|heating|landscap|renovat|builders?)/i, "ind-site", "On the *job*"],
-  [/\b(mov(ing|ers)|delivery|cleaning|cleaners|lawn)\b/i, "ind-route", "We come to *you*"],
+  // (A plumber's own bathroom-and-pipes scene with its services tagged, not a building site.)
+  [/\b(plumb(?:ers?|ing))\b/i, "ind-shop", "What we *fix*"],
+  [/\b(electric|roof|construction|contract|hvac|heating|renovat|builders?)/i, "ind-site", "On the *job*"],
+  [/\b(mov(ing|ers)|delivery|cleaning|cleaners|lawn|landscap\w*)\b/i, "ind-route", "We come to *you*"],
   [/\b(daycare|preschool|school|tutor|dance|lessons|classes)\b/i, "ind-lesson", "A day at *{name}*"],
   [/\b(dental|dentists?|clinic)\b/i, "ind-care", "Your *visit*"],
 ];
@@ -3104,7 +3106,8 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     characters: (KINDS as readonly string[]).includes(raw.characters as string) ? (raw.characters as VideoPlan["characters"]) : undefined,
     setting: (SCENES as readonly string[]).includes(raw.setting as string) ? raw.setting : undefined,
     render3d: raw.render3d === "flat" ? "flat" : undefined,
-    shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) && raw.shapeSet !== "geometric" ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
+    shapeSet: (SHAPE_SETS as readonly string[]).includes(raw.shapeSet as string) ? (raw.shapeSet as VideoPlan["shapeSet"]) : undefined,
+    motifs: Array.isArray(raw.motifs) ? (raw.motifs as unknown[]).filter((m): m is string => typeof m === "string" && hasIcon(m)).slice(0, 6) : undefined,
     watermark: typeof raw.watermark === "string" && raw.watermark.trim() ? raw.watermark.trim().slice(0, 40) : undefined,
     textFx: (TEXT_FX as readonly string[]).includes(raw.textFx as string) ? (raw.textFx as VideoPlan["textFx"]) : undefined,
     concept: typeof raw.concept === "string" && CONCEPT_MAP[raw.concept] ? raw.concept : undefined,

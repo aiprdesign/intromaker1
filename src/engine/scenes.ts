@@ -55,16 +55,12 @@ function room(ctx: C, w: number, h: number, fy: number, wall: [string, string], 
   ctx.fillStyle = mixHex(wall[1], "#000000", 0.08);
   ctx.fillRect(0, fy - 8 * u, w, 8 * u);
   indoor = true;
-  // A soft wallpaper texture: faint vertical stripes.
-  for (let x = 0, i = 0; x < w; x += 34 * u, i++) {
-    ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.022)";
-    ctx.fillRect(x, 0, 34 * u, fy - 8 * u);
-  }
-  // Warm wall-wash lights pooling down from the ceiling.
+  // (A clean, flat wall: no wallpaper stripes, so the room reads crisp and modern.)
+  // Soft wall-wash lights pooling down from the ceiling.
   for (const fx of [0.22, 0.78]) {
     const lg = ctx.createRadialGradient(w * fx, 0, 0, w * fx, 0, fy * 0.95);
-    lg.addColorStop(0, "rgba(255,244,222,0.3)");
-    lg.addColorStop(0.55, "rgba(255,244,222,0.06)");
+    lg.addColorStop(0, "rgba(255,248,236,0.16)");
+    lg.addColorStop(0.55, "rgba(255,248,236,0.03)");
     lg.addColorStop(1, "rgba(255,244,222,0)");
     ctx.fillStyle = lg;
     ctx.fillRect(0, 0, w, fy);
@@ -76,7 +72,7 @@ function room(ctx: C, w: number, h: number, fy: number, wall: [string, string], 
   ctx.fillRect(0, 10 * u, w, 3 * u);
   // The floor: a polished sheen under the wall, a contact shadow at the baseboard, darker toward the front.
   const sheen = ctx.createLinearGradient(0, fy, 0, fy + (h - fy) * 0.45);
-  sheen.addColorStop(0, "rgba(255,255,255,0.2)");
+  sheen.addColorStop(0, "rgba(255,255,255,0.12)");
   sheen.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = sheen;
   ctx.fillRect(0, fy, w, (h - fy) * 0.45);
@@ -90,8 +86,9 @@ function room(ctx: C, w: number, h: number, fy: number, wall: [string, string], 
 }
 
 /**
- * The finishing light over an indoor scene: slow sunbeams slanting in from the upper left with dust
- * motes drifting in them, and a gentle vignette, so the room has depth and air.
+ * The finishing light over an indoor scene: faint sunbeams slanting in from the upper left with a
+ * few motes drifting in them, and a light vignette: depth and air without haze, so the room stays
+ * crisp and its props read at a glance.
  */
 function finishIndoor(sc: SkillContext) {
   const { ctx, w, h, u } = sc;
@@ -102,7 +99,7 @@ function finishIndoor(sc: SkillContext) {
     const x0 = w * (0.08 + i * 0.13) + Math.sin(T * 0.15 + i) * w * 0.01;
     const bw = w * (0.05 + i * 0.015);
     const g = ctx.createLinearGradient(x0, 0, x0 + w * 0.32, h);
-    g.addColorStop(0, "rgba(255,236,200,0.035)");
+    g.addColorStop(0, "rgba(255,236,200,0.02)");
     g.addColorStop(1, "rgba(255,236,200,0)");
     ctx.fillStyle = g;
     ctx.beginPath();
@@ -114,12 +111,12 @@ function finishIndoor(sc: SkillContext) {
   }
   // Dust motes catching the light.
   const r = rng(91);
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 8; i++) {
     const bx = w * (0.08 + r() * 0.45);
     const by = h * r();
     const x = bx + ((T * (6 + r() * 6) * u + by * 0.3) % (w * 0.15));
     const y = (by + T * (4 + r() * 5) * u) % h;
-    ctx.fillStyle = `rgba(255,245,225,${0.18 + 0.15 * Math.sin(T * 1.3 + i)})`;
+    ctx.fillStyle = `rgba(255,245,225,${0.12 + 0.1 * Math.sin(T * 1.3 + i)})`;
     ctx.beginPath();
     ctx.arc(x, y, (1.2 + r() * 1.6) * u, 0, TAU);
     ctx.fill();
@@ -128,7 +125,7 @@ function finishIndoor(sc: SkillContext) {
   // A gentle vignette.
   const v = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.35, w / 2, h * 0.5, Math.max(w, h) * 0.75);
   v.addColorStop(0, "rgba(30,20,10,0)");
-  v.addColorStop(1, "rgba(30,20,10,0.2)");
+  v.addColorStop(1, "rgba(30,20,10,0.1)");
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, w, h);
 }

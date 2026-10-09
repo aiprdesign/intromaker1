@@ -3,7 +3,7 @@
  * brief, its showcase style, characters where the brief asks for them), from a fixed seed so the
  * gallery stays the same between visits.
  */
-import { cartoonPick, scenePick, themePick, WANTS_CHARACTERS } from "./charpick";
+import { cartoonPick, motifPick, scenePick, themePick, WANTS_CHARACTERS } from "./charpick";
 import { planFromPrompt } from "./planner";
 import { introFor, looksOf, RANDOM_TOPICS, type RandomIntro } from "./surprise";
 import { applyTemplate } from "./templates";
@@ -52,7 +52,7 @@ export function showcaseIntros(): ShowcaseIntro[] {
       if (pick) plan = applyTemplate({ ...plan, characters: pick.characters, setting: scenePick(r.prompt) }, pick.template);
     }
     // The business's own scene (a bakery, a barber shop…) for its industry slides.
-    plan = { ...plan, setting: plan.setting ?? scenePick(r.prompt) };
+    plan = { ...plan, setting: plan.setting ?? scenePick(r.prompt), motifs: motifPick(r.prompt) };
     // The niche's colours (cosy browns for a restaurant, red and yellow for pizza…).
     if (r.colors && plan.brand) plan = { ...plan, brand: { ...plan.brand, colors: r.colors } };
     return { ...r, group: GROUP.get(kind) ?? "Apps", plan };

@@ -21,7 +21,7 @@
 import { clamp, ease, lerp, mixHex, range, rgba, TAU } from "../math";
 import { drawDog, drawHouse, sceneStage, type SceneBackdrop } from "../scenes";
 import { displayFont, fillTextFit, subFont } from "../text";
-import { drawIcon, saasBackground, saasFont } from "../saasfx";
+import { drawIcon, luminance, saasBackground, saasFont } from "../saasfx";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { bounceIn, drawAbstract, idle, person, waveArm, type AbsRig } from "./abstract";
 import { exitOf, itemsOr, split, stage } from "./beats";
@@ -35,18 +35,18 @@ const INK = "#1f1d2b";
 const onLight = (p: Palette): Palette => (p.light ? p : { ...p, text: INK, light: true, bg0: "#f7f5f2", bg1: "#ffffff" });
 
 /** Paint a scene (unless the stage is drawn elsewhere) and return the context for drawing on it. */
-function scenic(sc: SkillContext, backdrop: SceneBackdrop | "lawn", bare = false): SkillContext {
+function scenic(sc: SkillContext, backdrop: SceneBackdrop | "sky", bare = false): SkillContext {
   const s2 = { ...sc, palette: onLight(sc.palette) };
   useToon(s2);
   if (!sc.noStage) {
-    if (backdrop === "lawn") lawn(s2);
+    if (backdrop === "sky") skyLawn(s2);
     else sceneStage(s2, backdrop, { bare });
   }
   return s2;
 }
 
 /** A plain sky over a lawn: the stage for a house. */
-function lawn(sc: SkillContext) {
+function skyLawn(sc: SkillContext) {
   const { ctx, w, h, u, palette } = sc;
   const T = sc.globalT ?? sc.t;
   const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -212,7 +212,7 @@ function sceneIn(sc: SkillContext, backdrop: SceneBackdrop, x: number, y: number
 }
 
 function homeTour(sc0: SkillContext) {
-  const sc = scenic(sc0, "lawn");
+  const sc = scenic(sc0, "sky");
   const { ctx, w, h, t, u, palette, scene, seed } = sc;
   const T0 = sc.globalT ?? t;
   const st = stage(sc);
@@ -321,7 +321,7 @@ function homeTour(sc0: SkillContext) {
 const BUILD_POINTS = ["Design", "Foundation", "Framing", "Move in"];
 
 function homeBuild(sc0: SkillContext) {
-  const sc = scenic(sc0, "lawn");
+  const sc = scenic(sc0, "sky");
   const { ctx, w, h, t, u, palette, scene, seed } = sc;
   const T0 = sc.globalT ?? t;
   const st = stage(sc);
@@ -879,6 +879,29 @@ function aboutUs(sc: SkillContext) {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(place, cs * 2, 1 * u);
+    ctx.restore();
+  }
+  // The business's own icon (a cone, a wrench, scissors…) badged on the picture's corner.
+  const lead = sc.motifs?.[0];
+  if (lead) {
+    const bk = ease.outBack(range(t, 0.55, 0.95));
+    const bs = 34 * u * S;
+    ctx.save();
+    ctx.globalAlpha = clamp(bk) * out;
+    ctx.translate(fx + fw - bs * 0.95 - 8 * u, fy + bs * 0.95 + 8 * u);
+    ctx.scale(0.7 + 0.3 * bk, 0.7 + 0.3 * bk);
+    ctx.shadowColor = "rgba(10,10,30,0.25)";
+    ctx.shadowBlur = 18 * u;
+    ctx.shadowOffsetY = 6 * u;
+    ctx.fillStyle = palette.primary;
+    ctx.beginPath();
+    ctx.arc(0, 0, bs, 0, TAU);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 3 * u;
+    ctx.stroke();
+    drawIcon(ctx, lead, 0, 0, bs * 1.05, luminance(palette.primary) > 0.6 ? INK : "#ffffff");
     ctx.restore();
   }
   // The words: beside the picture in a wide frame, under it otherwise.

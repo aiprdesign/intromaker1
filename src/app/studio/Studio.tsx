@@ -8,7 +8,7 @@ import SkillPicker from "@/components/SkillPicker";
 import PointerPicker, { POINTER_NAMES } from "@/components/PointerPicker";
 import { CastThumb, CharacterDesignerModal, loadCast, saveCast } from "@/components/CharacterDesigner";
 import { brandPalette } from "@/engine/renderer";
-import { cartoonPick, scenePick, themePick, WANTS_CHARACTERS, type CharacterPick } from "@/engine/charpick";
+import { cartoonPick, motifPick, scenePick, themePick, WANTS_CHARACTERS, type CharacterPick } from "@/engine/charpick";
 import CharacterKindPicker, { CHARACTER_NAMES, type CharacterChoice } from "@/components/CharacterKindPicker";
 import ShapesPicker from "@/components/ShapesPicker";
 import { SHAPE_SET_INFO } from "@/engine/shapes";
@@ -448,20 +448,21 @@ export default function Studio() {
     const want = castOn && cast.length ? cast : undefined;
     if (JSON.stringify(plan.cast ?? null) !== JSON.stringify(want ?? null)) setPlan((p) => ({ ...p, cast: want }));
   }, [plan, cast, castOn]);
-  // What floats behind SaaS slides: a set of animated shapes (geometric by default), watermark
-  // text, or nothing. Remembered, and saved with the video.
-  const [shapes, setShapes] = useState<ShapeSet | "off">("geometric");
+  // What floats behind SaaS slides: automatic (the business's own icons when the prompt names a
+  // business, else geometric shapes), a chosen set, watermark text, or nothing. Remembered, and
+  // saved with the video.
+  const [shapes, setShapes] = useState<ShapeSet | "off" | "auto">("auto");
   const [watermark, setWatermark] = useState("");
   useEffect(() => {
     try {
       const v = localStorage.getItem("intromaker.shapes");
-      if (v === "off" || (SHAPE_SETS as readonly string[]).includes(v ?? "")) setShapes(v as ShapeSet | "off");
+      if (v === "off" || v === "auto" || (SHAPE_SETS as readonly string[]).includes(v ?? "")) setShapes(v as ShapeSet | "off" | "auto");
       setWatermark(localStorage.getItem("intromaker.watermark") ?? "");
     } catch {
       /* ignore */
     }
   }, []);
-  const chooseShapes = (v: ShapeSet | "off") => {
+  const chooseShapes = (v: ShapeSet | "off" | "auto") => {
     setShapes(v);
     try {
       localStorage.setItem("intromaker.shapes", v);
@@ -480,7 +481,7 @@ export default function Studio() {
   useEffect(() => {
     const want = {
       shapes: shapes === "off" ? false : undefined,
-      shapeSet: shapes === "off" || shapes === "geometric" ? undefined : shapes,
+      shapeSet: shapes === "off" || shapes === "auto" ? undefined : shapes,
       watermark: shapes === "text" && watermark.trim() ? watermark.trim().slice(0, 40) : undefined,
     };
     if (plan.shapes !== want.shapes || plan.shapeSet !== want.shapeSet || plan.watermark !== want.watermark) setPlan((p) => ({ ...p, ...want }));
@@ -967,6 +968,9 @@ export default function Studio() {
     const chars = charsRef.current === "auto" ? characterPick(p)?.characters : charsRef.current === "own" ? undefined : charsRef.current;
     // Where they are (an office, a hospital…), from the intro's theme.
     const setting = p.style === "saas" && !p.product ? scenePick(promptRef.current) : undefined;
+    // The business's own icons (a cone, a wrench…) for the background, from the same words.
+    const motifs = p.style === "saas" && !p.product ? motifPick(promptRef.current || [p.title, p.brand?.name].filter(Boolean).join(" ")) : undefined;
+    if (JSON.stringify(p.motifs ?? null) !== JSON.stringify(motifs ?? null)) p = { ...p, motifs };
     if (p.characters !== chars || p.setting !== setting) {
       p = { ...p, characters: chars, setting };
       const tid = suggested ?? p.template;
@@ -2723,9 +2727,9 @@ export default function Studio() {
             <>
               <details className="fold">
                 <summary>
-                  <span className="field-label inline">Background shapes</span> <span className="tpl-desc">{shapes === "off" ? "Off" : SHAPE_SET_INFO[shapes].name}</span>
+                  <span className="field-label inline">Background shapes</span> <span className="tpl-desc">{shapes === "off" ? "Off" : shapes === "auto" ? (plan.motifs?.length ? "Automatic: business icons" : "Automatic") : SHAPE_SET_INFO[shapes].name}</span>
                 </summary>
-                <ShapesPicker value={shapes} onChange={chooseShapes} watermark={watermark} onWatermark={chooseWatermark} plan={{ palette: plan.palette, font: plan.font, seed: plan.seed, bpm: plan.bpm, brand: plan.brand, look: plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look }} />
+                <ShapesPicker value={shapes} onChange={chooseShapes} watermark={watermark} onWatermark={chooseWatermark} plan={{ palette: plan.palette, font: plan.font, seed: plan.seed, bpm: plan.bpm, brand: plan.brand, motifs: plan.motifs, look: plan.style === "saas" ? plan.look : TEMPLATE_MAP[template].look }} />
                 <p className="hint">{shapes === "off" ? "A clean stage with no floating shapes." : shapes === "text" ? "Your line in big, faint rows drifting behind the slides." : "They drift around the edges and pulse with the beat."}</p>
               </details>
             </>

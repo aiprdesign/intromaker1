@@ -17,11 +17,11 @@ export default function ShapesPicker({
   onWatermark,
   plan,
 }: {
-  value: ShapeSet | "off";
-  onChange: (v: ShapeSet | "off") => void;
+  value: ShapeSet | "off" | "auto";
+  onChange: (v: ShapeSet | "off" | "auto") => void;
   watermark: string;
   onWatermark: (text: string) => void;
-  plan: Pick<VideoPlan, "palette" | "font" | "seed" | "look" | "bpm" | "brand">;
+  plan: Pick<VideoPlan, "palette" | "font" | "seed" | "look" | "bpm" | "brand" | "motifs">;
 }) {
   return (
     <>
@@ -30,11 +30,15 @@ export default function ShapesPicker({
           <span className="fx-name">Off</span>
           <span className="fx-note">A clean stage</span>
         </button>
+        <button role="option" aria-selected={value === "auto"} className={`fx-card default ${value === "auto" ? "active" : ""}`} onClick={() => onChange("auto")}>
+          <span className="fx-name">Automatic</span>
+          <span className="fx-note">{plan.motifs?.length ? "Your business's icons" : "Business icons when the prompt names one"}</span>
+        </button>
         {SHAPE_SETS.map((id) => (
           <button key={id} role="option" aria-selected={value === id} className={`fx-card ${value === id ? "active" : ""}`} onClick={() => onChange(id)} title={SHAPE_SET_INFO[id].note}>
             <LoopCanvas
               scene={SAMPLE}
-              plan={{ palette: plan.palette, font: plan.font, seed: plan.seed, style: "saas", bpm: plan.bpm, look: plan.look, brand: plan.brand, shapeSet: id, watermark: watermark || undefined }}
+              plan={{ palette: plan.palette, font: plan.font, seed: plan.seed, style: "saas", bpm: plan.bpm, look: plan.look, brand: plan.brand, motifs: plan.motifs, shapeSet: id, watermark: watermark || undefined }}
               long={240}
               fps={20}
             />

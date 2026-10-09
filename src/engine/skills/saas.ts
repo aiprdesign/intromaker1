@@ -1701,16 +1701,17 @@ function ctaLockup(sc: SkillContext) {
     fillTextMid(ctx, brand.name, mx + size * 1.4, 0);
     ctx.restore();
   }
-  // (Beside a card the headline takes the left column; above one in a tall frame it sits higher.)
+  // (Beside a card the headline takes the left column, kept clear of the card; above one in a tall
+  // frame it sits higher.)
   const cy = side ? h * (hasLogo ? 0.47 : 0.45) : card ? h * (tall ? (hasLogo ? 0.4 : 0.37) : hasLogo ? 0.33 : 0.31) : h * (hasLogo ? 0.44 : 0.4);
-  const layout = sentence(sc, { text: accented(scene.text), cy, sizeFrac: side ? 0.085 : card && !tall ? 0.08 : 0.1, widthFrac: side ? 0.5 : 0.8, maxLines: side ? 3 : 2 });
+  const layout = sentence(sc, { text: accented(scene.text), cy, sizeFrac: side ? 0.085 : card && !tall ? 0.08 : 0.1, widthFrac: side ? 0.42 : 0.8, maxLines: side ? 3 : 2 });
   blurInLayout(sc, layout, 0.2, stagger(sc), { exitAt: d + 1 });
   const by = layout.ys[layout.ys.length - 1] + layout.size * 0.6 + (card && !side ? 64 : 80) * u;
   const button = ctaButton(sc, w / 2, by, S, T, { info: !card });
   ctx.restore();
   if (card) {
     // (Beside the call to action, centred on its column: lock-up to button.)
-    if (side) contactCard(sc, details, w * 0.71, null, (h * 0.2 + by + button.bh / 2) / 2, Math.min(w * 0.42, 760 * u), 1.3, T);
+    if (side) contactCard(sc, details, w * 0.72, null, (h * 0.2 + by + button.bh / 2) / 2, Math.min(w * 0.4, 740 * u), 1.3, T);
     else contactCard(sc, details, w / 2, by + button.bh / 2 + 34 * u * S, null, Math.min(w * 0.86, 820 * u * S), S, T);
   }
   ctx.restore();

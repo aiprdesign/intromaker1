@@ -14,7 +14,7 @@ type Props =
   | { plan: VideoPlan; scene?: undefined; long?: number; fps?: number; className?: string; /** A still poster frame, no animation. */ still?: boolean }
   | {
       scene: Scene;
-      plan: Pick<VideoPlan, "palette" | "font" | "seed"> & Partial<Pick<VideoPlan, "style" | "look" | "bpm" | "brand" | "product" | "title" | "trailerStyle" | "shapes" | "shapeSet" | "watermark">>;
+      plan: Pick<VideoPlan, "palette" | "font" | "seed"> & Partial<Pick<VideoPlan, "style" | "look" | "bpm" | "brand" | "product" | "title" | "trailerStyle" | "shapes" | "shapeSet" | "motifs" | "watermark">>;
       long?: number;
       fps?: number;
       className?: string;

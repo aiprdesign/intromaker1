@@ -335,7 +335,7 @@ function matchesIn(text: string): Match[] {
  * ("Team *calendar*" is a calendar, "Fast *checkout*" a card), then the rest of the title, then
  * its one-line description ("Title — description"), then modifiers ("fast", "live").
  */
-function candidates(label: string): string[] {
+function candidates(label: string, specificOnly = false): string[] {
   const [rawTitle, desc = ""] = label.split(/\s+[—–]\s+/);
   const title = rawTitle.toLowerCase();
   // The head phrase: the title up to its first preposition or "and" ("Dashboards *for teams*").
@@ -348,13 +348,16 @@ function candidates(label: string): string[] {
   const inHead = matchesIn(head);
   const inTitle = matchesIn(title);
   const inDesc = matchesIn(desc.toLowerCase());
-  const ordered = [...byHead(specific(inHead)), ...byHead(specific(inTitle)), ...byOrder(specific(inDesc)), ...byHead(generic(inTitle)), ...byOrder(generic(inDesc))].map((m) => m.icon);
+  const ordered = [...byHead(specific(inHead)), ...byHead(specific(inTitle)), ...byOrder(specific(inDesc)), ...(specificOnly ? [] : [...byHead(generic(inTitle)), ...byOrder(generic(inDesc))])].map((m) => m.icon);
   return [...new Set(ordered)];
 }
 
-/** Pick the icon for a label; `family` (the concept's icons) gives on-brand fallbacks. */
-export function iconFor(label: string, i: number, family: string[] = DEFAULT_FAMILY): string {
-  return candidates(label)[0] ?? family[i % family.length] ?? "Sparkles";
+/**
+ * Pick the icon for a label; `family` (the concept's icons) gives on-brand fallbacks. `own`: the
+ * family is the business's own icons (a cone, a wrench), which beat loose keyword matches.
+ */
+export function iconFor(label: string, i: number, family: string[] = DEFAULT_FAMILY, own = false): string {
+  return candidates(label, own)[0] ?? family[i % family.length] ?? "Sparkles";
 }
 
 /**
@@ -363,13 +366,13 @@ export function iconFor(label: string, i: number, family: string[] = DEFAULT_FAM
  * next match, then an icon related to its best one (another chart, another calendar), and only
  * then one from the product's icon family.
  */
-export function iconsFor(labels: string[], family: string[] = DEFAULT_FAMILY): string[] {
+export function iconsFor(labels: string[], family: string[] = DEFAULT_FAMILY, own = false): string[] {
   const used = new Set<string>();
   const pick = (icon: string) => {
     used.add(icon);
     return icon;
   };
-  const wants = labels.map(candidates);
+  const wants = labels.map((l) => candidates(l, own));
   return labels.map((_, i) => {
     const own = wants[i];
     // The best match, then a cousin of it (another chart, another calendar), before weaker matches.

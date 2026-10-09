@@ -79,7 +79,7 @@ export function scenePick(prompt: string): VideoPlan["setting"] {
   if (/\b(antiques?|vintage furniture|collectibles?|curiosit(?:y|ies))\b/.test(p)) return "antique";
   if (/\b(thrift|second-?hand|consignment|resale|pre-?loved|op shops?|charity shops?)\b/.test(p)) return "thrift";
   if (/\b(bakery|bakeries|bakers?|bakehouse|pastr(?:y|ies)|cakes?|cupcakes?|donuts?|doughnuts?)\b/.test(p)) return "bakery";
-  if (/\b(restaurants?|bistros?|diners?|pizzerias?|pizza|steakhouses?|trattorias?|dining|dinner|tacos?|grill)\b/.test(p)) return "restaurant";
+  if (/\b(restaurants?|bistros?|diners?|pizzerias?|pizza|steakhouses?|smokehouses?|bbq|barbecue|trattorias?|dining|dinner|tacos?|grill)\b/.test(p)) return "restaurant";
   if (/\b(construction|builders?|building sites?|contractors?|renovations?|remodel(?:ing)?|roofing|plumb(?:ers?|ing)|electricians?|handyman|architects?|engineering firms?|civil engineering)\b/.test(p)) return "construction";
   if (/\b(hospitals?|clinics?|clinical|doctors?|nurses?|nursing|patients?|medical|health ?care|telehealth|dentists?|dental|pharmac(?:y|ies|ists?)|physio(?:therapy)?|caregivers?|care homes?)\b/.test(p)) return "hospital";
   if (/\b(classrooms?|schools?|teachers?|teaching|tutors?|tutoring|homework|lessons?|pupils|students?|study|studying|flashcards?|kindergarten|universit(?:y|ies)|college)\b/.test(p)) return "classroom";
@@ -89,4 +89,74 @@ export function scenePick(prompt: string): VideoPlan["setting"] {
   if (/\b(homes?|households?|famil(?:y|ies)|parents?|parenting|chores|smart home|cleaning|cleaners|cooking|recipes?|pets?|babysit(?:ter|ting)?|elderly care|home care|furniture)\b/.test(p)) return "home";
   if (/\b(offices?|teams?|workplace|coworkers?|colleagues|employees?|hiring|recruit(?:ing|ment|ers?)?|hr|onboarding|meetings?|crm|accounting|bookkeeping|invoic(?:e|es|ing)|payroll|b2b|saas|productivity|project management|startups?|consult(?:ing|ants?)|legal|lawyers?|finance|insurance)\b/.test(p)) return "office";
   return undefined;
+}
+
+/**
+ * The business's own icons for a prompt (Lucide names): a pizza place gets a pizza, a chef's hat
+ * and a flame; a plumber a wrench, water drops and a shower head. They float behind its slides
+ * (the "Business icons" background) and badge its pictures, so the trade reads at a glance.
+ * Undefined when the prompt names no business these cover.
+ */
+const MOTIFS: [RegExp, string[]][] = [
+  [/\b(ice ?cream|gelato|frozen yogh?urt|creamery|sundaes?|soft serve)\b/, ["IceCreamCone", "Candy", "CakeSlice", "Sun"]],
+  [/\b(pizza|pizzeria)\b/, ["Pizza", "ChefHat", "Flame", "Utensils"]],
+  [/\b(burgers?|diner|fries)\b/, ["Hamburger", "Beef", "Flame", "Utensils"]],
+  [/\b(bbq|barbecue|smokehouse|brisket|steak ?house)\b/, ["Beef", "Flame", "ChefHat", "Utensils"]],
+  [/\b(sushi|ramen|japanese|seafood|fish)\b/, ["Fish", "Soup", "ChefHat", "Utensils"]],
+  [/\b(chinese|thai|indian|curry|buffet|dim sum|noodles?|vietnamese|korean|pho|tandoori|thali)\b/, ["Soup", "CookingPot", "ChefHat", "Flame", "Utensils"]],
+  [/\b(taco|tacos|mexican|burrito|taqueria|food truck)\b/, ["Utensils", "Flame", "Sandwich", "ChefHat"]],
+  [/\b(coffee|caf[eé]s?|espresso|roaster[sy]?|tea ?house)\b/, ["Coffee", "Croissant", "CakeSlice", "Heart"]],
+  [/\b(bak(?:ery|eries|er)|pastr(?:y|ies)|patisserie|cupcakes?|donuts?|bread)\b/, ["Croissant", "CakeSlice", "ChefHat", "Coffee"]],
+  [/\b(wine bar|winery|brewery|pub|cocktails?)\b/, ["Wine", "Utensils", "Music", "Star"]],
+  [/\b(restaurants?|trattoria|bistro|eatery|kitchen|catering|grill)\b/, ["Utensils", "ChefHat", "Wine", "Soup"]],
+  [/\b(barbers?|barbershops?)\b/, ["Scissors", "Sparkles", "Smile", "Star"]],
+  [/\b(nail (?:salons?|bars?|studios?)|manicures?|pedicures?)\b/, ["Sparkles", "Hand", "Gem", "Brush"]],
+  [/\b(tattoos?|piercing)\b/, ["PenTool", "Brush", "Palette", "Star"]],
+  [/\b(hair ?salons?|salons?|hairdress(?:ers?|ing)|stylists?|beauty|spa|lashes|brows)\b/, ["Scissors", "Sparkles", "Brush", "Heart"]],
+  [/\b(pet groom\w*|groomers?|dog walk\w*|pet sitt\w*|vets?|veterinar\w*|kennels?)\b/, ["PawPrint", "Dog", "Cat", "Bone", "Heart"]],
+  [/\b(dent(?:al|ists?)|orthodont\w*)\b/, ["Smile", "Sparkles", "CalendarCheck", "ShieldCheck"]],
+  [/\b(clinics?|doctors?|physio\w*|chiropract\w*|pharmac(?:y|ies))\b/, ["Stethoscope", "HeartPulse", "CalendarCheck", "Pill"]],
+  [/\b(car wash(?:es)?|detailing)\b/, ["CarFront", "Droplets", "SprayCan", "Sparkles"]],
+  [/\b(auto repair|mechanics?|garages?|collision|body shop|oil changes?|tires?|tyres?|auto care|brakes?)\b/, ["Wrench", "CarFront", "Settings", "Gauge"]],
+  [/\b(phones? (?:and \w+ )?repairs?|(?:screen|tablet|device|electronics|computer|laptop) repairs?|cell ?phones?)\b/, ["Smartphone", "Wrench", "Settings", "Zap"]],
+  [/\b(plumb(?:ers?|ing)|drains?|leaks?|water heaters?|pipes?)\b/, ["Wrench", "Droplets", "ShowerHead", "Bath", "Toolbox"]],
+  [/\b(electricians?|electrical|wiring|ev chargers?)\b/, ["PlugZap", "Zap", "Lightbulb", "Toolbox"]],
+  [/\b(hvac|heating|cooling|air condition\w*|furnaces?|heat pumps?)\b/, ["Thermometer", "Snowflake", "Flame", "Fan"]],
+  [/\b(roof(?:ers?|ing|s)?|shingles?|gutters?)\b/, ["House", "Hammer", "HardHat", "Construction"]],
+  [/\b(landscap\w*|lawns?|mowing|gardens?|gardeners?|yards?|tree (?:care|service)|hedges?)\b/, ["Trees", "Shrub", "Sprout", "Shovel", "Sun"]],
+  [/\b(clean(?:ers|ing)?|maids?|janitorial|housekeeping|carpet care)\b/, ["SprayCan", "Sparkles", "Droplets", "House"]],
+  [/\b(movers?|moving)\b/, ["Truck", "Box", "Boxes", "House"]],
+  [/\b(builders?|construction|contractors?|remodel\w*|renovat\w*|handyman|carpent\w*)\b/, ["HardHat", "Hammer", "Construction", "Toolbox"]],
+  [/\b(florists?|flowers?|bouquets?)\b/, ["Flower2", "Flower", "Heart", "Gift"]],
+  [/\b(plant shop|plants?|nurser(?:y|ies)|succulents?)\b/, ["Sprout", "Leaf", "Flower2", "Sun"]],
+  [/\b(daycare|preschool|nurser(?:y|ies)|childcare|kids club)\b/, ["Baby", "Blocks", "Smile", "Heart"]],
+  [/\b(yoga|pilates|meditation|barre)\b/, ["Sun", "Heart", "Leaf", "Waves"]],
+  [/\b(dance|ballet|salsa)\b/, ["Music", "Sparkles", "Star", "Heart"]],
+  [/\b(gyms?|boxing|crossfit|fitness|personal train\w*|martial arts|weight ?lifting)\b/, ["Dumbbell", "Flame", "Timer", "Trophy"]],
+  [/\b(photograph\w*|photo studio)\b/, ["Camera", "Image", "Sparkles", "Star"]],
+  [/\b(bookstores?|bookshops?|books|library)\b/, ["BookOpen", "Coffee", "Glasses", "Star"]],
+  [/\b(antiques?|vintage furniture|collectibles?)\b/, ["Clock", "Watch", "Lamp", "Armchair", "Gem"]],
+  [/\b(thrift|second-?hand|consignment|vintage|resale)\b/, ["Shirt", "Tag", "Recycle", "ShoppingBag"]],
+  [/\b(music (?:shop|store|lessons?|school)|guitars?|instruments?|pianos?|drums?)\b/, ["Guitar", "Piano", "Drum", "Music"]],
+  [/\b(church(?:es)?|parish|worship|congregation|ministr(?:y|ies)|chapel)\b/, ["Church", "Heart", "HandHeart", "Users"]],
+  [/\b(bed and breakfast|b&b|hotels?|inns?|motels?|guest ?house|lodge)\b/, ["BedDouble", "Coffee", "KeyRound", "ConciergeBell"]],
+  [/\b(tax(?:es)?|accountants?|accounting|bookkeep\w*|cpa)\b/, ["Calculator", "Receipt", "FileText", "Coins"]],
+  [/\b(law firm|lawyers?|attorneys?|legal)\b/, ["Scale", "Gavel", "Briefcase", "FileText"]],
+  [/\b(real estate|realtors?|estate agents?|homes? for sale|home ?builders?|new homes?)\b/, ["House", "KeyRound", "MapPin", "Handshake"]],
+];
+
+export function motifPick(prompt: string): string[] | undefined {
+  // (Not the quoted name, which can say anything — "Masala Garden" isn't a garden — nor the
+  // request's tone words: "a clean, modern intro for …".)
+  const p = prompt
+    .toLowerCase()
+    .replace(/"[^"\n]*"|“[^”\n]*”/g, " ")
+    .replace(/^[^\n]*?\b(?:intro|video)s? (?:for|about)\b/, " ");
+  // The business named first wins ("a bakery … with coffee" is a bakery).
+  let best: { at: number; icons: string[] } | undefined;
+  for (const [re, icons] of MOTIFS) {
+    const at = p.search(re);
+    if (at >= 0 && (!best || at < best.at)) best = { at, icons };
+  }
+  return best?.icons;
 }
