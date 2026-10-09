@@ -845,8 +845,8 @@ const LOCAL_KINDS: [RegExp, string, string][] = [
   [/\b(restaurants?|caf(e|é)s?|coffee|bak(ery|ehouse)|pizzas?|pizzeria|tacos?|ice cream|creamery|kitchen|diner|food truck|menu|sushi|bbq|smokehouse|trattoria|osteria|buffets?|curr(?:y|ies)|noodles?|bistro)\b/i, "ind-menu", "Fresh on the *menu*"],
   [/\b(church|chapel|parish|congregation|fellowship)\b/i, "ind-team", "Life at *{name}*"],
   // (A plumber's own bathroom-and-pipes scene with its services tagged, not a building site.)
-  [/\b(plumb(?:ers?|ing))\b/i, "ind-shop", "What we *fix*"],
-  [/\b(electric|roof|construction|contract|hvac|heating|renovat|builders?)/i, "ind-site", "On the *job*"],
+  [/\b(plumb(?:ers?|ing)|electricians?|electrical|hvac|heating|air condition\w*)\b/i, "ind-shop", "What we *fix*"],
+  [/\b(roof|construction|contract|renovat|builders?)/i, "ind-site", "On the *job*"],
   [/\b(mov(ing|ers)|delivery|cleaning|cleaners|lawn|landscap\w*)\b/i, "ind-route", "We come to *you*"],
   [/\b(daycare|preschool|school|tutor|dance|lessons|classes)\b/i, "ind-lesson", "A day at *{name}*"],
   [/\b(dental|dentists?|clinic)\b/i, "ind-care", "Your *visit*"],
@@ -898,9 +898,11 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
     const town = pitch.match(/\bin ([A-Z][a-z]+(?: [A-Z][a-z]+)?)$/)?.[1];
     const what = town ? pitch.replace(/\s+in [A-Z][a-z]+(?: [A-Z][a-z]+)?$/, "") : pitch;
     // (Lower-cased for the sentence, but not an acronym: "AC installs".)
-    const lower = items.map((x) => (/^[A-Z][a-z]/.test(x) && !/^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Christmas|Easter)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x));
+    const lower = items.map((x) => (/^(?:[A-Z][a-z]|A\s)/.test(x) && !/^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Christmas|Easter)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x));
     // A shop, a café or a studio is somewhere to come in to; a trade or a firm offers its services.
-    const verb = ["ind-menu", "ind-shop", "ind-lesson"].includes(skill) ? "Come in for" : "We offer";
+    // (A trade comes to you: an electrician offers rewiring, nobody comes in for it.)
+    const trade = /\b(plumb|electric|hvac|heating|air condition|roof|clean(?:ing|ers)|lawn|landscap|mov(?:ing|ers)|contract|handyman)/i.test(prompt);
+    const verb = ["ind-menu", "ind-shop", "ind-lesson"].includes(skill) && !trade ? "Come in for" : "We offer";
     const about = `${name} is ${what}${town ? ` in ${town}` : ""}${brief.audience ? `, for ${brief.audience.replace(/[.]+$/, "")}` : ""}.${lower.length >= 2 ? ` ${verb} ${lower[0]} and ${lower[1]}.` : ""}`;
     const at = out.findIndex((s) => s.role === "reveal");
     const next = out[at + 1] ?? out[out.length - 1];

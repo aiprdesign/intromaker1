@@ -545,10 +545,10 @@ function drawBoard(sc: SkillContext, kind: BoardKind, x: number, y: number, bw: 
 /** The business scenes a board suits: a menu in a restaurant or bakery, shop tags in a salon or florist… */
 const BOARD_SCENES: Record<BoardKind, SceneBackdrop[]> = {
   menu: ["cafe", "restaurant", "bakery", "asian", "icecream"],
-  tags: ["shop", "salon", "florist", "bookstore", "hotel", "garage", "antique", "thrift", "music", "repair", "plumbing", "lawn", "cleaning"],
+  tags: ["shop", "salon", "florist", "bookstore", "hotel", "garage", "antique", "thrift", "music", "repair", "plumbing", "lawn", "cleaning", "electrical", "hvac", "photo", "petgroom", "tattoo", "carwash"],
   chalk: ["classroom", "gym", "yoga"],
-  clipboard: ["hospital"],
-  sticky: ["office", "church"],
+  clipboard: ["hospital", "dental"],
+  sticky: ["office", "church", "law", "accounting"],
 };
 
 function boardSlide(sc0: SkillContext, B: BoardSpec) {
@@ -583,7 +583,8 @@ function boardSlide(sc0: SkillContext, B: BoardSpec) {
       const cols = [palette.primary, palette.accent, mixHex(palette.secondary, "#ffffff", 0.2), mixHex(palette.primary, "#ffffff", 0.4)];
       const nx = B.board === "tags" ? bx + (bw * (i + 0.5)) / n : bx + bw * (i % 2 ? 0.66 : 0.34);
       const ny = B.board === "tags" ? by + 60 * u + (bh - 60 * u) * 0.35 : by + bh * (0.25 + Math.floor(i / 2) * 0.42);
-      const nw = B.board === "tags" ? Math.min(bw / n - 14 * u, 220 * u * S) : bw * 0.4;
+      // (Sticky notes sit side by side without covering each other's words.)
+      const nw = B.board === "tags" ? Math.min(bw / n - 14 * u, 220 * u * S) : bw * 0.34;
       const nh = B.board === "tags" ? nw * 0.75 : bh * 0.34;
       linePos.push({ x: nx, y: ny });
       if (k <= 0) return;

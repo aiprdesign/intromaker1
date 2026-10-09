@@ -60,6 +60,17 @@ export function themePick(prompt: string): CharacterPick | undefined {
 export function scenePick(prompt: string): VideoPlan["setting"] {
   const p = prompt.toLowerCase();
   if (/\b(home ?builders?|house ?builders?|custom homes?|new homes?|new[- ]build|real estate|realtors?|estate agents?|propert(?:y|ies) (?:listings?|developers?|management)|homes? for sale|house hunting|mortgages?|interior design(?:ers?)?|show ?homes?)\b/.test(p)) return "house";
+  // Professional services, each in its own place (before the broader salon, garage, clinic and office rules).
+  if (/\b(tattoos?|tattoo (?:studios?|shops?|artists?)|piercings?)\b/.test(p)) return "tattoo";
+  if (/\b(pet grooming|dog grooming|groomers?|pet spa|dog wash)\b/.test(p)) return "petgroom";
+  if (/\b(car wash(?:es)?|auto spa|detailing)\b/.test(p)) return "carwash";
+  if (/\b(law (?:firms?|offices?|practices?)|lawyers?|attorneys?|solicitors?|legal (?:services?|advice|practice)|paralegals?|notar(?:y|ies)|estate planning|family law|personal injury)\b/.test(p)) return "law";
+  if (/\b(dentists?|dental|orthodont\w*|teeth whitening|hygienists?)\b/.test(p)) return "dental";
+  if (/\b(tax (?:prep\w*|preparers?|returns?|services?|offices?)|accountants?|accounting (?:firms?|offices?|practices?|services?)|bookkeepers?|bookkeeping (?:services?|offices?)|cpas?)\b/.test(p)) return "accounting";
+  if (/\b(electricians?|electrical (?:contractors?|services?|work|repairs?)|rewir\w*|wiring|panel upgrades?|ev charger install\w*)\b/.test(p)) return "electrical";
+  if (/\b(hvac|heating and (?:air|cooling)|heating|cooling|air condition\w*|furnaces?|heat pumps?|ac repairs?)\b/.test(p)) return "hvac";
+  if (/\b(photographers?|photography (?:studios?|business(?:es)?|services?)|photo studios?|portrait studios?|headshots?|wedding photo\w*)\b/.test(p)) return "photo";
+  if (/\b(movers?|moving (?:company|companies|services?|day|trucks?)|removals?|relocations?)\b/.test(p)) return "moving";
   if (/\b(barbers?|barbershops?|hair ?salons?|salons?|hairdress(?:ers?|ing)|stylists?|nail (?:salons?|bars?|studios?)|manicures?|beauty|tattoo(?:s| studios?| shops?)?|pet grooming|groomers?)\b/.test(p)) return "salon";
   if (/\b(auto repair|mechanics?|garages?|car wash(?:es)?|detailing|oil changes?|tire|tyre|body shop|auto care)\b/.test(p)) return "garage";
   if (/\b(gyms?|boxing|crossfit|personal train(?:ing|ers?)|fitness (?:club|studio|centre|center)|martial arts|weight ?lifting)\b/.test(p)) return "gym";

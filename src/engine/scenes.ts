@@ -9,7 +9,7 @@
 import { clamp, ease, mixHex, rgba, rng, TAU } from "./math";
 import type { Palette, SkillContext } from "./types";
 
-export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house", "salon", "restaurant", "bakery", "garage", "gym", "yoga", "florist", "bookstore", "hotel", "asian", "antique", "thrift", "music", "repair", "church", "roofing", "plumbing", "lawn", "cleaning", "icecream"] as const;
+export const SCENES = ["office", "city", "construction", "hospital", "classroom", "home", "shop", "cafe", "kitchen", "bedroom", "bathroom", "house", "salon", "restaurant", "bakery", "garage", "gym", "yoga", "florist", "bookstore", "hotel", "asian", "antique", "thrift", "music", "repair", "church", "roofing", "plumbing", "lawn", "cleaning", "icecream", "law", "dental", "accounting", "electrical", "hvac", "photo", "petgroom", "tattoo", "moving", "carwash"] as const;
 export type SceneBackdrop = (typeof SCENES)[number];
 
 type C = CanvasRenderingContext2D;
@@ -2444,7 +2444,965 @@ function icecream(sc: SkillContext) {
   }
 }
 
-const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house, salon, restaurant, bakery, garage, gym, yoga, florist, bookstore, hotel, asian, antique, thrift, music, repair, church, roofing, plumbing, lawn, cleaning, icecream };
+/* ───────────────────────── Professional services ───────────────────────── */
+
+/** A framed certificate: a gold frame, cream paper, a few text lines and a seal in the brand's colour. */
+function certificate(ctx: C, x: number, y: number, fw: number, fh: number, u: number, seal: string) {
+  box(ctx, x, y, fw, fh, 4 * u, "#c9a227");
+  box(ctx, x + 6 * u, y + 6 * u, fw - 12 * u, fh - 12 * u, 2 * u, "#fbf8f1");
+  ctx.fillStyle = "rgba(60,50,40,0.22)";
+  for (let i = 0; i < 3; i++) ctx.fillRect(x + fw * 0.2, y + fh * (0.3 + i * 0.16), fw * (i === 0 ? 0.6 : 0.45), 3 * u);
+  ctx.fillStyle = seal;
+  ctx.beginPath();
+  ctx.arc(x + fw * 0.76, y + fh * 0.72, Math.min(fw, fh) * 0.11, 0, TAU);
+  ctx.fill();
+}
+
+/** A tall bookcase of bound volumes with gilt bands. */
+function lawShelf(ctx: C, x: number, top: number, sw: number, fy: number, u: number, pal: Palette) {
+  box(ctx, x, top, sw, fy - top, 4 * u, "#5c3a24");
+  box(ctx, x + 8 * u, top + 8 * u, sw - 16 * u, fy - top - 16 * u, 2 * u, "#3e2616");
+  const spines = ["#7b1e1e", "#1f3b5c", "#24513a", "#5a2a4a", mixHex(pal.primary, "#1a1a1a", 0.35)];
+  const rows = 5;
+  const rh = (fy - top - 16 * u) / rows;
+  const r = rng(Math.round(x));
+  for (let row = 0; row < rows; row++) {
+    const base = top + 8 * u + rh * (row + 1);
+    box(ctx, x + 8 * u, base - 6 * u, sw - 16 * u, 6 * u, 1 * u, "#6e4528");
+    let bx = x + 12 * u;
+    while (bx < x + sw - 22 * u) {
+      const bw = (9 + r() * 7) * u;
+      const bh = rh * (0.62 + r() * 0.24);
+      const c = spines[Math.floor(r() * spines.length)];
+      box(ctx, bx, base - 6 * u - bh, bw, bh, 1.5 * u, c);
+      ctx.fillStyle = "#d4af37";
+      ctx.fillRect(bx + 1.5 * u, base - 6 * u - bh * 0.84, bw - 3 * u, 2 * u);
+      ctx.fillRect(bx + 1.5 * u, base - 6 * u - bh * 0.2, bw - 3 * u, 2 * u);
+      bx += bw + 2 * u;
+    }
+  }
+}
+
+/** A law office: wood panelling, shelves of bound law books, framed certificates, a desk with a banker's lamp and the scales of justice. */
+function law(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f3eee7", "#e8dfd3"], ["#8a6248", "#6f4c36"], u);
+  // Wainscot panels along the lower wall.
+  const wy = fy - h * 0.2;
+  box(ctx, 0, wy, w, h * 0.2, 0, "#8b5e3c");
+  for (let x = 0; x < w; x += w * 0.1) box(ctx, x + 8 * u, wy + 12 * u, w * 0.1 - 16 * u, h * 0.2 - 24 * u, 3 * u, "#96693f");
+  box(ctx, 0, wy - 6 * u, w, 9 * u, 2 * u, "#6e4528");
+  lawShelf(ctx, w * 0.02, h * 0.1, w * 0.16, fy, u, palette);
+  lawShelf(ctx, w * 0.82, h * 0.1, w * 0.16, fy, u, palette);
+  certificate(ctx, w * 0.22, h * 0.15, w * 0.09, h * 0.13, u, palette.primary);
+  certificate(ctx, w * 0.69, h * 0.15, w * 0.09, h * 0.13, u, palette.primary);
+  // The desk and its green banker's lamp, on the left.
+  const dx = w * 0.2;
+  const dw = w * 0.24;
+  box(ctx, dx, fy - h * 0.13, dw, h * 0.13, 4 * u, "#5c3a24");
+  box(ctx, dx - 6 * u, fy - h * 0.145, dw + 12 * u, h * 0.025, 4 * u, "#7a4d2e");
+  box(ctx, dx + dw * 0.1, fy - h * 0.105, dw * 0.35, h * 0.09, 3 * u, "#6b4329");
+  box(ctx, dx + dw * 0.55, fy - h * 0.105, dw * 0.35, h * 0.09, 3 * u, "#6b4329");
+  const lx = dx + dw * 0.22;
+  box(ctx, lx - 3 * u, fy - h * 0.23, 6 * u, h * 0.085, 2 * u, "#c9a227");
+  ctx.fillStyle = "#1f6b4a";
+  ctx.beginPath();
+  ctx.ellipse(lx, fy - h * 0.23, 34 * u, 14 * u, 0, Math.PI, 0);
+  ctx.fill();
+  const glow = ctx.createRadialGradient(lx, fy - h * 0.22, 0, lx, fy - h * 0.22, 70 * u);
+  glow.addColorStop(0, "rgba(255,236,170,0.4)");
+  glow.addColorStop(1, "rgba(255,236,170,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(lx - 70 * u, fy - h * 0.22, 140 * u, 70 * u);
+  // A stack of files on the desk.
+  for (let i = 0; i < 3; i++) box(ctx, dx + dw * 0.55 + i * 2 * u, fy - h * 0.16 - i * 7 * u, dw * 0.3, 6 * u, 1 * u, ["#f2ede0", "#e2d6bd", "#f7f2e6"][i]);
+  // The scales of justice on a pedestal, on the right, swaying gently.
+  const px = w * 0.7;
+  box(ctx, px - w * 0.04, fy - h * 0.12, w * 0.08, h * 0.12, 3 * u, "#e9e1d3");
+  box(ctx, px - w * 0.05, fy - h * 0.13, w * 0.1, h * 0.015, 3 * u, "#d6cbb7");
+  const gold = "#c9a227";
+  const top = fy - h * 0.34;
+  box(ctx, px - 3 * u, top, 6 * u, h * 0.21, 2 * u, gold);
+  const tilt = Math.sin(T * 0.6) * 0.06;
+  const arm = w * 0.055;
+  ctx.save();
+  ctx.translate(px, top + 8 * u);
+  ctx.rotate(tilt);
+  box(ctx, -arm, -3 * u, arm * 2, 6 * u, 3 * u, gold);
+  ctx.restore();
+  ctx.strokeStyle = gold;
+  ctx.lineWidth = 2 * u;
+  for (const side of [-1, 1]) {
+    const ex = px + side * arm * Math.cos(tilt);
+    const ey = top + 8 * u + side * arm * Math.sin(tilt);
+    const pan = ey + h * 0.07;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - 18 * u, pan);
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex + 18 * u, pan);
+    ctx.stroke();
+    ctx.fillStyle = gold;
+    ctx.beginPath();
+    ctx.ellipse(ex, pan, 24 * u, 8 * u, 0, 0, Math.PI);
+    ctx.fill();
+  }
+  ctx.fillStyle = gold;
+  ctx.beginPath();
+  ctx.arc(px, top, 7 * u, 0, TAU);
+  ctx.fill();
+}
+
+/** A tooth, for the dental poster. */
+function tooth(ctx: C, cx: number, cy: number, s: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.5, cy - s * 0.25);
+  ctx.bezierCurveTo(cx - s * 0.55, cy - s * 0.65, cx - s * 0.1, cy - s * 0.6, cx, cy - s * 0.45);
+  ctx.bezierCurveTo(cx + s * 0.1, cy - s * 0.6, cx + s * 0.55, cy - s * 0.65, cx + s * 0.5, cy - s * 0.25);
+  ctx.bezierCurveTo(cx + s * 0.45, cy + s * 0.1, cx + s * 0.35, cy + s * 0.6, cx + s * 0.22, cy + s * 0.6);
+  ctx.bezierCurveTo(cx + s * 0.1, cy + s * 0.6, cx + s * 0.08, cy + s * 0.15, cx, cy + s * 0.15);
+  ctx.bezierCurveTo(cx - s * 0.08, cy + s * 0.15, cx - s * 0.1, cy + s * 0.6, cx - s * 0.22, cy + s * 0.6);
+  ctx.bezierCurveTo(cx - s * 0.35, cy + s * 0.6, cx - s * 0.45, cy + s * 0.1, cx - s * 0.5, cy - s * 0.25);
+  ctx.fill();
+}
+
+/** A dental surgery: a mint room, the reclined chair under its lamp, a tray of instruments, cabinets and a tooth poster. */
+function dental(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eef8f6", "#dbefea"], ["#e3e8ea", "#cfd6da"], u);
+  // Cabinets and a counter with a basin on the right.
+  const cx0 = w * 0.68;
+  const cw = w * 0.3;
+  box(ctx, cx0, h * 0.12, cw, h * 0.14, 6 * u, "#ffffff");
+  for (let i = 0; i < 3; i++) box(ctx, cx0 + cw * (0.15 + i * 0.33), h * 0.24, cw * 0.06, 4 * u, 2 * u, "#b8c4ca");
+  box(ctx, cx0, fy - h * 0.16, cw, h * 0.16, 6 * u, "#ffffff");
+  box(ctx, cx0 - 6 * u, fy - h * 0.175, cw + 12 * u, h * 0.025, 4 * u, mixHex(palette.primary, "#ffffff", 0.55));
+  for (let i = 0; i < 3; i++) box(ctx, cx0 + cw * (0.06 + i * 0.32), fy - h * 0.13, cw * 0.27, h * 0.11, 4 * u, "#f2f6f7");
+  box(ctx, cx0 + cw * 0.6, fy - h * 0.23, 8 * u, h * 0.055, 3 * u, "#b8c4ca");
+  // A poster with a big tooth.
+  box(ctx, w * 0.06, h * 0.12, w * 0.12, h * 0.2, 6 * u, "#ffffff");
+  box(ctx, w * 0.07, h * 0.13, w * 0.1, h * 0.18, 4 * u, mixHex(palette.primary, "#ffffff", 0.8));
+  tooth(ctx, w * 0.12, h * 0.215, Math.min(w, h) * 0.1, "#ffffff");
+  // The chair: base, seat, a reclined back and a headrest, in the brand's colour.
+  const chair = mixHex(palette.primary, "#ffffff", 0.12);
+  const bx = w * 0.3;
+  box(ctx, bx - w * 0.03, fy - h * 0.12, w * 0.06, h * 0.12, 6 * u, "#cfd8dc");
+  box(ctx, bx - w * 0.05, fy - 10 * u, w * 0.1, 10 * u, 4 * u, "#b8c4ca");
+  box(ctx, bx - w * 0.02, fy - h * 0.16, w * 0.16, h * 0.05, 14 * u, chair);
+  ctx.save();
+  ctx.translate(bx - w * 0.01, fy - h * 0.14);
+  ctx.rotate(-2.55);
+  box(ctx, 0, -h * 0.025, w * 0.13, h * 0.05, 14 * u, chair);
+  box(ctx, w * 0.125, -h * 0.02, w * 0.035, h * 0.04, 10 * u, mixHex(chair, "#000000", 0.12));
+  ctx.restore();
+  box(ctx, bx + w * 0.12, fy - h * 0.19, w * 0.06, h * 0.035, 10 * u, chair);
+  // The lamp on its arm from the ceiling, its light steady and soft.
+  const lx = w * 0.27;
+  const ly = h * 0.36;
+  ctx.strokeStyle = "#b8c4ca";
+  ctx.lineWidth = 7 * u;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(lx + w * 0.08, 10 * u);
+  ctx.lineTo(lx + w * 0.08, h * 0.2);
+  ctx.lineTo(lx, ly - 14 * u);
+  ctx.stroke();
+  box(ctx, lx - 34 * u, ly - 16 * u, 68 * u, 26 * u, 12 * u, "#e9eef0");
+  const lg = ctx.createRadialGradient(lx, ly + 10 * u, 0, lx, ly + 10 * u, h * 0.2);
+  lg.addColorStop(0, `rgba(255,255,240,${0.42 + 0.04 * Math.sin(T * 0.8)})`);
+  lg.addColorStop(1, "rgba(255,255,240,0)");
+  ctx.fillStyle = lg;
+  ctx.beginPath();
+  ctx.moveTo(lx - 30 * u, ly + 8 * u);
+  ctx.lineTo(lx + 30 * u, ly + 8 * u);
+  ctx.lineTo(lx + w * 0.08, fy - h * 0.16);
+  ctx.lineTo(lx - w * 0.08, fy - h * 0.16);
+  ctx.fill();
+  // The instrument tray on its arm.
+  const tx = w * 0.5;
+  ctx.strokeStyle = "#b8c4ca";
+  ctx.lineWidth = 5 * u;
+  ctx.beginPath();
+  ctx.moveTo(tx, fy);
+  ctx.lineTo(tx, fy - h * 0.2);
+  ctx.stroke();
+  box(ctx, tx - w * 0.05, fy - h * 0.215, w * 0.1, 12 * u, 4 * u, "#e9eef0");
+  ctx.strokeStyle = "#8a979e";
+  ctx.lineWidth = 2.5 * u;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(tx - w * 0.035 + i * w * 0.022, fy - h * 0.21);
+    ctx.lineTo(tx - w * 0.03 + i * w * 0.022, fy - h * 0.205);
+    ctx.lineTo(tx - w * 0.02 + i * w * 0.022, fy - h * 0.205);
+    ctx.stroke();
+  }
+  plant(ctx, w * 0.62, fy, h * 0.13, T, "#ffffff");
+}
+
+/** A small bar chart in a frame (no numbers), in the brand's colours. */
+function chartFrame(ctx: C, x: number, y: number, fw: number, fh: number, u: number, T: number, pal: Palette) {
+  box(ctx, x, y, fw, fh, 8 * u, "#ffffff");
+  ctx.strokeStyle = "rgba(60,70,90,0.18)";
+  ctx.lineWidth = 2 * u;
+  ctx.beginPath();
+  ctx.moveTo(x + fw * 0.1, y + fh * 0.85);
+  ctx.lineTo(x + fw * 0.9, y + fh * 0.85);
+  ctx.stroke();
+  const hs = [0.3, 0.45, 0.4, 0.6, 0.72];
+  const cols = [mixHex(pal.primary, "#ffffff", 0.45), pal.primary];
+  hs.forEach((v, i) => {
+    const bh = fh * 0.65 * v * (0.96 + 0.04 * Math.sin(T * 0.7 + i));
+    box(ctx, x + fw * (0.14 + i * 0.15), y + fh * 0.85 - bh, fw * 0.1, bh, 3 * u, cols[i === hs.length - 1 ? 1 : 0]);
+  });
+}
+
+/** An accounting office: a window, a framed bar chart, a wall calendar, a desk with a monitor, a calculator and stacked files, and a filing cabinet. */
+function accounting(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f4f5f8", "#e7eaf0"], ["#cdd2da", "#bcc2cc"], u);
+  windowPane(ctx, w * 0.05, h * 0.12, w * 0.18, h * 0.3, u, T, true);
+  chartFrame(ctx, w * 0.74, h * 0.12, w * 0.16, h * 0.17, u, T, palette);
+  // A wall calendar with a ringed day (beside the window, clear of the headline).
+  const kx = w * 0.25;
+  box(ctx, kx, h * 0.13, w * 0.08, h * 0.12, 4 * u, "#ffffff");
+  box(ctx, kx, h * 0.13, w * 0.08, h * 0.028, 4 * u, palette.primary);
+  ctx.fillStyle = "rgba(60,70,90,0.25)";
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) ctx.fillRect(kx + w * (0.008 + c * 0.018), h * (0.17 + r * 0.025), w * 0.01, h * 0.012);
+  ctx.strokeStyle = palette.accent;
+  ctx.lineWidth = 2.5 * u;
+  ctx.beginPath();
+  ctx.arc(kx + w * 0.049, h * 0.201, 9 * u, 0, TAU);
+  ctx.stroke();
+  // The desk with a monitor, a calculator, a pen cup and stacks of files.
+  const dx = w * 0.56;
+  const dw = w * 0.3;
+  box(ctx, dx, fy - h * 0.13, dw, h * 0.025, 4 * u, "#c79b74");
+  ctx.fillStyle = "#a57b57";
+  ctx.fillRect(dx + dw * 0.05, fy - h * 0.11, 6 * u, h * 0.11);
+  ctx.fillRect(dx + dw * 0.95 - 6 * u, fy - h * 0.11, 6 * u, h * 0.11);
+  box(ctx, dx + dw * 0.08, fy - h * 0.26, dw * 0.36, h * 0.12, 6 * u, "#3d4459");
+  box(ctx, dx + dw * 0.1, fy - h * 0.25, dw * 0.32, h * 0.1, 4 * u, mixHex(palette.primary, "#ffffff", 0.6));
+  ctx.fillStyle = mixHex(palette.primary, "#ffffff", 0.2);
+  for (let i = 0; i < 4; i++) ctx.fillRect(dx + dw * (0.13 + i * 0.07), fy - h * (0.165 + i * 0.012), dw * 0.045, h * (0.01 + i * 0.012));
+  ctx.fillStyle = "#3d4459";
+  ctx.fillRect(dx + dw * 0.24, fy - h * 0.14, dw * 0.04, h * 0.012);
+  // Calculator.
+  const cx = dx + dw * 0.5;
+  box(ctx, cx, fy - h * 0.175, dw * 0.13, h * 0.045, 4 * u, "#4a5163");
+  box(ctx, cx + 4 * u, fy - h * 0.17, dw * 0.13 - 8 * u, h * 0.012, 2 * u, "#c8e6c9");
+  ctx.fillStyle = "#e1e4ea";
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) ctx.fillRect(cx + 5 * u + c * dw * 0.03, fy - h * (0.151 - r * 0.012), dw * 0.02, h * 0.007);
+  // Files.
+  for (let i = 0; i < 4; i++) box(ctx, dx + dw * 0.7 + (i % 2) * 3 * u, fy - h * 0.14 - i * 7 * u, dw * 0.24, 6 * u, 1 * u, ["#f2ede0", palette.primary, "#e2d6bd", mixHex(palette.secondary, "#ffffff", 0.3)][i]);
+  // The filing cabinet on the left of the desk.
+  const fx = w * 0.32;
+  box(ctx, fx, fy - h * 0.24, w * 0.09, h * 0.24, 4 * u, "#9aa3b2");
+  for (let i = 0; i < 3; i++) {
+    box(ctx, fx + 6 * u, fy - h * 0.235 + i * h * 0.078, w * 0.09 - 12 * u, h * 0.07, 3 * u, "#aeb6c4");
+    box(ctx, fx + w * 0.035, fy - h * 0.2 + i * h * 0.078, w * 0.02, 5 * u, 2 * u, "#6b7486");
+  }
+  plant(ctx, w * 0.27, fy, h * 0.15, T, "#e8e2d8");
+}
+
+/** An electrician's job: an open breaker panel, conduit runs, warm bulbs hanging steady, a step ladder, a cable reel and a hard hat. */
+function electrical(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f2f1ec", "#e3e1d9"], ["#cfcac0", "#bbb5a8"], u);
+  // The breaker panel, door open, rows of switches with brand-coloured labels.
+  const px = w * 0.06;
+  const py = h * 0.18;
+  const pw = w * 0.14;
+  const ph = h * 0.34;
+  box(ctx, px, py, pw, ph, 6 * u, "#a9b0ba");
+  box(ctx, px + 8 * u, py + 8 * u, pw - 16 * u, ph - 16 * u, 4 * u, "#3a3f4c");
+  for (let r = 0; r < 6; r++)
+    for (let c = 0; c < 2; c++) {
+      const bx = px + 16 * u + c * (pw - 32 * u) * 0.52;
+      const by = py + 18 * u + r * (ph - 36 * u) / 6;
+      box(ctx, bx, by, (pw - 32 * u) * 0.46, (ph - 36 * u) / 6 - 6 * u, 2 * u, "#e1e4ea");
+      box(ctx, bx + 4 * u, by + 4 * u, 8 * u, (ph - 36 * u) / 6 - 14 * u, 1 * u, r % 3 === 0 ? palette.primary : "#6b7486");
+    }
+  ctx.save();
+  ctx.translate(px + pw, py);
+  ctx.transform(1, 0.12, 0, 1, 0, 0);
+  box(ctx, 0, 0, pw * 0.35, ph, 4 * u, "#c3c9d1");
+  ctx.restore();
+  // Conduit from the panel up and across the wall, with junction boxes.
+  ctx.strokeStyle = "#b8bec9";
+  ctx.lineWidth = 8 * u;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(px + pw * 0.5, py);
+  ctx.lineTo(px + pw * 0.5, h * 0.08);
+  ctx.lineTo(w * 0.94, h * 0.08);
+  ctx.moveTo(w * 0.8, h * 0.08);
+  ctx.lineTo(w * 0.8, fy - h * 0.2);
+  ctx.stroke();
+  box(ctx, w * 0.8 - 16 * u, fy - h * 0.2, 32 * u, 40 * u, 4 * u, "#ffffff");
+  ctx.fillStyle = "#3a3f4c";
+  ctx.fillRect(w * 0.8 - 6 * u, fy - h * 0.2 + 10 * u, 3 * u, 8 * u);
+  ctx.fillRect(w * 0.8 + 3 * u, fy - h * 0.2 + 10 * u, 3 * u, 8 * u);
+  // Bulbs hanging from the run, glowing warm and steady.
+  for (const [bx, drop] of [[0.36, 0.14], [0.5, 0.1], [0.64, 0.16]] as const) {
+    const x = w * bx;
+    const y = h * (0.08 + drop);
+    ctx.strokeStyle = "#3a3f4c";
+    ctx.lineWidth = 2 * u;
+    ctx.beginPath();
+    ctx.moveTo(x, h * 0.08);
+    ctx.lineTo(x, y - 12 * u);
+    ctx.stroke();
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 60 * u);
+    g.addColorStop(0, `rgba(255,214,120,${0.38 + 0.04 * Math.sin(T * 0.7 + bx * 9)})`);
+    g.addColorStop(1, "rgba(255,214,120,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - 60 * u, y - 60 * u, 120 * u, 120 * u);
+    box(ctx, x - 6 * u, y - 16 * u, 12 * u, 8 * u, 2 * u, "#8a8f99");
+    ctx.fillStyle = "#ffe7a3";
+    ctx.beginPath();
+    ctx.arc(x, y, 11 * u, 0, TAU);
+    ctx.fill();
+  }
+  // A step ladder in the brand's colour.
+  const lx = w * 0.66;
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 7 * u;
+  ctx.beginPath();
+  ctx.moveTo(lx, fy);
+  ctx.lineTo(lx + w * 0.04, fy - h * 0.3);
+  ctx.lineTo(lx + w * 0.08, fy);
+  ctx.stroke();
+  ctx.lineWidth = 5 * u;
+  for (let i = 1; i < 4; i++) {
+    const f = i / 4;
+    ctx.beginPath();
+    ctx.moveTo(lx + w * 0.04 * f, fy - h * 0.3 * f);
+    ctx.lineTo(lx + w * 0.08 - w * 0.04 * f + w * 0.01, fy - h * 0.3 * f);
+    ctx.stroke();
+  }
+  // A cable reel and a hard hat on the floor.
+  const rx = w * 0.3;
+  ctx.fillStyle = "#a87b57";
+  ctx.beginPath();
+  ctx.arc(rx, fy - h * 0.07, h * 0.07, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = palette.accent;
+  ctx.lineWidth = 4 * u;
+  for (let k = 0; k < 4; k++) {
+    ctx.beginPath();
+    ctx.arc(rx, fy - h * 0.07, h * 0.02 + k * 5 * u, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#f2c230";
+  ctx.beginPath();
+  ctx.ellipse(w * 0.9, fy - 6 * u, w * 0.04, h * 0.05, 0, Math.PI, 0);
+  ctx.fill();
+  box(ctx, w * 0.85, fy - 8 * u, w * 0.1, 8 * u, 4 * u, "#e0ae1c");
+}
+
+/** Heating and cooling: a wall unit breathing cool air, a thermostat, a floor vent, a window, and a heat-pump cabinet with its fan turning. */
+function hvac(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#eef3f8", "#dfe7f0"], ["#d9c3a5", "#c6ab88"], u);
+  windowPane(ctx, w * 0.05, h * 0.14, w * 0.2, h * 0.3, u, T);
+  // The wall unit high on the right, with soft air lines drifting down.
+  const ax = w * 0.62;
+  const aw = w * 0.3;
+  box(ctx, ax, h * 0.1, aw, h * 0.1, 18 * u, "#ffffff");
+  box(ctx, ax + aw * 0.06, h * 0.17, aw * 0.88, 6 * u, 3 * u, "#d6dde5");
+  ctx.fillStyle = palette.primary;
+  ctx.beginPath();
+  ctx.arc(ax + aw * 0.9, h * 0.13, 4 * u, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(100,170,230,0.7)";
+  ctx.lineWidth = 4 * u;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const ph = (T * 0.25 + i * 0.25) % 1;
+    const x0 = ax + aw * (0.15 + i * 0.2);
+    const y0 = h * 0.2 + ph * h * 0.16;
+    ctx.globalAlpha = 1 - ph;
+    ctx.beginPath();
+    for (let k = 0; k <= 16; k++) {
+      const y = y0 + k * h * 0.006;
+      const x = x0 + Math.sin(k * 0.5 + T * 2 + i) * h * 0.01;
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // The thermostat: a round dial with a ring in the brand's colour.
+  const tx = w * 0.32;
+  const ty = h * 0.3;
+  const ts = h * 0.065;
+  box(ctx, tx - ts, ty - ts, ts * 2, ts * 2, ts * 0.4, "#ffffff");
+  ctx.strokeStyle = "#e1e6ec";
+  ctx.lineWidth = ts * 0.16;
+  ctx.beginPath();
+  ctx.arc(tx, ty, ts * 0.62, Math.PI * 0.75, Math.PI * 2.25);
+  ctx.stroke();
+  ctx.strokeStyle = palette.primary;
+  ctx.beginPath();
+  ctx.arc(tx, ty, ts * 0.62, Math.PI * 0.75, Math.PI * (1.7 + 0.04 * Math.sin(T * 0.4)));
+  ctx.stroke();
+  ctx.fillStyle = "#3a3f4c";
+  ctx.beginPath();
+  ctx.arc(tx, ty, ts * 0.14, 0, TAU);
+  ctx.fill();
+  // A floor vent.
+  box(ctx, w * 0.36, fy + h * 0.03, w * 0.1, h * 0.03, 3 * u, "#d6dde5");
+  ctx.fillStyle = "#9aa3b2";
+  for (let i = 0; i < 6; i++) ctx.fillRect(w * 0.365 + i * w * 0.015, fy + h * 0.035, w * 0.008, h * 0.02);
+  // The heat-pump cabinet with its fan turning slowly.
+  const hx = w * 0.7;
+  const hw = w * 0.22;
+  box(ctx, hx, fy - h * 0.22, hw, h * 0.22, 8 * u, "#e9edf2");
+  box(ctx, hx, fy - h * 0.22, hw, h * 0.03, 8 * u, mixHex(palette.primary, "#ffffff", 0.3));
+  const fx = hx + hw * 0.4;
+  const fyy = fy - h * 0.1;
+  const r = h * 0.075;
+  ctx.fillStyle = "#3a3f4c";
+  ctx.beginPath();
+  ctx.arc(fx, fyy, r, 0, TAU);
+  ctx.fill();
+  ctx.save();
+  ctx.translate(fx, fyy);
+  ctx.rotate(T * 1.2);
+  ctx.fillStyle = "#b8bec9";
+  for (let k = 0; k < 4; k++) {
+    ctx.rotate(TAU / 4);
+    ctx.beginPath();
+    ctx.ellipse(r * 0.45, 0, r * 0.42, r * 0.16, 0.4, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 2 * u;
+  for (let k = 1; k <= 3; k++) {
+    ctx.beginPath();
+    ctx.arc(fx, fyy, r * (k / 3), 0, TAU);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 5; i++) box(ctx, hx + hw * 0.72, fy - h * 0.17 + i * h * 0.03, hw * 0.2, 4 * u, 2 * u, "#c3c9d1");
+  plant(ctx, w * 0.5, fy, h * 0.13, T, "#ffffff");
+}
+
+/** A photo studio: a seamless paper backdrop in the brand's tint, two softboxes on stands, a camera on a tripod and a gold reflector. */
+function photo(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.76;
+  room(ctx, w, h, fy, ["#e8e6ee", "#d9d6e1"], ["#cbc7d3", "#b9b4c3"], u);
+  // The paper sweep: down the wall and curving out across the floor.
+  const sx = w * 0.27;
+  const sw = w * 0.46;
+  const paper = mixHex(palette.primary, "#ffffff", 0.72);
+  const pg = ctx.createLinearGradient(0, h * 0.08, 0, h * 0.95);
+  pg.addColorStop(0, mixHex(paper, "#000000", 0.06));
+  pg.addColorStop(0.7, paper);
+  pg.addColorStop(1, mixHex(paper, "#ffffff", 0.3));
+  ctx.fillStyle = pg;
+  ctx.beginPath();
+  ctx.moveTo(sx, h * 0.08);
+  ctx.lineTo(sx + sw, h * 0.08);
+  ctx.lineTo(sx + sw, fy - h * 0.04);
+  ctx.quadraticCurveTo(sx + sw, fy + h * 0.06, sx + sw + w * 0.02, h * 0.95);
+  ctx.lineTo(sx - w * 0.02, h * 0.95);
+  ctx.quadraticCurveTo(sx, fy + h * 0.06, sx, fy - h * 0.04);
+  ctx.closePath();
+  ctx.fill();
+  box(ctx, sx - 14 * u, h * 0.06, sw + 28 * u, 20 * u, 10 * u, "#3a3f4c");
+  // Softboxes on stands, aimed at the sweep, glowing softly.
+  const softbox = (x: number, dir: number) => {
+    ctx.strokeStyle = "#3a3f4c";
+    ctx.lineWidth = 4 * u;
+    ctx.beginPath();
+    ctx.moveTo(x, fy - h * 0.38);
+    ctx.lineTo(x, fy - h * 0.03);
+    ctx.moveTo(x, fy - h * 0.03);
+    ctx.lineTo(x - 26 * u, fy + h * 0.02);
+    ctx.moveTo(x, fy - h * 0.03);
+    ctx.lineTo(x + 26 * u, fy + h * 0.02);
+    ctx.moveTo(x, fy - h * 0.03);
+    ctx.lineTo(x, fy + h * 0.03);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(x, fy - h * 0.42);
+    ctx.scale(dir, 1);
+    ctx.fillStyle = "#2f333d";
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.015, -h * 0.03);
+    ctx.lineTo(w * 0.045, -h * 0.09);
+    ctx.lineTo(w * 0.045, h * 0.09);
+    ctx.lineTo(-w * 0.015, h * 0.03);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,255,250,${0.92 + 0.04 * Math.sin(T * 0.6)})`;
+    ctx.fillRect(w * 0.04, -h * 0.085, 8 * u, h * 0.17);
+    ctx.restore();
+  };
+  softbox(w * 0.13, 1);
+  softbox(w * 0.87, -1);
+  // The camera on its tripod, front right.
+  const cx = w * 0.78;
+  const cy = fy - h * 0.2;
+  ctx.strokeStyle = "#3a3f4c";
+  ctx.lineWidth = 4 * u;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 14 * u);
+  ctx.lineTo(cx - 34 * u, fy + h * 0.06);
+  ctx.moveTo(cx, cy + 14 * u);
+  ctx.lineTo(cx + 30 * u, fy + h * 0.06);
+  ctx.moveTo(cx, cy + 14 * u);
+  ctx.lineTo(cx + 4 * u, fy + h * 0.08);
+  ctx.stroke();
+  box(ctx, cx - 34 * u, cy - 22 * u, 68 * u, 40 * u, 8 * u, "#2f333d");
+  box(ctx, cx - 18 * u, cy - 30 * u, 22 * u, 10 * u, 3 * u, "#2f333d");
+  ctx.fillStyle = "#4a5163";
+  ctx.beginPath();
+  ctx.arc(cx - 34 * u, cy - 2 * u, 16 * u, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = mixHex(palette.primary, "#ffffff", 0.3);
+  ctx.beginPath();
+  ctx.arc(cx - 36 * u, cy - 2 * u, 8 * u, 0, TAU);
+  ctx.fill();
+  // A gold reflector leaning on the left.
+  ctx.fillStyle = "#e3b84a";
+  ctx.beginPath();
+  ctx.ellipse(w * 0.22, fy - h * 0.04, w * 0.035, h * 0.07, -0.2, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#c79a2c";
+  ctx.lineWidth = 3 * u;
+  ctx.stroke();
+}
+
+/** A pet groomer's: a raised tub with a dog in a cloud of bubbles, a shower head, rolled towels on a shelf and a dryer on a stand. */
+function petgroom(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#f2f8fb", "#e2edf4"], ["#e4e9ec", "#d0d8dc"], u);
+  // Small tiles behind the tub.
+  ctx.strokeStyle = "rgba(120,150,170,0.16)";
+  ctx.lineWidth = 1.5 * u;
+  const tx0 = w * 0.08;
+  const tw = w * 0.4;
+  for (let y = h * 0.22; y < fy; y += 28 * u) {
+    ctx.beginPath();
+    ctx.moveTo(tx0, y);
+    ctx.lineTo(tx0 + tw, y);
+    ctx.stroke();
+  }
+  for (let x = tx0; x <= tx0 + tw; x += 28 * u) {
+    ctx.beginPath();
+    ctx.moveTo(x, h * 0.22);
+    ctx.lineTo(x, fy);
+    ctx.stroke();
+  }
+  // A paw print decal.
+  ctx.fillStyle = rgba(palette.primary, 0.35);
+  const pp = (x: number, y: number, s: number) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y, s * 0.42, s * 0.36, 0, 0, TAU);
+    ctx.fill();
+    for (const [dx, dy] of [[-0.45, -0.55], [-0.15, -0.8], [0.15, -0.8], [0.45, -0.55]] as const) {
+      ctx.beginPath();
+      ctx.arc(x + dx * s, y + dy * s, s * 0.16, 0, TAU);
+      ctx.fill();
+    }
+  };
+  pp(w * 0.6, h * 0.22, h * 0.05);
+  // The tub: the dog sits in it, the front panel hides its legs.
+  const bx = w * 0.12;
+  const bw = w * 0.32;
+  const rim = fy - h * 0.2;
+  const ds = Math.min(w, h) * 0.22;
+  drawDog(ctx, bx + bw * 0.5, rim + ds * 0.32, ds, T, "#e3b27a", 1);
+  box(ctx, bx, rim, bw, h * 0.12, 8 * u, "#c3cbd3");
+  box(ctx, bx - 6 * u, rim - 6 * u, bw + 12 * u, 12 * u, 6 * u, "#dde3e8");
+  ctx.fillStyle = "#9aa3ad";
+  ctx.fillRect(bx + bw * 0.1, rim + h * 0.12, 8 * u, fy - rim - h * 0.12);
+  ctx.fillRect(bx + bw * 0.9 - 8 * u, rim + h * 0.12, 8 * u, fy - rim - h * 0.12);
+  // Bubbles drifting up.
+  const r = rng(77);
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.lineWidth = 2 * u;
+  for (let i = 0; i < 12; i++) {
+    const ph = (T * (0.12 + r() * 0.1) + r()) % 1;
+    const x = bx + bw * (0.1 + r() * 0.8) + Math.sin(T + i) * 6 * u;
+    const y = rim - ph * h * 0.3;
+    ctx.globalAlpha = 1 - ph;
+    ctx.beginPath();
+    ctx.arc(x, y, (5 + r() * 9) * u, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // The shower head on its hose.
+  ctx.strokeStyle = "#9aa3ad";
+  ctx.lineWidth = 6 * u;
+  ctx.beginPath();
+  ctx.moveTo(bx + bw * 0.85, rim);
+  ctx.quadraticCurveTo(bx + bw * 1.0, h * 0.3, bx + bw * 0.8, h * 0.26);
+  ctx.stroke();
+  box(ctx, bx + bw * 0.72, h * 0.24, 30 * u, 14 * u, 6 * u, "#b8bec9");
+  // Shelf of rolled towels in the brand's colours, and a dryer on a stand.
+  const sx = w * 0.62;
+  box(ctx, sx, h * 0.46, w * 0.22, 8 * u, 3 * u, "#c79b74");
+  const tcol = brandColors(palette);
+  const tr = h * 0.03;
+  const rolls: [number, number][] = [[0, 0], [1, 0], [2, 0], [3, 0], [0.5, 1], [1.5, 1], [2.5, 1]];
+  rolls.forEach(([cx, row], i) => {
+    const x = sx + tr * 1.2 + cx * tr * 2.05;
+    const y = h * 0.46 - tr - row * tr * 1.8;
+    ctx.fillStyle = tcol[i % tcol.length];
+    ctx.beginPath();
+    ctx.arc(x, y, tr, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 2 * u;
+    ctx.beginPath();
+    ctx.arc(x, y, tr * 0.55, 0, TAU);
+    ctx.arc(x, y, tr * 0.2, 0, TAU);
+    ctx.stroke();
+  });
+  const dx = w * 0.82;
+  ctx.strokeStyle = "#6b7486";
+  ctx.lineWidth = 6 * u;
+  ctx.beginPath();
+  ctx.moveTo(dx, fy);
+  ctx.lineTo(dx, fy - h * 0.26);
+  ctx.stroke();
+  box(ctx, dx - 40 * u, fy - 8 * u, 80 * u, 8 * u, 4 * u, "#6b7486");
+  box(ctx, dx - 20 * u, fy - h * 0.3, 60 * u, h * 0.06, 12 * u, palette.primary);
+  ctx.strokeStyle = "rgba(160,190,210,0.6)";
+  ctx.lineWidth = 3 * u;
+  for (let i = 0; i < 3; i++) {
+    const ph = (T * 0.8 + i / 3) % 1;
+    ctx.globalAlpha = 1 - ph;
+    ctx.beginPath();
+    ctx.moveTo(dx - 26 * u - ph * 40 * u, fy - h * 0.29 + i * 8 * u);
+    ctx.lineTo(dx - 46 * u - ph * 40 * u, fy - h * 0.29 + i * 8 * u);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** A tattoo studio: framed flash designs on the wall, a padded bench, a rolling stool, a lamp on its arm and a steady neon heart. */
+function tattoo(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const fy = h * 0.74;
+  room(ctx, w, h, fy, ["#ece7e1", "#ddd5cc"], ["#55555e", "#3e3e46"], u);
+  // Flash: two grids of framed designs, left and right of the middle.
+  const designs = (x: number, y: number, s: number, k: number) => {
+    const ink = "#24242b";
+    const red = "#c0392b";
+    ctx.lineWidth = 3 * u;
+    ctx.strokeStyle = ink;
+    if (k === 0) {
+      ctx.fillStyle = red;
+      ctx.beginPath();
+      ctx.moveTo(x, y + s * 0.3);
+      ctx.bezierCurveTo(x - s * 0.5, y - s * 0.05, x - s * 0.25, y - s * 0.45, x, y - s * 0.15);
+      ctx.bezierCurveTo(x + s * 0.25, y - s * 0.45, x + s * 0.5, y - s * 0.05, x, y + s * 0.3);
+      ctx.fill();
+      ctx.stroke();
+    } else if (k === 1) {
+      ctx.fillStyle = palette.primary;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const rr = i % 2 ? s * 0.16 : s * 0.38;
+        ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (k === 2) {
+      ctx.beginPath();
+      ctx.arc(x, y - s * 0.05, s * 0.3, Math.PI * 0.15, Math.PI * 1.85);
+      ctx.stroke();
+      ctx.fillStyle = ink;
+      ctx.beginPath();
+      ctx.arc(x + s * 0.12, y - s * 0.1, s * 0.05, 0, TAU);
+      ctx.fill();
+    } else if (k === 3) {
+      ctx.fillStyle = mixHex(palette.secondary, "#ffffff", 0.2);
+      ctx.beginPath();
+      ctx.moveTo(x, y - s * 0.38);
+      ctx.lineTo(x + s * 0.3, y);
+      ctx.lineTo(x, y + s * 0.38);
+      ctx.lineTo(x - s * 0.3, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (k === 4) {
+      ctx.fillStyle = "#f2c230";
+      ctx.beginPath();
+      ctx.arc(x, y, s * 0.3, Math.PI * 0.5, Math.PI * 1.5);
+      ctx.arc(x - s * 0.12, y, s * 0.24, Math.PI * 1.5, Math.PI * 0.5, true);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = red;
+      ctx.beginPath();
+      ctx.arc(x, y, s * 0.22, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#3c8d4f";
+      ctx.beginPath();
+      ctx.ellipse(x - s * 0.22, y + s * 0.25, s * 0.14, s * 0.06, -0.5, 0, TAU);
+      ctx.ellipse(x + s * 0.22, y + s * 0.25, s * 0.14, s * 0.06, 0.5, 0, TAU);
+      ctx.fill();
+    }
+  };
+  const fs = Math.min(w, h) * 0.09;
+  for (const [gx, start] of [[0.04, 0], [0.74, 3]] as const)
+    for (let r = 0; r < 2; r++)
+      for (let c = 0; c < 3; c++) {
+        const x = w * gx + c * (fs + 10 * u);
+        const y = h * 0.1 + r * (fs + 12 * u);
+        box(ctx, x, y, fs, fs, 3 * u, "#2f2f36");
+        box(ctx, x + 4 * u, y + 4 * u, fs - 8 * u, fs - 8 * u, 2 * u, "#fbf6ec");
+        designs(x + fs / 2, y + fs / 2, fs * 0.8, (start + r * 3 + c) % 6);
+      }
+  // A neon heart, glowing steady (no flicker).
+  const nx = w * 0.14;
+  const ny = h * 0.5;
+  ctx.save();
+  ctx.shadowColor = palette.primary;
+  ctx.shadowBlur = 18 * u;
+  ctx.strokeStyle = mixHex(palette.primary, "#ffffff", 0.35);
+  ctx.lineWidth = 5 * u;
+  const s = h * 0.07;
+  ctx.beginPath();
+  ctx.moveTo(nx, ny + s * 0.6);
+  ctx.bezierCurveTo(nx - s * 1.1, ny - s * 0.1, nx - s * 0.5, ny - s * 0.9, nx, ny - s * 0.3);
+  ctx.bezierCurveTo(nx + s * 0.5, ny - s * 0.9, nx + s * 1.1, ny - s * 0.1, nx, ny + s * 0.6);
+  ctx.stroke();
+  ctx.restore();
+  // The bench: a padded top on a chrome base, the headrest tilted up.
+  const bx = w * 0.58;
+  const bw = w * 0.3;
+  box(ctx, bx + bw * 0.4, fy - h * 0.12, bw * 0.12, h * 0.12, 4 * u, "#b8bec9");
+  box(ctx, bx + bw * 0.2, fy - 10 * u, bw * 0.55, 10 * u, 4 * u, "#9aa3ad");
+  box(ctx, bx, fy - h * 0.16, bw, h * 0.05, 12 * u, "#24242b");
+  ctx.save();
+  ctx.translate(bx + 10 * u, fy - h * 0.14);
+  ctx.rotate(-0.35);
+  box(ctx, -bw * 0.22, -h * 0.025, bw * 0.24, h * 0.045, 12 * u, "#24242b");
+  ctx.restore();
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(bx + 14 * u, fy - h * 0.155, bw - 28 * u, 4 * u);
+  // A rolling stool and the lamp.
+  const sx = w * 0.4;
+  box(ctx, sx - 30 * u, fy - h * 0.1, 60 * u, 16 * u, 8 * u, "#24242b");
+  box(ctx, sx - 3 * u, fy - h * 0.09, 6 * u, h * 0.08, 2 * u, "#b8bec9");
+  for (const d of [-1, 1]) {
+    ctx.strokeStyle = "#9aa3ad";
+    ctx.lineWidth = 4 * u;
+    ctx.beginPath();
+    ctx.moveTo(sx, fy - 8 * u);
+    ctx.lineTo(sx + d * 26 * u, fy - 2 * u);
+    ctx.stroke();
+  }
+  const lx = w * 0.93;
+  ctx.strokeStyle = "#3a3f4c";
+  ctx.lineWidth = 5 * u;
+  ctx.beginPath();
+  ctx.moveTo(lx, fy);
+  ctx.lineTo(lx, fy - h * 0.34);
+  ctx.lineTo(lx - w * 0.08, fy - h * 0.3);
+  ctx.stroke();
+  box(ctx, lx - w * 0.1, fy - h * 0.31, w * 0.04, h * 0.035, 8 * u, "#3a3f4c");
+  const lg = ctx.createRadialGradient(lx - w * 0.08, fy - h * 0.27, 0, lx - w * 0.08, fy - h * 0.27, h * 0.16);
+  lg.addColorStop(0, "rgba(255,246,220,0.35)");
+  lg.addColorStop(1, "rgba(255,246,220,0)");
+  ctx.fillStyle = lg;
+  ctx.fillRect(lx - w * 0.08 - h * 0.16, fy - h * 0.27, h * 0.32, h * 0.16);
+}
+
+/** Moving day: a house, a box truck in the brand's colour with its ramp down, stacked boxes and a hand truck. */
+function moving(sc: SkillContext) {
+  const { ctx, w, h, u, seed, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const ground = h * 0.74;
+  sky(ctx, w, h, T, u, seed);
+  // Lawn, sidewalk and road.
+  ctx.fillStyle = mixHex("#9fd58a", palette.secondary, 0.08);
+  ctx.fillRect(0, ground - h * 0.02, w, h * 0.04);
+  box(ctx, 0, ground + h * 0.02, w, h * 0.05, 0, "#d8d4cc");
+  box(ctx, 0, ground + h * 0.07, w, h, 0, "#5b6170");
+  ctx.fillStyle = "#f2f2f2";
+  for (let x = 0; x < w; x += 90 * u) ctx.fillRect(x, ground + h * 0.15, 46 * u, 6 * u);
+  const port = h > w;
+  drawHouse(ctx, port ? w * 0.3 : w * 0.18, ground, port ? w * 0.5 : w * 0.28, 1, T, palette, u);
+  // The truck: cab in the brand's colour, a white box with a brand stripe, the ramp down from the back.
+  const tx = w * 0.5;
+  const tw = w * 0.36;
+  const tb = ground + h * 0.14;
+  const th = h * 0.3;
+  box(ctx, tx, tb - th, tw * 0.72, th - h * 0.04, 8 * u, "#ffffff");
+  box(ctx, tx, tb - th + th * 0.45, tw * 0.72, th * 0.12, 0, palette.primary);
+  box(ctx, tx + tw * 0.72 + 4 * u, tb - th * 0.62, tw * 0.26, th * 0.58 - h * 0.04, 10 * u, palette.primary);
+  box(ctx, tx + tw * 0.8, tb - th * 0.56, tw * 0.15, th * 0.2, 6 * u, "#cfe8f7");
+  for (const wx of [tx + tw * 0.15, tx + tw * 0.55, tx + tw * 0.86]) {
+    ctx.fillStyle = "#2b2f38";
+    ctx.beginPath();
+    ctx.arc(wx, tb - h * 0.035, h * 0.04, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#b8bec9";
+    ctx.beginPath();
+    ctx.arc(wx, tb - h * 0.035, h * 0.016, 0, TAU);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#9aa3ad";
+  ctx.beginPath();
+  ctx.moveTo(tx, tb - h * 0.06);
+  ctx.lineTo(tx - w * 0.1, tb + h * 0.02);
+  ctx.lineTo(tx - w * 0.1, tb + h * 0.03);
+  ctx.lineTo(tx, tb - h * 0.045);
+  ctx.fill();
+  // Boxes, stacked, with tape.
+  const cardboard = (x: number, y: number, bw: number, bh: number) => {
+    box(ctx, x, y - bh, bw, bh, 3 * u, "#d9a86c");
+    ctx.fillStyle = "#c48f50";
+    ctx.fillRect(x, y - bh, bw, bh * 0.12);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(x + bw * 0.44, y - bh, bw * 0.12, bh * 0.45);
+  };
+  const by = ground + h * 0.06;
+  cardboard(w * 0.88, by, w * 0.08, h * 0.08);
+  cardboard(w * 0.89, by - h * 0.08, w * 0.06, h * 0.06);
+  // A hand truck with a box, leaning, at the foot of the ramp.
+  const hx = w * 0.36;
+  ctx.strokeStyle = "#3a3f4c";
+  ctx.lineWidth = 5 * u;
+  ctx.beginPath();
+  ctx.moveTo(hx, by);
+  ctx.lineTo(hx + w * 0.03, by - h * 0.2);
+  ctx.stroke();
+  cardboard(hx + 4 * u, by - 4 * u, w * 0.06, h * 0.08);
+  ctx.fillStyle = "#2b2f38";
+  ctx.beginPath();
+  ctx.arc(hx + 4 * u, by, 10 * u, 0, TAU);
+  ctx.fill();
+}
+
+/** A car wash: a bay with an arch in the brand's colour, two spinning brushes, a car under foam and water spraying down. */
+function carwash(sc: SkillContext) {
+  const { ctx, w, h, u, palette } = sc;
+  const T = sc.globalT ?? sc.t;
+  const fy = h * 0.76;
+  room(ctx, w, h, fy, ["#eaf4fb", "#d6e6f3"], ["#a3acb6", "#858e99"], u);
+  // A wet sheen on the floor.
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.ellipse(w * (0.2 + i * 0.2), fy + h * (0.06 + (i % 2) * 0.05), w * 0.08, h * 0.012, 0, 0, TAU);
+    ctx.fill();
+  }
+  // The arch.
+  const ax = w * 0.18;
+  const aw = w * 0.64;
+  // (Low enough that a headline at the top reads clear of it.)
+  const top = h * 0.25;
+  box(ctx, ax, top, aw, h * 0.06, 8 * u, palette.primary);
+  box(ctx, ax, top, w * 0.04, fy - top, 6 * u, palette.primary);
+  box(ctx, ax + aw - w * 0.04, top, w * 0.04, fy - top, 6 * u, palette.primary);
+  // Water spraying down from the arch.
+  ctx.strokeStyle = "rgba(90,170,230,0.55)";
+  ctx.lineWidth = 3 * u;
+  for (let i = 0; i < 14; i++) {
+    const x = ax + w * 0.06 + (i * (aw - w * 0.12)) / 13;
+    const off = ((T * 160 * u + i * 37 * u) % (34 * u));
+    for (let y = top + h * 0.07 + off; y < top + h * 0.26; y += 34 * u) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y + 14 * u);
+      ctx.stroke();
+    }
+  }
+  // Two brushes turning: their strips slide past.
+  const brush = (x: number) => {
+    const bw = w * 0.06;
+    const bt = top + h * 0.1;
+    const bh = fy - bt - h * 0.02;
+    box(ctx, x - bw / 2, bt, bw, bh, bw / 2, "#4f8fd9");
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x - bw / 2, bt, bw, bh, bw / 2);
+    ctx.clip();
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    const step = bw * 0.4;
+    const off = (T * bw * 0.8) % step;
+    for (let sx = x - bw / 2 - step + off; sx < x + bw / 2; sx += step) ctx.fillRect(sx, bt, step * 0.35, bh);
+    ctx.restore();
+    box(ctx, x - 5 * u, top + h * 0.06, 10 * u, h * 0.04, 2 * u, "#3a3f4c");
+  };
+  brush(ax + w * 0.1);
+  brush(ax + aw - w * 0.1);
+  // The car, side on, low in the frame.
+  const cx = w * 0.5;
+  const cy = fy - h * 0.02;
+  const cw = w * 0.3;
+  const body = mixHex(palette.secondary, "#3a4a6a", 0.4);
+  box(ctx, cx - cw / 2, cy - h * 0.12, cw, h * 0.08, 14 * u, body);
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(cx - cw * 0.3, cy - h * 0.12);
+  ctx.lineTo(cx - cw * 0.18, cy - h * 0.2);
+  ctx.lineTo(cx + cw * 0.18, cy - h * 0.2);
+  ctx.lineTo(cx + cw * 0.32, cy - h * 0.12);
+  ctx.fill();
+  ctx.fillStyle = "#cfe8f7";
+  ctx.beginPath();
+  ctx.moveTo(cx - cw * 0.25, cy - h * 0.125);
+  ctx.lineTo(cx - cw * 0.16, cy - h * 0.185);
+  ctx.lineTo(cx - cw * 0.01, cy - h * 0.185);
+  ctx.lineTo(cx - cw * 0.01, cy - h * 0.125);
+  ctx.moveTo(cx + cw * 0.02, cy - h * 0.125);
+  ctx.lineTo(cx + cw * 0.02, cy - h * 0.185);
+  ctx.lineTo(cx + cw * 0.16, cy - h * 0.185);
+  ctx.lineTo(cx + cw * 0.27, cy - h * 0.125);
+  ctx.fill();
+  for (const wx of [cx - cw * 0.3, cx + cw * 0.3]) {
+    ctx.fillStyle = "#2b2f38";
+    ctx.beginPath();
+    ctx.arc(wx, cy - h * 0.035, h * 0.04, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#b8bec9";
+    ctx.beginPath();
+    ctx.arc(wx, cy - h * 0.035, h * 0.016, 0, TAU);
+    ctx.fill();
+  }
+  // Foam on the roof and bonnet.
+  const r = rng(41);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  for (let i = 0; i < 18; i++) {
+    const x = cx - cw * 0.42 + r() * cw * 0.84;
+    const onRoof = Math.abs(x - cx) < cw * 0.18;
+    const y = (onRoof ? cy - h * 0.2 : cy - h * 0.12) + Math.sin(T * 1.5 + i) * 1.5 * u;
+    ctx.beginPath();
+    ctx.arc(x, y, (8 + r() * 10) * u, 0, TAU);
+    ctx.fill();
+  }
+}
+
+const DRAW: Record<SceneBackdrop, (sc: SkillContext) => void> = { office, city, construction, hospital, classroom, home, shop, cafe, kitchen, bedroom, bathroom, house, salon, restaurant, bakery, garage, gym, yoga, florist, bookstore, hotel, asian, antique, thrift, music, repair, church, roofing, plumbing, lawn, cleaning, icecream, law, dental, accounting, electrical, hvac, photo, petgroom, tattoo, moving, carwash };
 
 /** Draw a cartoon scene background, if `backdrop` is one. Returns whether it drew. */
 export function sceneStage(sc: SkillContext, backdrop: string | undefined, opts: { bare?: boolean } = {}) {

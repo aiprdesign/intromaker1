@@ -1646,6 +1646,16 @@ const INDUSTRY_ROLES: Partial<Record<NonNullable<VideoPlan["setting"]>, Partial<
   lawn: { how: "ind-route", features: "ind-shop" },
   cleaning: { how: "ind-route", features: "ind-shop" },
   icecream: { features: "ind-menu", demo: "ind-menu" },
+  law: { features: "ind-team", how: "ind-team" },
+  accounting: { features: "ind-team", how: "ind-team" },
+  dental: { features: "ind-care", how: "ind-care" },
+  electrical: { features: "ind-shop", demo: "ind-shop" },
+  hvac: { features: "ind-shop", demo: "ind-shop" },
+  photo: { features: "ind-shop", demo: "ind-shop" },
+  petgroom: { features: "ind-shop", demo: "ind-shop" },
+  tattoo: { features: "ind-shop", demo: "ind-shop" },
+  carwash: { features: "ind-shop", demo: "ind-shop" },
+  moving: { how: "ind-route", promise: "ind-route" },
 };
 
 /** Character slides that read well without a list of points (a crowd under the headline, a sign). */
