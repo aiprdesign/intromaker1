@@ -697,7 +697,10 @@ void main() {
   // (Three tones: sunlit, turned away from the sun, and in a cast shadow; tops a touch lighter.)
   // Faces take a tone by where they point (towards the sun, across it, away from it), cast
   // shadows a step darker and tops a touch lighter, so walls, floors and ceilings separate.
-  if (uFlat > 0.5) {
+  if (uFlat > 1.5) {
+    // Cartoon-flat: the colour as painted, a fixed tint by face direction (not by the light).
+    col = base * (N.y > 0.7 ? 1.0 : N.y < -0.7 ? 0.88 : 0.93);
+  } else if (uFlat > 0.5) {
     float band = ndl > 0.55 ? 1.0 : ndl > 0.18 ? 0.9 : 0.8;
     float inShade = ndl > 0.18 && sh < 0.5 ? 0.82 : 1.0;
     col = base * band * inShade * (N.y > 0.7 ? 1.05 : N.y < -0.7 ? 0.9 : 1.0) * mix(0.97, 1.03, hemi.b);
@@ -735,14 +738,14 @@ void main() {
     float dist = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
     ao = max(ao, exp(-max(dist, 0.0) * 5.0 / max(b.w, 0.35)) * 0.42);
   }
-  float a = max((1.0 - sh) * 0.32, ao) * uFloorAlpha;
+  float a = max((1.0 - sh) * 0.32, ao) * uFloorAlpha * step(uFlat, 1.5);
   gl_FragColor = vec4(0.0, 0.0, 0.0, a * uAlpha);
   return;
 #endif
   col += uEmit;
 #if !defined(MAP) && !defined(FLOOR) && !defined(BACKDROP)
   // A coloured rim light catching the edges.
-  col += uRim * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (1.0 - uFlat);
+  col += uRim * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (1.0 - min(uFlat, 1.0));
 #endif
   // Haze with distance (outdoor scenes), towards the horizon's colour.
   if (uFog.a > 0.0) col = mix(col, uFog.rgb, 1.0 - exp(-length(cameraPosition - vW) * uFog.a));
@@ -896,7 +899,11 @@ export interface View {
   sheen?: number;
   /** Draw it flat, as a 2D illustration: a straight-on (orthographic) camera and two-tone colour. */
   flat?: boolean;
-  /** Flat colours on the 3D scene: the same perspective camera and models, shaded in a few flat tones (lit, shade, shadow) like a modern 3D illustration, with no reflections. */
+  /**
+   * Cartoon-flat colours on the 3D scene: the same perspective camera and models, filled with
+   * their flat colours like a 2D cartoon: no sun shading, no shadows (cast or contact), no haze,
+   * no reflections; only a fixed tint on side and under faces so walls read against floors.
+   */
   cel?: boolean;
   /** Distance haze: colour and density (0: none). */
   fog?: [number, number, number, number];
@@ -932,12 +939,12 @@ export function render(W: World, v: View, w: number, h: number): HTMLCanvasEleme
   if (v.sky) env.uSky.value = v.sky;
   if (v.gnd) env.uGnd.value = v.gnd;
   env.uExposure.value = v.exposure ?? 1;
-  // (A flat 2D view has no depth to haze; flat colours on a 3D scene keep the distance haze.)
-  env.uFog.value = v.fog && !v.flat ? v.fog : [1, 1, 1, 0];
-  env.uFlat.value = v.flat || v.cel ? 1 : 0;
+  // (Flat views have no haze.)
+  env.uFog.value = v.fog && !v.flat && !v.cel ? v.fog : [1, 1, 1, 0];
+  env.uFlat.value = v.cel && !v.flat ? 2 : v.flat ? 1 : 0;
   env.uSheen.value = v.sheen ?? -9;
   env.uRim.value = v.rim ?? [0, 0, 0];
-  env.uAO.value = v.ao ?? 0;
+  env.uAO.value = v.cel ? 0 : v.ao ?? 0;
   env.uFill.value = v.fill ?? [0, 0, 0];
   env.uStudio.value = v.flat || v.cel ? 0 : v.studio ?? 0;
   const size = v.shadowSize ?? 4;
