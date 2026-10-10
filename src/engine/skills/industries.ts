@@ -851,10 +851,10 @@ function aboutTicker(sc: SkillContext, about: string, keys: Set<string>, out: nu
     return { wd, key, ww: ctx.measureText(wd).width };
   });
   const total = widths.reduce((a, x) => a + x.ww + space, 0);
-  // Starts with its head a third of the way in, ends with its tail past the middle.
-  const x0 = w * 0.62;
-  const x1 = w * 0.38 - total;
-  const k = range(t, 0.35, Math.max(1.5, d - 0.6));
+  // A full scroll: in from the right edge, out past the left.
+  const x0 = w;
+  const x1 = -total;
+  const k = range(t, 0.2, Math.max(1.5, d - 0.3));
   const x = lerp(x0, x1, k);
   const fade = clamp(t / 0.5) * out;
   // The band: a soft strip in the brand's tint, fading at both ends.
@@ -940,10 +940,12 @@ function aboutUs(sc: SkillContext) {
   ctx.fillStyle = palette.primary;
   ctx.fillRect(tx, y, hs * 0.9 * hk, Math.max(2, hs * 0.07));
   y += hs * 0.07 + hs * 0.38;
-  // The paragraph in rows of up to eight words (fewer in a square or tall frame, so the words stay
-  // large), one size for every row, as large as fits.
-  const words = about.split(/\s+/).filter(Boolean);
-  const per = tall ? 4 : wide ? 8 : 6;
+  // The paragraph's first seven words and an ellipsis (the foot runs the rest), on one row in a
+  // wide frame and two or three in a square or tall one, so they stay large.
+  const all = about.split(/\s+/).filter(Boolean);
+  const words = all.slice(0, LEAD_WORDS);
+  if (all.length > LEAD_WORDS && words.length) words[words.length - 1] = words[words.length - 1].replace(/[,;:.!?]+$/, "") + "…";
+  const per = wide ? LEAD_WORDS : tall ? 3 : 4;
   const rows: string[][] = [];
   for (let i = 0; i < words.length; i += per) rows.push(words.slice(i, i + per));
   // (A short last row borrows from the one above, so no row is left with a word or two.)
@@ -957,7 +959,7 @@ function aboutUs(sc: SkillContext) {
   if (rows.length) {
     const lh = 1.32;
     const room = Math.max(10, floor - y);
-    let ps = Math.min(Math.round(Math.min(w, h) * (tall ? 0.075 : 0.06)), room / (rows.length * lh));
+    let ps = Math.min(Math.round(Math.min(w, h) * (tall ? 0.085 : 0.075)), room / (rows.length * lh));
     const fontOf = (key: boolean, sz: number) => subFont(sz, key ? 750 : 500);
     const width = (r: string[], sz: number) => {
       let x = 0;
@@ -985,7 +987,20 @@ function aboutUs(sc: SkillContext) {
     });
   }
   ctx.restore();
-  if (about) aboutTicker(sc, about, keys, out);
+  if (about) aboutTicker(sc, tickerText(about), keys, out);
+}
+
+/** The lead under the heading: the paragraph's first seven words. */
+const LEAD_WORDS = 7;
+
+/** The ticker: the paragraph up to ten words, ending on a clause where one falls late enough. */
+function tickerText(about: string, max = 10) {
+  const words = about.split(/\s+/).filter(Boolean);
+  if (words.length <= max) return words.join(" ");
+  const head = words.slice(0, max);
+  let end = head.length;
+  for (let i = head.length - 1; i >= 5; i--) if (/[,;:.!?]$/.test(head[i])) { end = i + 1; break; }
+  return head.slice(0, end).join(" ").replace(/[,;:]$/, "") + "…";
 }
 
 /* ───────────────────────── Registry ───────────────────────── */
