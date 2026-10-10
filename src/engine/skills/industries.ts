@@ -920,9 +920,9 @@ function aboutUs(sc: SkillContext) {
   // The picture: the right half of a wide frame, the top of a tall or square one.
   const fw = wide ? w * 0.4 : w * 0.84;
   // (Above the ticker along the foot, which takes the bottom fifth of a wide frame.)
-  const fh = wide ? h * 0.6 : h * (tall ? 0.42 : 0.4);
+  const fh = wide ? h * 0.62 : h * (tall ? 0.42 : 0.4);
   const fx = wide ? w * 0.54 : (w - fw) / 2;
-  const fy = wide ? h * 0.1 : h * 0.07;
+  const fy = wide ? h * 0.06 : h * 0.045;
   const pk = ease.outCubic(range(t, 0.1, 0.8));
   const r = 26 * u * S;
   ctx.save();
@@ -997,7 +997,8 @@ function aboutUs(sc: SkillContext) {
   // The words: beside the picture in a wide frame, under it otherwise.
   const tx = wide ? w * 0.07 : fx;
   const tw = wide ? w * 0.42 : fw;
-  let y = wide ? h * 0.2 : fy + fh + h * (tall ? 0.05 : 0.045);
+  // (In a wide frame the name lines up with the picture's top edge.)
+  let y = wide ? fy + 4 * u : fy + fh + h * (tall ? 0.045 : 0.04);
   const T2 = wide ? 1.3 : 1;
   const line = (delay: number) => ease.outCubic(range(t, delay, delay + 0.6));
   ctx.save();

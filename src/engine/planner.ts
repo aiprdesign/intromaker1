@@ -3068,8 +3068,9 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
     .map((s) => ({
       skill: (SKILL_IDS as readonly string[]).includes(s.skill as string) ? (s.skill as SkillId) : "kinetic-slam",
       text: String(s.text ?? "").slice(0, 200) || "Untitled",
-      subtext: s.subtext ? String(s.subtext).slice(0, 100) : undefined,
-      duration: Math.min(8, Math.max(1.6, Number(s.duration) || 3)),
+      // (About us carries a short paragraph, and holds long enough for it to run past along the foot.)
+      subtext: s.subtext ? String(s.subtext).slice(0, s.skill === "ind-about" ? 240 : 100) : undefined,
+      duration: Math.min(s.skill === "ind-about" ? 12 : 8, Math.max(1.6, Number(s.duration) || 3)),
       transition: (TRANSITIONS as readonly string[]).includes(s.transition as string)
         ? (s.transition as Transition)
         : "cut",
