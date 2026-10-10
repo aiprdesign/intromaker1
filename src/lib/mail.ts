@@ -10,7 +10,27 @@ import { SITE_URL_ENV } from "./site";
  * Admin → Setup → Password reset email, else environment variables. SMTP wins when both are set.
  */
 
-export class MailError extends Error {}
+/** A failed send: `message` is safe to show anyone; `detail` says why, for the site owner. */
+export class MailError extends Error {
+  constructor(message: string, readonly detail?: string) {
+    super(message);
+  }
+}
+
+/** What an SMTP failure means, in the owner's words (nodemailer's error codes). */
+function smtpReason(e: unknown, host: string, port: number): string {
+  const err = e as { code?: string; responseCode?: number; response?: string; message?: string };
+  const code = err.code ?? "";
+  const said = (err.response ?? err.message ?? "").slice(0, 160);
+  if (code === "EAUTH" || err.responseCode === 535) return `The mail server rejected the login. Check the username (the full mailbox address) and its password, typed exactly, with no < > or spaces. (${said})`;
+  if (code === "ETIMEDOUT" || /timeout/i.test(said))
+    return `Couldn't reach ${host} on port ${port}: the connection timed out. The site's host is probably blocking outgoing email (Railway only allows SMTP on its paid plans), or the port is closed. Try port ${port === 465 ? 587 : 465}, or use an email API key (Resend, Postmark or SendGrid) instead, which sends over HTTPS.`;
+  if (code === "ECONNREFUSED") return `${host} refused the connection on port ${port}. Check the server name, or try port ${port === 465 ? 587 : 465}.`;
+  if (code === "EDNS" || code === "ENOTFOUND" || /ENOTFOUND|EAI_AGAIN/.test(said)) return /^smtp\.hostinger\.com$/i.test(host) ? `The server name ${host} couldn't be looked up from the site's server: it can't reach DNS right now (a network issue on the host, not your settings).` : `The server name ${host} couldn't be found: check the spelling (Hostinger's is smtp.hostinger.com).`;
+  if (code === "ESOCKET" || /certificate|tls|ssl|wrong version/i.test(said)) return `A secure connection to ${host}:${port} failed (${said}). Port 465 uses TLS from the start and 587 upgrades with STARTTLS: make sure the port matches the server's.`;
+  if (code === "EENVELOPE" || (err.responseCode ?? 0) >= 550) return `The mail server refused the message: ${said}. With SMTP, mail is sent from the mailbox you log in with.`;
+  return `The mail server said: ${said || code || "unknown error"}`;
+}
 
 export type Mail = { to: string; subject: string; text: string; html: string };
 
@@ -18,7 +38,8 @@ async function smtp() {
   const host = await serviceKey("smtpHost");
   const user = await serviceKey("smtpUser");
   const pass = await serviceKey("smtpPass");
-  return host && user && pass ? { host, user, pass, port: Number(process.env.INTROMAKER_SMTP_PORT) || 465 } : null;
+  const port = Number((await serviceKey("smtpPort")) || process.env.INTROMAKER_SMTP_PORT) || 465;
+  return host && user && pass ? { host, user, pass, port } : null;
 }
 
 /** Testing and staging: write emails to this file (one JSON line each) instead of sending them. */
@@ -53,8 +74,9 @@ export async function sendMail(m: Mail): Promise<void> {
       // (From the mailbox itself: SMTP servers like Hostinger's refuse other senders.)
       await t.sendMail({ from: { name: "Prodintro.com", address: box.user }, to: m.to, subject: m.subject, text: m.text, html: m.html });
     } catch (e) {
-      console.error(`[mail] SMTP: ${(e as Error).message}`);
-      throw new MailError("The email couldn't be sent. Try again in a minute.");
+      const reason = smtpReason(e, box.host, box.port);
+      console.error(`[mail] SMTP: ${reason}`);
+      throw new MailError("The email couldn't be sent. Try again in a minute.", reason);
     } finally {
       t.close();
     }
@@ -98,7 +120,7 @@ export async function sendMail(m: Mail): Promise<void> {
   if (!res.ok) {
     const detail = (await res.text().catch(() => "")).slice(0, 200);
     console.error(`[mail] ${res.status} ${detail}`);
-    throw new MailError("The email couldn't be sent. Try again in a minute.");
+    throw new MailError("The email couldn't be sent. Try again in a minute.", `The email service answered ${res.status}: ${detail || "no details"}. Check the API key and that the from address is on a domain verified with the service.`);
   }
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, CopyButton, Skeleton, useAdminUi, When } from "./ui";
 
-type KeyName = "openaiVoice" | "elevenlabs" | "amazonAccess" | "amazonSecret" | "amazonTag" | "ebayId" | "ebaySecret" | "mailKey" | "mailFrom" | "siteUrl" | "smtpHost" | "smtpUser" | "smtpPass";
+type KeyName = "openaiVoice" | "elevenlabs" | "amazonAccess" | "amazonSecret" | "amazonTag" | "ebayId" | "ebaySecret" | "mailKey" | "mailFrom" | "siteUrl" | "smtpHost" | "smtpUser" | "smtpPass" | "smtpPort";
 type KeyView = { label: string; env: string; source: "admin" | "env" | null; hint: string };
 type EnvRow = { name: string; group: string; purpose: string; example: string; secret: boolean; needed?: boolean; set: boolean; value?: string };
 export type SetupView = {
@@ -398,10 +398,11 @@ export default function SetupTab({ go }: { go: Go }) {
             send from. Add this site&apos;s address too, so the links point here. With SMTP, emails come from the mailbox itself.
           </>
         }
-        names={["smtpHost", "smtpUser", "smtpPass", "mailKey", "mailFrom", "siteUrl"]}
+        names={["smtpHost", "smtpUser", "smtpPass", "smtpPort", "mailKey", "mailFrom", "siteUrl"]}
         view={view}
         onSaved={setView}
       />
+      <MailTest />
       <Blocks />
       <EnvGuide env={view.env} />
       <KeysCard
@@ -417,5 +418,38 @@ export default function SetupTab({ go }: { go: Go }) {
         onSaved={setView}
       />
     </section>
+  );
+}
+
+/** Send a test email with the saved settings and show what the mail server said if it fails. */
+function MailTest() {
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setResult(null);
+    try {
+      const r = await api<{ ok: boolean; ms: number }>("/api/admin/mail-test", { method: "POST", body: JSON.stringify({ to }) });
+      setResult({ ok: true, text: `Sent in ${(r.ms / 1000).toFixed(1)} s. Check the inbox (and spam) for "Prodintro.com test email".` });
+    } catch (err) {
+      setResult({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form className="admin-card" onSubmit={send}>
+      <h3>Send a test email</h3>
+      <p className="hint">Uses the settings saved above. If it fails, the mail server&apos;s own reason shows here (the public forms only say it couldn&apos;t be sent).</p>
+      <div className="admin-row">
+        <input className="input" type="email" required placeholder="you@example.com" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Send the test to" />
+        <button className="btn btn-primary" disabled={busy}>
+          {busy ? "Sending… (up to 20 s)" : "Send test email"}
+        </button>
+      </div>
+      {result && <p className={result.ok ? "hint ok" : "error"}>{result.text}</p>}
+    </form>
   );
 }
