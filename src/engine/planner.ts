@@ -915,7 +915,8 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
       items: [town ? `Based in ${town}` : "", ...items.slice(0, 2)].filter(Boolean),
       eyebrow: "About us",
       role: "meet",
-      duration: 5,
+      // (Room for the paragraph to arrive bite by bite.)
+      duration: 7,
       transition: next?.transition ?? "cut",
     });
     // (The about slide takes the move into it; the slide after it now cuts in on the beat, so the

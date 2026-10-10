@@ -815,6 +815,61 @@ function deliveryRoute(sc0: SkillContext) {
 const ABOUT_POINTS = ["Based in your town", "Friendly local team", "Open six days a week"];
 
 /**
+ * The paragraph in bites a viewer reads at a glance: sentence by sentence, a long sentence split
+ * where it turns (", for families…", ", and…"), at most four bites.
+ */
+export function aboutBites(text: string): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]?/g)?.map((x) => x.trim()).filter(Boolean) ?? [];
+  const out: string[] = [];
+  for (const s0 of sentences) {
+    let s1 = s0;
+    while (s1.length > 52) {
+      const at = [", for ", ", with ", ", and ", ", where ", ", so ", ", "].map((k) => s1.indexOf(k, 18)).find((i) => i > 0 && i < s1.length - 12);
+      if (at === undefined) break;
+      out.push(s1.slice(0, at + 1).trim());
+      s1 = s1.slice(at + 1).trim();
+    }
+    out.push(s1);
+  }
+  return out.slice(0, 4);
+}
+
+/** How many lines `text` takes at the current font in `width`. */
+function fitLines(ctx: CanvasRenderingContext2D, text: string, width: number) {
+  return Math.max(1, Math.ceil(ctx.measureText(text).width / Math.max(1, width)));
+}
+
+/**
+ * Big outlined words drifting right to left along the foot of the frame, behind the slide: the
+ * name, what it is and where, like a shop's ticker. Slow and faint (texture, not copy).
+ */
+function aboutMarquee(sc: SkillContext) {
+  const { ctx, w, h, u, palette, scene, brand } = sc;
+  const T = sc.globalT ?? sc.t;
+  const place = (scene.items ?? []).map((x) => plain(split(x).title)).find((x) => /^based in\b/i.test(x))?.replace(/^based in\s+/i, "");
+  const what = plain(scene.subtext || "").match(/\bis (?:an? |the )?([^,.]{4,40}?)(?: in [A-Z]|,|\.)/)?.[1];
+  const parts = [brand?.name, what, place].filter((x): x is string => !!x && x.length < 40);
+  if (!parts.length) return;
+  const text = `${parts.join("  •  ")}  •  `.toUpperCase();
+  const size = Math.round(Math.min(w, h) * (h > w ? 0.09 : 0.13));
+  ctx.save();
+  ctx.font = displayFont(saasFont(sc), size);
+  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = `${(size * 0.02).toFixed(1)}px`;
+  const tw = Math.max(1, ctx.measureText(text).width);
+  const fade = clamp(sc.t / 0.6) * (1 - ease.inCubic(range(sc.t, sc.d - 0.45, sc.d)));
+  ctx.globalAlpha = fade;
+  ctx.strokeStyle = rgba(palette.primary, palette.light ? 0.22 : 0.28);
+  ctx.lineWidth = Math.max(1, 1.6 * u);
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  const y = h - Math.round(h * 0.035);
+  // About 70px a second at 1080p: calm enough to read, slow enough never to strobe.
+  const off = ((T * 70 * u) % tw + tw) % tw;
+  for (let x = -off; x < w; x += tw) ctx.strokeText(text, x, y);
+  ctx.restore();
+}
+
+/**
  * About us: a picture of the business's own place (its bakery, barber shop, gym…) in a frame
  * beside a few lines about it: the name small (no big logo), the headline, a short paragraph and
  * a few facts with ticks. A "Based in …" point becomes a pinned caption on the picture.
@@ -822,6 +877,7 @@ const ABOUT_POINTS = ["Based in your town", "Friendly local team", "Open six day
 function aboutUs(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 0 });
+  aboutMarquee(sc);
   const tall = h > w * 1.2;
   const wide = w > h * 1.3;
   const S = tall ? 1.45 : wide ? 1 : 1.12;
@@ -940,21 +996,38 @@ function aboutUs(sc: SkillContext) {
   ctx.fillStyle = palette.primary;
   ctx.fillRect(tx, y, 64 * u * S * hk, 5 * u * S);
   y += 26 * u * S;
-  // The paragraph.
-  const about = plain(scene.subtext || "");
-  if (about) {
-    const pk2 = line(0.6);
-    const ps = 25 * u * S * T2;
-    ctx.globalAlpha = pk2 * out;
-    ctx.font = subFont(ps, 500);
-    ctx.fillStyle = rgba(palette.text, 0.8);
-    const pn = fillTextFit(ctx, about, tx, y + (1 - pk2) * 12 * u, tw, { maxLines: tall ? 5 : 4, lineHeight: 1.45, minScale: 0.75 });
-    y += ps * 1.45 * pn + ps * 0.9;
+  // The paragraph, bite by bite: short phrases arrive one after another (gliding in the way the
+  // film travels), the one being read in full colour with a bar beside it, the earlier ones
+  // settling back, so the viewer reads a line at a time instead of facing a block of text.
+  const bites = aboutBites(plain(scene.subtext || ""));
+  const biteStart = 0.6;
+  const biteGap = bites.length ? Math.min(1.25, Math.max(0.6, (d - 2.2) / (bites.length + 0.6))) : 0;
+  if (bites.length) {
+    const ps = 27 * u * S * T2;
+    ctx.font = subFont(ps, 600);
+    bites.forEach((b, i) => {
+      const t0 = biteStart + i * biteGap;
+      const bk = ease.outCubic(range(t, t0, t0 + 0.5));
+      if (bk <= 0) {
+        // (Still to come: keep its room so the column doesn't jump as bites arrive.)
+        y += ps * 1.4 * Math.min(2, fitLines(ctx, b, tw - ps)) + ps * 0.35;
+        return;
+      }
+      const current = i === bites.length - 1 ? 1 : 1 - range(t, t0 + biteGap, t0 + biteGap + 0.4);
+      ctx.globalAlpha = bk * out * (0.5 + 0.5 * current);
+      ctx.fillStyle = palette.primary;
+      ctx.fillRect(tx, y + ps * 0.12, 4 * u * S, ps * 1.1 * current * bk);
+      ctx.fillStyle = rgba(palette.text, 0.92);
+      const n = fillTextFit(ctx, b, tx + ps * 0.7 + (1 - bk) * 22 * u, y, tw - ps, { maxLines: 2, lineHeight: 1.4, minScale: 0.8 });
+      y += ps * 1.4 * n + ps * 0.35;
+    });
+    y += ps * 0.6;
   }
-  // The facts, with ticks, one after another.
+  // The facts, with ticks, one after another, once the bites are in.
+  const factStart = bites.length ? biteStart + bites.length * biteGap : 0.9;
   const fs = 22 * u * S * T2;
   facts.forEach((f, i) => {
-    const fk = ease.outBack(range(t, 0.9 + i * 0.18, 1.3 + i * 0.18));
+    const fk = ease.outBack(range(t, factStart + i * 0.18, factStart + 0.4 + i * 0.18));
     if (fk <= 0) return;
     ctx.globalAlpha = clamp(fk) * out;
     ctx.fillStyle = mixHex(palette.primary, palette.light ? "#ffffff" : palette.bg0, 0.82);
@@ -978,7 +1051,7 @@ export const industrySkills: Skill[] = [
   {
     id: "ind-about",
     name: "About Us",
-    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline, a short paragraph and a few ticked facts; a 'Based in …' point pins to the picture.",
+    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline, a short paragraph arriving bite by bite (the line being read lit, earlier ones settling back), a few ticked facts and its name drifting by in big outlined letters along the foot; a 'Based in …' point pins to the picture.",
     bestFor: "Local businesses and services: who they are in a few lines (the text under the headline), with 1–3 short facts; no big logo.",
     sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
     itemsHint: "1–3 short facts (a 'Based in …' point pins to the picture)",
