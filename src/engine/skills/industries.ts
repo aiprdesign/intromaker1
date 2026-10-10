@@ -903,166 +903,89 @@ function aboutTicker(sc: SkillContext, about: string, keys: Set<string>, out: nu
 }
 
 /**
- * About us: a picture of the business's own place (its bakery, barber shop, gym…) in a frame
- * beside a few lines about it: the name small (no big logo), the headline, a short paragraph and
- * a few facts with ticks. A "Based in …" point becomes a pinned caption on the picture.
+ * About us: just words. "About us" set large on the left with a short rule under it, then the
+ * paragraph in rows of up to eight words, rising in one after another, its key words (the name,
+ * the town, the services) in the brand colour. The paragraph also runs large right to left along
+ * the foot. A "Based in …" point and the facts colour their words in the rows and the ticker.
  */
 function aboutUs(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 0 });
   const tall = h > w * 1.2;
   const wide = w > h * 1.3;
-  const S = tall ? 1.45 : wide ? 1 : 1.12;
   const out = 1 - ease.inCubic(range(t, d - 0.45, d));
   const points = itemsOr(scene, ABOUT_POINTS, 4, 1).map((x) => plain(split(x).title));
   const place = points.find((x) => /^based in\b|^in the heart of\b|^serving\b/i.test(x));
   const facts = points.filter((x) => x !== place).slice(0, 3);
-  // The picture: the right half of a wide frame, the top of a tall or square one.
-  const fw = wide ? w * 0.4 : w * 0.84;
-  // (Above the ticker along the foot, which takes the bottom fifth of a wide frame.)
-  const fh = wide ? h * 0.62 : h * (tall ? 0.42 : 0.4);
-  const fx = wide ? w * 0.54 : (w - fw) / 2;
-  const fy = wide ? h * 0.06 : h * 0.045;
-  const pk = ease.outCubic(range(t, 0.1, 0.8));
-  const r = 26 * u * S;
-  ctx.save();
-  ctx.globalAlpha = pk * out;
-  ctx.translate(0, (1 - pk) * 36 * u);
-  ctx.shadowColor = "rgba(10,10,30,0.3)";
-  ctx.shadowBlur = 44 * u;
-  ctx.shadowOffsetY = 16 * u;
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.roundRect(fx - 10 * u, fy - 10 * u, fw + 20 * u, fh + 20 * u, r + 8 * u);
-  ctx.fill();
-  ctx.shadowColor = "transparent";
-  ctx.beginPath();
-  ctx.roundRect(fx, fy, fw, fh, r);
-  ctx.clip();
-  // (A slow push into the picture while the slide holds.)
-  const push = 1.04 + 0.04 * range(t, 0, d);
-  ctx.translate(fx + fw / 2, fy + fh / 2);
-  ctx.scale(push, push);
-  ctx.translate(-(fx + fw / 2), -(fy + fh / 2));
-  const own = sc.setting as SceneBackdrop | undefined;
-  const pal = palette.light ? palette : { ...palette, text: INK, light: true };
-  sceneIn({ ...sc, palette: pal }, own && own !== "house" ? own : "shop", fx, fy, fw, fh);
-  ctx.restore();
-  // The pinned place caption on the picture.
-  if (place) {
-    const ck = ease.outBack(range(t, 0.7, 1.1));
-    const cs = 19 * u * S;
-    ctx.save();
-    ctx.globalAlpha = clamp(ck) * out;
-    ctx.font = subFont(cs, 700);
-    const cw = ctx.measureText(place).width + cs * 3;
-    const cx = fx + 18 * u;
-    const cy = fy + fh - cs * 2.4 - 14 * u;
-    ctx.translate(cx, cy + cs);
-    ctx.scale(0.8 + 0.2 * ck, 0.8 + 0.2 * ck);
-    ctx.fillStyle = "rgba(255,255,255,0.94)";
-    ctx.beginPath();
-    ctx.roundRect(0, -cs, cw, cs * 2, cs);
-    ctx.fill();
-    drawIcon(ctx, "MapPin", cs * 1.1, 0, cs * 1.05, palette.primary);
-    ctx.fillStyle = INK;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(place, cs * 2, 1 * u);
-    ctx.restore();
-  }
-  // The business's own icon (a cone, a wrench, scissors…) badged on the picture's corner.
-  const lead = sc.motifs?.[0];
-  if (lead) {
-    const bk = ease.outBack(range(t, 0.55, 0.95));
-    const bs = 34 * u * S;
-    ctx.save();
-    ctx.globalAlpha = clamp(bk) * out;
-    ctx.translate(fx + fw - bs * 0.95 - 8 * u, fy + bs * 0.95 + 8 * u);
-    ctx.scale(0.7 + 0.3 * bk, 0.7 + 0.3 * bk);
-    ctx.shadowColor = "rgba(10,10,30,0.25)";
-    ctx.shadowBlur = 18 * u;
-    ctx.shadowOffsetY = 6 * u;
-    ctx.fillStyle = palette.primary;
-    ctx.beginPath();
-    ctx.arc(0, 0, bs, 0, TAU);
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.strokeStyle = "rgba(255,255,255,0.9)";
-    ctx.lineWidth = 3 * u;
-    ctx.stroke();
-    drawIcon(ctx, lead, 0, 0, bs * 1.05, luminance(palette.primary) > 0.6 ? INK : "#ffffff");
-    ctx.restore();
-  }
-  // The words: beside the picture in a wide frame, under it otherwise.
-  const tx = wide ? w * 0.07 : fx;
-  const tw = wide ? w * 0.42 : fw;
-  // (In a wide frame the name lines up with the picture's top edge.)
-  let y = wide ? fy + 4 * u : fy + fh + h * (tall ? 0.045 : 0.04);
-  const T2 = wide ? 1.3 : 1;
+  const about = plain(scene.subtext || "");
+  const keys = keyWords(about, brand?.name ?? "", facts, place?.replace(/^based in\s+/i, ""));
+  const isKey = (wd: string) => keys.has(wd.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, ""));
   const line = (delay: number) => ease.outCubic(range(t, delay, delay + 0.6));
+  // The column: left aligned on the safe margin, from near the top down to the ticker.
+  const tx = w * (tall ? 0.08 : 0.07);
+  const tw = w - tx * 2;
+  const top = h * (tall ? 0.1 : 0.09);
+  const floor = h - (tall ? h * 0.085 : h * 0.1) - Math.min(w, h) * (tall ? 0.07 : 0.085) * 1.05 - h * 0.05;
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  // The name, small: a brand-coloured dot and the name in capitals.
-  const nk = line(0.25);
-  const ns = 18 * u * S * T2;
-  ctx.globalAlpha = nk * out;
-  ctx.fillStyle = palette.primary;
-  ctx.beginPath();
-  ctx.roundRect(tx, y + ns * 0.1, ns * 0.9, ns * 0.9, ns * 0.25);
-  ctx.fill();
-  ctx.font = subFont(ns, 700);
-  ctx.fillStyle = rgba(palette.text, 0.72);
-  const name = (brand?.name ?? "").toUpperCase();
-  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = `${(ns * 0.14).toFixed(1)}px`;
-  ctx.fillText(name, tx + ns * 1.5, y);
-  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = "0px";
-  y += ns * 2.2;
-  // The headline, with a short rule under it.
-  const hk = line(0.4);
-  const hs = (wide ? 84 : 58) * u * S;
+  // The heading, with a short rule under it.
+  const hk = line(0.15);
+  const hs = Math.round(Math.min(w, h) * (tall ? 0.13 : wide ? 0.13 : 0.12));
   ctx.globalAlpha = hk * out;
   ctx.font = displayFont(saasFont(sc), hs);
   ctx.fillStyle = palette.text;
-  const hn = fillTextFit(ctx, plain(scene.text || "About us"), tx, y + (1 - hk) * 14 * u, tw, { maxLines: 2, lineHeight: 1.08, minScale: 0.6 });
-  y += hs * 1.08 * hn + hs * 0.25;
+  const hn = fillTextFit(ctx, plain(scene.text || "About us"), tx, top + (1 - hk) * 16 * u, tw, { maxLines: 1, lineHeight: 1.05, minScale: 0.6 });
+  let y = top + hs * 1.05 * hn + hs * 0.22;
   ctx.fillStyle = palette.primary;
-  ctx.fillRect(tx, y, 64 * u * S * hk, 5 * u * S);
-  y += 26 * u * S;
-  // The paragraph, in two or three lines under the headline (it also runs large along the foot).
-  const para = plain(scene.subtext || "");
-  if (para) {
-    const pk2 = line(0.6);
-    const ps = 25 * u * S * T2;
-    ctx.globalAlpha = pk2 * out;
-    ctx.font = subFont(ps, 500);
-    ctx.fillStyle = rgba(palette.text, 0.8);
-    const pn = fillTextFit(ctx, para, tx, y + (1 - pk2) * 12 * u, tw, { maxLines: 3, lineHeight: 1.45, minScale: 0.7 });
-    y += ps * 1.45 * pn + ps * 0.9;
+  ctx.fillRect(tx, y, hs * 0.9 * hk, Math.max(2, hs * 0.07));
+  y += hs * 0.07 + hs * 0.38;
+  // The paragraph in rows of up to eight words (fewer in a square or tall frame, so the words stay
+  // large), one size for every row, as large as fits.
+  const words = about.split(/\s+/).filter(Boolean);
+  const per = tall ? 4 : wide ? 8 : 6;
+  const rows: string[][] = [];
+  for (let i = 0; i < words.length; i += per) rows.push(words.slice(i, i + per));
+  // (A short last row borrows from the one above, so no row is left with a word or two.)
+  if (rows.length > 1 && rows[rows.length - 1].length < 3) {
+    const last = rows.pop()!;
+    const prev = rows.pop()!;
+    const all = [...prev, ...last];
+    const cut = Math.ceil(all.length / 2);
+    rows.push(all.slice(0, cut), all.slice(cut));
   }
-  // The facts, with ticks, one after another.
-  const factStart = 0.9;
-  const fs = 22 * u * S * T2;
-  facts.forEach((f, i) => {
-    const fk = ease.outBack(range(t, factStart + i * 0.18, factStart + 0.4 + i * 0.18));
-    if (fk <= 0) return;
-    ctx.globalAlpha = clamp(fk) * out;
-    ctx.fillStyle = mixHex(palette.primary, palette.light ? "#ffffff" : palette.bg0, 0.82);
-    ctx.beginPath();
-    ctx.arc(tx + fs * 0.6, y + fs * 0.6, fs * 0.6, 0, TAU);
-    ctx.fill();
-    drawIcon(ctx, "Check", tx + fs * 0.6, y + fs * 0.6, fs * 0.75, palette.primary);
-    ctx.font = subFont(fs, 600);
-    ctx.fillStyle = palette.text;
-    ctx.fillText(f, tx + fs * 1.6 + (1 - clamp(fk)) * 10 * u, y + fs * 0.08);
-    y += fs * 1.75;
-  });
+  if (rows.length) {
+    const lh = 1.32;
+    const room = Math.max(10, floor - y);
+    let ps = Math.min(Math.round(Math.min(w, h) * (tall ? 0.075 : 0.06)), room / (rows.length * lh));
+    const fontOf = (key: boolean, sz: number) => subFont(sz, key ? 750 : 500);
+    const width = (r: string[], sz: number) => {
+      let x = 0;
+      for (const wd of r) {
+        ctx.font = fontOf(isKey(wd), sz);
+        x += ctx.measureText(wd + " ").width;
+      }
+      return x;
+    };
+    const widest = Math.max(...rows.map((r) => width(r, ps)));
+    if (widest > tw) ps *= tw / widest;
+    rows.forEach((r, i) => {
+      const rk = line(0.45 + i * 0.22);
+      if (rk <= 0) return;
+      ctx.globalAlpha = rk * out;
+      const ry = y + i * ps * lh + (1 - rk) * 14 * u;
+      let x = tx;
+      for (const wd of r) {
+        const key = isKey(wd);
+        ctx.font = fontOf(key, ps);
+        ctx.fillStyle = key ? palette.primary : rgba(palette.text, 0.86);
+        ctx.fillText(wd, x, ry);
+        x += ctx.measureText(wd + " ").width;
+      }
+    });
+  }
   ctx.restore();
-  // And the paragraph again, large, on one line running right to left along the foot, its key
-  // words in colour, so it's easy to read from a distance.
-  const about = plain(scene.subtext || "");
-  if (about) aboutTicker(sc, about, keyWords(about, brand?.name ?? "", facts, place?.replace(/^based in\s+/i, "")), out);
+  if (about) aboutTicker(sc, about, keys, out);
 }
 
 /* ───────────────────────── Registry ───────────────────────── */
@@ -1073,12 +996,12 @@ export const industrySkills: Skill[] = [
   {
     id: "ind-about",
     name: "About Us",
-    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline, a short paragraph and a few ticked facts, with the paragraph also running large right to left along the foot like a news ticker, its key words (name, town, services) in the brand colour with a soft highlight as they pass the middle; a 'Based in …' point pins to the picture.",
-    bestFor: "Local businesses and services: who they are in a few lines (the text under the headline), with 1–3 short facts; no big logo.",
+    tagline: "Just words: \"About us\" large on the left, then the paragraph in rows of up to eight words rising in one after another, its key words (name, town, services) in the brand colour, with the paragraph also running large right to left along the foot like a news ticker, a soft highlight swelling behind key words as they pass the middle.",
+    bestFor: "Local businesses and services: who they are in a short paragraph; the facts and town colour their words in it.",
     sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
-    itemsHint: "1–3 short facts (a 'Based in …' point pins to the picture)",
+    itemsHint: "1–3 short facts or a 'Based in …' point (their words are coloured in the paragraph)",
     render: aboutUs,
-    sfx: (scene) => [at(0.1, "whoosh"), ...pointTimes(scene, 3, 0.9).map((ti) => at(ti, "pop"))],
+    sfx: () => [at(0.1, "whoosh")],
   },
   {
     id: "ind-hometour",
