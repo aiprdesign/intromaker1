@@ -1028,6 +1028,17 @@ function aboutUs(sc: SkillContext) {
   ctx.fillStyle = palette.primary;
   ctx.fillRect(tx, y, 64 * u * S * hk, 5 * u * S);
   y += 26 * u * S;
+  // The paragraph, in two or three lines under the headline (it also runs large along the foot).
+  const para = plain(scene.subtext || "");
+  if (para) {
+    const pk2 = line(0.6);
+    const ps = 25 * u * S * T2;
+    ctx.globalAlpha = pk2 * out;
+    ctx.font = subFont(ps, 500);
+    ctx.fillStyle = rgba(palette.text, 0.8);
+    const pn = fillTextFit(ctx, para, tx, y + (1 - pk2) * 12 * u, tw, { maxLines: 3, lineHeight: 1.45, minScale: 0.7 });
+    y += ps * 1.45 * pn + ps * 0.9;
+  }
   // The facts, with ticks, one after another.
   const factStart = 0.9;
   const fs = 22 * u * S * T2;
@@ -1046,7 +1057,8 @@ function aboutUs(sc: SkillContext) {
     y += fs * 1.75;
   });
   ctx.restore();
-  // The paragraph: one line running right to left along the foot, its key words in colour.
+  // And the paragraph again, large, on one line running right to left along the foot, its key
+  // words in colour, so it's easy to read from a distance.
   const about = plain(scene.subtext || "");
   if (about) aboutTicker(sc, about, keyWords(about, brand?.name ?? "", facts, place?.replace(/^based in\s+/i, "")), out);
 }
@@ -1059,7 +1071,7 @@ export const industrySkills: Skill[] = [
   {
     id: "ind-about",
     name: "About Us",
-    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline and a few ticked facts, with the paragraph running right to left along the foot like a news ticker, its key words (name, town, services) in the brand colour with a soft highlight as they pass the middle; a 'Based in …' point pins to the picture.",
+    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline, a short paragraph and a few ticked facts, with the paragraph also running large right to left along the foot like a news ticker, its key words (name, town, services) in the brand colour with a soft highlight as they pass the middle; a 'Based in …' point pins to the picture.",
     bestFor: "Local businesses and services: who they are in a few lines (the text under the headline), with 1–3 short facts; no big logo.",
     sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
     itemsHint: "1–3 short facts (a 'Based in …' point pins to the picture)",
