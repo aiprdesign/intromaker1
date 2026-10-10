@@ -909,9 +909,11 @@ function aboutTicker(sc: SkillContext, about: string, keys: Set<string>, out: nu
  * the town, the services) in the brand colour. The paragraph also runs large right to left along
  * the foot. A "Based in …" point and the facts colour their words in the rows and the ticker.
  */
-function aboutUs(sc: SkillContext) {
-  const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
-  saasBackground(sc, { beams: 0 });
+type AboutKind = "card" | "panel" | "badge" | "stack" | "window";
+
+/** Shared by the About us variations: the words, the ticker and what the slide knows. */
+function aboutBits(sc: SkillContext) {
+  const { w, h, t, d, scene, brand } = sc;
   const tall = h > w * 1.2;
   const wide = w > h * 1.3;
   const out = 1 - ease.inCubic(range(t, d - 0.45, d));
@@ -919,49 +921,58 @@ function aboutUs(sc: SkillContext) {
   const place = points.find((x) => /^based in\b|^in the heart of\b|^serving\b/i.test(x));
   const facts = points.filter((x) => x !== place).slice(0, 3);
   const about = plain(scene.subtext || "");
-  const keys = keyWords(about, brand?.name ?? "", facts, place?.replace(/^based in\s+/i, ""));
+  const town = place?.replace(/^based in\s+|^in the heart of\s+|^serving\s+/i, "");
+  const keys = keyWords(about, brand?.name ?? "", facts, town);
+  const top = h * (tall ? 0.1 : 0.09);
+  // (The column ends above the ticker along the foot.)
+  const floor = h - (tall ? h * 0.085 : h * 0.1) - Math.min(w, h) * (tall ? 0.07 : 0.085) * 1.05 - h * 0.05;
+  const margin = w * (tall ? 0.08 : 0.07);
+  return { tall, wide, out, place, town, about, keys, top, floor, margin };
+}
+
+/**
+ * The words: "About us" large with a short rule under it, then the paragraph's first eight words
+ * and an ellipsis (the foot runs the rest) in rows that rise in one after another, key words in
+ * the brand colour. `share` is the part of the room down to `floor` the rows may take. Returns the
+ * y where the words end.
+ */
+function aboutWords(sc: SkillContext, o: { tx: number; tw: number; top: number; floor: number; share: number; per: number; ink?: string; keyInk?: string }) {
+  const { ctx, w, h, t, u, palette, scene } = sc;
+  const { tall, wide, out, about, keys } = aboutBits(sc);
+  const ink = o.ink ?? palette.text;
+  const keyInk = o.keyInk ?? palette.primary;
   const isKey = (wd: string) => keys.has(wd.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, ""));
   const line = (delay: number) => ease.outCubic(range(t, delay, delay + 0.6));
-  // The column: left aligned on the safe margin, from near the top down to the ticker; in a wide
-  // frame it takes the left half, with the logo or picture beside it.
-  const tx = w * (tall ? 0.08 : 0.07);
-  const tw = wide ? w * 0.42 : w - tx * 2;
-  const top = h * (tall ? 0.1 : 0.09);
-  const floor = h - (tall ? h * 0.085 : h * 0.1) - Math.min(w, h) * (tall ? 0.07 : 0.085) * 1.05 - h * 0.05;
+  const { tx, tw, top } = o;
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  // The heading, with a short rule under it.
   const hk = line(0.15);
   const hs = Math.round(Math.min(w, h) * (tall ? 0.13 : wide ? 0.13 : 0.12));
   ctx.globalAlpha = hk * out;
   ctx.font = displayFont(saasFont(sc), hs);
-  ctx.fillStyle = palette.text;
-  const hn = fillTextFit(ctx, plain(scene.text || "About us"), tx, top + (1 - hk) * 16 * u, tw, { maxLines: 1, lineHeight: 1.05, minScale: 0.6 });
+  ctx.fillStyle = ink;
+  const hn = fillTextFit(ctx, plain(scene.text || "About us"), tx, top + (1 - hk) * 16 * u, tw, { maxLines: 1, lineHeight: 1.05, minScale: 0.5 });
   let y = top + hs * 1.05 * hn + hs * 0.22;
-  ctx.fillStyle = palette.primary;
+  ctx.fillStyle = keyInk;
   ctx.fillRect(tx, y, hs * 0.9 * hk, Math.max(2, hs * 0.07));
   y += hs * 0.07 + hs * 0.38;
-  // The paragraph's first eight words and an ellipsis (the foot runs the rest), in three rows
-  // beside the picture or in a tall frame and two in a square one, so they stay large.
   const all = about.split(/\s+/).filter(Boolean);
   const words = all.slice(0, LEAD_WORDS);
   if (all.length > LEAD_WORDS && words.length) words[words.length - 1] = words[words.length - 1].replace(/[,;:.!?]+$/, "") + "…";
-  const per = wide || tall ? 3 : 4;
   const rows: string[][] = [];
-  for (let i = 0; i < words.length; i += per) rows.push(words.slice(i, i + per));
+  for (let i = 0; i < words.length; i += o.per) rows.push(words.slice(i, i + o.per));
   // (A short last row borrows from the one above, so no row is left with a word or two.)
   if (rows.length > 1 && rows[rows.length - 1].length < 3) {
     const last = rows.pop()!;
     const prev = rows.pop()!;
-    const all = [...prev, ...last];
-    const cut = Math.ceil(all.length / 2);
-    rows.push(all.slice(0, cut), all.slice(cut));
+    const both = [...prev, ...last];
+    const cut = Math.ceil(both.length / 2);
+    rows.push(both.slice(0, cut), both.slice(cut));
   }
   if (rows.length) {
     const lh = 1.32;
-    // (Under the picture's share of a square or tall frame.)
-    const room = Math.max(10, wide ? floor - y : (floor - y) * 0.42);
+    const room = Math.max(10, (o.floor - y) * o.share);
     let ps = Math.min(Math.round(Math.min(w, h) * (tall ? 0.085 : 0.075)), room / (rows.length * lh));
     const fontOf = (key: boolean, sz: number) => subFont(sz, key ? 750 : 500);
     const width = (r: string[], sz: number) => {
@@ -983,7 +994,7 @@ function aboutUs(sc: SkillContext) {
       for (const wd of r) {
         const key = isKey(wd);
         ctx.font = fontOf(key, ps);
-        ctx.fillStyle = key ? palette.primary : rgba(palette.text, 0.86);
+        ctx.fillStyle = key ? keyInk : rgba(ink, 0.86);
         ctx.fillText(wd, x, ry);
         x += ctx.measureText(wd + " ").width;
       }
@@ -991,14 +1002,278 @@ function aboutUs(sc: SkillContext) {
     y += rows.length * ps * lh;
   }
   ctx.restore();
-  // Beside the words in a wide frame, under them otherwise: the logo, traced, or the business's
-  // own place.
-  if (wide) aboutSide(sc, w * 0.55, top, w * 0.38, floor - top, out);
-  else {
-    const gy = y + h * 0.035;
-    if (floor - gy > h * 0.12) aboutSide(sc, tx, gy, tw, floor - gy, out);
+  return y;
+}
+
+/**
+ * The business's mark in a square box: its logo traced to vector (outlines draw on, then the
+ * colours fill in) or, with no logo, its own icon (a cone, a wrench, scissors…) drawing on.
+ * `light` is the ground the mark sits on.
+ */
+function aboutMark(sc: SkillContext, x: number, y: number, bw: number, bh: number, light: boolean, iconInk: string, start = 0.55) {
+  const { ctx, t, brand } = sc;
+  const traced = tracedLogo(brand?.logo, light);
+  const lineK = ease.inOutCubic(range(t, start, start + 1.35));
+  const fillK = ease.outCubic(range(t, start + 1.05, start + 1.85));
+  if (traced) drawTraced(ctx, traced, x, y, bw, bh, lineK, fillK);
+  else drawIcon(ctx, sc.motifs?.[0] ?? "Store", x + bw / 2, y + bh / 2, Math.min(bw, bh) * 0.9, iconInk, Math.max(0.001, lineK));
+  return !!traced;
+}
+
+/** A white card with a soft shadow, rising into place. */
+function aboutCard(sc: SkillContext, x: number, y: number, cw: number, ch: number, r: number, k: number) {
+  const { ctx, u } = sc;
+  ctx.shadowColor = "rgba(10,10,30,0.3)";
+  ctx.shadowBlur = 44 * u;
+  ctx.shadowOffsetY = 16 * u;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(x, y + (1 - k) * 36 * u, cw, ch, r);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+}
+
+/** The business's own place (its bakery, salon, garage…) painted into a box. */
+function aboutPlace(sc: SkillContext, x: number, y: number, pw: number, ph: number) {
+  const own = sc.setting as SceneBackdrop | undefined;
+  const pal = sc.palette.light ? sc.palette : { ...sc.palette, text: INK, light: true };
+  sceneIn({ ...sc, palette: pal }, own && own !== "house" ? own : "shop", x, y, pw, ph);
+}
+
+function aboutUs(sc: SkillContext, kind: AboutKind = "card") {
+  const { ctx, w, h, t, d, u, palette, brand } = sc;
+  const b = aboutBits(sc);
+  const { tall, wide, out, top, floor, margin } = b;
+  const per = wide || tall ? 3 : 4;
+  if (kind === "window") {
+    // The business's own place fills the frame, darkened towards the words, which sit on a pane
+    // of tinted glass; the logo, small, heads the pane.
+    const push = 1.04 + 0.05 * range(t, 0, d);
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(push, push);
+    ctx.translate(-w / 2, -h / 2);
+    aboutPlace(sc, 0, 0, w, h);
+    ctx.restore();
+    const g = wide ? ctx.createLinearGradient(0, 0, w, 0) : ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "rgba(8,8,20,0.55)");
+    g.addColorStop(0.6, "rgba(8,8,20,0.2)");
+    g.addColorStop(1, "rgba(8,8,20,0.05)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    const gk = ease.outCubic(range(t, 0.1, 0.8));
+    const gx = margin * 0.6;
+    const gw = wide ? w * 0.48 : w - gx * 2;
+    const gy = top * 0.6;
+    const gh = wide ? floor - gy + h * 0.02 : (floor - gy) * (tall ? 0.62 : 0.8);
+    ctx.save();
+    ctx.globalAlpha = gk * out;
+    ctx.translate((gk - 1) * 40 * u, 0);
+    ctx.fillStyle = rgba(mixHex(palette.bg0, "#000000", 0.4), 0.72);
+    ctx.beginPath();
+    ctx.roundRect(gx, gy, gw, gh, 28 * u);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1.5 * u;
+    ctx.stroke();
+    ctx.restore();
+    const pad = margin * 0.6;
+    let ty = gy + pad;
+    const tr = tracedLogo(brand?.logo, false);
+    if (tr) {
+      // (Its box shaped to the logo, so it sits flush with the words' left edge.)
+      const lh = Math.min(gh * 0.2, h * 0.14, ((gw - pad * 2) * 0.6 * tr.h) / tr.w);
+      ctx.save();
+      ctx.globalAlpha = out;
+      aboutMark(sc, gx + pad, ty, (lh * tr.w) / tr.h, lh, false, "#ffffff", 0.3);
+      ctx.restore();
+      ty += lh + h * 0.03;
+    }
+    aboutWords(sc, { tx: gx + pad, tw: gw - pad * 2, top: ty, floor: gy + gh - pad * 0.5, share: 1, per, ink: "#ffffff", keyInk: mixHex(palette.primary, "#ffffff", 0.35) });
+  } else if (kind === "panel") {
+    // A block of the brand colour (the left of a wide frame, the top of a tall one) carrying the
+    // mark on a white disc; the words beside or under it.
+    const pk = ease.outCubic(range(t, 0, 0.7));
+    const pw = wide ? w * 0.42 : w;
+    const ph = wide ? floor + h * 0.05 : h * (tall ? 0.36 : 0.4);
+    saasBackground(sc, { beams: 0 });
+    ctx.save();
+    ctx.globalAlpha = out;
+    ctx.translate(wide ? (pk - 1) * pw : 0, wide ? 0 : (pk - 1) * ph);
+    const g = ctx.createLinearGradient(0, 0, pw, ph);
+    g.addColorStop(0, palette.primary);
+    g.addColorStop(1, mixHex(palette.primary, palette.accent, 0.45));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, pw, ph);
+    const R = Math.min(pw, ph) * (wide ? 0.3 : 0.32);
+    const cx = pw / 2;
+    const cy = ph / 2 + (wide ? 0 : top * 0.2);
+    const dk = ease.outBack(range(t, 0.35, 0.95));
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(0.6 + 0.4 * clamp(dk), 0.6 + 0.4 * clamp(dk));
+    ctx.shadowColor = "rgba(10,10,30,0.3)";
+    ctx.shadowBlur = 40 * u;
+    ctx.shadowOffsetY = 14 * u;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, TAU);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.restore();
+    aboutMark(sc, cx - R * 0.62, cy - R * 0.62, R * 1.24, R * 1.24, true, palette.primary);
+    ctx.restore();
+    if (wide) aboutWords(sc, { tx: w * 0.5, tw: w * 0.43, top, floor, share: 1, per });
+    else aboutWords(sc, { tx: margin, tw: w - margin * 2, top: ph + h * 0.04, floor, share: 1, per });
+  } else {
+    saasBackground(sc, { beams: 0 });
+    const tw = wide ? w * 0.42 : w - margin * 2;
+    const y = aboutWords(sc, { tx: margin, tw, top, floor, share: wide ? 1 : 0.42, per });
+    // The visual: beside the words in a wide frame, under them otherwise.
+    const box = wide ? { x: w * 0.55, y: top, w: w * 0.38, h: floor - top } : { x: margin, y: y + h * 0.035, w: tw, h: floor - y - h * 0.035 };
+    if (box.h > h * 0.12) {
+      if (kind === "badge") aboutBadge(sc, box.x, box.y, box.w, box.h, out);
+      else if (kind === "stack") aboutStack(sc, box.x, box.y, box.w, box.h, out);
+      else aboutSide(sc, box.x, box.y, box.w, box.h, out);
+    }
   }
-  if (about) aboutTicker(sc, tickerText(about), keys, out);
+  if (b.about) aboutTicker(sc, tickerText(b.about), b.keys, out);
+}
+
+/**
+ * A round badge: the mark on a white disc, ringed by the business's name and town set around the
+ * circle, turning slowly.
+ */
+function aboutBadge(sc: SkillContext, x: number, y: number, bw: number, bh: number, out: number) {
+  const { ctx, t, u, palette, brand } = sc;
+  const { town } = aboutBits(sc);
+  const R = Math.min(bw, bh) / 2 - 6 * u;
+  const cx = x + bw / 2;
+  const cy = y + bh / 2;
+  const k = ease.outBack(range(t, 0.15, 0.85));
+  ctx.save();
+  ctx.globalAlpha = clamp(k) * out;
+  ctx.translate(cx, cy);
+  ctx.scale(0.7 + 0.3 * clamp(k), 0.7 + 0.3 * clamp(k));
+  // The ring: a band in the brand colour with the words set round it.
+  ctx.fillStyle = palette.primary;
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, TAU);
+  ctx.fill();
+  ctx.shadowColor = "rgba(10,10,30,0.3)";
+  ctx.shadowBlur = 30 * u;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(0, 0, R * 0.72, 0, TAU);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  const label = [brand?.name || "About us", town].filter(Boolean).join("  •  ").toUpperCase() + "  •  ";
+  const fs = R * 0.12;
+  ctx.font = subFont(fs, 800);
+  const ringR = R * 0.86;
+  const unit = ctx.measureText(label).width;
+  const reps = Math.max(1, Math.round((TAU * ringR) / unit));
+  const text = label.repeat(reps);
+  const chars = Array.from(text);
+  const widths = chars.map((c) => ctx.measureText(c).width);
+  const total = widths.reduce((a, b) => a + b, 0);
+  // (Spread so the words close the ring exactly.)
+  const scale = (TAU * ringR) / total;
+  let ang = -Math.PI / 2 + t * 0.22;
+  ctx.fillStyle = luminance(palette.primary) > 0.6 ? INK : "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  chars.forEach((c, i) => {
+    const a = ang + (widths[i] * scale) / 2 / ringR;
+    ctx.save();
+    ctx.rotate(a);
+    ctx.translate(0, -ringR);
+    ctx.fillText(c, 0, 0);
+    ctx.restore();
+    ang += (widths[i] * scale) / ringR;
+  });
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = out;
+  const m = R * 0.46;
+  aboutMark(sc, cx - m, cy - m, m * 2, m * 2, true, palette.primary);
+  ctx.restore();
+}
+
+/**
+ * A little stack on the table: the business's own place as a photo, tipped a touch, with the logo
+ * on a smaller card tucked over its corner and the town pinned to the photo.
+ */
+function aboutStack(sc: SkillContext, x: number, y: number, bw: number, bh: number, out: number) {
+  const { ctx, t, u, palette, brand } = sc;
+  const { place } = aboutBits(sc);
+  const pk = ease.outCubic(range(t, 0.15, 0.85));
+  const fw = bw * 0.9;
+  const fh = bh * 0.86;
+  const fx = x + bw - fw;
+  const fy = y;
+  const rot = -0.045 * pk - (1 - pk) * 0.12;
+  ctx.save();
+  ctx.globalAlpha = pk * out;
+  ctx.translate(fx + fw / 2, fy + fh / 2 + (1 - pk) * 40 * u);
+  ctx.rotate(rot);
+  ctx.translate(-fw / 2, -fh / 2);
+  const border = Math.max(8 * u, fw * 0.035);
+  aboutCard(sc, 0, 0, fw, fh, 12 * u, 1);
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(border, border, fw - border * 2, fh - border * 2, 6 * u);
+  ctx.clip();
+  aboutPlace(sc, border, border, fw - border * 2, fh - border * 2);
+  ctx.restore();
+  if (place) {
+    const ck = ease.outBack(range(t, 0.8, 1.2));
+    const cs = Math.min(fw, fh) * 0.045;
+    ctx.globalAlpha = clamp(ck) * out;
+    ctx.font = subFont(cs, 700);
+    const cw = ctx.measureText(place).width + cs * 3;
+    // (Top right: the logo card covers the lower left.)
+    const px = fw - border - cw - cs * 0.6;
+    const py = border + cs * 0.8;
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.beginPath();
+    ctx.roundRect(px, py, cw, cs * 2, cs);
+    ctx.fill();
+    drawIcon(ctx, "MapPin", px + cs * 1.1, py + cs, cs * 1.05, palette.primary);
+    ctx.fillStyle = INK;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(place, px + cs * 2, py + cs + 1 * u);
+  }
+  ctx.restore();
+  // The logo card over the photo's lower-left corner (or the business's icon on a brand disc).
+  const lk = ease.outBack(range(t, 0.5, 1.05));
+  if (lk <= 0) return;
+  const has = !!tracedLogo(brand?.logo, true);
+  const cs = Math.min(bw, bh) * 0.4;
+  const cw = has ? cs * 1.3 : cs;
+  const lx = x + bw * 0.02;
+  const ly = y + bh - cs - bh * 0.02;
+  ctx.save();
+  ctx.globalAlpha = clamp(lk) * out;
+  ctx.translate(lx + cw / 2, ly + cs / 2);
+  ctx.rotate(0.06 * clamp(lk));
+  ctx.scale(0.7 + 0.3 * clamp(lk), 0.7 + 0.3 * clamp(lk));
+  ctx.translate(-cw / 2, -cs / 2);
+  if (has) {
+    aboutCard(sc, 0, 0, cw, cs, 16 * u, 1);
+    aboutMark(sc, cs * 0.14, cs * 0.14, cw - cs * 0.28, cs * 0.72, true, palette.primary, 0.8);
+  } else {
+    ctx.shadowColor = "rgba(10,10,30,0.3)";
+    ctx.shadowBlur = 24 * u;
+    ctx.fillStyle = palette.primary;
+    ctx.beginPath();
+    ctx.arc(cs / 2, cs / 2, cs * 0.42, 0, TAU);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    aboutMark(sc, cs * 0.25, cs * 0.25, cs * 0.5, cs * 0.5, false, luminance(palette.primary) > 0.6 ? INK : "#ffffff", 0.8);
+  }
+  ctx.restore();
 }
 
 /**
@@ -1074,12 +1349,52 @@ const pops = (n: number, start = 0.8) => (scene: Scene) => pointTimes(scene, n, 
 export const industrySkills: Skill[] = [
   {
     id: "ind-about",
-    name: "About Us",
-    tagline: "Just words: \"About us\" large on the left, then the paragraph in rows of up to eight words rising in one after another, its key words (name, town, services) in the brand colour, with the paragraph also running large right to left along the foot like a news ticker, a soft highlight swelling behind key words as they pass the middle.",
+    name: "About Us: Side Card",
+    tagline: "\"About us\" large and left aligned with the first eight words of the paragraph rising in row by row, key words in the brand colour, beside a white card with the business's logo traced to vector (its outlines draw on, then its colours fill in), or its own place when there's no logo; the paragraph also scrolls fully across the foot like a news ticker, a soft highlight swelling behind key words as they pass the middle.",
     bestFor: "Local businesses and services: who they are in a short paragraph; the facts and town colour their words in it.",
     sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
     itemsHint: "1–3 short facts or a 'Based in …' point (their words are coloured in the paragraph)",
-    render: aboutUs,
+    render: (sc) => aboutUs(sc, "card"),
+    sfx: () => [at(0.1, "whoosh")],
+  },
+  {
+    id: "ind-about-panel",
+    name: "About Us: Brand Panel",
+    tagline: "A block of the brand colour slides in (the left of a wide frame, the top of a tall one) carrying the business's logo, traced to vector, on a white disc; beside it \"About us\" left aligned and the first eight words of its paragraph, which also scrolls fully across the foot.",
+    bestFor: "Local businesses with a strong brand colour or logo: who they are in a short paragraph.",
+    sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
+    itemsHint: "1–3 short facts or a 'Based in …' point (their words are coloured in the paragraph)",
+    render: (sc) => aboutUs(sc, "panel"),
+    sfx: () => [at(0.05, "whoosh"), at(0.4, "pop")],
+  },
+  {
+    id: "ind-about-badge",
+    name: "About Us: Badge",
+    tagline: "A round badge: the business's logo, traced to vector, on a white disc ringed by its name and town set round the circle and turning slowly, beside \"About us\" and the first eight words of its paragraph, which also scrolls fully across the foot.",
+    bestFor: "Local shops, cafés and studios with a town to name: a stamp of who and where they are.",
+    sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
+    itemsHint: "a 'Based in …' point names the town on the ring",
+    render: (sc) => aboutUs(sc, "badge"),
+    sfx: () => [at(0.1, "whoosh"), at(0.45, "pop")],
+  },
+  {
+    id: "ind-about-stack",
+    name: "About Us: Photo Stack",
+    tagline: "The business's own place as a photo, tipped a touch, with its logo on a smaller card tucked over the corner and its town pinned to the photo, beside \"About us\" and the first eight words of its paragraph, which also scrolls fully across the foot.",
+    bestFor: "Shops, restaurants and salons people visit: the place and the brand together.",
+    sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
+    itemsHint: "a 'Based in …' point pins to the photo",
+    render: (sc) => aboutUs(sc, "stack"),
+    sfx: () => [at(0.1, "whoosh"), at(0.55, "pop"), at(0.85, "pop")],
+  },
+  {
+    id: "ind-about-window",
+    name: "About Us: Window",
+    tagline: "The business's own place fills the frame with a slow push in, and \"About us\" sits on a pane of tinted glass headed by its logo traced to vector, with the first eight words of its paragraph; the paragraph also scrolls fully across the foot.",
+    bestFor: "Places with atmosphere (cafés, studios, showrooms): inside the business from the first frame.",
+    sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
+    itemsHint: "1–3 short facts or a 'Based in …' point (their words are coloured in the paragraph)",
+    render: (sc) => aboutUs(sc, "window"),
     sfx: () => [at(0.1, "whoosh")],
   },
   {

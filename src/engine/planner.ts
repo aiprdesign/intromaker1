@@ -859,6 +859,9 @@ const LOCAL_KINDS: [RegExp, string, string][] = [
  * tags…) and its steps; lines from a software category that doesn't fit ("Sell with…", "Get your
  * tickets") give way to plain local ones; and the close asks for the visit, the booking or the call.
  */
+/** The About us variations the director picks between. */
+const ABOUT_SKILLS: SkillId[] = ["ind-about", "ind-about-panel", "ind-about-badge", "ind-about-stack", "ind-about-window"];
+
 function localize(plan: VideoPlan, prompt: string, brief: Brief) {
   const name = plan.brand?.name ?? plan.title;
   const items = brief.features.map((f) => f.charAt(0).toUpperCase() + f.slice(1)).slice(0, 4);
@@ -909,7 +912,8 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
     const next = out[at + 1] ?? out[out.length - 1];
     const where = at >= 0 ? at + 1 : 1;
     out.splice(where, 0, {
-      skill: "ind-about" as SkillId,
+      // (One of the About us variations, picked by the business's name and the draw, so intros differ.)
+      skill: ABOUT_SKILLS[(hashString(name) + (plan.seed ?? 0)) % ABOUT_SKILLS.length],
       text: "About *us*",
       subtext: about,
       items: [town ? `Based in ${town}` : "", ...items.slice(0, 2)].filter(Boolean),
@@ -3069,8 +3073,8 @@ export function sanitizePlan(raw: Partial<VideoPlan> & { scenes?: Partial<Scene>
       skill: (SKILL_IDS as readonly string[]).includes(s.skill as string) ? (s.skill as SkillId) : "kinetic-slam",
       text: String(s.text ?? "").slice(0, 200) || "Untitled",
       // (About us carries a short paragraph, and holds long enough for it to run past along the foot.)
-      subtext: s.subtext ? String(s.subtext).slice(0, s.skill === "ind-about" ? 240 : 100) : undefined,
-      duration: Math.min(s.skill === "ind-about" ? 12 : 8, Math.max(1.6, Number(s.duration) || 3)),
+      subtext: s.subtext ? String(s.subtext).slice(0, String(s.skill).startsWith("ind-about") ? 240 : 100) : undefined,
+      duration: Math.min(String(s.skill).startsWith("ind-about") ? 12 : 8, Math.max(1.6, Number(s.duration) || 3)),
       transition: (TRANSITIONS as readonly string[]).includes(s.transition as string)
         ? (s.transition as Transition)
         : "cut",
