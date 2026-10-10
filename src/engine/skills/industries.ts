@@ -942,7 +942,7 @@ function aboutUs(sc: SkillContext) {
   ctx.fillStyle = palette.primary;
   ctx.fillRect(tx, y, hs * 0.9 * hk, Math.max(2, hs * 0.07));
   y += hs * 0.07 + hs * 0.38;
-  // The paragraph's first seven words and an ellipsis (the foot runs the rest), in three rows
+  // The paragraph's first eight words and an ellipsis (the foot runs the rest), in three rows
   // beside the picture or in a tall frame and two in a square one, so they stay large.
   const all = about.split(/\s+/).filter(Boolean);
   const words = all.slice(0, LEAD_WORDS);
@@ -1054,8 +1054,8 @@ function aboutSide(sc: SkillContext, x: number, y: number, bw: number, bh: numbe
   ctx.restore();
 }
 
-/** The lead under the heading: the paragraph's first seven words. */
-const LEAD_WORDS = 7;
+/** The lead under the heading: the paragraph's first eight words. */
+const LEAD_WORDS = 8;
 
 /** The ticker: the paragraph up to ten words, ending on a clause where one falls late enough. */
 function tickerText(about: string, max = 10) {
