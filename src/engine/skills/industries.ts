@@ -814,58 +814,91 @@ function deliveryRoute(sc0: SkillContext) {
 
 const ABOUT_POINTS = ["Based in your town", "Friendly local team", "Open six days a week"];
 
-/**
- * The paragraph in bites a viewer reads at a glance: sentence by sentence, a long sentence split
- * where it turns (", for families…", ", and…"), at most four bites.
- */
-export function aboutBites(text: string): string[] {
-  const sentences = text.match(/[^.!?]+[.!?]?/g)?.map((x) => x.trim()).filter(Boolean) ?? [];
-  const out: string[] = [];
-  for (const s0 of sentences) {
-    let s1 = s0;
-    while (s1.length > 52) {
-      const at = [", for ", ", with ", ", and ", ", where ", ", so ", ", "].map((k) => s1.indexOf(k, 18)).find((i) => i > 0 && i < s1.length - 12);
-      if (at === undefined) break;
-      out.push(s1.slice(0, at + 1).trim());
-      s1 = s1.slice(at + 1).trim();
-    }
-    out.push(s1);
-  }
-  return out.slice(0, 4);
-}
-
-/** How many lines `text` takes at the current font in `width`. */
-function fitLines(ctx: CanvasRenderingContext2D, text: string, width: number) {
-  return Math.max(1, Math.ceil(ctx.measureText(text).width / Math.max(1, width)));
+/** Words of the paragraph worth a colour: the name, the town, the services and who it's for. */
+function keyWords(about: string, name: string, facts: string[], place?: string) {
+  const keys = new Set<string>();
+  const add = (phrase?: string) => phrase && phrase.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !/^(and|the|for|with|our|you|your|who|are)$/.test(w)).forEach((w) => keys.add(w.replace(/[^\p{L}\p{N}'-]/gu, "")));
+  add(name);
+  add(place);
+  facts.forEach(add);
+  // Who it's for ("for families and curry lovers") and what it offers ("Come in for naan and catering").
+  for (const m of about.matchAll(/\b(?:for|offer|in for)\s+([^,.]{3,60})/gi)) add(m[1]);
+  return keys;
 }
 
 /**
- * Big outlined words drifting right to left along the foot of the frame, behind the slide: the
- * name, what it is and where, like a shop's ticker. Slow and faint (texture, not copy).
+ * The paragraph as one line running right to left along the foot of the frame, like a news
+ * ticker: big enough to read, at a pace set so it crosses in the slide's time (starting partly in
+ * view). Key words (the name, the town, the services, who it's for) are set bold in the brand's
+ * colour, and as each one reaches the middle a soft highlight swells behind it and it lifts a
+ * touch, then settles: emphasis without any flashing.
  */
-function aboutMarquee(sc: SkillContext) {
-  const { ctx, w, h, u, palette, scene, brand } = sc;
-  const T = sc.globalT ?? sc.t;
-  const place = (scene.items ?? []).map((x) => plain(split(x).title)).find((x) => /^based in\b/i.test(x))?.replace(/^based in\s+/i, "");
-  const what = plain(scene.subtext || "").match(/\bis (?:an? |the )?([^,.]{4,40}?)(?: in [A-Z]|,|\.)/)?.[1];
-  const parts = [brand?.name, what, place].filter((x): x is string => !!x && x.length < 40);
-  if (!parts.length) return;
-  const text = `${parts.join("  •  ")}  •  `.toUpperCase();
-  const size = Math.round(Math.min(w, h) * (h > w ? 0.09 : 0.13));
+function aboutTicker(sc: SkillContext, about: string, keys: Set<string>, out: number) {
+  const { ctx, w, h, t, d, u, palette } = sc;
+  const tall = h > w * 1.2;
+  const size = Math.round(Math.min(w, h) * (tall ? 0.048 : 0.056));
+  const band = Math.round(size * 2.1);
+  const cy = Math.round(h - (tall ? h * 0.075 : h * 0.085));
+  const words = about.split(/\s+/).filter(Boolean);
   ctx.save();
-  ctx.font = displayFont(saasFont(sc), size);
-  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = `${(size * 0.02).toFixed(1)}px`;
-  const tw = Math.max(1, ctx.measureText(text).width);
-  const fade = clamp(sc.t / 0.6) * (1 - ease.inCubic(range(sc.t, sc.d - 0.45, sc.d)));
-  ctx.globalAlpha = fade;
-  ctx.strokeStyle = rgba(palette.primary, palette.light ? 0.22 : 0.28);
-  ctx.lineWidth = Math.max(1, 1.6 * u);
-  ctx.textBaseline = "alphabetic";
+  ctx.textBaseline = "middle";
   ctx.textAlign = "left";
-  const y = h - Math.round(h * 0.035);
-  // About 70px a second at 1080p: calm enough to read, slow enough never to strobe.
-  const off = ((T * 70 * u) % tw + tw) % tw;
-  for (let x = -off; x < w; x += tw) ctx.strokeText(text, x, y);
+  const fontOf = (key: boolean) => subFont(size, key ? 800 : 600);
+  const space = (ctx.font = fontOf(false), ctx.measureText(" ").width);
+  const widths = words.map((wd) => {
+    const key = keys.has(wd.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, ""));
+    ctx.font = fontOf(key);
+    return { wd, key, ww: ctx.measureText(wd).width };
+  });
+  const total = widths.reduce((a, x) => a + x.ww + space, 0);
+  // Starts with its head a third of the way in, ends with its tail past the middle.
+  const x0 = w * 0.62;
+  const x1 = w * 0.38 - total;
+  const k = range(t, 0.35, Math.max(1.5, d - 0.6));
+  const x = lerp(x0, x1, k);
+  const fade = clamp(t / 0.5) * out;
+  // The band: a soft strip in the brand's tint, fading at both ends.
+  const g = ctx.createLinearGradient(0, 0, w, 0);
+  const tint = palette.light ? "rgba(255,255,255,0.75)" : rgba(mixHex(palette.bg0, "#000000", 0.3), 0.6);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(0.08, tint);
+  g.addColorStop(0.92, tint);
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.globalAlpha = fade;
+  ctx.fillStyle = g;
+  ctx.fillRect(0, cy - band / 2, w, band);
+  ctx.fillStyle = palette.primary;
+  ctx.fillRect(0, cy - band / 2, w, Math.max(1, 2 * u));
+  // The words, clipped to the band, with soft edges.
+  ctx.beginPath();
+  ctx.rect(0, cy - band / 2, w, band);
+  ctx.clip();
+  let px = x;
+  for (const { wd, key, ww } of widths) {
+    if (px + ww > -20 && px < w + 20) {
+      const mid = (px + ww / 2 - w / 2) / (w * 0.5);
+      const edge = clamp((Math.min(px + ww, w - px) ) / (w * 0.08));
+      ctx.globalAlpha = fade * edge;
+      ctx.font = fontOf(key);
+      if (key) {
+        // Near the middle: a highlight swells behind the word and it lifts a touch.
+        const near = Math.max(0, 1 - Math.abs(mid) * 2.2);
+        const e = ease.inOutCubic(near);
+        if (e > 0.01) {
+          ctx.fillStyle = rgba(palette.primary, 0.18 * e);
+          ctx.beginPath();
+          ctx.roundRect(px - size * 0.2, cy - size * 0.68, ww + size * 0.4, size * 1.36, size * 0.3);
+          ctx.fill();
+        }
+        ctx.fillStyle = mixHex(palette.primary, palette.accent, 0.35 * e);
+        ctx.fillText(wd, px, cy - 3 * u * e);
+      } else {
+        ctx.fillStyle = rgba(palette.text, 0.9);
+        ctx.fillText(wd, px, cy);
+      }
+    }
+    px += ww + space;
+  }
   ctx.restore();
 }
 
@@ -877,7 +910,6 @@ function aboutMarquee(sc: SkillContext) {
 function aboutUs(sc: SkillContext) {
   const { ctx, w, h, t, d, u, palette, scene, brand } = sc;
   saasBackground(sc, { beams: 0 });
-  aboutMarquee(sc);
   const tall = h > w * 1.2;
   const wide = w > h * 1.3;
   const S = tall ? 1.45 : wide ? 1 : 1.12;
@@ -996,35 +1028,8 @@ function aboutUs(sc: SkillContext) {
   ctx.fillStyle = palette.primary;
   ctx.fillRect(tx, y, 64 * u * S * hk, 5 * u * S);
   y += 26 * u * S;
-  // The paragraph, bite by bite: short phrases arrive one after another (gliding in the way the
-  // film travels), the one being read in full colour with a bar beside it, the earlier ones
-  // settling back, so the viewer reads a line at a time instead of facing a block of text.
-  const bites = aboutBites(plain(scene.subtext || ""));
-  const biteStart = 0.6;
-  const biteGap = bites.length ? Math.min(1.25, Math.max(0.6, (d - 2.2) / (bites.length + 0.6))) : 0;
-  if (bites.length) {
-    const ps = 27 * u * S * T2;
-    ctx.font = subFont(ps, 600);
-    bites.forEach((b, i) => {
-      const t0 = biteStart + i * biteGap;
-      const bk = ease.outCubic(range(t, t0, t0 + 0.5));
-      if (bk <= 0) {
-        // (Still to come: keep its room so the column doesn't jump as bites arrive.)
-        y += ps * 1.4 * Math.min(2, fitLines(ctx, b, tw - ps)) + ps * 0.35;
-        return;
-      }
-      const current = i === bites.length - 1 ? 1 : 1 - range(t, t0 + biteGap, t0 + biteGap + 0.4);
-      ctx.globalAlpha = bk * out * (0.5 + 0.5 * current);
-      ctx.fillStyle = palette.primary;
-      ctx.fillRect(tx, y + ps * 0.12, 4 * u * S, ps * 1.1 * current * bk);
-      ctx.fillStyle = rgba(palette.text, 0.92);
-      const n = fillTextFit(ctx, b, tx + ps * 0.7 + (1 - bk) * 22 * u, y, tw - ps, { maxLines: 2, lineHeight: 1.4, minScale: 0.8 });
-      y += ps * 1.4 * n + ps * 0.35;
-    });
-    y += ps * 0.6;
-  }
-  // The facts, with ticks, one after another, once the bites are in.
-  const factStart = bites.length ? biteStart + bites.length * biteGap : 0.9;
+  // The facts, with ticks, one after another.
+  const factStart = 0.9;
   const fs = 22 * u * S * T2;
   facts.forEach((f, i) => {
     const fk = ease.outBack(range(t, factStart + i * 0.18, factStart + 0.4 + i * 0.18));
@@ -1041,6 +1046,9 @@ function aboutUs(sc: SkillContext) {
     y += fs * 1.75;
   });
   ctx.restore();
+  // The paragraph: one line running right to left along the foot, its key words in colour.
+  const about = plain(scene.subtext || "");
+  if (about) aboutTicker(sc, about, keyWords(about, brand?.name ?? "", facts, place?.replace(/^based in\s+/i, "")), out);
 }
 
 /* ───────────────────────── Registry ───────────────────────── */
@@ -1051,7 +1059,7 @@ export const industrySkills: Skill[] = [
   {
     id: "ind-about",
     name: "About Us",
-    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline, a short paragraph arriving bite by bite (the line being read lit, earlier ones settling back), a few ticked facts and its name drifting by in big outlined letters along the foot; a 'Based in …' point pins to the picture.",
+    tagline: "The business's own place in a framed picture (its shop, salon, kitchen or studio) beside its name in small capitals, a headline and a few ticked facts, with the paragraph running right to left along the foot like a news ticker, its key words (name, town, services) in the brand colour with a soft highlight as they pass the middle; a 'Based in …' point pins to the picture.",
     bestFor: "Local businesses and services: who they are in a few lines (the text under the headline), with 1–3 short facts; no big logo.",
     sample: { text: "About *us*", subtext: "A neighbourhood bakery baking by hand from early in the morning, for the people who live and work around the corner.", items: ABOUT_POINTS },
     itemsHint: "1–3 short facts (a 'Based in …' point pins to the picture)",
