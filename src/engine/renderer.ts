@@ -27,6 +27,14 @@ import type { Aspect, EditLayout, MusicPulse, Palette, Scene, SkillContext, Tran
 export const TRANSITION_LEN = 0.45;
 
 /** Transitions where outgoing and incoming shots overlap on screen. */
+/**
+ * The film's direction of travel: sideways moves (whips, pushes, spins, exits, the carry after a
+ * cut) go one way through the whole film, the outgoing shot leaving to the left and the next
+ * arriving from the right, like reading forward. Alternating directions throws the eye back and
+ * forth; one flow reads as a single journey.
+ */
+const FLOW = 1;
+
 export const OVERLAP = new Set<Transition>(["whip", "dolly", "push", "dissolve", "leak", "liquid", "cube", "morph", "portal", "iris", "spin", "split", "swipe"]);
 /** How long past its end an overlapped scene keeps rendering (exit suppressed). */
 const OVERLAP_EXTEND = TRANSITION_LEN + 0.25;
@@ -296,7 +304,7 @@ function drawSceneOnce(
     layer.ctx.save();
     glassFace(csc);
     if (opts.camera !== false) applyCamera(csc, globalT);
-    if (transitionIn) applyTransitionIn(csc);
+    if (transitionIn) applyTransitionIn(csc, index);
     renderSlide(csc);
     layer.ctx.restore();
     const shot = exitLayer(layer.canvas, w, h, exit, sc.u);
@@ -313,7 +321,7 @@ function drawSceneOnce(
     const csc: SkillContext = { ...sc, ctx: layer.ctx, noStage: true };
     layer.ctx.save();
     if (opts.camera !== false) applyCamera(csc, globalT);
-    if (transitionIn) applyTransitionIn(csc);
+    if (transitionIn) applyTransitionIn(csc, index);
     renderSlide(csc);
     layer.ctx.restore();
     projectPlane(target, exitLayer(layer.canvas, w, h, exit, sc.u), w, h, depth, 0, level);
@@ -335,7 +343,7 @@ function drawSceneOnce(
   }
   target.save();
   if (opts.camera !== false) applyCamera(sc, globalT);
-  if (transitionIn) applyTransitionIn(sc);
+  if (transitionIn) applyTransitionIn(sc, index);
   renderSlide(sc);
   target.restore();
   resetCtx(target);
@@ -358,7 +366,8 @@ function exitLayer(src: HTMLCanvasElement, w: number, h: number, k: number, u: n
   c.save();
   c.globalAlpha = 1 - k;
   const s = 1 - 0.05 * k;
-  c.translate(w / 2, h / 2 - 46 * u * k);
+  // (Leaving forward, the way the film travels, and a little up: it hands its motion to the cut.)
+  c.translate(w / 2 - FLOW * 48 * u * k, h / 2 - 20 * u * k);
   c.scale(s, s);
   c.translate(-w / 2, -h / 2);
   if (k > 0.05) c.filter = `blur(${(8 * u * k).toFixed(1)}px)`;
@@ -1275,7 +1284,7 @@ function compositeOverlap(sc: SkillContext, a: HTMLCanvasElement, b: HTMLCanvasE
     ctx.drawImage((liquid ?? cube)!, 0, 0, w, h);
   } else if (kind === "whip" || kind === "push") {
     const e = kind === "whip" ? ease.inOutExpo(k) : ease.inOutCubic(k);
-    const dir = seed % 2 ? 1 : -1;
+    const dir = FLOW;
     const smear = kind === "whip" ? Math.sin(Math.PI * k) * w * 0.12 : 0;
     const n = kind === "whip" ? 6 : 1;
     for (const [img, x0] of [
@@ -1391,8 +1400,9 @@ function continuity(sc: SkillContext, kind: Transition, k: number, a: HTMLCanvas
       ctx.stroke();
     }
   } else if (kind === "spin") {
-    // A quarter-ish turn shared by the two shots, with a few motion-blurred copies at speed.
-    const dir = seed % 2 ? 1 : -1;
+    // A quarter-ish turn shared by the two shots, with a few motion-blurred copies at speed
+    // (turning the way the film travels).
+    const dir = -FLOW;
     const turn = 0.55 * dir;
     const speed = Math.sin(Math.PI * k);
     const shots: [HTMLCanvasElement, number, number, number][] = [
@@ -1458,8 +1468,21 @@ function continuity(sc: SkillContext, kind: Transition, k: number, a: HTMLCanvas
 }
 
 /** Transform applied before the skill draws (zoom-in punch). */
-function applyTransitionIn(sc: SkillContext) {
-  const { ctx, w, h, t, scene } = sc;
+function applyTransitionIn(sc: SkillContext, index = 0) {
+  const { ctx, w, h, t, scene, u } = sc;
+  // A hard cut carries the motion across: the new shot arrives with the last of the forward flow
+  // (a short glide in from the right, settling fast, with a touch of scale so no edge shows), so
+  // the edit reads as one continuous move instead of a jump.
+  if (sc.style === "saas" && index > 0 && scene.transition === "cut") {
+    const k = ease.outExpo(range(t, 0, 0.34));
+    if (k < 1) {
+      const s = 1 + 0.03 * (1 - k);
+      ctx.translate(w / 2 + FLOW * 30 * u * (1 - k), h / 2);
+      ctx.scale(s, s);
+      ctx.translate(-w / 2, -h / 2);
+    }
+    return;
+  }
   if (scene.transition === "zoom") {
     const k = ease.outExpo(range(t, 0, TRANSITION_LEN));
     const s = 1 + (1 - k) * 0.35;

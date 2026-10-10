@@ -146,5 +146,25 @@ export function cinematography(plan: VideoPlan, opts: CinemaOpts = {}): VideoPla
       }
     }
   });
+  // Motion vocabulary: a modern edit uses a few signature moves, not a different trick on every cut.
+  // Beyond the film's three most used moves (hard cuts and flashes aside, and the reveal, the end
+  // card and contrast slides keeping theirs), a move becomes the most used one that doesn't repeat
+  // its neighbours, else a cut on the beat.
+  const free = (s: Scene, i: number) => i > 0 && !isReveal(s) && !isEnd(s, i, n) && !flips.has(i) && !flips.has(i - 1) && scenes[i - 1]?.skill !== "product-teaser";
+  const tally = new Map<Transition, number>();
+  scenes.forEach((s, i) => {
+    if (i > 0 && s.transition !== "cut" && s.transition !== "flash") tally.set(s.transition, (tally.get(s.transition) ?? 0) + 1);
+  });
+  const keep = [...tally.entries()].sort((a, b) => b[1] - a[1] || pool.indexOf(a[0]) - pool.indexOf(b[0])).slice(0, 3).map(([t]) => t);
+  scenes.forEach((s, i) => {
+    if (!free(s, i) || s.transition === "cut" || s.transition === "flash" || keep.includes(s.transition)) return;
+    const prev = scenes[i - 1];
+    const next = scenes[i + 1];
+    const tr = keep.find((t) => t !== prev?.transition && t !== next?.transition && !(BIG.has(prev?.transition) && BIG.has(t))) ?? "cut";
+    if (tr !== s.transition) {
+      s.transition = tr;
+      changed = true;
+    }
+  });
   return changed ? { ...plan, scenes } : plan;
 }

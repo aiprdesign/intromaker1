@@ -907,7 +907,8 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
     const about = `${name} is ${what}${town ? ` in ${town}` : ""}${brief.audience ? `, for ${brief.audience.replace(/[.]+$/, "")}` : ""}.${lower.length >= 2 ? ` ${verb} ${lower[0]} and ${lower[1]}.` : ""}`;
     const at = out.findIndex((s) => s.role === "reveal");
     const next = out[at + 1] ?? out[out.length - 1];
-    out.splice(at >= 0 ? at + 1 : 1, 0, {
+    const where = at >= 0 ? at + 1 : 1;
+    out.splice(where, 0, {
       skill: "ind-about" as SkillId,
       text: "About *us*",
       subtext: about,
@@ -917,6 +918,10 @@ function localize(plan: VideoPlan, prompt: string, brief: Brief) {
       duration: 5,
       transition: next?.transition ?? "cut",
     });
+    // (The about slide takes the move into it; the slide after it now cuts in on the beat, so the
+    // same move never plays twice in a row.)
+    const after = out[where + 1];
+    if (after && after.transition === out[where].transition && after.role !== "cta") out[where + 1] = { ...after, transition: "cut" };
   }
   plan.scenes = out;
 }
