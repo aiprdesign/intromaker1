@@ -836,9 +836,9 @@ function keyWords(about: string, name: string, facts: string[], place?: string) 
 function aboutTicker(sc: SkillContext, about: string, keys: Set<string>, out: number) {
   const { ctx, w, h, t, d, u, palette } = sc;
   const tall = h > w * 1.2;
-  const size = Math.round(Math.min(w, h) * (tall ? 0.048 : 0.056));
+  const size = Math.round(Math.min(w, h) * (tall ? 0.07 : 0.085));
   const band = Math.round(size * 2.1);
-  const cy = Math.round(h - (tall ? h * 0.075 : h * 0.085));
+  const cy = Math.round(h - (tall ? h * 0.085 : h * 0.1));
   const words = about.split(/\s+/).filter(Boolean);
   ctx.save();
   ctx.textBaseline = "middle";
@@ -919,9 +919,10 @@ function aboutUs(sc: SkillContext) {
   const facts = points.filter((x) => x !== place).slice(0, 3);
   // The picture: the right half of a wide frame, the top of a tall or square one.
   const fw = wide ? w * 0.4 : w * 0.84;
-  const fh = wide ? h * 0.66 : h * (tall ? 0.42 : 0.4);
+  // (Above the ticker along the foot, which takes the bottom fifth of a wide frame.)
+  const fh = wide ? h * 0.6 : h * (tall ? 0.42 : 0.4);
   const fx = wide ? w * 0.54 : (w - fw) / 2;
-  const fy = wide ? (h - fh) / 2 : h * 0.07;
+  const fy = wide ? h * 0.1 : h * 0.07;
   const pk = ease.outCubic(range(t, 0.1, 0.8));
   const r = 26 * u * S;
   ctx.save();
