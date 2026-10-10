@@ -22,6 +22,7 @@ import { clamp, ease, lerp, mixHex, range, rgba, TAU } from "../math";
 import { drawDog, drawHouse, sceneStage, type SceneBackdrop } from "../scenes";
 import { displayFont, fillTextFit, subFont } from "../text";
 import { drawIcon, luminance, saasBackground, saasFont } from "../saasfx";
+import { drawTraced, tracedLogo } from "../trace";
 import type { Palette, Scene, SfxCue, Skill, SkillContext } from "../types";
 import { bounceIn, drawAbstract, idle, person, waveArm, type AbsRig } from "./abstract";
 import { exitOf, itemsOr, split, stage } from "./beats";
@@ -921,9 +922,10 @@ function aboutUs(sc: SkillContext) {
   const keys = keyWords(about, brand?.name ?? "", facts, place?.replace(/^based in\s+/i, ""));
   const isKey = (wd: string) => keys.has(wd.toLowerCase().replace(/[^\p{L}\p{N}'-]/gu, ""));
   const line = (delay: number) => ease.outCubic(range(t, delay, delay + 0.6));
-  // The column: left aligned on the safe margin, from near the top down to the ticker.
+  // The column: left aligned on the safe margin, from near the top down to the ticker; in a wide
+  // frame it takes the left half, with the logo or picture beside it.
   const tx = w * (tall ? 0.08 : 0.07);
-  const tw = w - tx * 2;
+  const tw = wide ? w * 0.42 : w - tx * 2;
   const top = h * (tall ? 0.1 : 0.09);
   const floor = h - (tall ? h * 0.085 : h * 0.1) - Math.min(w, h) * (tall ? 0.07 : 0.085) * 1.05 - h * 0.05;
   ctx.save();
@@ -940,12 +942,12 @@ function aboutUs(sc: SkillContext) {
   ctx.fillStyle = palette.primary;
   ctx.fillRect(tx, y, hs * 0.9 * hk, Math.max(2, hs * 0.07));
   y += hs * 0.07 + hs * 0.38;
-  // The paragraph's first seven words and an ellipsis (the foot runs the rest), on one row in a
-  // wide frame and two or three in a square or tall one, so they stay large.
+  // The paragraph's first seven words and an ellipsis (the foot runs the rest), in three rows
+  // beside the picture or in a tall frame and two in a square one, so they stay large.
   const all = about.split(/\s+/).filter(Boolean);
   const words = all.slice(0, LEAD_WORDS);
   if (all.length > LEAD_WORDS && words.length) words[words.length - 1] = words[words.length - 1].replace(/[,;:.!?]+$/, "") + "…";
-  const per = wide ? LEAD_WORDS : tall ? 3 : 4;
+  const per = wide || tall ? 3 : 4;
   const rows: string[][] = [];
   for (let i = 0; i < words.length; i += per) rows.push(words.slice(i, i + per));
   // (A short last row borrows from the one above, so no row is left with a word or two.)
@@ -958,7 +960,8 @@ function aboutUs(sc: SkillContext) {
   }
   if (rows.length) {
     const lh = 1.32;
-    const room = Math.max(10, floor - y);
+    // (Under the picture's share of a square or tall frame.)
+    const room = Math.max(10, wide ? floor - y : (floor - y) * 0.42);
     let ps = Math.min(Math.round(Math.min(w, h) * (tall ? 0.085 : 0.075)), room / (rows.length * lh));
     const fontOf = (key: boolean, sz: number) => subFont(sz, key ? 750 : 500);
     const width = (r: string[], sz: number) => {
@@ -985,9 +988,70 @@ function aboutUs(sc: SkillContext) {
         x += ctx.measureText(wd + " ").width;
       }
     });
+    y += rows.length * ps * lh;
   }
   ctx.restore();
+  // Beside the words in a wide frame, under them otherwise: the logo, traced, or the business's
+  // own place.
+  if (wide) aboutSide(sc, w * 0.55, top, w * 0.38, floor - top, out);
+  else {
+    const gy = y + h * 0.035;
+    if (floor - gy > h * 0.12) aboutSide(sc, tx, gy, tw, floor - gy, out);
+  }
   if (about) aboutTicker(sc, tickerText(about), keys, out);
+}
+
+/**
+ * The About us visual, in a white card: the business's logo traced to vector shapes (its outlines
+ * draw on, then its colours fill in), or without a logo the business's own place (its bakery,
+ * salon, garage…) with a slow push in.
+ */
+function aboutSide(sc: SkillContext, x: number, y: number, bw: number, bh: number, out: number) {
+  const { ctx, t, d, u, palette, brand } = sc;
+  const traced = tracedLogo(brand?.logo, true);
+  const pk = ease.outCubic(range(t, 0.15, 0.85));
+  // A logo sits in a card shaped to it; a picture fills the space.
+  let fw = bw;
+  let fh = bh;
+  if (traced) {
+    const pad = 0.16;
+    const ar = traced.w / traced.h;
+    fh = Math.min(bh, Math.max(bh * 0.55, (bw / ar) * (1 + pad * 2)));
+    fw = Math.min(bw, Math.max(fh * 1.1, fh * ar * (1 - pad)));
+  }
+  const fx = x + (bw - fw) / 2;
+  const fy = y + (bh - fh) / 2;
+  const r = Math.min(fw, fh) * 0.08 + 8 * u;
+  ctx.save();
+  ctx.globalAlpha = pk * out;
+  ctx.translate(0, (1 - pk) * 36 * u);
+  ctx.shadowColor = "rgba(10,10,30,0.3)";
+  ctx.shadowBlur = 44 * u;
+  ctx.shadowOffsetY = 16 * u;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(fx - 10 * u, fy - 10 * u, fw + 20 * u, fh + 20 * u, r + 8 * u);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  if (traced) {
+    const p = Math.min(fw, fh) * 0.16;
+    const line = ease.inOutCubic(range(t, 0.55, 1.9));
+    const fill = ease.outCubic(range(t, 1.6, 2.4));
+    drawTraced(ctx, traced, fx + p, fy + p, fw - p * 2, fh - p * 2, line, fill);
+  } else {
+    ctx.beginPath();
+    ctx.roundRect(fx, fy, fw, fh, r);
+    ctx.clip();
+    // (A slow push into the picture while the slide holds.)
+    const push = 1.04 + 0.04 * range(t, 0, d);
+    ctx.translate(fx + fw / 2, fy + fh / 2);
+    ctx.scale(push, push);
+    ctx.translate(-(fx + fw / 2), -(fy + fh / 2));
+    const own = sc.setting as SceneBackdrop | undefined;
+    const pal = palette.light ? palette : { ...palette, text: INK, light: true };
+    sceneIn({ ...sc, palette: pal }, own && own !== "house" ? own : "shop", fx, fy, fw, fh);
+  }
+  ctx.restore();
 }
 
 /** The lead under the heading: the paragraph's first seven words. */
